@@ -372,7 +372,7 @@ const evaluateCourseMCQ = async (req, res) => {
       return ReE(res, "Course ID and answers array are required", 400);
     }
 
-    // 1️⃣ Fetch all MCQs and correct answers for the course
+    // Fetch all MCQs and correct answers for the course
     const mcqs = await model.MCQ.findAll({
       where: { courseId },
       include: [
