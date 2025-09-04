@@ -460,7 +460,7 @@ const evaluateCaseStudies = async (req, res) => {
       return ReE(res, "Course ID and answers array are required", 400);
     }
 
-    // 1️⃣ Fetch all CaseStudies for this course
+    // Fetch all CaseStudies for this course
     const caseStudies = await model.CaseStudy.findAll({
       where: { courseId },
       attributes: ['id', 'answerKeywords']
