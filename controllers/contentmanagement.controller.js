@@ -477,7 +477,7 @@ const evaluateCaseStudies = async (req, res) => {
       const cs = caseStudies.find(c => c.id === submitted.caseStudyId);
       if (!cs) return;
 
-      // 2️⃣ Get keywords (comma-separated or JSON array)
+      //  Get keywords (comma-separated or JSON array)
       let keywords = [];
       try {
         keywords = typeof cs.answerKeywords === 'string' ? cs.answerKeywords.split(',') : cs.answerKeywords;
