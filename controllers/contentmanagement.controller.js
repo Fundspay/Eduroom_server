@@ -485,7 +485,7 @@ const evaluateCaseStudies = async (req, res) => {
         keywords = [];
       }
 
-      // 3️⃣ Count matched keywords in submitted paragraph (case-insensitive)
+      //  Count matched keywords in submitted paragraph (case-insensitive)
       const text = submitted.answerParagraph.toLowerCase();
       const matchedKeywords = keywords.filter(k => text.includes(k.toLowerCase()));
 
