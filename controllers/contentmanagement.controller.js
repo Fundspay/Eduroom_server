@@ -489,7 +489,7 @@ const evaluateCaseStudies = async (req, res) => {
       const text = submitted.answerParagraph.toLowerCase();
       const matchedKeywords = keywords.filter(k => text.includes(k.toLowerCase()));
 
-      // 4️⃣ Accept if 3 or more keywords found
+      //  Accept if 3 or more keywords found
       if (matchedKeywords.length >= 3) {
         correctCount++;
       } else {
