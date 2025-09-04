@@ -242,7 +242,7 @@ const updateCourse = async (req, res) => {
           await Promise.all(
             mcqs[i].options.map(opt =>
               model.MCQAnswer.create({
-                courseId: id,     // ✅ linked to course
+                courseId: id,
                 mcqId: mcq.id,   
                 answerText: opt.optionText,
                 isCorrect: opt.isCorrect || false,
