@@ -31,10 +31,17 @@ module.exports = (sequelize, Sequelize) => {
             tableName: "Users",
             timestamps: true,
         }
-    )
+    );
 
-     
-    
+    // ✅ Associations
+    User.associate = (models) => {
+        User.belongsTo(models.Gender, {
+            foreignKey: "gender",
+            onDelete: "RESTRICT",
+            onUpdate: "RESTRICT",
+            constraints: true,
+        });
+    };
 
     return User;
 };
