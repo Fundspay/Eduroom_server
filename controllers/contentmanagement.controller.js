@@ -387,7 +387,7 @@ const evaluateCourseMCQ = async (req, res) => {
       return ReE(res, "No MCQs found for this course", 404);
     }
 
-    // 2️⃣ Evaluate submitted answers
+    // Evaluate submitted answers
     let correctCount = 0;
     let incorrectCount = 0;
 
