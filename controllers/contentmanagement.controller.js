@@ -198,13 +198,13 @@ const updateCourse = async (req, res) => {
       userId
     } = req.body;
 
-    // 1️⃣ Find the course
+    //  Find the course
     const course = await model.Course.findByPk(id);
     if (!course || course.isDeleted) {
       return ReE(res, "Course not found", 404);
     }
 
-    // 2️⃣ Update course fields
+    // Update course fields
     await course.update({
       title,
       description: description || [],
