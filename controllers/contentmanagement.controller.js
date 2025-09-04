@@ -363,7 +363,7 @@ const getCourseMCQsAndYouTube = async (req, res) => {
 module.exports.getCourseMCQsAndYouTube = getCourseMCQsAndYouTube;
 
 // ✅ Evaluate MCQ quiz for a course
-// req.body: { courseId, answers: [{ mcqId, answerText }] }
+
 const evaluateCourseMCQ = async (req, res) => {
   try {
     const { courseId, answers, userId } = req.body;
