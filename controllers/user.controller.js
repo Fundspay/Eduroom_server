@@ -269,7 +269,14 @@ const requestPasswordReset = async (req, res) => {
       <p>– The EduRoom Team</p>
     `;
 
-    await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
+    // ✅ Capture mail result
+    const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
+    console.log(" Password Reset Email Result:", mailResult);
+
+    if (!mailResult.success) {
+      console.error(" Failed to send reset email:", mailResult.error);
+      return ReE(res, "Failed to send reset email. Please try again later.", 500);
+    }
 
     return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
 
@@ -278,7 +285,6 @@ const requestPasswordReset = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.requestPasswordReset = requestPasswordReset;
 
 // ✅ Reset Password
