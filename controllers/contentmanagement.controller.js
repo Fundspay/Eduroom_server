@@ -213,7 +213,7 @@ const updateCourse = async (req, res) => {
       duration
     });
 
-    // 3️⃣ Update or assign Tutor
+    //  Update or assign Tutor
     if (tutor) {
       let tutorObj = await model.Tutor.findOne({ where: { name: tutor.name, userId } });
       if (!tutorObj) {
@@ -226,7 +226,7 @@ const updateCourse = async (req, res) => {
       await course.update({ tutorId: tutorObj.id });
     }
 
-    // 4️⃣ Replace MCQs + MCQAnswers if provided
+    //  Replace MCQs + MCQAnswers if provided
     if (Array.isArray(mcqs)) {
       await model.MCQ.destroy({ where: { courseId: id } });
 
