@@ -243,7 +243,7 @@ const updateCourse = async (req, res) => {
             mcqs[i].options.map(opt =>
               model.MCQAnswer.create({
                 courseId: id,     // ✅ linked to course
-                mcqId: mcq.id,    // ✅ linked to mcq
+                mcqId: mcq.id,   
                 answerText: opt.optionText,
                 isCorrect: opt.isCorrect || false,
                 userId
