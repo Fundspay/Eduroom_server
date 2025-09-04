@@ -254,7 +254,7 @@ const updateCourse = async (req, res) => {
       }
     }
 
-    // 5️⃣ Replace Case Studies if provided
+    //  Replace Case Studies if provided
     if (Array.isArray(caseStudies)) {
       await model.CaseStudy.destroy({ where: { courseId: id } });
 
