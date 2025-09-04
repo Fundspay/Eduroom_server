@@ -408,7 +408,7 @@ const evaluateCourseMCQ = async (req, res) => {
     const score = correctCount; // 1 point per correct answer
     const percentage = ((correctCount / totalQuestions) * 100).toFixed(2);
 
-    // 3️⃣ Return evaluation
+    //  Return evaluation
     return ReS(res, {
       success: true,
       totalQuestions,
