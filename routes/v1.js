@@ -9,6 +9,8 @@ const genderRouter = require("./gender.route")
 const contentmanagementRouter = require("./contentmanagement.route");
 const internshipmodeRouter = require("./internshipmode.route");
 const communicationmodeRouter = require("./communicationmode.route");
+const domainRouter = require("./domain.route");
+const domaintypeRouter = require("./domaintype.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -23,5 +25,7 @@ router.use("/gender", genderRouter);
 router.use("/contentmanagement", contentmanagementRouter);
 router.use("/internshipmode", internshipmodeRouter);
 router.use("/communicationmode", communicationmodeRouter);
+router.use("/domain", domainRouter);
+router.use("/domaintype", domaintypeRouter);
 
 module.exports = router;
