@@ -1,12 +1,38 @@
 const express = require("express");
 const router = express.Router();
-const domaintypeController = require("../controllers/domaintype.controller");
+const domainController = require("../controllers/domain.controller");
 
-// ✅ DomainType Routes
-router.post("/add", domaintypeController.addDomainType);
-router.get("/list", domaintypeController.fetchAllDomainTypes);
-router.get("/list/:id", domaintypeController.fetchSingleDomainType);
-router.put("/update/:id", domaintypeController.updateDomainType);
-router.delete("/delete/:id", domaintypeController.deleteDomainType);
+// ✅ Domain Routes
+router.post("/add", domainController.addDomain);
+router.get("/list", domainController.fetchAllDomains);
+router.get("/list/:id", domainController.fetchSingleDomain);
+router.put("/update/:id", domainController.updateDomain);
+router.delete("/delete/:id", domainController.deleteDomain);
 
 module.exports = router;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
