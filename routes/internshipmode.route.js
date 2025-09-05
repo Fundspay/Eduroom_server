@@ -6,6 +6,6 @@ router.post("/add", internshipmodeController.add);
 router.get("/list", internshipmodeController.fetchAll);
 router.get("/list/:id", internshipmodeController.fetchSingle);
 router.put("/update/:id", internshipmodeController.updateMode);
-router.delete("/delete/:id", internshipModeController.deleteMode);
+router.delete("/delete/:id", internshipmodeController.deleteMode);
 
 module.exports = router;
