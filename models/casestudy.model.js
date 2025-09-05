@@ -5,7 +5,9 @@ module.exports = (sequelize, Sequelize) => {
     {
       id: { type: Sequelize.BIGINT, primaryKey: true, autoIncrement: true },
       userId: { type: Sequelize.BIGINT, allowNull: false },
-      courseId: { type: Sequelize.BIGINT, allowNull: false }, // ✅ direct link to course
+      courseId: { type: Sequelize.BIGINT, allowNull: false },
+      domainId: { type: Sequelize.BIGINT, allowNull: false },
+      domainTypeId: { type: Sequelize.BIGINT, allowNull: true },
       problemStatement: { type: Sequelize.TEXT, allowNull: false },
       answerKeywords: { type: Sequelize.TEXT, allowNull: true },
       result: { type: Sequelize.TEXT, allowNull: true }
@@ -19,6 +21,8 @@ module.exports = (sequelize, Sequelize) => {
   CaseStudy.associate = function (models) {
     CaseStudy.belongsTo(models.User, { foreignKey: "userId", onDelete: "CASCADE" });
     CaseStudy.belongsTo(models.Course, { foreignKey: "courseId", onDelete: "CASCADE" });
+    CaseStudy.belongsTo(models.Domain, { foreignKey: "domainId", onDelete: "CASCADE" });
+    CaseStudy.belongsTo(models.DomainType, { foreignKey: "domainTypeId", onDelete: "SET NULL" });
   };
 
   return CaseStudy;
