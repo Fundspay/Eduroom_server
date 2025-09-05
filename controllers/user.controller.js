@@ -143,26 +143,37 @@ module.exports.addInternshipDetails = addInternshipDetails;
 /**
  * 🔹 STEP 4: Add Verification Docs
  */
+/**
+ * Upload & Save Verification Documents
+ * Accepts: studentIdCard, governmentIdProof, passportPhoto
+ */
 var addVerificationDocs = async function (req, res) {
-    try {
-        const { userId } = req.params;
-        const { studentIdCard, governmentIdProof, passportPhoto } = req.body;
+  try {
+    const { userId } = req.params;
 
-        const user = await model.User.findByPk(userId);
-        if (!user) return ReE(res, "User not found", 404);
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
 
-        await user.update({
-            studentIdCard,
-            governmentIdProof,
-            passportPhoto,
-        });
+    // S3 file URLs from multer
+    const studentIdCard = req.files?.studentIdCard?.[0]?.location || null;
+    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location || null;
+    const passportPhoto = req.files?.passportPhoto?.[0]?.location || null;
 
-        return ReS(res, { success: true, message: "Verification docs updated" }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+    await user.update({
+      studentIdCard,
+      governmentIdProof,
+      passportPhoto,
+    });
+
+    return ReS(res, { success: true, message: "Verification docs uploaded successfully" }, 200);
+  } catch (error) {
+    console.error("Error uploading verification docs:", error);
+    return ReE(res, error.message, 500);
+  }
 };
+
 module.exports.addVerificationDocs = addVerificationDocs;
+
 
 /**
  * 🔹 STEP 5: Add Bank Details
