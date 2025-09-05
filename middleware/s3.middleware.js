@@ -15,7 +15,7 @@ const s3Client = new S3Client({
 const buildS3Storage = (pathPrefix) =>
   multerS3({
     s3: s3Client,
-    bucket: CONFIG.s3Bucket,
+    bucket: CONFIG.s3Bucket, // make sure CONFIG.s3Bucket = "eduroom-registration-details"
     contentType: multerS3.AUTO_CONTENT_TYPE,
     key: (req, file, cb) => {
       const fileName = `${Date.now()}-${file.originalname}`;
@@ -23,16 +23,16 @@ const buildS3Storage = (pathPrefix) =>
     },
   });
 
-// ✅ Profile Picture Upload
+// ✅ Profile Picture Upload (to eduroom.registration.details/profile)
 const uploadProfilePicture = multer({
-  storage: buildS3Storage("fundsweb/profile"),
-  limits: { fileSize: 10 * 1024 * 1024 }, // Optional: 10MB limit
+  storage: buildS3Storage("eduroom.registration.details/profile"),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
 });
 
-// ✅ General File Upload
+// ✅ General File Upload (to eduroom-registration-details/uploads)
 const uploadGeneralFile = multer({
-  storage: buildS3Storage("fundsweb/uploads"),
-  limits: { fileSize: 50 * 1024 * 1024 }, // Optional: 50MB limit
+  storage: buildS3Storage("eduroom-registration-details/uploads"),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
 
 module.exports = {
