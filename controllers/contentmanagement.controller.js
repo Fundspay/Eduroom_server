@@ -2,44 +2,43 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
-
 const safeParseJSON = (data) => {
   try {
     if (!data) return [];
     if (typeof data === "string") {
       return JSON.parse(data);
     }
-    return data; // already object/array
+    return data;
   } catch (err) {
-    console.warn(" JSON parse failed, returning raw data:", data);
+    console.warn("JSON parse failed, returning raw data:", data);
     return data;
   }
 };
 
-// ✅ Create a new Course with Tutor, MCQs (with answers), and Case Studies
+// ✅ Create a new Course with Domain, DomainType, Tutor, MCQs, and Case Studies
+
 const createCourse = async (req, res) => {
   try {
     const {
       title,
-      description,   // JSON array [{ type, content }]
+      description, // JSON array [{ type, content }]
       youtubeLink,
       type,
       duration,
       tutor,
       mcqs,
       caseStudies,
-      userId
+      userId,
+      domainId,
+      domainTypeId
     } = req.body;
 
-    if (!title || !tutor?.name || !userId) {
-      return ReE(res, "Course title, tutor name, and userId are required", 400);
+    if (!title || !tutor?.name || !userId || !domainId || !domainTypeId) {
+      return ReE(res, "Title, tutor, userId, domainId, and domainTypeId are required", 400);
     }
 
     // 1️⃣ Create or reuse Tutor
-    let tutorObj = await model.Tutor.findOne({
-      where: { name: tutor.name, userId }
-    });
-
+    let tutorObj = await model.Tutor.findOne({ where: { name: tutor.name, userId } });
     if (!tutorObj) {
       tutorObj = await model.Tutor.create({
         name: tutor.name,
@@ -64,7 +63,9 @@ const createCourse = async (req, res) => {
       type,
       duration,
       tutorId: tutorObj.id,
-      userId
+      userId,
+      domainId,
+      domainTypeId
     });
 
     // 4️⃣ Create MCQs + Answers
@@ -81,8 +82,8 @@ const createCourse = async (req, res) => {
           await Promise.all(
             mcqs[i].options.map(opt =>
               model.MCQAnswer.create({
-                courseId: course.id,   // ✅ link to course
-                mcqId: mcq.id,         // ✅ link to mcq
+                courseId: course.id,
+                mcqId: mcq.id,
                 answerText: opt.optionText,
                 isCorrect: opt.isCorrect || false,
                 userId
@@ -98,7 +99,7 @@ const createCourse = async (req, res) => {
       await Promise.all(
         caseStudies.map(cs =>
           model.CaseStudy.create({
-            courseId: course.id,     // ✅ link to course
+            courseId: course.id,
             problemStatement: cs.problemStatement,
             answerKeywords: cs.answerKeywords,
             result: cs.result,
@@ -108,7 +109,19 @@ const createCourse = async (req, res) => {
       );
     }
 
-    return ReS(res, { success: true, courseId: course.id }, 201);
+    // 6️⃣ Fetch domain and domainType names
+    const domain = await model.Domain.findByPk(domainId);
+    const domainType = await model.DomainType.findByPk(domainTypeId);
+
+    const responsePayload = {
+      courseId: course.id,
+      title: course.title,
+      tutor: tutorObj.name,
+      domain: domain ? domain.name : null,
+      domainType: domainType ? domainType.name : null
+    };
+
+    return ReS(res, { success: true, data: responsePayload }, 201);
   } catch (error) {
     console.error("Create Course Error:", error);
     return ReE(res, error.message, 500);
@@ -117,8 +130,7 @@ const createCourse = async (req, res) => {
 
 module.exports.createCourse = createCourse;
 
-
-// ✅ Get all courses
+// ✅ Get all courses with domain & domainType names
 const getAllCourses = async (req, res) => {
   try {
     const courses = await model.Course.findAll({
@@ -127,15 +139,29 @@ const getAllCourses = async (req, res) => {
         { model: model.Tutor },
         {
           model: model.MCQ,
-          include: [model.MCQAnswer]
+          include: [
+            model.MCQAnswer,
+            { model: model.Domain, attributes: ["id", "name"] },
+            { model: model.DomainType, attributes: ["id", "name"] }
+          ]
         },
-        { model: model.CaseStudy }
+        { 
+          model: model.CaseStudy,
+          include: [
+            { model: model.Domain, attributes: ["id", "name"] },
+            { model: model.DomainType, attributes: ["id", "name"] }
+          ]
+        },
+        { model: model.Domain, attributes: ["id", "name"] },
+        { model: model.DomainType, attributes: ["id", "name"] }
       ]
     });
 
-    const parsedCourses = courses.map((course) => ({
+    const parsedCourses = courses.map(course => ({
       ...course.toJSON(),
-      description: safeParseJSON(course.description)
+      description: safeParseJSON(course.description),
+      domain: course.Domain ? course.Domain.name : null,
+      domainType: course.DomainType ? course.DomainType.name : null
     }));
 
     return ReS(res, { success: true, data: parsedCourses }, 200);
