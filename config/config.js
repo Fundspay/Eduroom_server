@@ -40,5 +40,14 @@ CONFIG.s3AccessKeyId = process.env.S3_ACCESS_KEY_ID || 'your-access-key-id';
 CONFIG.s3SecretAccessKey = process.env.S3_SECRET_ACCESS_KEY || 'your-secret-access-key';
 CONFIG.s3Bucket = process.env.S3_BUCKET || 'your-bucket-name';
 
+CONFIG.googleClientId = process.env.GOOGLE_CLIENT_ID || 'your-google-client-id';
+CONFIG.googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || 'your-google-client-secret';
+CONFIG.googleCallbackUrl = process.env.GOOGLE_CALLBACK_URL || 'http://localhost:3000/auth/google/callback';
+
+// Firebase Config
+CONFIG.firebaseDB_URL = process.env.FIREBASEDB_URL || 'db-url';
+CONFIG.firebaseCredentialPath = process.env.FIREBASE_CREDENTIAL_PATH || 'firebase-credential-path';
+
+CONFIG.jwtSecret = process.env.JWT_SECRET || 'your_jwt_secret';
 
 module.exports = CONFIG;  // <-- ✅ export it
