@@ -56,4 +56,5 @@ coverage/
 /.yarn-integrity
 /.pnp.*
 
-
+# ────── Firebase Service Account ──────────
+config/firebase-service-account.json
