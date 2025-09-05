@@ -5,7 +5,9 @@ module.exports = (sequelize, Sequelize) => {
     {
       id: { type: Sequelize.BIGINT, primaryKey: true, autoIncrement: true },
       userId: { type: Sequelize.BIGINT, allowNull: false },
-      courseId: { type: Sequelize.BIGINT, allowNull: false }, // ✅ link to course
+      courseId: { type: Sequelize.BIGINT, allowNull: false },
+      domainId: { type: Sequelize.BIGINT, allowNull: false },
+      domainTypeId: { type: Sequelize.BIGINT, allowNull: true },
       questionText: { type: Sequelize.TEXT, allowNull: false },
       serialNo: { type: Sequelize.INTEGER, allowNull: false }
     },
@@ -19,6 +21,8 @@ module.exports = (sequelize, Sequelize) => {
     MCQ.belongsTo(models.User, { foreignKey: "userId", onDelete: "CASCADE" });
     MCQ.belongsTo(models.Course, { foreignKey: "courseId", onDelete: "CASCADE" });
     MCQ.hasMany(models.MCQAnswer, { foreignKey: "mcqId", onDelete: "CASCADE" });
+    MCQ.belongsTo(models.Domain, { foreignKey: "domainId", onDelete: "CASCADE" });
+    MCQ.belongsTo(models.DomainType, { foreignKey: "domainTypeId", onDelete: "SET NULL" });
   };
 
   return MCQ;
