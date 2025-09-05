@@ -5,6 +5,8 @@ module.exports = (sequelize, Sequelize) => {
     {
       id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
       userId: { type: Sequelize.BIGINT, allowNull: false },
+      domainId: { type: Sequelize.BIGINT, allowNull: false },
+      domainTypeId: { type: Sequelize.BIGINT, allowNull: true },
       tutorId: { type: Sequelize.BIGINT, allowNull: false },
       title: { type: Sequelize.STRING, allowNull: false },
       description: { type: Sequelize.JSON, allowNull: true },
@@ -13,6 +15,7 @@ module.exports = (sequelize, Sequelize) => {
       businessTarget: { type: Sequelize.INTEGER, allowNull: true },
       type: { type: Sequelize.STRING, allowNull: true },
       isDeleted: { type: Sequelize.BOOLEAN, defaultValue: false }
+
     },
     {
       tableName: "Courses",
@@ -25,6 +28,8 @@ module.exports = (sequelize, Sequelize) => {
     Course.belongsTo(models.User, { foreignKey: "userId" });
     Course.hasMany(models.MCQ, { foreignKey: "courseId" });
     Course.hasMany(models.CaseStudy, { foreignKey: "courseId" });
+    Course.belongsTo(models.Domain, { foreignKey: "domainId" });
+    Course.belongsTo(models.DomainType, { foreignKey: "domainTypeId" });
   };
 
   return Course;
