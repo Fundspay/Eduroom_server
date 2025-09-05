@@ -1,4 +1,4 @@
-require("dotenv").config(); 
+require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
@@ -23,28 +23,28 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(compression());
 
 // ────── CORS ───────────────────────────────────────────
+const allowedOrigins = [
+  "http://localhost:8080",  // development frontend
+  "https://eduroom.in",
+  "http://eduroom.in"     
+];
+
 const corsOptions = {
-  origin: "*",
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow non-browser requests (like Postman)
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error("CORS policy: This origin is not allowed"), false);
+    }
+    return callback(null, true);
+  },
   methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", 'Accept'],
+  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
   credentials: true,
   optionsSuccessStatus: 204
 };
 
 // Apply CORS globally
 app.use(cors(corsOptions));
-
-// Ensure CORS headers are always set
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.header("Access-Control-Allow-Methods", corsOptions.methods.join(","));
-  res.header("Access-Control-Allow-Headers", corsOptions.allowedHeaders.join(","));
-  res.header("Access-Control-Allow-Credentials", "true");
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(corsOptions.optionsSuccessStatus);
-  }
-  next();
-});
 
 // ────── LOGGING (before routes) ─────────────────────────
 app.use(
