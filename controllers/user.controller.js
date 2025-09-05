@@ -5,79 +5,242 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const crypto = require("crypto");
 const { Op } = require("sequelize");
+const jwt = require('jsonwebtoken');
+const admin = require('firebase-admin');
 
-// ✅ Add User
-var addUser = async (req, res) => {
+if (!admin.apps.length) {
+    admin.initializeApp({
+        credential: admin.credential.cert(require("../config/firebase-service-account.json"))
+    });
+}
+
+// **
+//  * 🔹 STEP 1: Create Student Personal Information
+//  */
+var addPersonalInfo = async function (req, res) {
     try {
-        const { firstName, lastName, email, phoneNumber, password, gender,
-            collegeName, course, state, city, referralCode, referralLink } = req.body;
+        const {
+            firstName,
+            lastName,
+            fullName,
+            dateOfBirth,
+            gender,
+            phoneNumber,
+            alternatePhoneNumber,
+            email,
+            residentialAddress,
+            emergencyContactName,
+            emergencyContactNumber,
+            city,
+            state,
+            pinCode,
+            password,
+        } = req.body;
 
-        // Basic validation
-        if (!firstName || !lastName || !email || !password) {
-            return ReE(res, "Missing required fields", 400);
+        if (!firstName || !lastName || !email || !phoneNumber || !password) {
+            return ReE(res, "Required fields missing", 400);
         }
 
-        // Validate Gender (if provided)
-        let userGender = null;
-        if (gender) {
-            const gen = await model.Gender.findByPk(gender);
-            if (!gen) return ReE(res, "Invalid gender ID", 400);
-            userGender = gen.id;
-        }
-
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create the user
         const user = await model.User.create({
             firstName,
             lastName,
-            email,
+            fullName,
+            dateOfBirth,
+            gender,
             phoneNumber,
-            password: hashedPassword,
-            gender: userGender,
-            collegeName,
-            course,
-            state,
+            alternatePhoneNumber,
+            email,
+            residentialAddress,
+            emergencyContactName,
+            emergencyContactNumber,
             city,
-            referralCode,
-            referralLink
+            state,
+            pinCode,
+            password,
         });
 
-        /// Send welcome email
-        const subject = "Welcome to EduRoom! 🎓";
-        const html = `
-    <h3>Hi ${firstName},</h3>
-    <p>Welcome to <strong>EduRoom</strong> – your learning journey starts here! 🚀</p>
-    <p>Your account has been successfully created. You can now login with your email: <strong>${email}</strong></p>
-    <p>Explore your courses, track your progress, and grow your skills with us.</p>
-    <p><a href="https://eduroom.in/login" target="_blank">👉 Click here to login</a></p>
-    <br>
-    <p>Happy Learning,<br>The EduRoom Team</p>
-`;
-
-        const mailResponse = await sendMail(email, subject, html);
-        if (!mailResponse.success) {
-            console.error("Failed to send welcome email:", mailResponse.error);
-        }
-
-        return ReS(res, { success: true, user }, 201);
-
+        return ReS(res, { success: true, userId: user.id }, 201);
     } catch (error) {
-        console.error("Error:", error);
-
-        if (error.name === "SequelizeValidationError") {
-            return ReE(res, error.errors.map(e => e.message), 422);
-        }
-
-        if (error.name === "SequelizeUniqueConstraintError") {
-            return ReE(res, "Duplicate entry detected!", 422);
-        }
-
-        return ReE(res, error.message, 422);
+        return ReE(res, error.message, 500);
     }
 };
-module.exports.addUser = addUser;
+module.exports.addPersonalInfo = addPersonalInfo;
+
+/**
+ * 🔹 STEP 2: Add Educational Details
+ */
+var addEducationalDetails = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const {
+            collegeName,
+            collegeRollNumber,
+            course,
+            specialization,
+            currentYearSemester,
+            collegeAddress,
+            placementCoordinatorName,
+            placementCoordinatorContact,
+        } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            collegeName,
+            collegeRollNumber,
+            course,
+            specialization,
+            currentYearSemester,
+            collegeAddress,
+            placementCoordinatorName,
+            placementCoordinatorContact,
+        });
+
+        return ReS(res, { success: true, message: "Educational details updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addEducationalDetails = addEducationalDetails;
+
+/**
+ * 🔹 STEP 3: Add Internship Details
+ */
+var addInternshipDetails = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const {
+            internshipProgram,
+            internshipDuration,
+            internshipModeId,
+            preferredStartDate,
+            referralCode,
+            referralLink,
+            referralSource,
+        } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            internshipProgram,
+            internshipDuration,
+            internshipModeId,
+            preferredStartDate,
+            referralCode,
+            referralLink,
+            referralSource,
+        });
+
+        return ReS(res, { success: true, message: "Internship details updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addInternshipDetails = addInternshipDetails;
+
+/**
+ * 🔹 STEP 4: Add Verification Docs
+ */
+var addVerificationDocs = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const { studentIdCard, governmentIdProof, passportPhoto } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            studentIdCard,
+            governmentIdProof,
+            passportPhoto,
+        });
+
+        return ReS(res, { success: true, message: "Verification docs updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addVerificationDocs = addVerificationDocs;
+
+/**
+ * 🔹 STEP 5: Add Bank Details
+ */
+var addBankDetails = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const {
+            accountHolderName,
+            bankName,
+            branchAddress,
+            ifscCode,
+            accountNumber,
+        } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            accountHolderName,
+            bankName,
+            branchAddress,
+            ifscCode,
+            accountNumber,
+        });
+
+        return ReS(res, { success: true, message: "Bank details updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addBankDetails = addBankDetails;
+
+/**
+ * 🔹 STEP 6: Add Communication Preferences
+ */
+var addCommunicationPreferences = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const { preferredCommunicationId, linkedInProfile } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            preferredCommunicationId,
+            linkedInProfile,
+        });
+
+        return ReS(res, { success: true, message: "Communication preferences updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addCommunicationPreferences = addCommunicationPreferences;
+
+/**
+ * 🔹 STEP 7: Add Declaration & Consent
+ */
+var addConsent = async function (req, res) {
+    try {
+        const { userId } = req.params;
+        const { studentDeclaration, consentAgreement } = req.body;
+
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
+
+        await user.update({
+            studentDeclaration,
+            consentAgreement,
+        });
+
+        return ReS(res, { success: true, message: "Consent updated" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.addConsent = addConsent;
 
 // ✅ Fetch All Users
 var fetchAllUsers = async (req, res) => {
@@ -188,26 +351,35 @@ const loginWithEmailPassword = async (req, res) => {
 
         await user.update({ lastLoginAt: new Date() });
 
-        return ReS(res, {
+        // ✅ Only return allowed fields
+        const payload = {
             user_id: user.id,
-            name: user.firstName,
-            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            fullName: user.fullName,
+            dateOfBirth: user.dateOfBirth,
+            gender: user.gender,
             phoneNumber: user.phoneNumber,
-            photoUrl: user.photoUrl || null,
-            collegeName: user.collegeName,
-            course: user.course,
-            state: user.state,
+            alternatePhoneNumber: user.alternatePhoneNumber,
+            email: user.email,
+            residentialAddress: user.residentialAddress,
+            emergencyContactName: user.emergencyContactName,
+            emergencyContactNumber: user.emergencyContactNumber,
             city: user.city,
-            referralCode: user.referralCode,
-            referralLink: user.referralLink,
-            isFirstLogin,
-        }, 200);
+            state: user.state,
+            pinCode: user.pinCode
+        };
+
+        const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
+
+        return ReS(res, { success: true, user: { ...payload, isFirstLogin, token } }, 200);
 
     } catch (error) {
         console.error("Login Error:", error);
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
 
 // ✅ Logout User
@@ -236,30 +408,30 @@ module.exports.logoutUser = logoutUser;
 
 // ✅ Request Password Reset
 const requestPasswordReset = async (req, res) => {
-  try {
-    const { email } = req.body;
+    try {
+        const { email } = req.body;
 
-    if (!email) return ReE(res, "Email is required", 400);
+        if (!email) return ReE(res, "Email is required", 400);
 
-    const user = await model.User.findOne({ where: { email, isDeleted: false } });
+        const user = await model.User.findOne({ where: { email, isDeleted: false } });
 
-    if (!user) {
-      // Generic response to prevent user enumeration
-      return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
-    }
+        if (!user) {
+            // Generic response to prevent user enumeration
+            return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
+        }
 
-    // Generate secure token
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+        // Generate secure token
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const resetTokenExpiry = Date.now() + 3600000; // 1 hour
 
-    await user.update({ resetToken, resetTokenExpiry });
+        await user.update({ resetToken, resetTokenExpiry });
 
-    // Generate password reset link
-    const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
-    const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
+        // Generate password reset link
+        const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
+        const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
 
-    // Email template
-    const htmlContent = `
+        // Email template
+        const htmlContent = `
       <h3>Hello ${user.firstName},</h3>
       <p>You requested a password reset for your EduRoom account.</p>
       <p>Click the link below to reset your password (valid for 1 hour):</p>
@@ -269,58 +441,103 @@ const requestPasswordReset = async (req, res) => {
       <p>– The EduRoom Team</p>
     `;
 
-    // ✅ Capture mail result
-    const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
-    console.log(" Password Reset Email Result:", mailResult);
+        // ✅ Capture mail result
+        const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
+        console.log(" Password Reset Email Result:", mailResult);
 
-    if (!mailResult.success) {
-      console.error(" Failed to send reset email:", mailResult.error);
-      return ReE(res, "Failed to send reset email. Please try again later.", 500);
+        if (!mailResult.success) {
+            console.error(" Failed to send reset email:", mailResult.error);
+            return ReE(res, "Failed to send reset email. Please try again later.", 500);
+        }
+
+        return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
+
+    } catch (error) {
+        console.error("Password reset error:", error);
+        return ReE(res, error.message, 500);
     }
-
-    return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
-
-  } catch (error) {
-    console.error("Password reset error:", error);
-    return ReE(res, error.message, 500);
-  }
 };
 module.exports.requestPasswordReset = requestPasswordReset;
 
 // ✅ Reset Password
 const resetPassword = async (req, res) => {
-  try {
-    const { email, token, newPassword } = req.body;
+    try {
+        const { email, token, newPassword } = req.body;
 
-    if (!email || !token || !newPassword) {
-      return ReE(res, "All fields are required", 400);
+        if (!email || !token || !newPassword) {
+            return ReE(res, "All fields are required", 400);
+        }
+
+        const user = await model.User.findOne({
+            where: {
+                email,
+                resetToken: token,
+                resetTokenExpiry: { [Op.gt]: Date.now() },
+                isDeleted: false,
+            },
+        });
+
+        if (!user) return ReE(res, "Invalid or expired reset token", 400);
+
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+        await user.update({
+            password: hashedPassword,
+            resetToken: null,
+            resetTokenExpiry: null,
+        });
+
+        return ReS(res, { message: "Password has been reset successfully" }, 200);
+
+    } catch (error) {
+        return ReE(res, error.message, 500);
     }
-
-    const user = await model.User.findOne({
-      where: {
-        email,
-        resetToken: token,
-        resetTokenExpiry: { [Op.gt]: Date.now() },
-        isDeleted: false,
-      },
-    });
-
-    if (!user) return ReE(res, "Invalid or expired reset token", 400);
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await user.update({
-      password: hashedPassword,
-      resetToken: null,
-      resetTokenExpiry: null,
-    });
-
-    return ReS(res, { message: "Password has been reset successfully" }, 200);
-
-  } catch (error) {
-    return ReE(res, error.message, 500);
-  }
 };
 
 module.exports.resetPassword = resetPassword;
 
+const loginWithGoogle = async (req, res) => {
+    try {
+        const firebaseUser = req.user; // Comes from firebaseAuth middleware
+
+        // Find existing user
+        const user = await model.User.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
+        if (!user) return ReE(res, "User not found. Please register first.", 404);
+
+        // Mark first login if needed
+        let isFirstLogin = false;
+        if (!user.hasLoggedIn) {
+            await user.update({ hasLoggedIn: true });
+            isFirstLogin = true;
+        }
+
+        // ✅ Only return the allowed fields
+        const payload = {
+            user_id: user.id,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            fullName: user.fullName,
+            dateOfBirth: user.dateOfBirth,
+            gender: user.gender,
+            phoneNumber: user.phoneNumber,
+            alternatePhoneNumber: user.alternatePhoneNumber,
+            email: user.email,
+            residentialAddress: user.residentialAddress,
+            emergencyContactName: user.emergencyContactName,
+            emergencyContactNumber: user.emergencyContactNumber,
+            city: user.city,
+            state: user.state,
+            pinCode: user.pinCode
+        };
+
+        const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
+
+        return ReS(res, { success: true, user: { ...payload, isFirstLogin, token } });
+
+    } catch (error) {
+        console.error("Google login failed:", error);
+        return ReE(res, "Login failed", 500);
+    }
+};
+
+module.exports.loginWithGoogle = loginWithGoogle;
