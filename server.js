@@ -24,8 +24,8 @@ app.use(compression());
 
 // ────── CORS ───────────────────────────────────────────
 const allowedOrigins = [
-  "http://localhost:8080",  // development frontend
-];
+  "http://localhost:8080","https://eduroom.in"];  // development frontend
+
 
 const corsOptions = {
   origin: function (origin, callback) {
