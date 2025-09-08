@@ -110,6 +110,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
+// ✅ Evaluate MCQs for a specific course + course preview + day
 const evaluateDayMCQ = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -144,10 +145,11 @@ const evaluateDayMCQ = async (req, res) => {
         const results = [];
 
         for (let ans of answers) {
-            const mcq = mcqs.find(m => m.id === ans.mcqId);
+            // Coerce types to string to avoid mismatches
+            const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
 
-            const isCorrect = mcq.answer === ans.selectedOption;
+            const isCorrect = mcq.answer.toUpperCase() === String(ans.selectedOption).toUpperCase();
 
             if (isCorrect) correctCount++;
             else wrongCount++;
@@ -178,6 +180,7 @@ const evaluateDayMCQ = async (req, res) => {
 
         // 4️⃣ Response
         return ReS(res, {
+            success: true,
             courseDetail: dayDetail,
             questions: mcqs,
             evaluation: {
@@ -197,6 +200,7 @@ const evaluateDayMCQ = async (req, res) => {
 };
 
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
+
 
 
 // ✅ Get all case studies for a specific day (if eligible)
