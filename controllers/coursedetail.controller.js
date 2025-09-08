@@ -110,7 +110,6 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
-// ✅ Evaluate MCQs for a specific course + course preview + day
 const evaluateDayMCQ = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -120,12 +119,12 @@ const evaluateDayMCQ = async (req, res) => {
             return ReE(res, "userId and answers are required", 400);
         }
 
-        // Fetch CourseDetail including all questions
+        // 1️⃣ Fetch CourseDetail for this day, including all questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
                 {
-                    model: model.QuestionModel,
+                    model: model.QuestionModel, // No alias
                     where: { isDeleted: false },
                     required: false
                 }
@@ -134,10 +133,12 @@ const evaluateDayMCQ = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
+        // ✅ Use default pluralized association key
         const mcqs = dayDetail.QuestionModels || [];
+
         if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
 
-        // Evaluate answers
+        // 2️⃣ Evaluate answers
         let correctCount = 0;
         let wrongCount = 0;
         const results = [];
@@ -147,6 +148,7 @@ const evaluateDayMCQ = async (req, res) => {
             if (!mcq) continue;
 
             const isCorrect = mcq.answer === ans.selectedOption;
+
             if (isCorrect) correctCount++;
             else wrongCount++;
 
@@ -165,17 +167,17 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // Save user progress (key as string!)
+        // 3️⃣ Save user progress in CourseDetail.userProgress (JSON)
         const userProgress = dayDetail.userProgress || {};
-        userProgress[userId.toString()] = {
+        userProgress[userId] = {
             correct: correctCount,
             total,
             eligibleForCaseStudy
         };
         await dayDetail.update({ userProgress });
 
+        // 4️⃣ Response
         return ReS(res, {
-            success: true,
             courseDetail: dayDetail,
             questions: mcqs,
             evaluation: {
@@ -196,6 +198,7 @@ const evaluateDayMCQ = async (req, res) => {
 
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
 
+
 // ✅ Get all case studies for a specific day (if eligible)
 const getCaseStudiesForDay = async (req, res) => {
     try {
@@ -204,7 +207,7 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // Fetch CourseDetail including questions with case studies
+        // 1️⃣ Fetch CourseDetail including questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
@@ -218,9 +221,10 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // Check user eligibility (key as string!)
+        // 2️⃣ Check user eligibility
         const userProgress = dayDetail.userProgress || {};
-        const progress = userProgress[userId.toString()];
+        const progress = userProgress[userId];
+
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
                 success: false,
@@ -228,7 +232,7 @@ const getCaseStudiesForDay = async (req, res) => {
             }, 200);
         }
 
-        // Extract case studies
+        // 3️⃣ Extract case studies
         const caseStudies = dayDetail.QuestionModels.map(q => ({
             questionId: q.id,
             caseStudy: q.caseStudy
@@ -251,7 +255,6 @@ const getCaseStudiesForDay = async (req, res) => {
 };
 
 module.exports.getCaseStudiesForDay = getCaseStudiesForDay;
-
 
 // ✅ Submit Case Study Answer & Evaluate
 const submitCaseStudyAnswer = async (req, res) => {
