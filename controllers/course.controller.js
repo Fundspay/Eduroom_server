@@ -26,12 +26,18 @@ var addCourse = async (req, res) => {
                 duration: duration || null
             });
 
-            const response = await model.Course.findByPk(course.id, {
-                attributes: { exclude: ["createdAt", "updatedAt"] },
-                include: [{ model: model.Domain, attributes: ["name"] }]
+            // Fetch course with nested domain without circular references
+            const response = await model.Course.findOne({
+                where: { id: course.id },
+                attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
+                include: [
+                    { model: model.Domain, attributes: ["id", "name"] }
+                ],
+                raw: true,
+                nest: true
             });
 
-            return ReS(res, response.toJSON(), 201);
+            return ReS(res, response, 201);
 
         } catch (error) {
             return ReE(res, error.message, 422);
@@ -45,12 +51,13 @@ var fetchAllCourses = async (req, res) => {
     try {
         const courses = await model.Course.findAll({
             where: { isDeleted: false },
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }]
+            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
+            include: [{ model: model.Domain, attributes: ["id", "name"] }],
+            raw: true,
+            nest: true
         });
 
-        const plainCourses = courses.map(course => course.toJSON());
-        return ReS(res, { success: true, data: plainCourses }, 200);
+        return ReS(res, { success: true, data: courses }, 200);
 
     } catch (error) {
         return ReE(res, error.message, 500);
@@ -64,14 +71,17 @@ var fetchSingleCourse = async (req, res) => {
     if (!id) return ReE(res, "Course ID is required", 400);
 
     try {
-        const course = await model.Course.findByPk(id, {
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }]
+        const course = await model.Course.findOne({
+            where: { id, isDeleted: false },
+            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
+            include: [{ model: model.Domain, attributes: ["id", "name"] }],
+            raw: true,
+            nest: true
         });
 
         if (!course) return ReE(res, "Course not found", 404);
 
-        return ReS(res, course.toJSON(), 200);
+        return ReS(res, course, 200);
 
     } catch (error) {
         return ReE(res, error.message, 500);
@@ -98,12 +108,16 @@ var updateCourse = async (req, res) => {
                 duration: req.body.duration !== undefined ? req.body.duration : course.duration,
             });
 
-            const updatedCourse = await model.Course.findByPk(course.id, {
-                attributes: { exclude: ["createdAt", "updatedAt"] },
-                include: [{ model: model.Domain, attributes: ["name"] }]
+            // Fetch updated course without circular references
+            const updatedCourse = await model.Course.findOne({
+                where: { id: course.id },
+                attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
+                include: [{ model: model.Domain, attributes: ["id", "name"] }],
+                raw: true,
+                nest: true
             });
 
-            return ReS(res, updatedCourse.toJSON(), 200);
+            return ReS(res, updatedCourse, 200);
 
         } catch (error) {
             return ReE(res, error.message, 500);
@@ -138,12 +152,13 @@ var fetchCoursesByDomain = async (req, res) => {
 
         const courses = await model.Course.findAll({
             where: { domainId, isDeleted: false },
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }]
+            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
+            include: [{ model: model.Domain, attributes: ["id", "name"] }],
+            raw: true,
+            nest: true
         });
 
-        const plainCourses = courses.map(course => course.toJSON());
-        return ReS(res, { success: true, data: plainCourses }, 200);
+        return ReS(res, { success: true, data: courses }, 200);
 
     } catch (error) {
         return ReE(res, error.message, 500);
