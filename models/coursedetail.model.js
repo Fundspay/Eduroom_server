@@ -7,7 +7,7 @@ module.exports = (sequelize, Sequelize) => {
             domainId: { type: Sequelize.BIGINT, allowNull: false },
             courseId: { type: Sequelize.BIGINT, allowNull: false },
             coursePreviewId: { type: Sequelize.BIGINT, allowNull: false },
-            userId: { type: Sequelize.BIGINT, allowNull: false },
+            userId: { type: Sequelize.BIGINT, allowNull: true },
             day: { type: Sequelize.INTEGER, allowNull: false }, // Day number
             title: { type: Sequelize.TEXT, allowNull: false },
             description: { type: Sequelize.TEXT, allowNull: true },
