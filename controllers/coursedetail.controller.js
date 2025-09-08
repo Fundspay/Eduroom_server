@@ -226,8 +226,8 @@ const getCaseStudyForDay = async (req, res) => {
                 : dayDetail.userProgress;
         }
 
-       const progress = userProgress[userId] || userProgress[String(userId)];
-
+        // ✅ Check both string and number keys
+        const progress = userProgress[userId] || userProgress[String(userId)];
 
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
