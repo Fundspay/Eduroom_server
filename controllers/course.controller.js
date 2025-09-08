@@ -4,7 +4,6 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { uploadGeneralFile2 } = require("../middleware/s3.middleware.js"); // adjust path if needed
 
 // ✅ Add a new Course with optional image upload
-// ✅ Add a new Course with optional image upload
 var addCourse = async (req, res) => {
     uploadGeneralFile2.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
@@ -33,8 +32,8 @@ var addCourse = async (req, res) => {
                 include: [{ model: model.Domain, attributes: ["name"] }]
             });
 
-            // Convert to plain object to avoid circular JSON error
-            return ReS(res, response.get({ plain: true }), 201);
+            // Convert to JSON to remove circular references
+            return ReS(res, response.toJSON(), 201);
 
         } catch (error) {
             return ReE(res, error.message, 422);
@@ -42,7 +41,6 @@ var addCourse = async (req, res) => {
     });
 };
 module.exports.addCourse = addCourse;
-
 
 // ✅ Fetch all Courses
 var fetchAllCourses = async (req, res) => {
@@ -52,7 +50,11 @@ var fetchAllCourses = async (req, res) => {
             attributes: { exclude: ["createdAt", "updatedAt"] },
             include: [{ model: model.Domain, attributes: ["name"] }]
         });
-        return ReS(res, { success: true, data: courses }, 200);
+
+        // Convert array of Sequelize instances to JSON
+        const plainCourses = courses.map(course => course.toJSON());
+        return ReS(res, { success: true, data: plainCourses }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
@@ -70,7 +72,9 @@ var fetchSingleCourse = async (req, res) => {
             include: [{ model: model.Domain, attributes: ["name"] }]
         });
         if (!course) return ReE(res, "Course not found", 404);
-        return ReS(res, course, 200);
+
+        return ReS(res, course.toJSON(), 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
@@ -79,7 +83,7 @@ module.exports.fetchSingleCourse = fetchSingleCourse;
 
 // ✅ Update Course with optional image upload
 var updateCourse = async (req, res) => {
-    uploadGeneralFile.single("img")(req, res, async function (err) {
+    uploadGeneralFile2.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
 
         try {
@@ -101,7 +105,8 @@ var updateCourse = async (req, res) => {
                 include: [{ model: model.Domain, attributes: ["name"] }]
             });
 
-            return ReS(res, updatedCourse, 200);
+            return ReS(res, updatedCourse.toJSON(), 200);
+
         } catch (error) {
             return ReE(res, error.message, 500);
         }
@@ -117,6 +122,7 @@ var deleteCourse = async (req, res) => {
 
         await course.update({ isDeleted: true });
         return ReS(res, { message: "Course deleted successfully" }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
@@ -138,7 +144,9 @@ var fetchCoursesByDomain = async (req, res) => {
             include: [{ model: model.Domain, attributes: ["name"] }]
         });
 
-        return ReS(res, { success: true, data: courses }, 200);
+        const plainCourses = courses.map(course => course.toJSON());
+        return ReS(res, { success: true, data: plainCourses }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
