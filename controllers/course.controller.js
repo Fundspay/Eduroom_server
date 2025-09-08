@@ -10,10 +10,9 @@ var addCourse = async (req, res) => {
 
         const { name, domainId, description, businessTarget, totalDays, duration } = req.body;
         if (!name) return ReE(res, "Course name is required", 400);
-        if (!domainId) return ReE(res, "domainId is required", 400);
+        if (!domainId) return ReE(res, "Domain ID is required", 400);
 
         try {
-            // Ensure the domain exists
             const domain = await model.Domain.findByPk(domainId);
             if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
 
@@ -32,7 +31,6 @@ var addCourse = async (req, res) => {
                 include: [{ model: model.Domain, attributes: ["name"] }]
             });
 
-            // Convert to JSON to remove circular references
             return ReS(res, response.toJSON(), 201);
 
         } catch (error) {
@@ -51,7 +49,6 @@ var fetchAllCourses = async (req, res) => {
             include: [{ model: model.Domain, attributes: ["name"] }]
         });
 
-        // Convert array of Sequelize instances to JSON
         const plainCourses = courses.map(course => course.toJSON());
         return ReS(res, { success: true, data: plainCourses }, 200);
 
@@ -71,6 +68,7 @@ var fetchSingleCourse = async (req, res) => {
             attributes: { exclude: ["createdAt", "updatedAt"] },
             include: [{ model: model.Domain, attributes: ["name"] }]
         });
+
         if (!course) return ReE(res, "Course not found", 404);
 
         return ReS(res, course.toJSON(), 200);
