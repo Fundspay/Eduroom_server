@@ -135,13 +135,13 @@ const evaluateDayMCQ = async (req, res) => {
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
         const mcqs = dayDetail.QuestionModels || [];
-
         if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
 
         let correctCount = 0;
         let wrongCount = 0;
         const results = [];
 
+        // ✅ Evaluate each answer
         for (let ans of answers) {
             const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
@@ -165,15 +165,34 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Save progress with string key
-        const userProgress = dayDetail.userProgress || {};
+        // ✅ Parse existing userProgress safely
+        let userProgress = {};
+        if (dayDetail.userProgress) {
+            try {
+                userProgress = typeof dayDetail.userProgress === "string"
+                    ? JSON.parse(dayDetail.userProgress)
+                    : dayDetail.userProgress;
+            } catch (err) {
+                console.error("Error parsing userProgress:", err);
+                userProgress = {};
+            }
+        }
+
+        // ✅ Update user's progress for this day
         userProgress[String(userId)] = {
             correct: correctCount,
             total,
             eligibleForCaseStudy
         };
-        await dayDetail.update({ userProgress });
 
+        // ✅ Save progress correctly (stringify if column is TEXT)
+        await dayDetail.update({
+            userProgress: typeof dayDetail.userProgress === "string"
+                ? JSON.stringify(userProgress)
+                : userProgress
+        });
+
+        // ✅ Respond with evaluation
         return ReS(res, {
             success: true,
             courseDetail: dayDetail,
@@ -195,6 +214,7 @@ const evaluateDayMCQ = async (req, res) => {
 };
 
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
+
 
 // ✅ Get all case studies for a specific day (if eligible)
 const getCaseStudyForDay = async (req, res) => {
