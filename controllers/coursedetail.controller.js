@@ -47,6 +47,7 @@ var addCourseDetail = async (req, res) => {
         let questionRecords = [];
         if (Array.isArray(questions) && questions.length > 0) {
             questionRecords = questions.map(q => ({
+                courseDetailId: courseDetail.id,
                 domainId,
                 courseId,
                 coursePreviewId,
