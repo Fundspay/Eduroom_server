@@ -476,11 +476,6 @@ const getOverallCourseStatus = async (req, res) => {
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
-"use strict";
-const axios = require("axios");
-const model = require("../models/index");
-const { ReE, ReS } = require("../utils/util.service.js");
-
 // ✅ Get business target for a user per course
 const getBusinessTarget = async (req, res) => {
   try {
