@@ -6,6 +6,7 @@ const { ReE, ReS } = require("../utils/util.service.js");
 var addCourseDetail = async (req, res) => {
     const {
         domainId,
+          userId,
         courseId,
         coursePreviewId,
         day,
@@ -36,6 +37,7 @@ var addCourseDetail = async (req, res) => {
             courseId,
             coursePreviewId,
             day,
+              userId,
             title,
             description: description || null,
             youtubeLink: youtubeLink || null
