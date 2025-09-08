@@ -141,7 +141,7 @@ const evaluateDayMCQ = async (req, res) => {
         let wrongCount = 0;
         const results = [];
 
-        // ✅ Evaluate each answer
+        // Evaluate each answer
         for (let ans of answers) {
             const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
@@ -165,51 +165,21 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Parse existing userProgress safely
-        let userProgress = {};
-        if (dayDetail.userProgress) {
-            try {
-                userProgress = typeof dayDetail.userProgress === "string"
-                    ? JSON.parse(dayDetail.userProgress)
-                    : dayDetail.userProgress;
-            } catch (err) {
-                console.error("Error parsing userProgress:", err);
-                userProgress = {};
-            }
-        }
+        // Safely update userProgress
+        const userProgress = dayDetail.userProgress || {};
+        userProgress[String(userId)] = { correct: correctCount, total, eligibleForCaseStudy };
 
-        // ✅ Update user's progress for this day
-        userProgress[String(userId)] = {
-            correct: correctCount,
-            total,
-            eligibleForCaseStudy
-        };
         console.log("Updating userProgress for user", userId, ":", userProgress);
 
-
-        // ✅ Save progress correctly (stringify if column is TEXT)
-        await dayDetail.update({
-            userProgress: typeof dayDetail.userProgress === "string"
-                ? JSON.stringify(userProgress)
-                : userProgress
-        });
-
+        // Save directly since column is JSON
+        await dayDetail.update({ userProgress });
         console.log("Updated userProgress for user", userId, ":", userProgress);
 
-
-        // ✅ Respond with evaluation
         return ReS(res, {
             success: true,
             courseDetail: dayDetail,
             questions: mcqs,
-            evaluation: {
-                totalQuestions: total,
-                correct: correctCount,
-                wrong: wrongCount,
-                score,
-                eligibleForCaseStudy,
-                results
-            }
+            evaluation: { totalQuestions: total, correct: correctCount, wrong: wrongCount, score, eligibleForCaseStudy, results }
         }, 200);
 
     } catch (error) {
@@ -222,6 +192,7 @@ module.exports.evaluateDayMCQ = evaluateDayMCQ;
 
 
 // ✅ Get all case studies for a specific day (if eligible)
+// ✅ Get case study for a specific day if user is eligible
 const getCaseStudyForDay = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -229,49 +200,20 @@ const getCaseStudyForDay = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // 1️⃣ Fetch the course detail for the day, including all questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
-                {
-                    model: model.QuestionModel,
-                    where: { isDeleted: false },
-                    required: false
-                }
+                { model: model.QuestionModel, where: { isDeleted: false }, required: false }
             ]
         });
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // 2️⃣ Safely parse userProgress
-        let userProgress = {};
-        if (dayDetail.userProgress) {
-            try {
-                if (typeof dayDetail.userProgress === "string") {
-                    let parsed = dayDetail.userProgress;
+        // Access userProgress directly (column is JSON)
+        const userProgress = dayDetail.userProgress || {};
+        const progress = userProgress[String(userId)];
 
-                    // Keep parsing until it's an object
-                    while (typeof parsed === "string") {
-                        parsed = JSON.parse(parsed);
-                    }
-                    userProgress = parsed;
-                } else {
-                    userProgress = dayDetail.userProgress;
-                }
-            } catch (err) {
-                console.error("Error parsing userProgress:", err);
-                userProgress = {};
-            }
-        }
-
-        // 3️⃣ Normalize userId to string for key lookup
-        const userKey = String(userId);
-        const progress = userProgress && userProgress[userKey];
-
-        // 🔹 Debug logs
         console.log("dayDetail.userProgress:", dayDetail.userProgress);
-        console.log("Parsed userProgress:", userProgress);
-        console.log("User key:", userKey);
         console.log("Progress for user:", progress);
 
         if (!progress || progress.eligibleForCaseStudy !== true) {
@@ -281,27 +223,19 @@ const getCaseStudyForDay = async (req, res) => {
             }, 200);
         }
 
-        // 4️⃣ Find the single case study for the day
+        // Find the case study question
         const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
-
         if (!caseStudyQuestion) {
-            return ReS(res, {
-                success: false,
-                message: "No Case Study available for this day."
-            }, 200);
+            return ReS(res, { success: false, message: "No Case Study available for this day." }, 200);
         }
 
-        // 5️⃣ Return the case study
         return ReS(res, {
             success: true,
             data: {
                 courseId,
                 coursePreviewId,
                 day,
-                caseStudy: {
-                    questionId: caseStudyQuestion.id,
-                    caseStudy: caseStudyQuestion.caseStudy
-                }
+                caseStudy: { questionId: caseStudyQuestion.id, caseStudy: caseStudyQuestion.caseStudy }
             }
         }, 200);
 
