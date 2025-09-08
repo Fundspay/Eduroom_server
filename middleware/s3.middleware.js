@@ -31,11 +31,19 @@ const uploadProfilePicture = multer({
 
 // ✅ General File Upload (to eduroom-registration-details/uploads)
 const uploadGeneralFile = multer({
-  storage: buildS3Storage("eduroom-registration-details/uploads"),
+  storage: buildS3Storage("eduroom.registration.details/domain-images"),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
 });
+
+// ✅ General File Upload (to eduroom-registration-details/uploads)
+const uploadGeneralFile2 = multer({
+  storage: buildS3Storage("eduroom.registration.details/course-images"),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
+});
+
 
 module.exports = {
   uploadProfilePicture,
   uploadGeneralFile,
+  uploadGeneralFile2
 };
