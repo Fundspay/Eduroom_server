@@ -111,6 +111,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
 // ✅ Evaluate MCQs for a specific course + course preview + day
+// ✅ Evaluate MCQs for a specific course + course preview + day
 const evaluateDayMCQ = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -120,12 +121,11 @@ const evaluateDayMCQ = async (req, res) => {
             return ReE(res, "userId and answers are required", 400);
         }
 
-        // 1️⃣ Fetch CourseDetail for this day, including all questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
                 {
-                    model: model.QuestionModel, // No alias
+                    model: model.QuestionModel,
                     where: { isDeleted: false },
                     required: false
                 }
@@ -134,23 +134,19 @@ const evaluateDayMCQ = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // ✅ Use default pluralized association key
         const mcqs = dayDetail.QuestionModels || [];
 
         if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
 
-        // 2️⃣ Evaluate answers
         let correctCount = 0;
         let wrongCount = 0;
         const results = [];
 
         for (let ans of answers) {
-            // Coerce types to string to avoid mismatches
             const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
 
-            const isCorrect = mcq.answer.toUpperCase() === String(ans.selectedOption).toUpperCase();
-
+            const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
             if (isCorrect) correctCount++;
             else wrongCount++;
 
@@ -169,16 +165,15 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // 3️⃣ Save user progress in CourseDetail.userProgress (JSON)
+        // ✅ Save progress with string key
         const userProgress = dayDetail.userProgress || {};
-        userProgress[userId] = {
+        userProgress[String(userId)] = {
             correct: correctCount,
             total,
             eligibleForCaseStudy
         };
         await dayDetail.update({ userProgress });
 
-        // 4️⃣ Response
         return ReS(res, {
             success: true,
             courseDetail: dayDetail,
@@ -209,7 +204,6 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // 1️⃣ Fetch CourseDetail including questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
@@ -223,9 +217,8 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // 2️⃣ Check user eligibility
         const userProgress = dayDetail.userProgress || {};
-        const progress = userProgress[userId];
+        const progress = userProgress[String(userId)]; // ✅ always string key
 
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
@@ -234,7 +227,6 @@ const getCaseStudiesForDay = async (req, res) => {
             }, 200);
         }
 
-        // 3️⃣ Extract case studies
         const caseStudies = dayDetail.QuestionModels.map(q => ({
             questionId: q.id,
             caseStudy: q.caseStudy
