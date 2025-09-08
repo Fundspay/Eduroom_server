@@ -226,7 +226,8 @@ const getCaseStudyForDay = async (req, res) => {
                 : dayDetail.userProgress;
         }
 
-        const progress = userProgress[String(userId)];
+       const progress = userProgress[userId] || userProgress[String(userId)];
+
 
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
