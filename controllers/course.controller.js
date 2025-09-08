@@ -4,6 +4,7 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { uploadGeneralFile2 } = require("../middleware/s3.middleware.js"); // adjust path if needed
 
 // ✅ Add a new Course with optional image upload
+// ✅ Add a new Course with optional image upload
 var addCourse = async (req, res) => {
     uploadGeneralFile2.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
@@ -32,13 +33,16 @@ var addCourse = async (req, res) => {
                 include: [{ model: model.Domain, attributes: ["name"] }]
             });
 
-            return ReS(res, response, 201);
+            // Convert to plain object to avoid circular JSON error
+            return ReS(res, response.get({ plain: true }), 201);
+
         } catch (error) {
             return ReE(res, error.message, 422);
         }
     });
 };
 module.exports.addCourse = addCourse;
+
 
 // ✅ Fetch all Courses
 var fetchAllCourses = async (req, res) => {
