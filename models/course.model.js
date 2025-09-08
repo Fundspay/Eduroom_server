@@ -8,7 +8,7 @@ module.exports = (sequelize, Sequelize) => {
             name: { type: Sequelize.TEXT, allowNull: false },
             img: { type: Sequelize.STRING, allowNull: true }, 
             description: { type: Sequelize.TEXT, allowNull: true },
-            businessTarget: { type: Sequelize.TEXT, allowNull: true }, 
+            businessTarget: { type: Sequelize.INTEGER, allowNull: true }, 
             totalDays: { type: Sequelize.INTEGER, allowNull: true },
             duration: { type: Sequelize.STRING, allowNull: true },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
