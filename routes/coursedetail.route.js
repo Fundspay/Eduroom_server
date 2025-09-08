@@ -7,7 +7,7 @@ router.get("/course-preview/:coursePreviewId/details", coursedetailController.fe
 router.post("/course/:courseId/preview/:coursePreviewId/day/:day/evaluate", coursedetailController.evaluateDayMCQ);
 router.get(
     "/course/:courseId/preview/:coursePreviewId/day/:day/casestudies",
-    coursedetailController.getCaseStudiesForDay
+    coursedetailController.getCaseStudyForDay
 );
 
 // Submit case study answer
