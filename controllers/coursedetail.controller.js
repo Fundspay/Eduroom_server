@@ -197,21 +197,20 @@ const evaluateDayMCQ = async (req, res) => {
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
 
 // ✅ Get all case studies for a specific day (if eligible)
-// ✅ Get all case studies for a specific day (if eligible)
-const getCaseStudiesForDay = async (req, res) => {
+const getCaseStudyForDay = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
-        const { userId } = req.query; // userId passed as query
+        const { userId } = req.query;
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // 1️⃣ Fetch CourseDetail including questions that have case studies
+        // Fetch the course detail and all questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
                 {
                     model: model.QuestionModel,
-                    where: { isDeleted: false, caseStudy: { [model.Sequelize.Op.ne]: null } },
+                    where: { isDeleted: false },
                     required: false
                 }
             ]
@@ -219,41 +218,48 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // 2️⃣ Coerce userId to string to match stored keys in JSON
+        // Check user eligibility
         const userProgress = dayDetail.userProgress || {};
-        const progress = userProgress[String(userId)]; 
+        const progress = userProgress[String(userId)];
 
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
                 success: false,
-                message: "You are not eligible to attempt the Case Studies yet. Complete all MCQs correctly first."
+                message: "You are not eligible to attempt the Case Study yet. Complete all MCQs correctly first."
             }, 200);
         }
 
-        // 3️⃣ Extract case studies from the questions
-        const caseStudies = dayDetail.QuestionModels.map(q => ({
-            questionId: q.id,
-            caseStudy: q.caseStudy
-        }));
+        // Get the single case study question (if exists)
+        const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
 
-        // 4️⃣ Send response
+        if (!caseStudyQuestion) {
+            return ReS(res, {
+                success: false,
+                message: "No Case Study available for this day."
+            }, 200);
+        }
+
         return ReS(res, {
             success: true,
             data: {
                 courseId,
                 coursePreviewId,
                 day,
-                caseStudies
+                caseStudy: {
+                    questionId: caseStudyQuestion.id,
+                    caseStudy: caseStudyQuestion.caseStudy
+                }
             }
         }, 200);
 
     } catch (error) {
-        console.error("Get Case Studies Error:", error);
+        console.error("Get Case Study Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 
-module.exports.getCaseStudiesForDay = getCaseStudiesForDay;
+module.exports.getCaseStudyForDay = getCaseStudyForDay;
+
 
 // ✅ Submit Case Study Answer & Evaluate
 const submitCaseStudyAnswer = async (req, res) => {
