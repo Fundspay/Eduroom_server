@@ -204,7 +204,7 @@ const getCaseStudyForDay = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // 1️⃣ Fetch the course detail and all questions
+        // 1️⃣ Fetch the course detail for the day, including all questions
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
@@ -218,7 +218,7 @@ const getCaseStudyForDay = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // 2️⃣ Safely parse userProgress (JSON field can sometimes come as string)
+        // 2️⃣ Safely parse userProgress
         let userProgress = {};
         if (dayDetail.userProgress) {
             userProgress = typeof dayDetail.userProgress === "string"
@@ -228,7 +228,6 @@ const getCaseStudyForDay = async (req, res) => {
 
         const progress = userProgress[String(userId)];
 
-        // 3️⃣ Check eligibility
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
                 success: false,
@@ -236,7 +235,7 @@ const getCaseStudyForDay = async (req, res) => {
             }, 200);
         }
 
-        // 4️⃣ Extract the single case study question (if it exists)
+        // 3️⃣ Find the single case study for the day
         const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
 
         if (!caseStudyQuestion) {
@@ -246,7 +245,7 @@ const getCaseStudyForDay = async (req, res) => {
             }, 200);
         }
 
-        // 5️⃣ Return the case study
+        // 4️⃣ Return the case study
         return ReS(res, {
             success: true,
             data: {
