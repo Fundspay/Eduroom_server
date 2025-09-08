@@ -184,6 +184,8 @@ const evaluateDayMCQ = async (req, res) => {
             total,
             eligibleForCaseStudy
         };
+        console.log("Updating userProgress for user", userId, ":", userProgress);
+
 
         // ✅ Save progress correctly (stringify if column is TEXT)
         await dayDetail.update({
@@ -191,6 +193,9 @@ const evaluateDayMCQ = async (req, res) => {
                 ? JSON.stringify(userProgress)
                 : userProgress
         });
+
+        console.log("Updated userProgress for user", userId, ":", userProgress);
+
 
         // ✅ Respond with evaluation
         return ReS(res, {
