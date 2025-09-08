@@ -14,9 +14,10 @@ if (!admin.apps.length) {
     });
 }
 
-// **
-//  * 🔹 STEP 1: Create Student Personal Information
-//  */
+
+// ✅  STEP 1: Create Student Personal Information
+
+
 var addPersonalInfo = async function (req, res) {
     try {
         const {
@@ -66,9 +67,9 @@ var addPersonalInfo = async function (req, res) {
 };
 module.exports.addPersonalInfo = addPersonalInfo;
 
-/**
- * 🔹 STEP 2: Add Educational Details
- */
+
+//  ✅ STEP 2: Add Educational Details
+ 
 var addEducationalDetails = async function (req, res) {
     try {
         const { userId } = req.params;
@@ -106,9 +107,9 @@ var addEducationalDetails = async function (req, res) {
 };
 module.exports.addEducationalDetails = addEducationalDetails;
 
-/**
- * 🔹 STEP 3: Add Internship Details
- */
+
+// ✅ STEP 3: Add Internship Details
+ 
 var addInternshipDetails = async function (req, res) {
     try {
         const { userId } = req.params;
@@ -142,44 +143,58 @@ var addInternshipDetails = async function (req, res) {
 };
 module.exports.addInternshipDetails = addInternshipDetails;
 
-/**
- * 🔹 STEP 4: Add Verification Docs
- */
-/**
- * Upload & Save Verification Documents
- * Accepts: studentIdCard, governmentIdProof, passportPhoto
- */
-var addVerificationDocs = async function (req, res) {
+// ✅ STEP 4: Add Verification Docs
+
+const addVerificationDocs = async (req, res) => {
   try {
     const { userId } = req.params;
 
+    // Check if user exists
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // S3 file URLs from multer
+    // Debug log incoming files
+    console.log("Uploaded files:", req.files);
+
+    // Extract file URLs from multer-S3
     const studentIdCard = req.files?.studentIdCard?.[0]?.location || null;
     const governmentIdProof = req.files?.governmentIdProof?.[0]?.location || null;
     const passportPhoto = req.files?.passportPhoto?.[0]?.location || null;
 
+    // Ensure all files are uploaded
+    if (!studentIdCard || !governmentIdProof || !passportPhoto) {
+      return ReE(res, "All 3 documents (Student ID, Government ID, Passport Photo) are required", 400);
+    }
+
+    // Save to DB
     await user.update({
       studentIdCard,
       governmentIdProof,
       passportPhoto,
     });
 
-    return ReS(res, { success: true, message: "Verification docs uploaded successfully" }, 200);
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Verification docs uploaded successfully",
+        data: { studentIdCard, governmentIdProof, passportPhoto },
+      },
+      200
+    );
   } catch (error) {
     console.error("Error uploading verification docs:", error);
-    return ReE(res, error.message, 500);
+    return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
 
 module.exports.addVerificationDocs = addVerificationDocs;
 
 
-/**
- * 🔹 STEP 5: Add Bank Details
- */
+
+
+//✅  STEP 5: Add Bank Details
+
 var addBankDetails = async function (req, res) {
     try {
         const { userId } = req.params;
@@ -209,9 +224,9 @@ var addBankDetails = async function (req, res) {
 };
 module.exports.addBankDetails = addBankDetails;
 
-/**
- * 🔹 STEP 6: Add Communication Preferences
- */
+
+// ✅  STEP 6: Add Communication Preferences
+
 var addCommunicationPreferences = async function (req, res) {
     try {
         const { userId } = req.params;
@@ -232,9 +247,9 @@ var addCommunicationPreferences = async function (req, res) {
 };
 module.exports.addCommunicationPreferences = addCommunicationPreferences;
 
-/**
- * 🔹 STEP 7: Add Declaration & Consent
- */
+
+// ✅  STEP 7: Add Declaration & Consent
+ 
 var addConsent = async function (req, res) {
     try {
         const { userId } = req.params;
