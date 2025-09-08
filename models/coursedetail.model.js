@@ -25,7 +25,9 @@ module.exports = (sequelize, Sequelize) => {
         CourseDetail.belongsTo(models.Domain, { foreignKey: "domainId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
         CourseDetail.belongsTo(models.CoursePreview, { foreignKey: "coursePreviewId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
         CourseDetail.belongsTo(models.User, { foreignKey: "userId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
-        CourseDetail.hasMany(models.QuestionModel, { foreignKey: "day", sourceKey: "day" }); // Link questions by day
+
+        // ✅ Link questions by courseDetailId (primary key)
+        CourseDetail.hasMany(models.QuestionModel, { foreignKey: "courseDetailId", onDelete: "CASCADE", onUpdate: "CASCADE" });
     };
 
     return CourseDetail;
