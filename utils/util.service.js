@@ -17,17 +17,9 @@ module.exports.ReE = (res, err, code = 422) => {
     return res.status(code).json({ success: false, error: errorMessage });
 };
 
-// ✅ Success Web Response (fixed circular structure issue)
+// Success Web Response
 module.exports.ReS = (res, data, code = 200) => {
-    let safeData;
-    try {
-        // This removes Sequelize circular refs like `parent` and `include`
-        safeData = JSON.parse(JSON.stringify(data));
-    } catch (e) {
-        safeData = data; // fallback in case JSON conversion fails
-    }
-
-    return res.status(code).json({ success: true, data: safeData });
+    return res.status(code).json({ success: true, ...data });
 };
 
 // Throw Error Utility (TE stands for Throw Error)
