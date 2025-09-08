@@ -222,18 +222,26 @@ const getCaseStudyForDay = async (req, res) => {
         let userProgress = {};
         if (dayDetail.userProgress) {
             try {
-                userProgress = typeof dayDetail.userProgress === "string"
-                    ? JSON.parse(dayDetail.userProgress)
-                    : dayDetail.userProgress;
+                if (typeof dayDetail.userProgress === "string") {
+                    // remove extra quotes if any, then parse
+                    const cleaned = dayDetail.userProgress.replace(/^"|"$/g, '');
+                    userProgress = JSON.parse(cleaned);
+                } else {
+                    userProgress = dayDetail.userProgress;
+                }
             } catch (err) {
                 console.error("Error parsing userProgress:", err);
                 userProgress = {};
             }
         }
 
-        // 3️⃣ Normalize userId to string
+        // 3️⃣ Normalize userId to string for key lookup
         const userKey = String(userId);
-        const progress = userProgress[userKey];
+        const progress = userProgress && userProgress[userKey];
+
+        console.log("Parsed userProgress:", userProgress);
+        console.log("User key:", userKey);
+        console.log("Progress for user:", progress);
 
         if (!progress || progress.eligibleForCaseStudy !== true) {
             return ReS(res, {
