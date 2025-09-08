@@ -1,36 +1,31 @@
 "use strict";
 module.exports = (sequelize, Sequelize) => {
-  const Course = sequelize.define(
-    "Course",
-    {
-      id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
-      userId: { type: Sequelize.BIGINT, allowNull: false },
-      domainId: { type: Sequelize.BIGINT, allowNull: false },
-      domainTypeId: { type: Sequelize.BIGINT, allowNull: true },
-      tutorId: { type: Sequelize.BIGINT, allowNull: false },
-      title: { type: Sequelize.STRING, allowNull: false },
-      description: { type: Sequelize.JSON, allowNull: true },
-      youtubeLink: { type: Sequelize.STRING, allowNull: true },
-      duration: { type: Sequelize.INTEGER, allowNull: true },
-      businessTarget: { type: Sequelize.INTEGER, allowNull: true },
-      type: { type: Sequelize.STRING, allowNull: true },
-      isDeleted: { type: Sequelize.BOOLEAN, defaultValue: false }
+    const Course = sequelize.define(
+        "Course",
+        {
+            id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
+            domainId: { type: Sequelize.BIGINT, allowNull: false },
+            name: { type: Sequelize.TEXT, allowNull: false },
+            img: { type: Sequelize.STRING, allowNull: true }, 
+            description: { type: Sequelize.TEXT, allowNull: true },
+            businessTarget: { type: Sequelize.TEXT, allowNull: true }, 
+            totalDays: { type: Sequelize.INTEGER, allowNull: true },
+            duration: { type: Sequelize.STRING, allowNull: true },
+            isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+            createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+            updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+        },
+        { timestamps: true }
+    );
 
-    },
-    {
-      tableName: "Courses",
-      timestamps: true
-    }
-  );
+    Course.associate = function (models) {
+        Course.belongsTo(models.Domain, {
+            foreignKey: "domainId",
+            onDelete: "RESTRICT",
+            onUpdate: "RESTRICT",
+            constraints: true,
+        });
+    };
 
-  Course.associate = (models) => {
-    Course.belongsTo(models.Tutor, { foreignKey: "tutorId" });
-    Course.belongsTo(models.User, { foreignKey: "userId" });
-    Course.hasMany(models.MCQ, { foreignKey: "courseId" });
-    Course.hasMany(models.CaseStudy, { foreignKey: "courseId" });
-    Course.belongsTo(models.Domain, { foreignKey: "domainId" });
-    Course.belongsTo(models.DomainType, { foreignKey: "domainTypeId" });
-  };
-
-  return Course;
+    return Course;
 };
