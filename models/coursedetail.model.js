@@ -12,7 +12,11 @@ module.exports = (sequelize, Sequelize) => {
             title: { type: Sequelize.TEXT, allowNull: false },
             description: { type: Sequelize.TEXT, allowNull: true },
             youtubeLink: { type: Sequelize.TEXT, allowNull: true },
-            userProgress: { type: Sequelize.JSON, allowNull: true, defaultValue: {} }, 
+            userProgress: { 
+                type: Sequelize.JSON, // JSON type, e.g., { "eligibleForCaseStudy": true }
+                allowNull: true,
+                defaultValue: { eligibleForCaseStudy: false } 
+            },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },

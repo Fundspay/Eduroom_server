@@ -111,7 +111,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
 // ✅ Evaluate MCQs for a specific course + course preview + day
-// ✅ Evaluate MCQs for a specific course + course preview + day
+
 const evaluateDayMCQ = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -138,7 +138,6 @@ const evaluateDayMCQ = async (req, res) => {
         if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
 
         let correctCount = 0;
-        let wrongCount = 0;
         const results = [];
 
         // Evaluate each answer
@@ -148,7 +147,6 @@ const evaluateDayMCQ = async (req, res) => {
 
             const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
             if (isCorrect) correctCount++;
-            else wrongCount++;
 
             results.push({
                 mcqId: mcq.id,
@@ -165,13 +163,10 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // Safely update userProgress
-        const userProgress = dayDetail.userProgress || {};
-        userProgress[String(userId)] = { correct: correctCount, total, eligibleForCaseStudy };
-
+        // Update userProgress: store only eligibility boolean
+        const userProgress = { eligibleForCaseStudy };
         console.log("Updating userProgress for user", userId, ":", userProgress);
 
-        // Save directly since column is JSON
         await dayDetail.update({ userProgress });
         console.log("Updated userProgress for user", userId, ":", userProgress);
 
@@ -179,7 +174,7 @@ const evaluateDayMCQ = async (req, res) => {
             success: true,
             courseDetail: dayDetail,
             questions: mcqs,
-            evaluation: { totalQuestions: total, correct: correctCount, wrong: wrongCount, score, eligibleForCaseStudy, results }
+            evaluation: { totalQuestions: total, correct: correctCount, wrong: total - correctCount, score, eligibleForCaseStudy, results }
         }, 200);
 
     } catch (error) {
@@ -190,9 +185,7 @@ const evaluateDayMCQ = async (req, res) => {
 
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
 
-
 // ✅ Get all case studies for a specific day (if eligible)
-// ✅ Get case study for a specific day if user is eligible
 const getCaseStudyForDay = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -202,28 +195,22 @@ const getCaseStudyForDay = async (req, res) => {
 
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
-            include: [
-                { model: model.QuestionModel, where: { isDeleted: false }, required: false }
-            ]
+            include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
         });
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
-        // Access userProgress directly (column is JSON)
-        const userProgress = dayDetail.userProgress || {};
-        const progress = userProgress[String(userId)];
-
+        const progress = dayDetail.userProgress?.eligibleForCaseStudy;
         console.log("dayDetail.userProgress:", dayDetail.userProgress);
-        console.log("Progress for user:", progress);
+        console.log("Eligibility for user:", progress);
 
-        if (!progress || progress.eligibleForCaseStudy !== true) {
+        if (!progress) {
             return ReS(res, {
                 success: false,
                 message: "You are not eligible to attempt the Case Study yet. Complete all MCQs correctly first."
             }, 200);
         }
 
-        // Find the case study question
         const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
         if (!caseStudyQuestion) {
             return ReS(res, { success: false, message: "No Case Study available for this day." }, 200);
