@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const coursepreviewController = require("../controllers/coursepreviewController");
+const coursepreviewController = require("../controllers/coursepreview.controller");
 
 // ✅ Add a new CoursePreview
 router.post("/course-preview", coursepreviewController.addCoursePreview);
