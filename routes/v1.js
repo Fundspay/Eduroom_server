@@ -28,4 +28,4 @@ router.use("/communicationmode", communicationmodeRouter);
 router.use("/domain", domainRouter);
 router.use("/domaintype", domaintypeRouter);
 
-module.exports = router;a
+module.exports = router;
