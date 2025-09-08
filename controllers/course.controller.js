@@ -1,11 +1,11 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { uploadGeneralFile2 } = require("../middleware/s3.middleware.js"); // adjust path if needed
+const { uploadGeneralFile } = require("../middleware/s3.middleware.js"); // adjust path if needed
 
 // ✅ Add a new Course with optional image upload
 var addCourse = async (req, res) => {
-    uploadGeneralFile2.single("img")(req, res, async function (err) {
+    uploadGeneralFile.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
 
         const { name, domainId, description, businessTarget, totalDays, duration } = req.body;
@@ -19,26 +19,14 @@ var addCourse = async (req, res) => {
             const course = await model.Course.create({
                 name,
                 domainId,
-                img: req.file ? req.file.location : null,
                 description: description || null,
                 businessTarget: businessTarget || null,
                 totalDays: totalDays || null,
-                duration: duration || null
+                duration: duration || null,
+                img: req.file ? req.file.location : null, // S3 URL
             });
 
-            // Fetch course with nested domain without circular references
-            const response = await model.Course.findOne({
-                where: { id: course.id },
-                attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
-                include: [
-                    { model: model.Domain, attributes: ["id", "name"] }
-                ],
-                raw: true,
-                nest: true
-            });
-
-            return ReS(res, response, 201);
-
+            return ReS(res, course, 201);
         } catch (error) {
             return ReE(res, error.message, 422);
         }
@@ -46,52 +34,9 @@ var addCourse = async (req, res) => {
 };
 module.exports.addCourse = addCourse;
 
-// ✅ Fetch all Courses
-var fetchAllCourses = async (req, res) => {
-    try {
-        const courses = await model.Course.findAll({
-            where: { isDeleted: false },
-            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
-            include: [{ model: model.Domain, attributes: ["id", "name"] }],
-            raw: true,
-            nest: true
-        });
-
-        return ReS(res, { success: true, data: courses }, 200);
-
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
-};
-module.exports.fetchAllCourses = fetchAllCourses;
-
-// ✅ Fetch single Course
-var fetchSingleCourse = async (req, res) => {
-    const { id } = req.params;
-    if (!id) return ReE(res, "Course ID is required", 400);
-
-    try {
-        const course = await model.Course.findOne({
-            where: { id, isDeleted: false },
-            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
-            include: [{ model: model.Domain, attributes: ["id", "name"] }],
-            raw: true,
-            nest: true
-        });
-
-        if (!course) return ReE(res, "Course not found", 404);
-
-        return ReS(res, course, 200);
-
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
-};
-module.exports.fetchSingleCourse = fetchSingleCourse;
-
 // ✅ Update Course with optional image upload
 var updateCourse = async (req, res) => {
-    uploadGeneralFile2.single("img")(req, res, async function (err) {
+    uploadGeneralFile.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
 
         try {
@@ -101,30 +46,53 @@ var updateCourse = async (req, res) => {
             await course.update({
                 name: req.body.name || course.name,
                 domainId: req.body.domainId || course.domainId,
-                img: req.file ? req.file.location : course.img,
                 description: req.body.description !== undefined ? req.body.description : course.description,
                 businessTarget: req.body.businessTarget !== undefined ? req.body.businessTarget : course.businessTarget,
                 totalDays: req.body.totalDays !== undefined ? req.body.totalDays : course.totalDays,
                 duration: req.body.duration !== undefined ? req.body.duration : course.duration,
+                img: req.file ? req.file.location : course.img, // update image if uploaded
             });
 
-            // Fetch updated course without circular references
-            const updatedCourse = await model.Course.findOne({
-                where: { id: course.id },
-                attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
-                include: [{ model: model.Domain, attributes: ["id", "name"] }],
-                raw: true,
-                nest: true
-            });
-
-            return ReS(res, updatedCourse, 200);
-
+            return ReS(res, course, 200);
         } catch (error) {
             return ReE(res, error.message, 500);
         }
     });
 };
 module.exports.updateCourse = updateCourse;
+
+// ✅ Fetch all Courses
+var fetchAllCourses = async (req, res) => {
+    try {
+        const courses = await model.Course.findAll({
+            where: { isDeleted: false },
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+            include: [{ model: model.Domain, attributes: ["name"] }],
+        });
+        return ReS(res, { success: true, data: courses }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.fetchAllCourses = fetchAllCourses;
+
+// ✅ Fetch single Course by ID
+var fetchSingleCourse = async (req, res) => {
+    const { id } = req.params;
+    if (!id) return ReE(res, "Course ID is required", 400);
+
+    try {
+        const course = await model.Course.findByPk(id, {
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+            include: [{ model: model.Domain, attributes: ["name"] }],
+        });
+        if (!course) return ReE(res, "Course not found", 404);
+        return ReS(res, course, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.fetchSingleCourse = fetchSingleCourse;
 
 // ✅ Soft delete Course
 var deleteCourse = async (req, res) => {
@@ -134,7 +102,6 @@ var deleteCourse = async (req, res) => {
 
         await course.update({ isDeleted: true });
         return ReS(res, { message: "Course deleted successfully" }, 200);
-
     } catch (error) {
         return ReE(res, error.message, 500);
     }
@@ -152,14 +119,11 @@ var fetchCoursesByDomain = async (req, res) => {
 
         const courses = await model.Course.findAll({
             where: { domainId, isDeleted: false },
-            attributes: ["id", "name", "img", "description", "businessTarget", "totalDays", "duration", "domainId"],
-            include: [{ model: model.Domain, attributes: ["id", "name"] }],
-            raw: true,
-            nest: true
+            attributes: { exclude: ["createdAt", "updatedAt"] },
+            include: [{ model: model.Domain, attributes: ["name"] }],
         });
 
         return ReS(res, { success: true, data: courses }, 200);
-
     } catch (error) {
         return ReE(res, error.message, 500);
     }
