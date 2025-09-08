@@ -248,9 +248,13 @@ const getCaseStudyForDay = async (req, res) => {
         if (dayDetail.userProgress) {
             try {
                 if (typeof dayDetail.userProgress === "string") {
-                    // remove extra quotes if any, then parse
-                    const cleaned = dayDetail.userProgress.replace(/^"|"$/g, '');
-                    userProgress = JSON.parse(cleaned);
+                    let parsed = dayDetail.userProgress;
+
+                    // Keep parsing until it's an object
+                    while (typeof parsed === "string") {
+                        parsed = JSON.parse(parsed);
+                    }
+                    userProgress = parsed;
                 } else {
                     userProgress = dayDetail.userProgress;
                 }
@@ -264,6 +268,8 @@ const getCaseStudyForDay = async (req, res) => {
         const userKey = String(userId);
         const progress = userProgress && userProgress[userKey];
 
+        // 🔹 Debug logs
+        console.log("dayDetail.userProgress:", dayDetail.userProgress);
         console.log("Parsed userProgress:", userProgress);
         console.log("User key:", userKey);
         console.log("Progress for user:", progress);
