@@ -14,14 +14,7 @@ module.exports = (sequelize, Sequelize) => {
         { timestamps: true }
     );
 
-    Domain.associate = function (models) {
-        Domain.hasMany(models.Course, {
-            foreignKey: "domainId",
-            onDelete: "RESTRICT",
-            onUpdate: "RESTRICT",
-            constraints: true,
-        });
-    };
+    
 
     return Domain;
 };
