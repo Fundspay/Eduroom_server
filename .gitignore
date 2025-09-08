@@ -30,6 +30,7 @@ build/
 *.sqlite3
 db/*.sqlite
 db/*.sqlite3
+config/config.js
 
 # ────── Node Modules ──────────────────────
 node_modules/
