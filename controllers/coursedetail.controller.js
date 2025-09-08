@@ -197,6 +197,7 @@ const evaluateDayMCQ = async (req, res) => {
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
 
 // ✅ Get all case studies for a specific day (if eligible)
+// ✅ Get all case studies for a specific day (if eligible)
 const getCaseStudiesForDay = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -204,6 +205,7 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
+        // 1️⃣ Fetch CourseDetail including questions that have case studies
         const dayDetail = await model.CourseDetail.findOne({
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
@@ -217,8 +219,9 @@ const getCaseStudiesForDay = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
+        // 2️⃣ Coerce userId to string to match stored keys in JSON
         const userProgress = dayDetail.userProgress || {};
-        const progress = userProgress[String(userId)]; // ✅ always string key
+        const progress = userProgress[String(userId)]; 
 
         if (!progress || !progress.eligibleForCaseStudy) {
             return ReS(res, {
@@ -227,11 +230,13 @@ const getCaseStudiesForDay = async (req, res) => {
             }, 200);
         }
 
+        // 3️⃣ Extract case studies from the questions
         const caseStudies = dayDetail.QuestionModels.map(q => ({
             questionId: q.id,
             caseStudy: q.caseStudy
         }));
 
+        // 4️⃣ Send response
         return ReS(res, {
             success: true,
             data: {
