@@ -6,11 +6,12 @@ const router = express.Router();
 // const exampleRouter = require("./example.route");
 const userRouter = require("./user.route");
 const genderRouter = require("./gender.route")
-const contentmanagementRouter = require("./contentmanagement.route");
 const internshipmodeRouter = require("./internshipmode.route");
 const communicationmodeRouter = require("./communicationmode.route");
 const domainRouter = require("./domain.route");
-const domaintypeRouter = require("./domaintype.route");
+const courseRouter = require("./course.route");
+const coursepreviewRouter = require("./coursepreview.route");
+const coursedetailRouter = require("./coursedetail.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -22,10 +23,11 @@ router.get("/health", (req, res) => {
 // router.use("/example", exampleRouter);
 router.use("/user", userRouter);
 router.use("/gender", genderRouter);
-router.use("/contentmanagement", contentmanagementRouter);
 router.use("/internshipmode", internshipmodeRouter);
 router.use("/communicationmode", communicationmodeRouter);
 router.use("/domain", domainRouter);
-router.use("/domaintype", domaintypeRouter);
+router.use("/course", courseRouter);
+router.use("/coursepreview", coursepreviewRouter);
+router.use("/coursedetail", coursedetailRouter);
 
 module.exports = router;
