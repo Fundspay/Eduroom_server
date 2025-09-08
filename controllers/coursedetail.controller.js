@@ -110,7 +110,6 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
-// ✅ Evaluate MCQs for a specific course + course preview + day
 const evaluateDayMCQ = async (req, res) => {
     try {
         const { courseId, coursePreviewId, day } = req.params;
@@ -125,7 +124,7 @@ const evaluateDayMCQ = async (req, res) => {
             where: { courseId, coursePreviewId, day, isDeleted: false },
             include: [
                 {
-                    model: model.QuestionModel,
+                    model: model.QuestionModel, // No alias
                     where: { isDeleted: false },
                     required: false
                 }
@@ -134,6 +133,7 @@ const evaluateDayMCQ = async (req, res) => {
 
         if (!dayDetail) return ReE(res, "Day details not found", 404);
 
+        // ✅ Use default pluralized association key
         const mcqs = dayDetail.QuestionModels || [];
 
         if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
@@ -147,7 +147,7 @@ const evaluateDayMCQ = async (req, res) => {
             const mcq = mcqs.find(m => m.id === ans.mcqId);
             if (!mcq) continue;
 
-            const isCorrect = mcq.answer === ans.selectedOption; // "A"/"B"/"C"/"D"
+            const isCorrect = mcq.answer === ans.selectedOption;
 
             if (isCorrect) correctCount++;
             else wrongCount++;
@@ -178,11 +178,9 @@ const evaluateDayMCQ = async (req, res) => {
 
         // 4️⃣ Response
         return ReS(res, {
-            success: true,
-            data: {
-                courseId,
-                coursePreviewId,
-                day,
+            courseDetail: dayDetail,
+            questions: mcqs,
+            evaluation: {
                 totalQuestions: total,
                 correct: correctCount,
                 wrong: wrongCount,
@@ -199,6 +197,7 @@ const evaluateDayMCQ = async (req, res) => {
 };
 
 module.exports.evaluateDayMCQ = evaluateDayMCQ;
+
 
 // ✅ Get all case studies for a specific day (if eligible)
 const getCaseStudiesForDay = async (req, res) => {
