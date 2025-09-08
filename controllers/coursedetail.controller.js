@@ -221,22 +221,28 @@ const getCaseStudyForDay = async (req, res) => {
         // 2️⃣ Safely parse userProgress
         let userProgress = {};
         if (dayDetail.userProgress) {
-            userProgress = typeof dayDetail.userProgress === "string"
-                ? JSON.parse(dayDetail.userProgress)
-                : dayDetail.userProgress;
+            try {
+                userProgress = typeof dayDetail.userProgress === "string"
+                    ? JSON.parse(dayDetail.userProgress)
+                    : dayDetail.userProgress;
+            } catch (err) {
+                console.error("Error parsing userProgress:", err);
+                userProgress = {};
+            }
         }
 
-        // ✅ Check both string and number keys
-        const progress = userProgress[userId] || userProgress[String(userId)];
+        // 3️⃣ Normalize userId to string
+        const userKey = String(userId);
+        const progress = userProgress[userKey];
 
-        if (!progress || !progress.eligibleForCaseStudy) {
+        if (!progress || progress.eligibleForCaseStudy !== true) {
             return ReS(res, {
                 success: false,
                 message: "You are not eligible to attempt the Case Study yet. Complete all MCQs correctly first."
             }, 200);
         }
 
-        // 3️⃣ Find the single case study for the day
+        // 4️⃣ Find the single case study for the day
         const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
 
         if (!caseStudyQuestion) {
@@ -246,7 +252,7 @@ const getCaseStudyForDay = async (req, res) => {
             }, 200);
         }
 
-        // 4️⃣ Return the case study
+        // 5️⃣ Return the case study
         return ReS(res, {
             success: true,
             data: {
@@ -267,7 +273,6 @@ const getCaseStudyForDay = async (req, res) => {
 };
 
 module.exports.getCaseStudyForDay = getCaseStudyForDay;
-
 
 // ✅ Submit Case Study Answer & Evaluate
 const submitCaseStudyAnswer = async (req, res) => {
