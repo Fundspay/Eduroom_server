@@ -11,6 +11,7 @@ module.exports = (sequelize, Sequelize) => {
             businessTarget: { type: Sequelize.STRING, allowNull: true }, 
             totalDays: { type: Sequelize.INTEGER, allowNull: true },
             duration: { type: Sequelize.STRING, allowNull: true },
+            certificateCount : { type: Sequelize.INTEGER, allowNull: true },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
