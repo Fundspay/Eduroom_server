@@ -217,8 +217,13 @@ const evaluateSessionMCQ = async (req, res) => {
             delete progress.eligibleForCaseStudy;
         }
 
-        // Set eligibility for current user
-        progress[userId] = { eligibleForCaseStudy };
+        // Store both correct count and eligibility
+        progress[userId] = { 
+            correctMCQs: correctCount, 
+            totalMCQs: total,
+            eligibleForCaseStudy 
+        };
+
         await sessionDetail.update({ userProgress: progress });
 
         return ReS(res, {
@@ -242,8 +247,6 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
-
-
 
 const getCaseStudyForSession = async (req, res) => {
     try {
@@ -378,16 +381,21 @@ const getSessionStatusPerUser = async (req, res) => {
       order: [['day', 'ASC'], ['sessionNumber', 'ASC']]
     });
 
-    if (!sessions || sessions.length === 0) return res.status(404).json({ success: false, error: "No sessions found" });
+    if (!sessions || sessions.length === 0) {
+      return res.status(404).json({ success: false, error: "No sessions found" });
+    }
 
     const data = [];
 
     for (let session of sessions) {
       const totalMCQs = session.QuestionModels.length;
 
-      // Calculate correct MCQs based on userProgress for that session
+      // Get user progress safely
       const userProgress = session.userProgress || {};
-      const eligibleForCaseStudy = userProgress[userId]?.eligibleForCaseStudy || false;
+      const userData = userProgress[userId] || {};
+
+      const correctMCQs = userData.correctMCQs || 0;
+      const eligibleForCaseStudy = userData.eligibleForCaseStudy || false;
 
       // Check case study completion
       const caseStudyResults = await model.CaseStudyResult.findAll({
@@ -408,7 +416,7 @@ const getSessionStatusPerUser = async (req, res) => {
         sessionNumber: session.sessionNumber,
         title: session.title,
         totalMCQs,
-        correctMCQs: eligibleForCaseStudy ? totalMCQs : 0,
+        correctMCQs,
         eligibleForCaseStudy,
         caseStudyCompleted,
         caseStudyPassed
@@ -421,6 +429,7 @@ const getSessionStatusPerUser = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 module.exports.getSessionStatusPerUser = getSessionStatusPerUser;
 
 // ✅ Get overall course progress per user
