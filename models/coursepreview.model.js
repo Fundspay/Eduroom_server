@@ -16,11 +16,11 @@ module.exports = (sequelize, Sequelize) => {
             level: { type: Sequelize.STRING, allowNull: true },
 
             // ✅ JSON field for paragraph + bullet points
-            whatYouWillLearn: { 
-                type: Sequelize.JSON, 
-                allowNull: true,
-                defaultValue: { paragraph: "", bullets: [] } 
-            },
+            // whatYouWillLearn: { 
+            //     type: Sequelize.JSON, 
+            //     allowNull: true,
+            //     defaultValue: { paragraph: "", bullets: [] } 
+            // },
 
             duration: { type: Sequelize.STRING, allowNull: true },
 
