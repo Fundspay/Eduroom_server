@@ -271,19 +271,6 @@ var addConsent = async function (req, res) {
 };
 module.exports.addConsent = addConsent;
 
-// ✅ Fetch All Users
-var fetchAllUsers = async (req, res) => {
-    try {
-        const users = await model.User.findAll({
-            where: { isDeleted: false },
-            include: [model.Gender] // only Gender left
-        });
-        return ReS(res, { success: true, data: users }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
-};
-module.exports.fetchAllUsers = fetchAllUsers;
 
 // ✅ Fetch Single User
 var fetchSingleUser = async (req, res) => {
@@ -648,4 +635,66 @@ const fetchSingleUserById = async (req, res) => {
 };
 
 module.exports.fetchSingleUserById = fetchSingleUserById;
+
+//  Fetch All Users with full data + profile completion + subscriptions
+const fetchAllUsers = async (req, res) => {
+    try {
+        const users = await model.User.findAll({
+            where: { isDeleted: false }, // exclude deleted ones
+        });
+
+        if (!users || users.length === 0) {
+            return ReE(res, "No users found", 404);
+        }
+
+        const fields = [
+            "firstName", "lastName", "fullName", "dateOfBirth", "gender",
+            "phoneNumber", "alternatePhoneNumber", "email", "residentialAddress",
+            "emergencyContactName", "emergencyContactNumber", "city", "state", "pinCode",
+            "collegeName", "collegeRollNumber", "course", "specialization", "currentYear",
+            "currentSemester", "collegeAddress", "placementCoordinatorName",
+            "placementCoordinatorContact", "internshipProgram", "internshipDuration",
+            "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
+            "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
+            "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
+            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement"
+        ];
+
+        const formattedUsers = users.map(user => {
+            const userData = user.get({ plain: true });
+
+            // Profile completion
+            let filled = 0;
+            fields.forEach(f => {
+                if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
+            });
+            const profileCompletion = Math.round((filled / fields.length) * 100);
+
+            //  Total subscriptions
+            const totalSubscriptions = userData.businessTargets
+                ? Object.keys(userData.businessTargets).length
+                : 0;
+
+            //  Return all user fields + extra fields
+            return {
+                ...userData,
+                ProfileCompletion: profileCompletion,
+                TotalSubscriptions: totalSubscriptions
+            };
+        });
+
+        return ReS(res, { 
+            success: true, 
+            totalUsers: formattedUsers.length,
+            data: formattedUsers 
+        }, 200);
+
+    } catch (error) {
+        console.error("Fetch all users error:", error);
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.fetchAllUsers = fetchAllUsers;
+
 
