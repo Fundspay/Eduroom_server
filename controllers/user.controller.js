@@ -356,51 +356,82 @@ var deleteUser = async (req, res) => {
 };
 module.exports.deleteUser = deleteUser;
 
-// ✅ Login User
+// Unified Login for User & TeamManager
 const loginWithEmailPassword = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        const { email, password, role } = req.body;
 
-        if (!email || !password) {
-            return ReE(res, "Missing email or password", 400);
+        if (!email || !password || !role) {
+            return ReE(res, "Missing email, password or role", 400);
         }
 
-        const user = await model.User.findOne({
+        let modelRef, identifierField, payload;
+
+        if (role === "user") {
+            modelRef = model.User;
+            identifierField = "id";
+        } else if (role === "manager") {
+            modelRef = model.TeamManager;
+            identifierField = "managerId";
+        } else {
+            return ReE(res, "Invalid role specified", 400);
+        }
+
+        // Find record in the correct model
+        const account = await modelRef.findOne({
             where: { email, isDeleted: false }
         });
 
-        if (!user) return ReE(res, "Invalid credentials", 401);
+        if (!account) return ReE(res, "Invalid credentials", 401);
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Compare password
+        const isMatch = await bcrypt.compare(password, account.password);
         if (!isMatch) return ReE(res, "Invalid credentials", 401);
 
-        const isFirstLogin = !user.hasLoggedIn;
-        if (isFirstLogin) await user.update({ hasLoggedIn: true });
+        // Update login timestamp
+        const isFirstLogin = !account.hasLoggedIn;
+        if (isFirstLogin) await account.update({ hasLoggedIn: true });
+        await account.update({ lastLoginAt: new Date() });
 
-        await user.update({ lastLoginAt: new Date() });
+        // Build payload based on role
+        if (role === "user") {
+            payload = {
+                user_id: account.id,
+                firstName: account.firstName,
+                lastName: account.lastName,
+                fullName: account.fullName,
+                dateOfBirth: account.dateOfBirth,
+                gender: account.gender,
+                phoneNumber: account.phoneNumber,
+                alternatePhoneNumber: account.alternatePhoneNumber,
+                email: account.email,
+                residentialAddress: account.residentialAddress,
+                emergencyContactName: account.emergencyContactName,
+                emergencyContactNumber: account.emergencyContactNumber,
+                city: account.city,
+                state: account.state,
+                pinCode: account.pinCode,
+                role: "user"
+            };
+        } else if (role === "manager") {
+            payload = {
+                managerId: account.managerId,
+                name: account.name,
+                email: account.email,
+                mobileNumber: account.mobileNumber,
+                department: account.department,
+                position: account.position,
+                role: "manager"
+            };
+        }
 
-        // ✅ Only return allowed fields
-        const payload = {
-            user_id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            fullName: user.fullName,
-            dateOfBirth: user.dateOfBirth,
-            gender: user.gender,
-            phoneNumber: user.phoneNumber,
-            alternatePhoneNumber: user.alternatePhoneNumber,
-            email: user.email,
-            residentialAddress: user.residentialAddress,
-            emergencyContactName: user.emergencyContactName,
-            emergencyContactNumber: user.emergencyContactNumber,
-            city: user.city,
-            state: user.state,
-            pinCode: user.pinCode
-        };
-
+        // Sign JWT with role info
         const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-        return ReS(res, { success: true, user: { ...payload, isFirstLogin, token } }, 200);
+        return ReS(res, {
+            success: true,
+            account: { ...payload, isFirstLogin, token }
+        }, 200);
 
     } catch (error) {
         console.error("Login Error:", error);
@@ -410,40 +441,73 @@ const loginWithEmailPassword = async (req, res) => {
 
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
 
-// ✅ Logout User
+//  Logout User (works for both User & TeamManager)
 const logoutUser = async (req, res) => {
     try {
-        const { userId } = req.body;
+        const { id, role } = req.body;
 
-        if (!userId) {
-            return ReE(res, "Missing userId", 400);
+        if (!id || !role) {
+            return ReE(res, "Missing id or role", 400);
         }
 
-        const user = await model.User.findByPk(userId);
-        if (!user || user.isDeleted) {
-            return ReE(res, "User not found", 404);
+        let modelRef, identifierField;
+
+        if (role === "user") {
+            modelRef = model.User;
+            identifierField = "id";
+        } else if (role === "manager") {
+            modelRef = model.TeamManager;
+            identifierField = "managerId";
+        } else {
+            return ReE(res, "Invalid role specified", 400);
         }
 
-        await user.update({ lastLogoutAt: new Date() });
+        //  Find the record
+        const account = await modelRef.findOne({
+            where: { [identifierField]: id, isDeleted: false }
+        });
 
-        return ReS(res, { success: true, message: "Logged out successfully" }, 200);
+        if (!account) {
+            return ReE(res, `${role} not found`, 404);
+        }
+
+        //  Update logout timestamp
+        await account.update({ lastLogoutAt: new Date() });
+
+        return ReS(res, {
+            success: true,
+            message: `${role} logged out successfully`
+        }, 200);
+
     } catch (error) {
         console.error("Logout Error:", error);
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.logoutUser = logoutUser;
 
-// ✅ Request Password Reset
+
+//  Request Password Reset (works for both User & TeamManager)
 const requestPasswordReset = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, role } = req.body;
 
-        if (!email) return ReE(res, "Email is required", 400);
+        if (!email || !role) return ReE(res, "Email and role are required", 400);
 
-        const user = await model.User.findOne({ where: { email, isDeleted: false } });
+        let modelRef;
 
-        if (!user) {
+        if (role === "user") {
+            modelRef = model.User;
+        } else if (role === "manager") {
+            modelRef = model.TeamManager;
+        } else {
+            return ReE(res, "Invalid role specified", 400);
+        }
+
+        const account = await modelRef.findOne({ where: { email, isDeleted: false } });
+
+        if (!account) {
             // Generic response to prevent user enumeration
             return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
         }
@@ -452,29 +516,29 @@ const requestPasswordReset = async (req, res) => {
         const resetToken = crypto.randomBytes(32).toString("hex");
         const resetTokenExpiry = Date.now() + 3600000; // 1 hour
 
-        await user.update({ resetToken, resetTokenExpiry });
+        await account.update({ resetToken, resetTokenExpiry });
 
         // Generate password reset link
         const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
         const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
 
-        // Email template
+        //  Email template
         const htmlContent = `
-      <h3>Hello ${user.firstName},</h3>
-      <p>You requested a password reset for your EduRoom account.</p>
-      <p>Click the link below to reset your password (valid for 1 hour):</p>
-      <p><a href="${resetUrl}" target="_blank" style="color:#007bff; text-decoration:underline;">Reset Password</a></p>
-      <br>
-      <p>If you didn’t request this, you can safely ignore this email.</p>
-      <p>– The EduRoom Team</p>
-    `;
+          <h3>Hello ${account.name || account.firstName},</h3>
+          <p>You requested a password reset for your EduRoom account.</p>
+          <p>Click the link below to reset your password (valid for 1 hour):</p>
+          <p><a href="${resetUrl}" target="_blank" style="color:#007bff; text-decoration:underline;">Reset Password</a></p>
+          <br>
+          <p>If you didn’t request this, you can safely ignore this email.</p>
+          <p>– The EduRoom Team</p>
+        `;
 
-        // ✅ Capture mail result
+        // Send email
         const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
-        console.log(" Password Reset Email Result:", mailResult);
+        console.log("Password Reset Email Result:", mailResult);
 
         if (!mailResult.success) {
-            console.error(" Failed to send reset email:", mailResult.error);
+            console.error("Failed to send reset email:", mailResult.error);
             return ReE(res, "Failed to send reset email. Please try again later.", 500);
         }
 
@@ -485,18 +549,30 @@ const requestPasswordReset = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.requestPasswordReset = requestPasswordReset;
 
-// ✅ Reset Password
+
+// Reset Password (works for both User & TeamManager)
 const resetPassword = async (req, res) => {
     try {
-        const { email, token, newPassword } = req.body;
+        const { email, token, newPassword, role } = req.body;
 
-        if (!email || !token || !newPassword) {
+        if (!email || !token || !newPassword || !role) {
             return ReE(res, "All fields are required", 400);
         }
 
-        const user = await model.User.findOne({
+        let modelRef;
+
+        if (role === "user") {
+            modelRef = model.User;
+        } else if (role === "manager") {
+            modelRef = model.TeamManager;
+        } else {
+            return ReE(res, "Invalid role specified", 400);
+        }
+
+        const account = await modelRef.findOne({
             where: {
                 email,
                 resetToken: token,
@@ -505,11 +581,11 @@ const resetPassword = async (req, res) => {
             },
         });
 
-        if (!user) return ReE(res, "Invalid or expired reset token", 400);
+        if (!account) return ReE(res, "Invalid or expired reset token", 400);
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-        await user.update({
+        await account.update({
             password: hashedPassword,
             resetToken: null,
             resetTokenExpiry: null,
@@ -524,38 +600,50 @@ const resetPassword = async (req, res) => {
 
 module.exports.resetPassword = resetPassword;
 
+
+//  Google Login (works for both User & TeamManager)
 const loginWithGoogle = async (req, res) => {
     try {
+        const { role } = req.body; // role must be "user" or "manager"
         const firebaseUser = req.user; // Comes from firebaseAuth middleware
 
-        // Find existing user
-        const user = await model.User.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
-        if (!user) return ReE(res, "User not found. Please register first.", 404);
+        if (!role || (role !== "user" && role !== "manager")) {
+            return ReE(res, "Invalid or missing role", 400);
+        }
+
+        const modelRef = role === "user" ? model.User : model.TeamManager;
+
+        // Find existing account
+        const account = await modelRef.findOne({
+            where: { email: firebaseUser.email, isDeleted: false }
+        });
+
+        if (!account) return ReE(res, `${role === "user" ? "User" : "Manager"} not found. Please register first.`, 404);
 
         // Mark first login if needed
         let isFirstLogin = false;
-        if (!user.hasLoggedIn) {
-            await user.update({ hasLoggedIn: true });
+        if (!account.hasLoggedIn) {
+            await account.update({ hasLoggedIn: true });
             isFirstLogin = true;
         }
 
-        // ✅ Only return the allowed fields
+        //  Only return allowed fields
         const payload = {
-            user_id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            fullName: user.fullName,
-            dateOfBirth: user.dateOfBirth,
-            gender: user.gender,
-            phoneNumber: user.phoneNumber,
-            alternatePhoneNumber: user.alternatePhoneNumber,
-            email: user.email,
-            residentialAddress: user.residentialAddress,
-            emergencyContactName: user.emergencyContactName,
-            emergencyContactNumber: user.emergencyContactNumber,
-            city: user.city,
-            state: user.state,
-            pinCode: user.pinCode
+            user_id: account.id,
+            firstName: account.firstName,
+            lastName: account.lastName,
+            fullName: account.fullName || `${account.firstName} ${account.lastName}`,
+            dateOfBirth: account.dateOfBirth || null,
+            gender: account.gender || null,
+            phoneNumber: account.phoneNumber || null,
+            alternatePhoneNumber: account.alternatePhoneNumber || null,
+            email: account.email,
+            residentialAddress: account.residentialAddress || null,
+            emergencyContactName: account.emergencyContactName || null,
+            emergencyContactNumber: account.emergencyContactNumber || null,
+            city: account.city || null,
+            state: account.state || null,
+            pinCode: account.pinCode || null
         };
 
         const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
@@ -569,3 +657,4 @@ const loginWithGoogle = async (req, res) => {
 };
 
 module.exports.loginWithGoogle = loginWithGoogle;
+
