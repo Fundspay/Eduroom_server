@@ -500,60 +500,39 @@ const getOverallCourseStatus = async (req, res) => {
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
 
-// ✅ Get business target for a user per course
 const getBusinessTarget = async (req, res) => {
   try {
     const { userId, courseId } = req.params;
 
-    // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Fetch course
     const course = await model.Course.findByPk(courseId);
     if (!course) return ReE(res, "Course not found", 404);
 
-    // 3️⃣ Check if user has referral code
     const referralCode = user.referralCode;
     let referralCount = 0;
 
     if (referralCode) {
-      // ✅ Call external API to get number of referrals
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${referralCode}`;
       const apiResponse = await axios.get(apiUrl);
-
       referralCount = apiResponse.data?.referral_count || 0;
     }
 
-    // 4️⃣ Calculate business target (example: each referral = 10 units)
     const businessTarget = referralCount * 10;
 
-    // 5️⃣ Save or update UserCourse
-    let userCourse = await model.UserCourse.findOne({
-      where: { userId, courseId }
-    });
+    let userCourse = await model.UserCourse.findOne({ where: { userId, courseId } });
 
     if (!userCourse) {
-      userCourse = await model.UserCourse.create({
-        userId,
-        courseId,
-        businessTarget
-      });
+      userCourse = await model.UserCourse.create({ userId, courseId, businessTarget });
     } else {
       userCourse.businessTarget = businessTarget;
       await userCourse.save();
     }
 
-    // 6️⃣ Return response
     return ReS(res, {
       success: true,
-      data: {
-        userId,
-        courseId,
-        referralCode,
-        referralCount,
-        businessTarget
-      }
+      data: { userId, courseId, referralCode, referralCount, businessTarget }
     }, 200);
 
   } catch (error) {
