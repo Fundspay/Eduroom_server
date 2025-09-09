@@ -5,22 +5,21 @@ const axios = require('axios');
 
 
 // ✅ Add CourseDetail with Questions for a specific day (multiple sessions)
-var addCourseDetail = async (req, res) => {
+// ✅ Add CourseDetail with Questions for multiple days and sessions
+var addCourseDetails = async (req, res) => {
     const {
         domainId,
         userId,
         courseId,
         coursePreviewId,
-        day,
-        sessions // Array of sessions for this day
+        days // Array of days, each containing sessions
     } = req.body;
 
     // Basic validations
     if (!domainId) return ReE(res, "domainId is required", 400);
     if (!courseId) return ReE(res, "courseId is required", 400);
     if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
-    if (!day) return ReE(res, "day is required", 400);
-    if (!Array.isArray(sessions) || sessions.length === 0) return ReE(res, "sessions are required", 400);
+    if (!Array.isArray(days) || days.length === 0) return ReE(res, "days are required", 400);
 
     try {
         // Check if course and course preview exist
@@ -30,69 +29,84 @@ var addCourseDetail = async (req, res) => {
         const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
         if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
 
-        const createdSessions = [];
+        const createdDays = [];
 
-        // Loop through each session and create CourseDetail + Questions
-        for (const session of sessions) {
-            const { sessionNumber, title, description, youtubeLink, questions } = session;
+        // Loop through each day
+        for (const dayObj of days) {
+            const { day, sessions } = dayObj;
 
-            if (!sessionNumber) return ReE(res, "sessionNumber is required for each session", 400);
-            if (!title) return ReE(res, "title is required for each session", 400);
+            if (!day) return ReE(res, "day is required for each day object", 400);
+            if (!Array.isArray(sessions) || sessions.length === 0) return ReE(res, `sessions are required for day ${day}`, 400);
 
-            // Create CourseDetail for this session
-            const courseDetail = await model.CourseDetail.create({
-                domainId,
-                courseId,
-                coursePreviewId,
-                day,
-                sessionNumber,
-                userId,
-                title,
-                description: description || null,
-                youtubeLink: youtubeLink || null
-            });
+            const createdSessions = [];
 
-            // Add MCQs if provided
-            let questionRecords = [];
-            if (Array.isArray(questions) && questions.length > 0) {
-                questionRecords = questions.map(q => ({
-                    courseDetailId: courseDetail.id,
+            // Loop through each session
+            for (const session of sessions) {
+                const { sessionNumber, title, description, youtubeLink, questions } = session;
+
+                if (!sessionNumber) return ReE(res, "sessionNumber is required for each session", 400);
+                if (!title) return ReE(res, "title is required for each session", 400);
+
+                // Create CourseDetail for this session
+                const courseDetail = await model.CourseDetail.create({
                     domainId,
                     courseId,
                     coursePreviewId,
                     day,
                     sessionNumber,
-                    question: q.question,
-                    optionA: q.optionA,
-                    optionB: q.optionB,
-                    optionC: q.optionC,
-                    optionD: q.optionD,
-                    answer: q.answer,
-                    keywords: q.keywords || null,
-                    caseStudy: q.caseStudy || null
-                }));
+                    userId,
+                    title,
+                    description: description || null,
+                    youtubeLink: youtubeLink || null
+                });
 
-                await model.QuestionModel.bulkCreate(questionRecords);
+                // Add MCQs if provided
+                let questionRecords = [];
+                if (Array.isArray(questions) && questions.length > 0) {
+                    questionRecords = questions.map(q => ({
+                        courseDetailId: courseDetail.id,
+                        domainId,
+                        courseId,
+                        coursePreviewId,
+                        day,
+                        sessionNumber,
+                        question: q.question,
+                        optionA: q.optionA,
+                        optionB: q.optionB,
+                        optionC: q.optionC,
+                        optionD: q.optionD,
+                        answer: q.answer,
+                        keywords: q.keywords || null,
+                        caseStudy: q.caseStudy || null
+                    }));
+
+                    await model.QuestionModel.bulkCreate(questionRecords);
+                }
+
+                createdSessions.push({
+                    courseDetail,
+                    questions: questionRecords
+                });
             }
 
-            createdSessions.push({
-                courseDetail,
-                questions: questionRecords
+            createdDays.push({
+                day,
+                sessions: createdSessions
             });
         }
 
         return ReS(res, {
             success: true,
-            day,
-            sessions: createdSessions
+            days: createdDays
         }, 201);
 
     } catch (error) {
+        console.error("Add Course Details Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 
-module.exports.addCourseDetail = addCourseDetail;
+module.exports.addCourseDetails = addCourseDetails;
 
 
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
