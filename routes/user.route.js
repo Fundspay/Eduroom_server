@@ -31,4 +31,6 @@ router.post("/password/reset", userController.resetPassword);
 router.post("/logout", userController.logoutUser);
 router.post('/google-login', firebaseAuth, userController.loginWithGoogle);
 
+router.get("/profile/:id", userController.fetchSingleUserById);
+
 module.exports = router;

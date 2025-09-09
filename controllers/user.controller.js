@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const { Op } = require("sequelize");
 const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
+const CONFIG = require("../config/config.js");
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -356,44 +357,31 @@ var deleteUser = async (req, res) => {
 };
 module.exports.deleteUser = deleteUser;
 
-// Unified Login for User & TeamManager
+// ===================== LOGIN =====================
 const loginWithEmailPassword = async (req, res) => {
     try {
-        const { email, password, role } = req.body;
+        const { email, password } = req.body;
 
-        if (!email || !password || !role) {
-            return ReE(res, "Missing email, password or role", 400);
+        if (!email || !password) return ReE(res, "Missing email or password", 400);
+
+        let account = await model.User.findOne({ where: { email, isDeleted: false } });
+        let role = "user";
+
+        if (!account) {
+            account = await model.TeamManager.findOne({ where: { email, isDeleted: false } });
+            role = "manager";
         }
-
-        let modelRef, identifierField, payload;
-
-        if (role === "user") {
-            modelRef = model.User;
-            identifierField = "id";
-        } else if (role === "manager") {
-            modelRef = model.TeamManager;
-            identifierField = "managerId";
-        } else {
-            return ReE(res, "Invalid role specified", 400);
-        }
-
-        // Find record in the correct model
-        const account = await modelRef.findOne({
-            where: { email, isDeleted: false }
-        });
 
         if (!account) return ReE(res, "Invalid credentials", 401);
 
-        // Compare password
         const isMatch = await bcrypt.compare(password, account.password);
         if (!isMatch) return ReE(res, "Invalid credentials", 401);
 
-        // Update login timestamp
         const isFirstLogin = !account.hasLoggedIn;
         if (isFirstLogin) await account.update({ hasLoggedIn: true });
         await account.update({ lastLoginAt: new Date() });
 
-        // Build payload based on role
+        let payload;
         if (role === "user") {
             payload = {
                 user_id: account.id,
@@ -411,9 +399,8 @@ const loginWithEmailPassword = async (req, res) => {
                 city: account.city,
                 state: account.state,
                 pinCode: account.pinCode,
-                role: "user"
             };
-        } else if (role === "manager") {
+        } else {
             payload = {
                 managerId: account.managerId,
                 name: account.name,
@@ -421,108 +408,71 @@ const loginWithEmailPassword = async (req, res) => {
                 mobileNumber: account.mobileNumber,
                 department: account.department,
                 position: account.position,
-                role: "manager"
             };
         }
 
-        // Sign JWT with role info
-        const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
+        const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-        return ReS(res, {
-            success: true,
-            account: { ...payload, isFirstLogin, token }
-        }, 200);
+        return ReS(res, { success: true, account: { ...payload, isFirstLogin, token, role } }, 200);
 
     } catch (error) {
         console.error("Login Error:", error);
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
 
-//  Logout User (works for both User & TeamManager)
+// ===================== LOGOUT =====================
 const logoutUser = async (req, res) => {
     try {
-        const { id, role } = req.body;
+        const { id } = req.body;
+        if (!id) return ReE(res, "Missing id", 400);
 
-        if (!id || !role) {
-            return ReE(res, "Missing id or role", 400);
-        }
-
-        let modelRef, identifierField;
-
-        if (role === "user") {
-            modelRef = model.User;
-            identifierField = "id";
-        } else if (role === "manager") {
-            modelRef = model.TeamManager;
-            identifierField = "managerId";
-        } else {
-            return ReE(res, "Invalid role specified", 400);
-        }
-
-        //  Find the record
-        const account = await modelRef.findOne({
-            where: { [identifierField]: id, isDeleted: false }
-        });
+        let account = await model.User.findOne({ where: { id, isDeleted: false } });
+        let role = "user";
 
         if (!account) {
-            return ReE(res, `${role} not found`, 404);
+            account = await model.TeamManager.findOne({ where: { managerId: id, isDeleted: false } });
+            role = "manager";
         }
 
-        //  Update logout timestamp
+        if (!account) return ReE(res, "Account not found", 404);
+
         await account.update({ lastLogoutAt: new Date() });
 
-        return ReS(res, {
-            success: true,
-            message: `${role} logged out successfully`
-        }, 200);
+        return ReS(res, { success: true, message: `${role} logged out successfully` }, 200);
 
     } catch (error) {
         console.error("Logout Error:", error);
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.logoutUser = logoutUser;
 
-
-//  Request Password Reset (works for both User & TeamManager)
+// ===================== REQUEST PASSWORD RESET =====================
 const requestPasswordReset = async (req, res) => {
     try {
-        const { email, role } = req.body;
+        const { email } = req.body;
+        if (!email) return ReE(res, "Email is required", 400);
 
-        if (!email || !role) return ReE(res, "Email and role are required", 400);
-
-        let modelRef;
-
-        if (role === "user") {
-            modelRef = model.User;
-        } else if (role === "manager") {
-            modelRef = model.TeamManager;
-        } else {
-            return ReE(res, "Invalid role specified", 400);
-        }
-
-        const account = await modelRef.findOne({ where: { email, isDeleted: false } });
+        let account = await model.User.findOne({ where: { email, isDeleted: false } });
+        let role = "user";
 
         if (!account) {
-            // Generic response to prevent user enumeration
-            return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
+            account = await model.TeamManager.findOne({ where: { email, isDeleted: false } });
+            role = "manager";
         }
 
-        // Generate secure token
+        if (!account) return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
+
         const resetToken = crypto.randomBytes(32).toString("hex");
-        const resetTokenExpiry = Date.now() + 3600000; // 1 hour
+        const resetTokenExpiry = Date.now() + 3600000;
 
         await account.update({ resetToken, resetTokenExpiry });
 
-        // Generate password reset link
         const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
         const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
 
-        //  Email template
         const htmlContent = `
           <h3>Hello ${account.name || account.firstName},</h3>
           <p>You requested a password reset for your EduRoom account.</p>
@@ -533,14 +483,8 @@ const requestPasswordReset = async (req, res) => {
           <p>– The EduRoom Team</p>
         `;
 
-        // Send email
         const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
-        console.log("Password Reset Email Result:", mailResult);
-
-        if (!mailResult.success) {
-            console.error("Failed to send reset email:", mailResult.error);
-            return ReE(res, "Failed to send reset email. Please try again later.", 500);
-        }
+        if (!mailResult.success) return ReE(res, "Failed to send reset email", 500);
 
         return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
 
@@ -549,47 +493,40 @@ const requestPasswordReset = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.requestPasswordReset = requestPasswordReset;
 
-
-// Reset Password (works for both User & TeamManager)
+// ===================== RESET PASSWORD =====================
 const resetPassword = async (req, res) => {
     try {
-        const { email, token, newPassword, role } = req.body;
+        const { email, token, newPassword } = req.body;
+        if (!email || !token || !newPassword) return ReE(res, "All fields are required", 400);
 
-        if (!email || !token || !newPassword || !role) {
-            return ReE(res, "All fields are required", 400);
-        }
-
-        let modelRef;
-
-        if (role === "user") {
-            modelRef = model.User;
-        } else if (role === "manager") {
-            modelRef = model.TeamManager;
-        } else {
-            return ReE(res, "Invalid role specified", 400);
-        }
-
-        const account = await modelRef.findOne({
+        let account = await model.User.findOne({
             where: {
                 email,
                 resetToken: token,
                 resetTokenExpiry: { [Op.gt]: Date.now() },
                 isDeleted: false,
-            },
+            }
         });
+        let role = "user";
+
+        if (!account) {
+            account = await model.TeamManager.findOne({
+                where: {
+                    email,
+                    resetToken: token,
+                    resetTokenExpiry: { [Op.gt]: Date.now() },
+                    isDeleted: false,
+                }
+            });
+            role = "manager";
+        }
 
         if (!account) return ReE(res, "Invalid or expired reset token", 400);
 
         const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-        await account.update({
-            password: hashedPassword,
-            resetToken: null,
-            resetTokenExpiry: null,
-        });
+        await account.update({ password: hashedPassword, resetToken: null, resetTokenExpiry: null });
 
         return ReS(res, { message: "Password has been reset successfully" }, 200);
 
@@ -597,45 +534,35 @@ const resetPassword = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.resetPassword = resetPassword;
 
-
-//  Google Login (works for both User & TeamManager)
+// ===================== GOOGLE LOGIN =====================
 const loginWithGoogle = async (req, res) => {
     try {
-        const { role } = req.body; // role must be "user" or "manager"
-        const firebaseUser = req.user; // Comes from firebaseAuth middleware
+        const firebaseUser = req.user;
 
-        if (!role || (role !== "user" && role !== "manager")) {
-            return ReE(res, "Invalid or missing role", 400);
+        let account = await model.User.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
+        let role = "user";
+
+        if (!account) {
+            account = await model.TeamManager.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
+            role = "manager";
         }
 
-        const modelRef = role === "user" ? model.User : model.TeamManager;
+        if (!account) return ReE(res, "Account not found. Please register first.", 404);
 
-        // Find existing account
-        const account = await modelRef.findOne({
-            where: { email: firebaseUser.email, isDeleted: false }
-        });
+        let isFirstLogin = !account.hasLoggedIn;
+        if (isFirstLogin) await account.update({ hasLoggedIn: true });
 
-        if (!account) return ReE(res, `${role === "user" ? "User" : "Manager"} not found. Please register first.`, 404);
-
-        // Mark first login if needed
-        let isFirstLogin = false;
-        if (!account.hasLoggedIn) {
-            await account.update({ hasLoggedIn: true });
-            isFirstLogin = true;
-        }
-
-        //  Only return allowed fields
         const payload = {
-            user_id: account.id,
-            firstName: account.firstName,
-            lastName: account.lastName,
-            fullName: account.fullName || `${account.firstName} ${account.lastName}`,
+            user_id: account.id || null,
+            managerId: account.managerId || null,
+            firstName: account.firstName || null,
+            lastName: account.lastName || null,
+            fullName: account.fullName || account.name || `${account.firstName || ""} ${account.lastName || ""}`,
             dateOfBirth: account.dateOfBirth || null,
             gender: account.gender || null,
-            phoneNumber: account.phoneNumber || null,
+            phoneNumber: account.phoneNumber || account.mobileNumber || null,
             alternatePhoneNumber: account.alternatePhoneNumber || null,
             email: account.email,
             residentialAddress: account.residentialAddress || null,
@@ -643,18 +570,82 @@ const loginWithGoogle = async (req, res) => {
             emergencyContactNumber: account.emergencyContactNumber || null,
             city: account.city || null,
             state: account.state || null,
-            pinCode: account.pinCode || null
+            pinCode: account.pinCode || null,
         };
 
-        const token = jwt.sign(payload, CONFIG.jwtSecret, { expiresIn: "365d" });
+        const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-        return ReS(res, { success: true, user: { ...payload, isFirstLogin, token } });
+        return ReS(res, { success: true, user: { ...payload, isFirstLogin, token, role } });
 
     } catch (error) {
         console.error("Google login failed:", error);
         return ReE(res, "Login failed", 500);
     }
 };
-
 module.exports.loginWithGoogle = loginWithGoogle;
+
+//  Fetch Single User Info by ID with profile completion and filtered fields
+const fetchSingleUserById = async (req, res) => {
+    try {
+        const { id } = req.params; // get ID from URL
+
+        if (!id) {
+            return ReE(res, "Missing user ID", 400);
+        }
+
+        const user = await model.User.findByPk(id);
+
+        if (!user || user.isDeleted) {
+            return ReE(res, "User not found", 404);
+        }
+
+        const userData = user.get({ plain: true });
+
+        //  Calculate profile completion
+        const fields = [
+            "firstName", "lastName", "fullName", "dateOfBirth", "gender",
+            "phoneNumber", "alternatePhoneNumber", "email", "residentialAddress",
+            "emergencyContactName", "emergencyContactNumber", "city", "state", "pinCode",
+            "collegeName", "collegeRollNumber", "course", "specialization", "currentYear",
+            "currentSemester", "collegeAddress", "placementCoordinatorName",
+            "placementCoordinatorContact", "internshipProgram", "internshipDuration",
+            "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
+            "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
+            "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
+            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement"
+        ];
+
+        let filled = 0;
+        fields.forEach(f => {
+            if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
+        });
+
+        const profileCompletion = Math.round((filled / fields.length) * 100);
+
+        //  Calculate total subscriptions
+        const totalSubscriptions = userData.businessTargets
+            ? Object.keys(userData.businessTargets).length
+            : 0;
+
+        //  Prepare filtered response
+        const filteredData = {
+            Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
+            Email: userData.email,
+            PhoneNumber: userData.phoneNumber,
+            CollegeName: userData.collegeName,
+            ReferralCode: userData.referralCode,
+            ReferralLink: userData.referralLink,
+            ProfileCompletion: profileCompletion,
+            TotalSubscriptions: totalSubscriptions
+        };
+
+        return ReS(res, { success: true, data: filteredData }, 200);
+
+    } catch (error) {
+        console.error("Fetch user error:", error);
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.fetchSingleUserById = fetchSingleUserById;
 
