@@ -44,4 +44,11 @@ router.get(
   coursedetailController.getBusinessTarget
 );
 
+//  Get daily status for a user
+router.get(
+  "/course/:courseId/preview/:coursePreviewId/user/:userId/dailystatus",
+  coursedetailController.getDailyStatusPerUser
+);
+
+
 module.exports = router;

@@ -463,6 +463,65 @@ const getOverallCourseStatus = async (req, res) => {
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
+// ✅ Daily status for a user (group by day)
+const getDailyStatusPerUser = async (req, res) => {
+    try {
+        const { courseId, coursePreviewId, userId } = req.params;
+
+        // Fetch all sessions for this course preview
+        const sessions = await model.CourseDetail.findAll({
+            where: { courseId, coursePreviewId, isDeleted: false },
+            order: [["day", "ASC"], ["sessionNumber", "ASC"]]
+        });
+
+        if (sessions.length === 0) return ReE(res, "No sessions found for this course", 404);
+
+        const daysMap = {};
+
+        sessions.forEach(session => {
+            const progress = session.userProgress?.[userId];
+            const eligible = progress?.eligibleForCaseStudy || false;
+
+            if (!daysMap[session.day]) {
+                daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+            }
+
+            daysMap[session.day].total++;
+            if (eligible) daysMap[session.day].completed++;
+
+            daysMap[session.day].sessions.push({
+                sessionNumber: session.sessionNumber,
+                title: session.title,
+                attempted: !!progress,
+                correctMCQs: progress?.correctMCQs || 0,
+                totalMCQs: progress?.totalMCQs || 0,
+                eligibleForCaseStudy: eligible
+            });
+        });
+
+        // Build final daily status response
+        const dailyStatus = Object.keys(daysMap).map(dayKey => {
+            const d = daysMap[dayKey];
+            return {
+                day: Number(dayKey),
+                totalSessions: d.total,
+                completedSessions: d.completed,
+                fullyCompleted: d.completed === d.total, // ✅ user completed all sessions in this day
+                sessions: d.sessions
+            };
+        });
+
+        return ReS(res, { success: true, dailyStatus }, 200);
+
+    } catch (error) {
+        console.error("Get Daily Status Error:", error);
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
+
+
 
 
 const getBusinessTarget = async (req, res) => {
