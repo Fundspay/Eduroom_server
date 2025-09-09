@@ -8,7 +8,7 @@ var addCourse = async (req, res) => {
     uploadGeneralFile.single("img")(req, res, async function (err) {
         if (err) return ReE(res, err.message, 422);
 
-        const { name, domainId, description, businessTarget, totalDays, duration } = req.body;
+        const { name, domainId, description, businessTarget, totalDays, duration, certificateCount } = req.body;
         if (!name) return ReE(res, "Course name is required", 400);
         if (!domainId) return ReE(res, "Domain ID is required", 400);
 
@@ -23,6 +23,7 @@ var addCourse = async (req, res) => {
                 businessTarget: businessTarget || null,
                 totalDays: totalDays || null,
                 duration: duration || null,
+                certificateCount: certificateCount || null,
                 img: req.file ? req.file.location : null, // S3 URL
             });
 
