@@ -6,7 +6,7 @@ const axios = require('axios');
 
 // ✅ Add CourseDetail with Questions for a specific day (multiple sessions)
 // ✅ Add CourseDetail with Questions for multiple days and sessions
-var addCourseDetails = async (req, res) => {
+var addCourseDetail = async (req, res) => {
     const {
         domainId,
         userId,
@@ -106,7 +106,7 @@ var addCourseDetails = async (req, res) => {
     }
 };
 
-module.exports.addCourseDetails = addCourseDetails;
+module.exports.addCourseDetail = addCourseDetail;
 
 
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
