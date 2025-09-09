@@ -538,44 +538,43 @@ const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
-    // Convert IDs to numbers (safety)
+    // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
     if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
 
-    // Fetch user
+    // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Get referral count from external API
-    const referralCode = user.referralCode;
-    let referralCount = 0;
+    // 2️⃣ Fetch course
+    const course = await model.Course.findByPk(courseId);
+    if (!course) return ReE(res, "Course not found", 404);
 
-    if (referralCode) {
-      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${referralCode}`;
+    const businessTarget = course.businessTarget || 0;
+
+    // 3️⃣ Fetch referral count from external API
+    let referralCount = 0;
+    if (user.referralCode) {
+      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
       const apiResponse = await axios.get(apiUrl);
       referralCount = Number(apiResponse.data?.referral_count) || 0;
     }
 
-    // Calculate business target (1 referral = 10 units)
-    const businessTarget = referralCount * 10;
+    // 4️⃣ Calculate achieved units (assuming 1 referral = 10 units)
+    const achievedCount = referralCount * 10;
+    const remaining = Math.max(businessTarget - achievedCount, 0);
 
-    // Update per-course in user.businessTargets JSON
-    const userBusinessTargets = user.businessTargets || {};
-    userBusinessTargets[courseId] = businessTarget;
-
-    await user.update({ businessTargets: userBusinessTargets });
-
-    // Return response
+    // 5️⃣ Return response
     return ReS(res, {
       success: true,
       data: {
         userId,
         courseId,
-        referralCode,
-        referralCount,
-        businessTarget
+        businessTarget,
+        achievedCount,
+        remaining
       }
     }, 200);
 
