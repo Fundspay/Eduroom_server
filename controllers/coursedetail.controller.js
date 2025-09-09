@@ -502,37 +502,47 @@ module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
 const getBusinessTarget = async (req, res) => {
   try {
-    const { userId, courseId } = req.params;
+    let { userId, courseId } = req.params;
 
+    // Convert IDs to numbers (safety)
+    userId = parseInt(userId, 10);
+    courseId = parseInt(courseId, 10);
+
+    if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
+
+    // Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    const course = await model.Course.findByPk(courseId);
-    if (!course) return ReE(res, "Course not found", 404);
-
+    // Get referral count from external API
     const referralCode = user.referralCode;
     let referralCount = 0;
 
     if (referralCode) {
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${referralCode}`;
       const apiResponse = await axios.get(apiUrl);
-      referralCount = apiResponse.data?.referral_count || 0;
+      referralCount = Number(apiResponse.data?.referral_count) || 0;
     }
 
+    // Calculate business target (1 referral = 10 units)
     const businessTarget = referralCount * 10;
 
-    let userCourse = await model.UserCourse.findOne({ where: { userId, courseId } });
+    // Update per-course in user.businessTargets JSON
+    const userBusinessTargets = user.businessTargets || {};
+    userBusinessTargets[courseId] = businessTarget;
 
-    if (!userCourse) {
-      userCourse = await model.UserCourse.create({ userId, courseId, businessTarget });
-    } else {
-      userCourse.businessTarget = businessTarget;
-      await userCourse.save();
-    }
+    await user.update({ businessTargets: userBusinessTargets });
 
+    // Return response
     return ReS(res, {
       success: true,
-      data: { userId, courseId, referralCode, referralCount, businessTarget }
+      data: {
+        userId,
+        courseId,
+        referralCode,
+        referralCount,
+        businessTarget
+      }
     }, 200);
 
   } catch (error) {
