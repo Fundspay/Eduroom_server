@@ -209,37 +209,46 @@ const evaluateSessionMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Update session-level userProgress **per user**
-        let progress = sessionDetail.userProgress || {};
-
-        // Remove old global key if exists
-        if (progress.hasOwnProperty("eligibleForCaseStudy")) {
-            delete progress.eligibleForCaseStudy;
+        // ✅ Normalize userProgress into an object
+        let progress = {};
+        if (sessionDetail.userProgress) {
+            if (typeof sessionDetail.userProgress === "string") {
+                try {
+                    progress = JSON.parse(sessionDetail.userProgress);
+                } catch (e) {
+                    console.warn("Invalid JSON in userProgress:", sessionDetail.userProgress);
+                }
+            } else {
+                progress = sessionDetail.userProgress;
+            }
         }
 
-        // Store both correct count and eligibility
-        progress[userId] = { 
-            correctMCQs: correctCount, 
+        // ✅ Store per-user progress
+        progress[userId] = {
+            correctMCQs: correctCount,
             totalMCQs: total,
-            eligibleForCaseStudy 
+            eligibleForCaseStudy
         };
 
         await sessionDetail.update({ userProgress: progress });
 
-        return ReS(res, {
-            success: true,
-            courseDetail: sessionDetail,
-            questions: mcqs,
-            evaluation: {
-                totalQuestions: total,
-                correct: correctCount,
-                wrong: total - correctCount,
-                score,
-                eligibleForCaseStudy,
-                results
-            }
-        }, 200);
-
+        return ReS(
+            res,
+            {
+                success: true,
+                courseDetail: sessionDetail,
+                questions: mcqs,
+                evaluation: {
+                    totalQuestions: total,
+                    correct: correctCount,
+                    wrong: total - correctCount,
+                    score,
+                    eligibleForCaseStudy,
+                    results
+                }
+            },
+            200
+        );
     } catch (error) {
         console.error("Evaluate Session MCQ Error:", error);
         return ReE(res, error.message, 500);
