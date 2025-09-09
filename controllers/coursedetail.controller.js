@@ -368,12 +368,14 @@ module.exports.submitCaseStudyAnswer = submitCaseStudyAnswer;
 // ✅ Get session-wise status per user for a course + course preview
 const getSessionStatusPerUser = async (req, res) => {
     try {
-        const { userId, courseId, coursePreviewId } = req.params;
+        let { courseId, coursePreviewId, userId } = req.params;
+        userId = parseInt(userId, 10);
+        courseId = parseInt(courseId, 10);
 
-        if (!userId) return ReE(res, "userId is required", 400);
+        if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
 
-        // 1️⃣ Fetch all CourseDetail sessions for this course + preview
-        const courseSessions = await model.CourseDetail.findAll({
+        // Fetch all course details (sessions) for the course & preview
+        const courseDetails = await model.CourseDetail.findAll({
             where: { courseId, coursePreviewId, isDeleted: false },
             include: [
                 {
@@ -385,58 +387,46 @@ const getSessionStatusPerUser = async (req, res) => {
             order: [["day", "ASC"], ["sessionNumber", "ASC"]]
         });
 
-        if (!courseSessions || courseSessions.length === 0) {
-            return ReE(res, "No course sessions found", 404);
+        const sessionStatus = [];
+
+        for (const cd of courseDetails) {
+            const questions = cd.QuestionModels || [];
+            const totalMCQs = questions.length;
+
+            // Here you need the answers user submitted (MCQs) - from your MCQ evaluation table
+            // For simplicity, assuming you store correct answers in CourseDetail.userProgress[userId]?.correctMCQs
+            const correctMCQs = cd.userProgress?.[userId]?.correctMCQs || 0;
+
+            // Eligible if all MCQs correct
+            const eligibleForCaseStudy = cd.userProgress?.[userId]?.eligibleForCaseStudy || false;
+
+            // Case study result
+            const caseStudyResults = await model.CaseStudyResult.findAll({
+                where: {
+                    userId,
+                    courseId,
+                    coursePreviewId,
+                    day: cd.day,
+                    questionId: questions.map(q => q.id)
+                }
+            });
+
+            const caseStudyCompleted = caseStudyResults.length > 0;
+            const caseStudyPassed = caseStudyResults.every(r => r.passed);
+
+            sessionStatus.push({
+                dayNumber: cd.day,
+                sessionNumber: cd.sessionNumber,
+                title: cd.title,
+                totalMCQs,
+                correctMCQs,
+                eligibleForCaseStudy,
+                caseStudyCompleted,
+                caseStudyPassed
+            });
         }
 
-        const sessionStatus = await Promise.all(
-            courseSessions.map(async (session) => {
-                const questions = session.QuestionModels || [];
-
-                // MCQs for this session
-                const mcqs = questions.filter(q => q.optionA && q.optionB && q.optionC && q.optionD);
-                const totalMCQs = mcqs.length;
-
-                // ✅ Evaluate user MCQ progress stored in CourseDetail.userProgress
-                const userProgress = session.userProgress || {};
-                const progress = userProgress[userId] || {};
-                const correctMCQs = progress.correct || 0;
-                const eligibleForCaseStudy = totalMCQs > 0 ? (correctMCQs === totalMCQs) : false;
-
-                // ✅ Case Study for this session
-                const caseStudyQuestions = questions.filter(q => q.caseStudy);
-                const caseStudyIds = caseStudyQuestions.map(q => q.id);
-
-                // ✅ Check if user has submitted case study results
-                const caseStudyResults = await model.CaseStudyResult.findAll({
-                    where: {
-                        userId,
-                        courseId,
-                        coursePreviewId,
-                        day: session.day,
-                        sessionNumber: session.sessionNumber,
-                        questionId: caseStudyIds
-                    }
-                });
-
-                const caseStudyCompleted = caseStudyResults.length > 0;
-                const caseStudyPassed = caseStudyResults.some(r => r.passed);
-
-                return {
-                    dayNumber: session.day,
-                    sessionNumber: session.sessionNumber,
-                    title: session.title,
-                    totalMCQs,
-                    correctMCQs,
-                    eligibleForCaseStudy,
-                    caseStudyCompleted,
-                    caseStudyPassed
-                };
-            })
-        );
-
         return ReS(res, { success: true, data: sessionStatus }, 200);
-
     } catch (error) {
         console.error("Get Session Status Error:", error);
         return ReE(res, error.message, 500);
@@ -444,6 +434,7 @@ const getSessionStatusPerUser = async (req, res) => {
 };
 
 module.exports.getSessionStatusPerUser = getSessionStatusPerUser;
+
 
 // ✅ Get overall course progress per user
 const getOverallCourseStatus = async (req, res) => {
