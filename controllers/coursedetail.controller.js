@@ -209,8 +209,15 @@ const evaluateSessionMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // Update session-level userProgress **per user**
-        const progress = sessionDetail.userProgress || {};
+        // ✅ Update session-level userProgress **per user**
+        let progress = sessionDetail.userProgress || {};
+
+        // Remove old global key if exists
+        if (progress.hasOwnProperty("eligibleForCaseStudy")) {
+            delete progress.eligibleForCaseStudy;
+        }
+
+        // Set eligibility for current user
         progress[userId] = { eligibleForCaseStudy };
         await sessionDetail.update({ userProgress: progress });
 
@@ -235,6 +242,7 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
+
 
 
 const getCaseStudyForSession = async (req, res) => {
