@@ -3,6 +3,7 @@ const model = require("../models/index");
 const bcrypt = require("bcrypt");
 const { ReE, ReS } = require("../utils/util.service.js");
 
+
 // Register Team Manager
 var registerTeamManager = async function (req, res) {
     try {
@@ -59,6 +60,7 @@ module.exports.registerTeamManager = registerTeamManager;
 //  Fetch All Team Managers
 var getAllTeamManagers = async function (req, res) {
     try {
+        // Fetch all managers
         const managers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: [
@@ -73,10 +75,38 @@ var getAllTeamManagers = async function (req, res) {
             order: [["createdAt", "DESC"]],
         });
 
-        return ReS(res, { success: true, data: managers }, 200);
+        // Map over each manager to calculate interns with more than 3 business targets
+        const managersWithInternCounts = await Promise.all(
+            managers.map(async (manager) => {
+                // Count interns under this manager with businessTargets count > 3
+                const interns = await model.User.findAll({
+                    where: {
+                        managerId: manager.managerId,
+                        isDeleted: false
+                    },
+                    attributes: ["businessTargets"]
+                });
+
+                let internsWithMoreThanThree = 0;
+                interns.forEach((intern) => {
+                    const targets = intern.businessTargets || {};
+                    if (Object.keys(targets).length > 3) {
+                        internsWithMoreThanThree++;
+                    }
+                });
+
+                return {
+                    ...manager.get({ plain: true }),
+                    internsWithMoreThanThree
+                };
+            })
+        );
+
+        return ReS(res, { success: true, data: managersWithInternCounts }, 200);
     } catch (error) {
         console.error("Error fetching managers:", error);
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.getAllTeamManagers = getAllTeamManagers;
