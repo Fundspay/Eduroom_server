@@ -463,7 +463,6 @@ const getOverallCourseStatus = async (req, res) => {
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
-// ✅ Daily status for a user (group by day)
 const getDailyStatusPerUser = async (req, res) => {
     try {
         const { courseId, coursePreviewId, userId } = req.params;
@@ -479,7 +478,8 @@ const getDailyStatusPerUser = async (req, res) => {
         const daysMap = {};
 
         sessions.forEach(session => {
-            const progress = session.userProgress?.[userId];
+            // ✅ Correctly check progress for this user
+            const progress = session.userProgress && session.userProgress[userId];
             const eligible = progress?.eligibleForCaseStudy || false;
 
             if (!daysMap[session.day]) {
@@ -487,6 +487,7 @@ const getDailyStatusPerUser = async (req, res) => {
             }
 
             daysMap[session.day].total++;
+
             if (eligible) daysMap[session.day].completed++;
 
             daysMap[session.day].sessions.push({
@@ -506,7 +507,7 @@ const getDailyStatusPerUser = async (req, res) => {
                 day: Number(dayKey),
                 totalSessions: d.total,
                 completedSessions: d.completed,
-                fullyCompleted: d.completed === d.total, // ✅ user completed all sessions in this day
+                fullyCompleted: d.completed === d.total, // ✅ Fix: now reflects true completion
                 sessions: d.sessions
             };
         });
