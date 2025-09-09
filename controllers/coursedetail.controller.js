@@ -166,21 +166,9 @@ const evaluateSessionMCQ = async (req, res) => {
             return ReE(res, "userId and answers are required", 400);
         }
 
-        // ✅ Convert params to integers to match DB
-        const courseIdInt = parseInt(courseId);
-        const coursePreviewIdInt = parseInt(coursePreviewId);
-        const dayInt = parseInt(day);
-        const sessionNumberInt = parseInt(sessionNumber);
-
-        // ✅ Find the session details
+        // Find the session details
         const sessionDetail = await model.CourseDetail.findOne({
-            where: {
-                courseId: courseIdInt,
-                coursePreviewId: coursePreviewIdInt,
-                day: dayInt,
-                sessionNumber: sessionNumberInt,
-                isDeleted: false
-            },
+            where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
             include: [
                 {
                     model: model.QuestionModel,
@@ -198,7 +186,7 @@ const evaluateSessionMCQ = async (req, res) => {
         let correctCount = 0;
         const results = [];
 
-        // ✅ Evaluate each answer
+        // Evaluate each answer
         for (let ans of answers) {
             const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
@@ -221,9 +209,22 @@ const evaluateSessionMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Update session-level userProgress
-        const userProgress = { eligibleForCaseStudy };
-        await sessionDetail.update({ userProgress });
+        // ✅ Update session-level userProgress **per user**
+        let progress = sessionDetail.userProgress || {};
+
+        // Remove old global key if exists
+        if (progress.hasOwnProperty("eligibleForCaseStudy")) {
+            delete progress.eligibleForCaseStudy;
+        }
+
+        // Store both correct count and eligibility
+        progress[userId] = { 
+            correctMCQs: correctCount, 
+            totalMCQs: total,
+            eligibleForCaseStudy 
+        };
+
+        await sessionDetail.update({ userProgress: progress });
 
         return ReS(res, {
             success: true,
@@ -369,80 +370,64 @@ module.exports.submitCaseStudyAnswer = submitCaseStudyAnswer;
 
 // ✅ Get session-wise status per user for a course + course preview
 const getSessionStatusPerUser = async (req, res) => {
-    try {
-        const { userId, courseId, coursePreviewId } = req.params;
+  try {
+    const { courseId, coursePreviewId, userId } = req.params;
 
-        if (!userId) return ReE(res, "userId is required", 400);
+    const sessions = await model.CourseDetail.findAll({
+      where: { courseId, coursePreviewId, isDeleted: false },
+      include: [
+        { model: model.QuestionModel, where: { isDeleted: false }, required: false }
+      ],
+      order: [['day', 'ASC'], ['sessionNumber', 'ASC']]
+    });
 
-        // 1️⃣ Fetch all CourseDetail sessions for this course + preview
-        const courseSessions = await model.CourseDetail.findAll({
-            where: { courseId, coursePreviewId, isDeleted: false },
-            include: [
-                {
-                    model: model.QuestionModel,
-                    where: { isDeleted: false },
-                    required: false
-                }
-            ],
-            order: [["day", "ASC"], ["sessionNumber", "ASC"]]
-        });
-
-        if (!courseSessions || courseSessions.length === 0) {
-            return ReE(res, "No course sessions found", 404);
-        }
-
-        const sessionStatus = await Promise.all(
-            courseSessions.map(async (session) => {
-                const questions = session.QuestionModels || [];
-
-                // MCQs for this session
-                const mcqs = questions.filter(q => q.optionA && q.optionB && q.optionC && q.optionD);
-                const totalMCQs = mcqs.length;
-
-                // ✅ Evaluate user MCQ progress stored in CourseDetail.userProgress
-                const userProgress = session.userProgress || {};
-                const progress = userProgress[userId] || {};
-                const correctMCQs = progress.correct || 0;
-                const eligibleForCaseStudy = totalMCQs > 0 ? (correctMCQs === totalMCQs) : false;
-
-                // ✅ Case Study for this session
-                const caseStudyQuestions = questions.filter(q => q.caseStudy);
-                const caseStudyIds = caseStudyQuestions.map(q => q.id);
-
-                // ✅ Check if user has submitted case study results
-                const caseStudyResults = await model.CaseStudyResult.findAll({
-                    where: {
-                        userId,
-                        courseId,
-                        coursePreviewId,
-                        day: session.day,
-                        sessionNumber: session.sessionNumber,
-                        questionId: caseStudyIds
-                    }
-                });
-
-                const caseStudyCompleted = caseStudyResults.length > 0;
-                const caseStudyPassed = caseStudyResults.some(r => r.passed);
-
-                return {
-                    dayNumber: session.day,
-                    sessionNumber: session.sessionNumber,
-                    title: session.title,
-                    totalMCQs,
-                    correctMCQs,
-                    eligibleForCaseStudy,
-                    caseStudyCompleted,
-                    caseStudyPassed
-                };
-            })
-        );
-
-        return ReS(res, { success: true, data: sessionStatus }, 200);
-
-    } catch (error) {
-        console.error("Get Session Status Error:", error);
-        return ReE(res, error.message, 500);
+    if (!sessions || sessions.length === 0) {
+      return res.status(404).json({ success: false, error: "No sessions found" });
     }
+
+    const data = [];
+
+    for (let session of sessions) {
+      const totalMCQs = session.QuestionModels.length;
+
+      // Get user progress safely
+      const userProgress = session.userProgress || {};
+      const userData = userProgress[userId] || {};
+
+      const correctMCQs = userData.correctMCQs || 0;
+      const eligibleForCaseStudy = userData.eligibleForCaseStudy || false;
+
+      // Check case study completion
+      const caseStudyResults = await model.CaseStudyResult.findAll({
+        where: {
+          userId,
+          courseId,
+          coursePreviewId,
+          day: session.day,
+          questionId: session.QuestionModels.map(q => q.id)
+        }
+      });
+
+      const caseStudyCompleted = caseStudyResults.length === session.QuestionModels.length;
+      const caseStudyPassed = caseStudyResults.every(r => r.passed);
+
+      data.push({
+        dayNumber: session.day,
+        sessionNumber: session.sessionNumber,
+        title: session.title,
+        totalMCQs,
+        correctMCQs,
+        eligibleForCaseStudy,
+        caseStudyCompleted,
+        caseStudyPassed
+      });
+    }
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    console.error("getSessionStatusPerUser Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 };
 
 module.exports.getSessionStatusPerUser = getSessionStatusPerUser;

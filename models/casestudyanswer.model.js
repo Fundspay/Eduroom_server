@@ -12,6 +12,7 @@ module.exports = (sequelize, Sequelize) => {
             answer: { type: Sequelize.TEXT, allowNull: false },
             matchPercentage: { type: Sequelize.FLOAT, allowNull: false },
             passed: { type: Sequelize.BOOLEAN, allowNull: false },
+            sessionNumber: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 1 },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
         },
