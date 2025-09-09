@@ -3,8 +3,20 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 // ✅ Add a new CoursePreview
-var addCoursePreview = async (req, res) => {
-    const { courseId, domainId, title, heading, youtubeLink, description, totalLectures, language, whatYouWillLearn, durationPerDay } = req.body;
+const addCoursePreview = async (req, res) => {
+    const {
+        courseId,
+        domainId,
+        title,
+        heading,
+        youtubeLink,
+        description,
+        dayCount,
+        language,
+        level,
+        whatYouWillLearn,
+        duration
+    } = req.body;
 
     if (!courseId) return ReE(res, "courseId is required", 400);
     if (!domainId) return ReE(res, "domainId is required", 400);
@@ -19,6 +31,20 @@ var addCoursePreview = async (req, res) => {
         const domain = await model.Domain.findByPk(domainId);
         if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
 
+        // Ensure whatYouWillLearn is proper JSON with paragraph + bullets
+        let whatYouWillLearnJson = { paragraph: "", bullets: [] };
+        if (whatYouWillLearn) {
+            if (typeof whatYouWillLearn === "string") {
+                try {
+                    whatYouWillLearnJson = JSON.parse(whatYouWillLearn);
+                } catch (err) {
+                    return ReE(res, "Invalid JSON for whatYouWillLearn", 400);
+                }
+            } else if (typeof whatYouWillLearn === "object") {
+                whatYouWillLearnJson = whatYouWillLearn;
+            }
+        }
+
         const preview = await model.CoursePreview.create({
             courseId,
             domainId,
@@ -26,17 +52,20 @@ var addCoursePreview = async (req, res) => {
             heading,
             youtubeLink: youtubeLink || null,
             description: description || null,
-            totalLectures: totalLectures || null,
+            dayCount: dayCount || null,
             language: language || null,
-            whatYouWillLearn: whatYouWillLearn || null,
-            durationPerDay: durationPerDay || null
+            level: level || null,
+            whatYouWillLearn: whatYouWillLearnJson,
+            duration: duration || null
         });
 
-        return ReS(res, preview, 201);
+        return ReS(res, { success: true, data: preview }, 201);
     } catch (error) {
+        console.error("Add CoursePreview Error:", error);
         return ReE(res, error.message, 422);
     }
 };
+
 module.exports.addCoursePreview = addCoursePreview;
 
 // ✅ Fetch all CoursePreviews
