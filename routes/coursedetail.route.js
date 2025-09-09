@@ -2,28 +2,46 @@ const express = require("express");
 const router = express.Router();
 const coursedetailController = require("../controllers/coursedetail.controller");
 
+//  Add new CourseDetail (per session)
 router.post("/course-detail", coursedetailController.addCourseDetail);
+
+//  Fetch all sessions by coursePreviewId (with MCQs)
 router.get("/course-preview/:coursePreviewId/details", coursedetailController.fetchCourseDetailsByPreview);
-router.post("/course/:courseId/preview/:coursePreviewId/day/:day/evaluate", coursedetailController.evaluateDayMCQ);
-router.get(
-    "/course/:courseId/preview/:coursePreviewId/day/:day/casestudies",
-    coursedetailController.getCaseStudyForDay
-);
 
-// Submit case study answer
+//  Evaluate MCQs for a session
 router.post(
-    "/course/:courseId/preview/:coursePreviewId/day/:day/question/:questionId/casestudy",
-    coursedetailController.submitCaseStudyAnswer
-);
-router.get(
-    "/course/:courseId/preview/:coursePreviewId/user/:userId/dailystatus",
-    coursedetailController.getDailyStatusPerUser
-);
-router.get(
-    "/course/:courseId/preview/:coursePreviewId/user/:userId/overallstatus",
-    coursedetailController.getOverallCourseStatus
+  "/course/:courseId/preview/:coursePreviewId/day/:day/session/:sessionNumber/evaluate",
+  coursedetailController.evaluateSessionMCQ
 );
 
-router.get("/course/:courseId/user/:userId/business-target", coursedetailController.getBusinessTarget);
+//  Get case study for a session
+router.get(
+  "/course/:courseId/preview/:coursePreviewId/day/:day/session/:sessionNumber/casestudies",
+  coursedetailController.getCaseStudyForSession
+);
+
+//  Submit case study answer for a session
+router.post(
+  "/course/:courseId/preview/:coursePreviewId/day/:day/session/:sessionNumber/question/:questionId/casestudy",
+  coursedetailController.submitCaseStudyAnswer
+);
+
+//  Get session-wise status for a user
+router.get(
+  "/course/:courseId/preview/:coursePreviewId/user/:userId/sessionstatus",
+  coursedetailController.getSessionStatusPerUser
+);
+
+//  Get overall course status (session-based)
+router.get(
+  "/course/:courseId/preview/:coursePreviewId/user/:userId/overallstatus",
+  coursedetailController.getOverallCourseStatus
+);
+
+//  Business target (referrals)
+router.get(
+  "/course/:courseId/user/:userId/business-target",
+  coursedetailController.getBusinessTarget
+);
 
 module.exports = router;
