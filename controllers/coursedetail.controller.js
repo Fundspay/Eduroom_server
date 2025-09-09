@@ -1,6 +1,8 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
+const axios = require('axios');
+
 
 // ✅ Add CourseDetail with Questions for a specific day
 var addCourseDetail = async (req, res) => {
@@ -498,51 +500,40 @@ const getOverallCourseStatus = async (req, res) => {
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
 
-// ✅ Get business target for a user per course
 const getBusinessTarget = async (req, res) => {
   try {
-    const { userId, courseId } = req.params;
+    let { userId, courseId } = req.params;
 
-    // 1️⃣ Fetch user
+    // Convert IDs to numbers (safety)
+    userId = parseInt(userId, 10);
+    courseId = parseInt(courseId, 10);
+
+    if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
+
+    // Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Fetch course
-    const course = await model.Course.findByPk(courseId);
-    if (!course) return ReE(res, "Course not found", 404);
-
-    // 3️⃣ Check if user has referral code
+    // Get referral count from external API
     const referralCode = user.referralCode;
     let referralCount = 0;
 
     if (referralCode) {
-      // ✅ Call external API to get number of referrals
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${referralCode}`;
       const apiResponse = await axios.get(apiUrl);
-
-      referralCount = apiResponse.data?.referral_count || 0;
+      referralCount = Number(apiResponse.data?.referral_count) || 0;
     }
 
-    // 4️⃣ Calculate business target (example: each referral = 10 units)
+    // Calculate business target (1 referral = 10 units)
     const businessTarget = referralCount * 10;
 
-    // 5️⃣ Save or update UserCourse
-    let userCourse = await model.UserCourse.findOne({
-      where: { userId, courseId }
-    });
+    // Update per-course in user.businessTargets JSON
+    const userBusinessTargets = user.businessTargets || {};
+    userBusinessTargets[courseId] = businessTarget;
 
-    if (!userCourse) {
-      userCourse = await model.UserCourse.create({
-        userId,
-        courseId,
-        businessTarget
-      });
-    } else {
-      userCourse.businessTarget = businessTarget;
-      await userCourse.save();
-    }
+    await user.update({ businessTargets: userBusinessTargets });
 
-    // 6️⃣ Return response
+    // Return response
     return ReS(res, {
       success: true,
       data: {

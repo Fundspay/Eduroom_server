@@ -62,6 +62,11 @@ module.exports = (sequelize, Sequelize) => {
             // 🔹 Consent / Declaration
             studentDeclaration: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             consentAgreement: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+            businessTargets: {
+                type: Sequelize.JSON,
+                allowNull: true,
+                defaultValue: {}
+            },
 
             // 🔹 Auth & System
             password: { type: Sequelize.STRING, allowNull: false },
@@ -96,7 +101,7 @@ module.exports = (sequelize, Sequelize) => {
             onDelete: "RESTRICT",
             onUpdate: "RESTRICT",
             constraints: true,
-           
+
         });
 
         User.belongsTo(models.InternshipMode, {
