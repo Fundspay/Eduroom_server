@@ -262,8 +262,9 @@ const getCaseStudyForSession = async (req, res) => {
 
         if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-        // ✅ Fix: eligibility is now per user
-        const progress = sessionDetail.userProgress?.[userId]?.eligibleForCaseStudy || false;
+        const progress = sessionDetail.userProgress?.eligibleForCaseStudy;
+        console.log("sessionDetail.userProgress:", sessionDetail.userProgress);
+        console.log("Eligibility for user:", progress);
 
         if (!progress) {
             return ReS(res, {
@@ -293,6 +294,7 @@ const getCaseStudyForSession = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
 
 const submitCaseStudyAnswer = async (req, res) => {
@@ -388,30 +390,25 @@ const getSessionStatusPerUser = async (req, res) => {
     for (let session of sessions) {
       const totalMCQs = session.QuestionModels.length;
 
-      // ✅ Get user progress safely
+      // Get user progress safely
       const userProgress = session.userProgress || {};
       const userData = userProgress[userId] || {};
 
       const correctMCQs = userData.correctMCQs || 0;
       const eligibleForCaseStudy = userData.eligibleForCaseStudy || false;
 
-      // ✅ Filter case study questions only
-      const caseStudyQuestions = session.QuestionModels.filter(q => q.caseStudy);
-      const caseStudyQuestionIds = caseStudyQuestions.map(q => q.id);
-
-      // ✅ Query results for this user, day, session
+      // Check case study completion
       const caseStudyResults = await model.CaseStudyResult.findAll({
         where: {
           userId,
           courseId,
           coursePreviewId,
           day: session.day,
-          sessionNumber: session.sessionNumber,  // ✅ added
-          questionId: caseStudyQuestionIds
+          questionId: session.QuestionModels.map(q => q.id)
         }
       });
 
-      const caseStudyCompleted = caseStudyResults.length === caseStudyQuestions.length;
+      const caseStudyCompleted = caseStudyResults.length === session.QuestionModels.length;
       const caseStudyPassed = caseStudyResults.every(r => r.passed);
 
       data.push({
@@ -432,6 +429,7 @@ const getSessionStatusPerUser = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 module.exports.getSessionStatusPerUser = getSessionStatusPerUser;
 
 // ✅ Get overall course progress per user
