@@ -1,6 +1,8 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
+const axios = require('axios');
+
 
 // ✅ Add CourseDetail with Questions for a specific day
 var addCourseDetail = async (req, res) => {
