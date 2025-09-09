@@ -166,21 +166,9 @@ const evaluateSessionMCQ = async (req, res) => {
             return ReE(res, "userId and answers are required", 400);
         }
 
-        // ✅ Convert params to integers to match DB
-        const courseIdInt = parseInt(courseId);
-        const coursePreviewIdInt = parseInt(coursePreviewId);
-        const dayInt = parseInt(day);
-        const sessionNumberInt = parseInt(sessionNumber);
-
-        // ✅ Find the session details
+        // Find the session details
         const sessionDetail = await model.CourseDetail.findOne({
-            where: {
-                courseId: courseIdInt,
-                coursePreviewId: coursePreviewIdInt,
-                day: dayInt,
-                sessionNumber: sessionNumberInt,
-                isDeleted: false
-            },
+            where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
             include: [
                 {
                     model: model.QuestionModel,
@@ -198,7 +186,7 @@ const evaluateSessionMCQ = async (req, res) => {
         let correctCount = 0;
         const results = [];
 
-        // ✅ Evaluate each answer
+        // Evaluate each answer
         for (let ans of answers) {
             const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
             if (!mcq) continue;
@@ -221,9 +209,10 @@ const evaluateSessionMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Update session-level userProgress
-        const userProgress = { eligibleForCaseStudy };
-        await sessionDetail.update({ userProgress });
+        // Update session-level userProgress **per user**
+        const progress = sessionDetail.userProgress || {};
+        progress[userId] = { eligibleForCaseStudy };
+        await sessionDetail.update({ userProgress: progress });
 
         return ReS(res, {
             success: true,
@@ -246,6 +235,7 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
+
 
 const getCaseStudyForSession = async (req, res) => {
     try {
