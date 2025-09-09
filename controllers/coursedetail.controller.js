@@ -209,7 +209,7 @@ const evaluateSessionMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // ✅ Normalize userProgress into an object
+        /// ✅ Normalize userProgress into an object
         let progress = {};
         if (sessionDetail.userProgress) {
             if (typeof sessionDetail.userProgress === "string") {
@@ -221,6 +221,11 @@ const evaluateSessionMCQ = async (req, res) => {
             } else {
                 progress = sessionDetail.userProgress;
             }
+        }
+
+        // 🔥 Ensure no global leftover key
+        if (progress && typeof progress === "object") {
+            delete progress.eligibleForCaseStudy;
         }
 
         // ✅ Store per-user progress
@@ -535,53 +540,53 @@ module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
 
 const getBusinessTarget = async (req, res) => {
-  try {
-    let { userId, courseId } = req.params;
+    try {
+        let { userId, courseId } = req.params;
 
-    // Convert IDs to integers
-    userId = parseInt(userId, 10);
-    courseId = parseInt(courseId, 10);
+        // Convert IDs to integers
+        userId = parseInt(userId, 10);
+        courseId = parseInt(courseId, 10);
 
-    if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
+        if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
 
-    // 1️⃣ Fetch user
-    const user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
+        // 1️⃣ Fetch user
+        const user = await model.User.findByPk(userId);
+        if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Fetch course
-    const course = await model.Course.findByPk(courseId);
-    if (!course) return ReE(res, "Course not found", 404);
+        // 2️⃣ Fetch course
+        const course = await model.Course.findByPk(courseId);
+        if (!course) return ReE(res, "Course not found", 404);
 
-    const businessTarget = course.businessTarget || 0;
+        const businessTarget = course.businessTarget || 0;
 
-    // 3️⃣ Fetch referral count from external API
-    let referralCount = 0;
-    if (user.referralCode) {
-      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-      const apiResponse = await axios.get(apiUrl);
-      referralCount = Number(apiResponse.data?.referral_count) || 0;
+        // 3️⃣ Fetch referral count from external API
+        let referralCount = 0;
+        if (user.referralCode) {
+            const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+            const apiResponse = await axios.get(apiUrl);
+            referralCount = Number(apiResponse.data?.referral_count) || 0;
+        }
+
+        // 4️⃣ Calculate achieved units (assuming 1 referral = 10 units)
+        const achievedCount = referralCount * 10;
+        const remaining = Math.max(businessTarget - achievedCount, 0);
+
+        // 5️⃣ Return response
+        return ReS(res, {
+            success: true,
+            data: {
+                userId,
+                courseId,
+                businessTarget,
+                achievedCount,
+                remaining
+            }
+        }, 200);
+
+    } catch (error) {
+        console.error("Get Business Target Error:", error);
+        return ReE(res, error.message, 500);
     }
-
-    // 4️⃣ Calculate achieved units (assuming 1 referral = 10 units)
-    const achievedCount = referralCount * 10;
-    const remaining = Math.max(businessTarget - achievedCount, 0);
-
-    // 5️⃣ Return response
-    return ReS(res, {
-      success: true,
-      data: {
-        userId,
-        courseId,
-        businessTarget,
-        achievedCount,
-        remaining
-      }
-    }, 200);
-
-  } catch (error) {
-    console.error("Get Business Target Error:", error);
-    return ReE(res, error.message, 500);
-  }
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
