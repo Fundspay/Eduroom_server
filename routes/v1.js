@@ -12,6 +12,7 @@ const domainRouter = require("./domain.route");
 const courseRouter = require("./course.route");
 const coursepreviewRouter = require("./coursepreview.route");
 const coursedetailRouter = require("./coursedetail.route");
+const teamManagerRouter = require("./teamManager.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -29,5 +30,6 @@ router.use("/domain", domainRouter);
 router.use("/course", courseRouter);
 router.use("/coursepreview", coursepreviewRouter);
 router.use("/coursedetail", coursedetailRouter);
+router.use("/teammanager", teamManagerRouter);
 
 module.exports = router;
