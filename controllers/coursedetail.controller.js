@@ -6,14 +6,15 @@ const { ReE, ReS } = require("../utils/util.service.js");
 var addCourseDetail = async (req, res) => {
     const {
         domainId,
-          userId,
+        userId,
         courseId,
         coursePreviewId,
         day,
+        sessionNumber,   // 👈 New: session number per day
         title,
         description,
         youtubeLink,
-        questions // Array of questions for this day
+        questions // Array of questions for this session
     } = req.body;
 
     // Basic validations
@@ -21,6 +22,7 @@ var addCourseDetail = async (req, res) => {
     if (!courseId) return ReE(res, "courseId is required", 400);
     if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
     if (!day) return ReE(res, "day is required", 400);
+    if (!sessionNumber) return ReE(res, "sessionNumber is required", 400);
     if (!title) return ReE(res, "title is required", 400);
 
     try {
@@ -31,13 +33,14 @@ var addCourseDetail = async (req, res) => {
         const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
         if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
 
-        // Create CourseDetail for the day
+        // Create CourseDetail for the session
         const courseDetail = await model.CourseDetail.create({
             domainId,
             courseId,
             coursePreviewId,
             day,
-              userId,
+            sessionNumber,
+            userId,
             title,
             description: description || null,
             youtubeLink: youtubeLink || null
@@ -52,6 +55,7 @@ var addCourseDetail = async (req, res) => {
                 courseId,
                 coursePreviewId,
                 day,
+                sessionNumber,
                 question: q.question,
                 optionA: q.optionA,
                 optionB: q.optionB,
@@ -59,7 +63,7 @@ var addCourseDetail = async (req, res) => {
                 optionD: q.optionD,
                 answer: q.answer,
                 keywords: q.keywords || null,
-                caseStudy: q.caseStudy || null
+                caseStudy: q.caseStudy || null // 👈 stays at question level only
             }));
 
             await model.QuestionModel.bulkCreate(questionRecords);
@@ -91,13 +95,27 @@ var fetchCourseDetailsByPreview = async (req, res) => {
         // Fetch all course details for this preview, include questions
         const courseDetails = await model.CourseDetail.findAll({
             where: { coursePreviewId, isDeleted: false },
-            order: [["day", "ASC"]],
+            order: [
+                ["day", "ASC"],
+                ["sessionNumber", "ASC"] // 👈 Order sessions inside each day
+            ],
             include: [
                 {
                     model: model.QuestionModel,
                     where: { isDeleted: false },
                     required: false, // include even if no questions
-                    attributes: ["id","question","optionA","optionB","optionC","optionD","answer","keywords","caseStudy"]
+                    attributes: [
+                        "id",
+                        "question",
+                        "optionA",
+                        "optionB",
+                        "optionC",
+                        "optionD",
+                        "answer",
+                        "keywords",
+                        "caseStudy",
+                        "sessionNumber" // 👈 keep session info at question level too
+                    ]
                 }
             ]
         });
@@ -112,17 +130,18 @@ module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
 // ✅ Evaluate MCQs for a specific course + course preview + day
 
-const evaluateDayMCQ = async (req, res) => {
+const evaluateSessionMCQ = async (req, res) => {
     try {
-        const { courseId, coursePreviewId, day } = req.params;
+        const { courseId, coursePreviewId, day, sessionNumber } = req.params;
         const { userId, answers } = req.body;
 
         if (!userId || !Array.isArray(answers)) {
             return ReE(res, "userId and answers are required", 400);
         }
 
-        const dayDetail = await model.CourseDetail.findOne({
-            where: { courseId, coursePreviewId, day, isDeleted: false },
+        // Find the session details
+        const sessionDetail = await model.CourseDetail.findOne({
+            where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
             include: [
                 {
                     model: model.QuestionModel,
@@ -132,10 +151,10 @@ const evaluateDayMCQ = async (req, res) => {
             ]
         });
 
-        if (!dayDetail) return ReE(res, "Day details not found", 404);
+        if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-        const mcqs = dayDetail.QuestionModels || [];
-        if (mcqs.length === 0) return ReE(res, "No MCQs found for this day", 404);
+        const mcqs = sessionDetail.QuestionModels || [];
+        if (mcqs.length === 0) return ReE(res, "No MCQs found for this session", 404);
 
         let correctCount = 0;
         const results = [];
@@ -163,45 +182,51 @@ const evaluateDayMCQ = async (req, res) => {
         const score = `${correctCount}/${total}`;
         const eligibleForCaseStudy = correctCount === total;
 
-        // Update userProgress: store only eligibility boolean
+        // Update session-level userProgress
         const userProgress = { eligibleForCaseStudy };
         console.log("Updating userProgress for user", userId, ":", userProgress);
 
-        await dayDetail.update({ userProgress });
+        await sessionDetail.update({ userProgress });
         console.log("Updated userProgress for user", userId, ":", userProgress);
 
         return ReS(res, {
             success: true,
-            courseDetail: dayDetail,
+            courseDetail: sessionDetail,
             questions: mcqs,
-            evaluation: { totalQuestions: total, correct: correctCount, wrong: total - correctCount, score, eligibleForCaseStudy, results }
+            evaluation: {
+                totalQuestions: total,
+                correct: correctCount,
+                wrong: total - correctCount,
+                score,
+                eligibleForCaseStudy,
+                results
+            }
         }, 200);
 
     } catch (error) {
-        console.error("Evaluate Day MCQ Error:", error);
+        console.error("Evaluate Session MCQ Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 
-module.exports.evaluateDayMCQ = evaluateDayMCQ;
+module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
 
-// ✅ Get all case studies for a specific day (if eligible)
-const getCaseStudyForDay = async (req, res) => {
+const getCaseStudyForSession = async (req, res) => {
     try {
-        const { courseId, coursePreviewId, day } = req.params;
+        const { courseId, coursePreviewId, day, sessionNumber } = req.params;
         const { userId } = req.query;
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        const dayDetail = await model.CourseDetail.findOne({
-            where: { courseId, coursePreviewId, day, isDeleted: false },
+        const sessionDetail = await model.CourseDetail.findOne({
+            where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
             include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
         });
 
-        if (!dayDetail) return ReE(res, "Day details not found", 404);
+        if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-        const progress = dayDetail.userProgress?.eligibleForCaseStudy;
-        console.log("dayDetail.userProgress:", dayDetail.userProgress);
+        const progress = sessionDetail.userProgress?.eligibleForCaseStudy;
+        console.log("sessionDetail.userProgress:", sessionDetail.userProgress);
         console.log("Eligibility for user:", progress);
 
         if (!progress) {
@@ -211,9 +236,9 @@ const getCaseStudyForDay = async (req, res) => {
             }, 200);
         }
 
-        const caseStudyQuestion = (dayDetail.QuestionModels || []).find(q => q.caseStudy);
+        const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy);
         if (!caseStudyQuestion) {
-            return ReS(res, { success: false, message: "No Case Study available for this day." }, 200);
+            return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
         }
 
         return ReS(res, {
@@ -222,6 +247,7 @@ const getCaseStudyForDay = async (req, res) => {
                 courseId,
                 coursePreviewId,
                 day,
+                sessionNumber,
                 caseStudy: { questionId: caseStudyQuestion.id, caseStudy: caseStudyQuestion.caseStudy }
             }
         }, 200);
@@ -232,23 +258,23 @@ const getCaseStudyForDay = async (req, res) => {
     }
 };
 
-module.exports.getCaseStudyForDay = getCaseStudyForDay;
+module.exports.getCaseStudyForSession = getCaseStudyForSession;
 
-// ✅ Submit Case Study Answer & Evaluate
 const submitCaseStudyAnswer = async (req, res) => {
     try {
-        const { courseId, coursePreviewId, day, questionId } = req.params;
+        const { courseId, coursePreviewId, day, sessionNumber, questionId } = req.params;
         const { userId, answer } = req.body;
 
-        if (!userId || !answer) return ReE(res, "userId and answer is required", 400);
+        if (!userId || !answer) return ReE(res, "userId and answer are required", 400);
 
-        // 1️⃣ Fetch QuestionModel with caseStudy
+        // 1️⃣ Fetch QuestionModel with caseStudy (session-specific)
         const question = await model.QuestionModel.findOne({
             where: {
                 id: questionId,
                 courseId,
                 coursePreviewId,
                 day,
+                sessionNumber,
                 isDeleted: false,
                 caseStudy: { [model.Sequelize.Op.ne]: null } // must have caseStudy
             }
@@ -276,6 +302,7 @@ const submitCaseStudyAnswer = async (req, res) => {
             courseId,
             coursePreviewId,
             day,
+            sessionNumber,
             questionId,
             answer,
             matchPercentage,
@@ -288,6 +315,7 @@ const submitCaseStudyAnswer = async (req, res) => {
                 courseId,
                 coursePreviewId,
                 day,
+                sessionNumber,
                 questionId,
                 matchPercentage,
                 passed,
@@ -303,15 +331,15 @@ const submitCaseStudyAnswer = async (req, res) => {
 
 module.exports.submitCaseStudyAnswer = submitCaseStudyAnswer;
 
-// ✅ Get daily status per user for a course + course preview
-const getDailyStatusPerUser = async (req, res) => {
+// ✅ Get session-wise status per user for a course + course preview
+const getSessionStatusPerUser = async (req, res) => {
     try {
         const { userId, courseId, coursePreviewId } = req.params;
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // 1️⃣ Fetch all CourseDetail days for this course + preview
-        const courseDays = await model.CourseDetail.findAll({
+        // 1️⃣ Fetch all CourseDetail sessions for this course + preview
+        const courseSessions = await model.CourseDetail.findAll({
             where: { courseId, coursePreviewId, isDeleted: false },
             include: [
                 {
@@ -320,36 +348,39 @@ const getDailyStatusPerUser = async (req, res) => {
                     required: false
                 }
             ],
-            order: [["day", "ASC"]]
+            order: [["day", "ASC"], ["sessionNumber", "ASC"]]
         });
 
-        if (!courseDays || courseDays.length === 0) return ReE(res, "No course days found", 404);
+        if (!courseSessions || courseSessions.length === 0) {
+            return ReE(res, "No course sessions found", 404);
+        }
 
-        const dailyStatus = await Promise.all(
-            courseDays.map(async (day) => {
-                const questions = day.QuestionModels || [];
+        const sessionStatus = await Promise.all(
+            courseSessions.map(async (session) => {
+                const questions = session.QuestionModels || [];
 
-                // MCQs for this day
+                // MCQs for this session
                 const mcqs = questions.filter(q => q.optionA && q.optionB && q.optionC && q.optionD);
                 const totalMCQs = mcqs.length;
 
-                // Evaluate user MCQs based on userProgress stored in CourseDetail
-                const userProgress = day.userProgress || {};
+                // ✅ Evaluate user MCQ progress stored in CourseDetail.userProgress
+                const userProgress = session.userProgress || {};
                 const progress = userProgress[userId] || {};
                 const correctMCQs = progress.correct || 0;
                 const eligibleForCaseStudy = totalMCQs > 0 ? (correctMCQs === totalMCQs) : false;
 
-                // Case Study for this day (questions with caseStudy)
+                // ✅ Case Study for this session
                 const caseStudyQuestions = questions.filter(q => q.caseStudy);
                 const caseStudyIds = caseStudyQuestions.map(q => q.id);
 
-                // Check if user has submitted case study results
+                // ✅ Check if user has submitted case study results
                 const caseStudyResults = await model.CaseStudyResult.findAll({
                     where: {
                         userId,
                         courseId,
                         coursePreviewId,
-                        day,
+                        day: session.day,
+                        sessionNumber: session.sessionNumber,
                         questionId: caseStudyIds
                     }
                 });
@@ -358,8 +389,9 @@ const getDailyStatusPerUser = async (req, res) => {
                 const caseStudyPassed = caseStudyResults.some(r => r.passed);
 
                 return {
-                    dayNumber: day.day,
-                    title: day.title,
+                    dayNumber: session.day,
+                    sessionNumber: session.sessionNumber,
+                    title: session.title,
                     totalMCQs,
                     correctMCQs,
                     eligibleForCaseStudy,
@@ -369,15 +401,15 @@ const getDailyStatusPerUser = async (req, res) => {
             })
         );
 
-        return ReS(res, { success: true, data: dailyStatus }, 200);
+        return ReS(res, { success: true, data: sessionStatus }, 200);
 
     } catch (error) {
-        console.error("Get Daily Status Error:", error);
+        console.error("Get Session Status Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 
-module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
+module.exports.getSessionStatusPerUser = getSessionStatusPerUser;
 
 // ✅ Get overall course progress per user
 const getOverallCourseStatus = async (req, res) => {
@@ -386,8 +418,8 @@ const getOverallCourseStatus = async (req, res) => {
 
         if (!userId) return ReE(res, "userId is required", 400);
 
-        // Fetch all CourseDetail days for this course + preview
-        const courseDays = await model.CourseDetail.findAll({
+        // 1️⃣ Fetch all CourseDetail sessions for this course + preview
+        const courseSessions = await model.CourseDetail.findAll({
             where: { courseId, coursePreviewId, isDeleted: false },
             include: [
                 {
@@ -395,27 +427,30 @@ const getOverallCourseStatus = async (req, res) => {
                     where: { isDeleted: false },
                     required: false
                 }
-            ]
+            ],
+            order: [["day", "ASC"], ["sessionNumber", "ASC"]]
         });
 
-        if (!courseDays || courseDays.length === 0) return ReE(res, "No course days found", 404);
+        if (!courseSessions || courseSessions.length === 0) {
+            return ReE(res, "No course sessions found", 404);
+        }
 
-        let completedDays = 0;
+        let completedSessions = 0;
 
-        for (const day of courseDays) {
-            const questions = day.QuestionModels || [];
+        for (const session of courseSessions) {
+            const questions = session.QuestionModels || [];
 
-            // MCQs for this day
+            // MCQs for this session
             const mcqs = questions.filter(q => q.optionA && q.optionB && q.optionC && q.optionD);
             const totalMCQs = mcqs.length;
 
-            // User MCQ progress stored in CourseDetail
-            const userProgress = day.userProgress || {};
+            // ✅ User MCQ progress stored in CourseDetail
+            const userProgress = session.userProgress || {};
             const progress = userProgress[userId] || {};
             const correctMCQs = progress.correct || 0;
             const eligibleForCaseStudy = totalMCQs > 0 ? (correctMCQs === totalMCQs) : false;
 
-            // Case Studies
+            // ✅ Case Studies for this session
             const caseStudyQuestions = questions.filter(q => q.caseStudy);
             const caseStudyIds = caseStudyQuestions.map(q => q.id);
 
@@ -424,26 +459,32 @@ const getOverallCourseStatus = async (req, res) => {
                     userId,
                     courseId,
                     coursePreviewId,
-                    day,
+                    day: session.day,
+                    sessionNumber: session.sessionNumber,
                     questionId: caseStudyIds
                 }
             });
 
             const caseStudyPassed = caseStudyResults.some(r => r.passed);
 
-            // Check if day is fully completed
-            const dayCompleted = (eligibleForCaseStudy && (caseStudyQuestions.length === 0 || caseStudyPassed));
-            if (dayCompleted) completedDays++;
+            // ✅ A session is completed if:
+            // - All MCQs are correct
+            // - Case Study (if any) is passed
+            const sessionCompleted = (eligibleForCaseStudy && (caseStudyQuestions.length === 0 || caseStudyPassed));
+
+            if (sessionCompleted) completedSessions++;
         }
 
-        const totalDays = courseDays.length;
-        const overallProgressPercent = totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0;
+        const totalSessions = courseSessions.length;
+        const overallProgressPercent = totalSessions > 0
+            ? Math.round((completedSessions / totalSessions) * 100)
+            : 0;
 
         return ReS(res, {
             success: true,
             data: {
-                totalDays,
-                completedDays,
+                totalSessions,
+                completedSessions,
                 overallProgressPercent
             }
         }, 200);
@@ -455,6 +496,7 @@ const getOverallCourseStatus = async (req, res) => {
 };
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
+
 
 // ✅ Get business target for a user per course
 const getBusinessTarget = async (req, res) => {
@@ -474,12 +516,11 @@ const getBusinessTarget = async (req, res) => {
     let referralCount = 0;
 
     if (referralCode) {
-      // Call external Lambda or API to get number of referrals
-      const lambdaResponse = await axios.get(
-        `https://your-lambda-endpoint.com/getReferrals?code=${referralCode}`
-      );
+      // ✅ Call external API to get number of referrals
+      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${referralCode}`;
+      const apiResponse = await axios.get(apiUrl);
 
-      referralCount = lambdaResponse.data?.totalReferrals || 0;
+      referralCount = apiResponse.data?.referral_count || 0;
     }
 
     // 4️⃣ Calculate business target (example: each referral = 10 units)
@@ -520,9 +561,3 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
-
-
-
-
-
