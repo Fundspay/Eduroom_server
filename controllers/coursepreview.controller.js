@@ -4,34 +4,39 @@ const { ReE, ReS } = require("../utils/util.service.js");
 
 // ✅ Add a new CoursePreview
 const addCoursePreview = async (req, res) => {
-    const {
-        courseId,
-        domainId,
-        title,
-        heading,
-        youtubeLink,
-        description,
-        dayCount,
-        language,
-        level,
-        whatYouWillLearn,
-        duration
-    } = req.body;
-
-    if (!courseId) return ReE(res, "courseId is required", 400);
-    if (!domainId) return ReE(res, "domainId is required", 400);
-    if (!title) return ReE(res, "title is required", 400);
-    if (!heading) return ReE(res, "heading is required", 400);
-
     try {
-        // Ensure course and domain exist
+        let {
+            courseId,
+            domainId,
+            title,
+            heading,
+            youtubeLink,
+            description,
+            dayCount,
+            language,
+            level,
+            whatYouWillLearn,
+            duration
+        } = req.body;
+
+        // 🔹 Validate required fields
+        courseId = parseInt(courseId, 10);
+        domainId = parseInt(domainId, 10);
+        dayCount = dayCount ? parseInt(dayCount, 10) : null;
+
+        if (!courseId || isNaN(courseId)) return ReE(res, "Valid courseId is required", 400);
+        if (!domainId || isNaN(domainId)) return ReE(res, "Valid domainId is required", 400);
+        if (!title || !title.trim()) return ReE(res, "title is required", 400);
+        if (!heading || !heading.trim()) return ReE(res, "heading is required", 400);
+
+        // 🔹 Ensure course and domain exist
         const course = await model.Course.findByPk(courseId);
         if (!course || course.isDeleted) return ReE(res, "Course not found", 404);
 
         const domain = await model.Domain.findByPk(domainId);
         if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
 
-        // Ensure whatYouWillLearn is proper JSON with paragraph + bullets
+        // 🔹 Parse whatYouWillLearn safely
         let whatYouWillLearnJson = { paragraph: "", bullets: [] };
         if (whatYouWillLearn) {
             if (typeof whatYouWillLearn === "string") {
@@ -45,21 +50,23 @@ const addCoursePreview = async (req, res) => {
             }
         }
 
+        // 🔹 Create the CoursePreview
         const preview = await model.CoursePreview.create({
             courseId,
             domainId,
-            title,
-            heading,
-            youtubeLink: youtubeLink || null,
-            description: description || null,
-            dayCount: dayCount || null,
-            language: language || null,
-            level: level || null,
+            title: title.trim(),
+            heading: heading.trim(),
+            youtubeLink: youtubeLink?.trim() || null,
+            description: description?.trim() || null,
+            dayCount,
+            language: language?.trim() || null,
+            level: level?.trim() || null,
             whatYouWillLearn: whatYouWillLearnJson,
-            duration: duration || null
+            duration: duration?.trim() || null
         });
 
         return ReS(res, { success: true, data: preview }, 201);
+
     } catch (error) {
         console.error("Add CoursePreview Error:", error);
         return ReE(res, error.message, 422);
@@ -67,6 +74,7 @@ const addCoursePreview = async (req, res) => {
 };
 
 module.exports.addCoursePreview = addCoursePreview;
+
 
 // ✅ Fetch all CoursePreviews
 var fetchAllCoursePreviews = async (req, res) => {
