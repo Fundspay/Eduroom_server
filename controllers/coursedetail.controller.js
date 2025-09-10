@@ -60,7 +60,7 @@ var addCourseDetail = async (req, res) => {
                     coursePreviewId,
                     day,
                     sessionNumber,
-                    userId,
+                    userId: userId || null,
                     title,
                     heading: heading || null,
                     sessionDuration: sessionDuration || null,
