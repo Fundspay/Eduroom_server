@@ -3,7 +3,7 @@ const router = express.Router();
 const coursedetailController = require("../controllers/coursedetail.controller");
 
 //  Add new CourseDetail (per session)
-router.post("/course-detail", coursedetailController.addCourseDetail);
+router.post("/course-detail", coursedetailController.addOrUpdateCourseDetail);
 
 //  Fetch all sessions by coursePreviewId (with MCQs)
 router.get("/course-preview/:coursePreviewId/details", coursedetailController.fetchCourseDetailsByPreview);
