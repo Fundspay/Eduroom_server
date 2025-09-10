@@ -19,13 +19,9 @@ const addCoursePreview = async (req, res) => {
             duration
         } = req.body;
 
-        // 🔹 Validate required fields
-        courseId = parseInt(courseId, 10);
-        domainId = parseInt(domainId, 10);
-        dayCount = dayCount ? parseInt(dayCount, 10) : null;
 
-        if (!courseId || isNaN(courseId)) return ReE(res, "Valid courseId is required", 400);
-        if (!domainId || isNaN(domainId)) return ReE(res, "Valid domainId is required", 400);
+        if (!courseId) return ReE(res, "Valid courseId is required", 400);
+        if (!domainId) return ReE(res, "Valid domainId is required", 400);
         if (!title || !title.trim()) return ReE(res, "title is required", 400);
         if (!heading || !heading.trim()) return ReE(res, "heading is required", 400);
 
