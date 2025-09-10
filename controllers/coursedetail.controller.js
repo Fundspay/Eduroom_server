@@ -478,6 +478,7 @@ const getDailyStatusPerUser = async (req, res) => {
         let totalSessions = 0;
         let completedSessions = 0;
 
+        // Build sessions and day stats
         sessions.forEach(session => {
             totalSessions++;
 
@@ -504,6 +505,7 @@ const getDailyStatusPerUser = async (req, res) => {
             });
         });
 
+        // Build daily stats array
         const dailyStatus = Object.keys(daysMap).map(dayKey => {
             const d = daysMap[dayKey];
             return {
