@@ -8,6 +8,7 @@ const { Op } = require("sequelize");
 const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 const CONFIG = require("../config/config.js");
+const axios = require('axios');
 
 if (!admin.apps.length) {
     admin.initializeApp({
