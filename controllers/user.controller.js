@@ -346,6 +346,7 @@ var deleteUser = async (req, res) => {
 module.exports.deleteUser = deleteUser;
 
 // ===================== LOGIN =====================
+// ===================== LOGIN =====================
 const loginWithEmailPassword = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -387,6 +388,7 @@ const loginWithEmailPassword = async (req, res) => {
                 city: account.city,
                 state: account.state,
                 pinCode: account.pinCode,
+                internshipStatus: account.internshipStatus || null   // ✅ Added here
             };
         } else {
             payload = {
@@ -396,20 +398,29 @@ const loginWithEmailPassword = async (req, res) => {
                 mobileNumber: account.mobileNumber,
                 department: account.department,
                 position: account.position,
+                internshipStatus: account.internshipStatus || null   // ✅ Added here
             };
         }
 
         const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-        return ReS(res, { success: true, account: { ...payload, isFirstLogin, token, role } }, 200);
+        return ReS(res, {
+            success: true,
+            account: {
+                ...payload,
+                isFirstLogin,
+                token,
+                role
+            }
+        }, 200);
 
     } catch (error) {
         console.error("Login Error:", error);
         return ReE(res, error.message, 500);
     }
 };
-module.exports.loginWithEmailPassword = loginWithEmailPassword;
 
+module.exports.loginWithEmailPassword = loginWithEmailPassword;
 // ===================== LOGOUT =====================
 const logoutUser = async (req, res) => {
     try {
@@ -559,6 +570,7 @@ const loginWithGoogle = async (req, res) => {
             city: account.city || null,
             state: account.state || null,
             pinCode: account.pinCode || null,
+            internshipStatus: account.internshipStatus || null   // ✅ Added here
         };
 
         const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
@@ -600,7 +612,7 @@ const fetchSingleUserById = async (req, res) => {
             "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
             "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
             "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
-            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement"
+            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement","internshipStatus"
         ];
 
         let filled = 0;
@@ -624,7 +636,8 @@ const fetchSingleUserById = async (req, res) => {
             ReferralCode: userData.referralCode,
             ReferralLink: userData.referralLink,
             ProfileCompletion: profileCompletion,
-            TotalSubscriptions: totalSubscriptions
+            TotalSubscriptions: totalSubscriptions,
+            InternshipStatus: userData.internshipStatus || null
         };
 
         return ReS(res, { success: true, data: filteredData }, 200);
@@ -658,7 +671,7 @@ const fetchAllUsers = async (req, res) => {
             "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
             "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
             "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
-            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement"
+            "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement","internshipStatus"
         ];
 
         const formattedUsers = users.map(user => {
