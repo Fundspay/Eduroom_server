@@ -9,5 +9,6 @@ router.get("/course-preview/:id", coursepreviewController.fetchSingleCoursePrevi
 router.put("/course-preview/:id", coursepreviewController.updateCoursePreview);
 router.delete("/course-preview/:id", coursepreviewController.deleteCoursePreview);
 router.get("/previews/:courseId", coursepreviewController.fetchPreviewsByCourse);
+router.get("/get-course-preview-id", coursepreviewController.getCoursePreviewId);
 
 module.exports = router;
