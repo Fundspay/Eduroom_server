@@ -81,6 +81,12 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         defaultValue: 0,
       },
+      courseDates: {
+        type: Sequelize.JSON,
+        allowNull: true,
+        defaultValue: {}
+      },
+
 
       // 🔹 Auth & System
       password: { type: Sequelize.STRING, allowNull: false },
