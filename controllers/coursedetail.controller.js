@@ -21,7 +21,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
     if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
-    // **One CourseDetail per coursePreviewId**
+    // One CourseDetail per coursePreviewId
     let courseDetail = await model.CourseDetail.findOne({
       where: { coursePreviewId, courseId },
       transaction
@@ -51,33 +51,31 @@ const addOrUpdateCourseDetail = async (req, res) => {
         if (!sessionNumber) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // **Find existing session in the same CourseDetail**
+        // Check for existing session in the same CourseDetail
         let existingSession = await model.CourseDetail.findOne({
           where: { coursePreviewId, courseId, day, sessionNumber },
           transaction
         });
 
         if (!existingSession) {
-          // Create session fields under the same CourseDetail
           await courseDetail.update({
-            day, // you may store multiple sessions in JSON if needed
+            day,
             sessionNumber,
             title,
-            heading: heading || null,
-            sessionDuration: sessionDuration || null,
-            duration: duration || null,
             description: description || null,
-            youtubeLink: youtubeLink || null
+            youtubeLink: youtubeLink || null,
+            duration: duration || null,
+            sessionDuration: sessionDuration || null,
+            heading: heading || null
           }, { transaction });
         } else {
-          // Update existing session info
           await existingSession.update({
             title,
-            heading: heading || null,
-            sessionDuration: sessionDuration || null,
-            duration: duration || null,
             description: description || null,
-            youtubeLink: youtubeLink || null
+            youtubeLink: youtubeLink || null,
+            duration: duration || null,
+            sessionDuration: sessionDuration || null,
+            heading: heading || null
           }, { transaction });
         }
 
@@ -109,7 +107,17 @@ const addOrUpdateCourseDetail = async (req, res) => {
           }
         }
 
-        createdSessions.push({ sessionNumber, title, questions });
+        // Include all session details in response
+        createdSessions.push({
+          sessionNumber,
+          title,
+          description: description || null,
+          youtubeLink: youtubeLink || null,
+          duration: duration || null,
+          sessionDuration: sessionDuration || null,
+          heading: heading || null,
+          questions
+        });
       }
 
       createdDays.push({ day, sessions: createdSessions });
