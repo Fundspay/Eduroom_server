@@ -19,7 +19,6 @@ const addCoursePreview = async (req, res) => {
             duration
         } = req.body;
 
-
         if (!courseId) return ReE(res, "courseId is required", 400);
         if (!domainId) return ReE(res, "Valid domainId is required", 400);
         if (!title || !title.trim()) return ReE(res, "title is required", 400);
@@ -31,6 +30,14 @@ const addCoursePreview = async (req, res) => {
 
         const domain = await model.Domain.findByPk(domainId);
         if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
+
+        // 🔹 Check if a CoursePreview already exists for this course
+        const existingPreview = await model.CoursePreview.findOne({
+            where: { courseId, isDeleted: false },
+        });
+        if (existingPreview) {
+            return ReE(res, "This course already has a CoursePreview. Only one is allowed.", 400);
+        }
 
         // 🔹 Parse whatYouWillLearn safely
         let whatYouWillLearnJson = { paragraph: "", bullets: [] };
@@ -70,7 +77,6 @@ const addCoursePreview = async (req, res) => {
 };
 
 module.exports.addCoursePreview = addCoursePreview;
-
 
 // ✅ Fetch all CoursePreviews
 var fetchAllCoursePreviews = async (req, res) => {
