@@ -7,7 +7,7 @@ module.exports = (sequelize, Sequelize) => {
             domainId: { type: Sequelize.BIGINT, allowNull: false },
             courseId: { type: Sequelize.BIGINT, allowNull: false },
             coursePreviewId: { type: Sequelize.BIGINT, allowNull: false },
-            userId: { type: Sequelize.BIGINT, allowNull: false },
+            userId: { type: Sequelize.BIGINT, allowNull: true },
             day: { type: Sequelize.INTEGER, allowNull: false }, // Day number
             sessionNumber: { type: Sequelize.INTEGER, allowNull: false },
             sessionDuration: { type: Sequelize.INTEGER, allowNull: true }, // 👈 New: Session duration in minutes
