@@ -4,114 +4,140 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
 
 
-// ✅ Add CourseDetail with Questions for a specific day (multiple sessions)
-var addCourseDetail = async (req, res) => {
-    const {
-        domainId,
-        userId,
-        courseId,
-        coursePreviewId,
-        days // Array of days, each containing sessions
-    } = req.body;
+const addOrUpdateCourseDetail = async (req, res) => {
+  const {
+    domainId,
+    userId,
+    courseId,
+    coursePreviewId,
+    days // Array of days, each containing sessions
+  } = req.body;
 
-    // Basic validations
-    if (!domainId) return ReE(res, "domainId is required", 400);
-    if (!courseId) return ReE(res, "courseId is required", 400);
-    if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
-    if (!Array.isArray(days) || days.length === 0) return ReE(res, "days are required", 400);
+  if (!domainId) return ReE(res, "domainId is required", 400);
+  if (!courseId) return ReE(res, "courseId is required", 400);
+  if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
+  if (!Array.isArray(days) || days.length === 0) return ReE(res, "days are required", 400);
 
-    try {
-        const course = await model.Course.findByPk(courseId);
-        if (!course || course.isDeleted) return ReE(res, "Course not found", 404);
+  const transaction = await sequelize.transaction();
+  try {
+    const course = await model.Course.findByPk(courseId);
+    if (!course || course.isDeleted) throw new Error("Course not found");
 
-        const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
-        if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
+    const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
+    if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
-        const createdDays = [];
+    const createdDays = [];
 
-        // Loop through each day
-        for (const dayObj of days) {
-            const { day, sessions } = dayObj;
+    for (const dayObj of days) {
+      const { day, sessions } = dayObj;
+      if (!day) throw new Error("day is required for each day object");
+      if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
-            if (!day) return ReE(res, "day is required for each day object", 400);
-            if (!Array.isArray(sessions) || sessions.length === 0) return ReE(res, `sessions are required for day ${day}`, 400);
+      const createdSessions = [];
 
-            const createdSessions = [];
+      for (const session of sessions) {
+        const {
+          sessionNumber,
+          title,
+          description,
+          youtubeLink,
+          questions,
+          duration,
+          sessionDuration,
+          heading
+        } = session;
 
-            for (const session of sessions) {
-                const {
-                    sessionNumber,
-                    title,
-                    description,
-                    youtubeLink,
-                    questions,
-                    duration,
-                    sessionDuration,
-                    heading
-                } = session;
+        if (!sessionNumber) throw new Error("sessionNumber is required for each session");
+        if (!title) throw new Error("title is required for each session");
 
-                if (!sessionNumber) return ReE(res, "sessionNumber is required for each session", 400);
-                if (!title) return ReE(res, "title is required for each session", 400);
+        // Check for existing CourseDetail
+        let courseDetail = await model.CourseDetail.findOne({
+          where: { coursePreviewId, day, sessionNumber },
+          transaction
+        });
 
-                // ✅ Add new fields
-                const courseDetail = await model.CourseDetail.create({
-                    domainId,
-                    courseId,
-                    coursePreviewId,
-                    day,
-                    sessionNumber,
-                    userId: userId || null,
-                    title,
-                    heading: heading || null,
-                    sessionDuration: sessionDuration || null,
-                    duration: duration || null,
-                    description: description || null,
-                    youtubeLink: youtubeLink || null
-                });
-
-                // Add MCQs
-                let questionRecords = [];
-                if (Array.isArray(questions) && questions.length > 0) {
-                    questionRecords = questions.map(q => ({
-                        courseDetailId: courseDetail.id,
-                        domainId,
-                        courseId,
-                        coursePreviewId,
-                        day,
-                        sessionNumber,
-                        question: q.question,
-                        optionA: q.optionA,
-                        optionB: q.optionB,
-                        optionC: q.optionC,
-                        optionD: q.optionD,
-                        answer: q.answer,
-                        keywords: q.keywords || null,
-                        caseStudy: q.caseStudy || null
-                    }));
-
-                    await model.QuestionModel.bulkCreate(questionRecords);
-                }
-
-                createdSessions.push({
-                    courseDetail,
-                    questions: questionRecords
-                });
-            }
-
-            createdDays.push({
-                day,
-                sessions: createdSessions
-            });
+        if (!courseDetail) {
+          // Create new
+          courseDetail = await model.CourseDetail.create({
+            domainId,
+            courseId,
+            coursePreviewId,
+            day,
+            sessionNumber,
+            userId: userId || null,
+            title,
+            heading: heading || null,
+            sessionDuration: sessionDuration || null,
+            duration: duration || null,
+            description: description || null,
+            youtubeLink: youtubeLink || null
+          }, { transaction });
+        } else {
+          // Update existing
+          await courseDetail.update({
+            title,
+            heading: heading || null,
+            sessionDuration: sessionDuration || null,
+            duration: duration || null,
+            description: description || null,
+            youtubeLink: youtubeLink || null
+          }, { transaction });
         }
 
-        return ReS(res, { success: true, days: createdDays }, 201);
+        // MCQs: replace old questions
+        if (Array.isArray(questions)) {
+          await model.QuestionModel.destroy({
+            where: { courseDetailId: courseDetail.id },
+            transaction
+          });
 
-    } catch (error) {
-        console.error("Add Course Details Error:", error);
-        return ReE(res, error.message, 500);
+          if (questions.length > 0) {
+            const questionRecords = questions.map(q => ({
+              courseDetailId: courseDetail.id,
+              domainId,
+              courseId,
+              coursePreviewId,
+              day,
+              sessionNumber,
+              question: q.question,
+              optionA: q.optionA,
+              optionB: q.optionB,
+              optionC: q.optionC,
+              optionD: q.optionD,
+              answer: q.answer,
+              keywords: q.keywords || null,
+              caseStudy: q.caseStudy || null
+            }));
+            await model.QuestionModel.bulkCreate(questionRecords, { transaction });
+          }
+        }
+
+        createdSessions.push({
+          courseDetail,
+          questions
+        });
+      }
+
+      createdDays.push({
+        day,
+        sessions: createdSessions
+      });
     }
+
+    // Commit the transaction
+    await transaction.commit();
+
+    return ReS(res, { success: true, days: createdDays }, 201);
+
+  } catch (error) {
+    await transaction.rollback();
+    console.error("Add/Update Course Details Error:", error);
+    return ReE(res, error.message, 500);
+  }
 };
-module.exports.addCourseDetail = addCourseDetail;
+
+module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
+
 
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
 var fetchCourseDetailsByPreview = async (req, res) => {
