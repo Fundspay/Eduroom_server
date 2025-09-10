@@ -542,6 +542,7 @@ const getDailyStatusPerUser = async (req, res) => {
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
 
+
 const getBusinessTarget = async (req, res) => {
     try {
         let { userId, courseId } = req.params;
