@@ -576,8 +576,8 @@ const getBusinessTarget = async (req, res) => {
             referralCount = Number(apiResponse.data?.referral_count) || 0;
         }
 
-        // 4️⃣ Calculate achieved units (assuming 1 referral = 10 units)
-        const achievedCount = referralCount * 10;
+        // 4️⃣ Calculate achieved units 
+        const achievedCount = referralCount ;
         const remaining = Math.max(businessTarget - achievedCount, 0);
 
         // 5️⃣ Update user's subscriptionWallet with achieved count
