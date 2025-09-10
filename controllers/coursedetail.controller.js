@@ -475,22 +475,30 @@ const getDailyStatusPerUser = async (req, res) => {
         if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
 
         const daysMap = {};
+        let totalSessions = 0;
+        let completedSessions = 0;
 
         sessions.forEach(session => {
+            totalSessions++;
+
             const progress = session.userProgress?.[userId];
             const attempted = !!progress;
+            const isCompleted = attempted && progress.correctMCQs === progress.totalMCQs;
+
+            if (isCompleted) completedSessions++;
 
             if (!daysMap[session.day]) {
                 daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
             }
 
             daysMap[session.day].total++;
-            if (attempted) daysMap[session.day].completed++;
+            if (isCompleted) daysMap[session.day].completed++;
 
             daysMap[session.day].sessions.push({
                 sessionNumber: session.sessionNumber,
                 title: session.title,
                 attempted,
+                status: isCompleted ? "Completed" : "In Progress",
                 correctMCQs: progress?.correctMCQs || 0,
                 totalMCQs: progress?.totalMCQs || 0
             });
@@ -503,11 +511,25 @@ const getDailyStatusPerUser = async (req, res) => {
                 totalSessions: d.total,
                 completedSessions: d.completed,
                 fullyCompleted: d.completed === d.total,
+                status: d.completed === d.total ? "Completed" : "In Progress",
                 sessions: d.sessions
             };
         });
 
-        return ReS(res, { success: true, dailyStatus }, 200);
+        const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2) + "%";
+        const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+
+        return ReS(res, {
+            success: true,
+            summary: {
+                totalSessions,
+                completedSessions,
+                remainingSessions: totalSessions - completedSessions,
+                overallCompletionRate,
+                overallStatus
+            },
+            dailyStatus
+        }, 200);
 
     } catch (error) {
         console.error("Get Daily Status Error:", error);
@@ -579,11 +601,11 @@ const getCourseStatus = async (req, res) => {
         }
 
         // 1. Fetch all sessions of this course
-        const sessions = await CourseDetail.findAll({
+        const sessions = await model.CourseDetail.findAll({
             where: { courseId, coursePreviewId, isDeleted: false },
             include: [
                 {
-                    model: QuestionModel,
+                    model: model.QuestionModel,
                     where: { isDeleted: false },
                     required: false
                 }
@@ -642,3 +664,55 @@ const getCourseStatus = async (req, res) => {
 };
 
 module.exports.getCourseStatus = getCourseStatus;
+
+const setCourseStartEndDates = async (req, res) => {
+  try {
+    const { userId, courseId, startDate } = req.body;
+
+    if (!userId || !courseId || !startDate) {
+      return ReE(res, "userId, courseId, and startDate are required", 400);
+    }
+
+    // Fetch the user
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Fetch the course to get duration
+    const course = await model.Course.findByPk(courseId);
+    if (!course || !course.duration) {
+      return ReE(res, "Course not found or duration not set", 404);
+    }
+
+    // Calculate end date
+    const start = new Date(startDate);
+    const durationDays = parseInt(course.duration); // assuming duration is in days
+    const end = new Date(start);
+    end.setDate(start.getDate() + durationDays);
+
+    // Update user's courseDates JSON
+    const courseDates = user.courseDates || {};
+    courseDates[courseId] = {
+      startDate: start.toISOString().split("T")[0],
+      endDate: end.toISOString().split("T")[0],
+    };
+
+    await user.update({ courseDates });
+
+    return ReS(res, {
+      success: true,
+      message: "Course start and end dates updated successfully",
+      data: {
+        courseId,
+        startDate: courseDates[courseId].startDate,
+        endDate: courseDates[courseId].endDate,
+      },
+    }, 200);
+
+  } catch (error) {
+    console.error("Set Course Start/End Dates Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.setCourseStartEndDates = setCourseStartEndDates;
+
