@@ -6,13 +6,7 @@ const axios = require('axios');
 
 
 const addOrUpdateCourseDetail = async (req, res) => {
-  const {
-    domainId,
-    userId,
-    courseId,
-    coursePreviewId,
-    days // Array of days, each containing sessions
-  } = req.body;
+  const { domainId, userId, courseId, coursePreviewId, days } = req.body;
 
   if (!domainId) return ReE(res, "domainId is required", 400);
   if (!courseId) return ReE(res, "courseId is required", 400);
@@ -27,6 +21,21 @@ const addOrUpdateCourseDetail = async (req, res) => {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
     if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
+    // **One CourseDetail per coursePreviewId**
+    let courseDetail = await model.CourseDetail.findOne({
+      where: { coursePreviewId, courseId },
+      transaction
+    });
+
+    if (!courseDetail) {
+      courseDetail = await model.CourseDetail.create({
+        domainId,
+        courseId,
+        coursePreviewId,
+        userId: userId || null
+      }, { transaction });
+    }
+
     const createdDays = [];
 
     for (const dayObj of days) {
@@ -37,35 +46,22 @@ const addOrUpdateCourseDetail = async (req, res) => {
       const createdSessions = [];
 
       for (const session of sessions) {
-        const {
-          sessionNumber,
-          title,
-          description,
-          youtubeLink,
-          questions,
-          duration,
-          sessionDuration,
-          heading
-        } = session;
+        const { sessionNumber, title, description, youtubeLink, questions, duration, sessionDuration, heading } = session;
 
         if (!sessionNumber) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Check for existing CourseDetail
-        let courseDetail = await model.CourseDetail.findOne({
-          where: { coursePreviewId, day, sessionNumber },
+        // **Find existing session in the same CourseDetail**
+        let existingSession = await model.CourseDetail.findOne({
+          where: { coursePreviewId, courseId, day, sessionNumber },
           transaction
         });
 
-        if (!courseDetail) {
-          // Create new
-          courseDetail = await model.CourseDetail.create({
-            domainId,
-            courseId,
-            coursePreviewId,
-            day,
+        if (!existingSession) {
+          // Create session fields under the same CourseDetail
+          await courseDetail.update({
+            day, // you may store multiple sessions in JSON if needed
             sessionNumber,
-            userId: userId || null,
             title,
             heading: heading || null,
             sessionDuration: sessionDuration || null,
@@ -74,8 +70,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
             youtubeLink: youtubeLink || null
           }, { transaction });
         } else {
-          // Update existing
-          await courseDetail.update({
+          // Update existing session info
+          await existingSession.update({
             title,
             heading: heading || null,
             sessionDuration: sessionDuration || null,
@@ -85,10 +81,10 @@ const addOrUpdateCourseDetail = async (req, res) => {
           }, { transaction });
         }
 
-        // MCQs: replace old questions
+        // MCQs: replace old questions for this session
         if (Array.isArray(questions)) {
           await model.QuestionModel.destroy({
-            where: { courseDetailId: courseDetail.id },
+            where: { courseDetailId: courseDetail.id, sessionNumber },
             transaction
           });
 
@@ -113,22 +109,14 @@ const addOrUpdateCourseDetail = async (req, res) => {
           }
         }
 
-        createdSessions.push({
-          courseDetail,
-          questions
-        });
+        createdSessions.push({ sessionNumber, title, questions });
       }
 
-      createdDays.push({
-        day,
-        sessions: createdSessions
-      });
+      createdDays.push({ day, sessions: createdSessions });
     }
 
-    // Commit the transaction
     await transaction.commit();
-
-    return ReS(res, { success: true, days: createdDays }, 201);
+    return ReS(res, { success: true, courseDetailId: courseDetail.id, days: createdDays }, 201);
 
   } catch (error) {
     await transaction.rollback();
@@ -138,7 +126,6 @@ const addOrUpdateCourseDetail = async (req, res) => {
 };
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
-
 
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
 var fetchCourseDetailsByPreview = async (req, res) => {
