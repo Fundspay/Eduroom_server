@@ -77,13 +77,31 @@ var fetchAllCoursePreviews = async (req, res) => {
     try {
         const previews = await model.CoursePreview.findAll({
             where: { isDeleted: false },
+            attributes: [
+                ["id", "coursePreviewId"], // 👈 rename id -> coursePreviewId
+                "courseId",
+                "domainId",
+                "title",
+                "heading",
+                "youtubeLink",
+                "description",
+                "dayCount",
+                "language",
+                "level",
+                "whatYouWillLearn",
+                "duration",
+                "createdAt",
+                "updatedAt"
+            ],
             include: [
                 { model: model.Course, attributes: ["name"] },
                 { model: model.Domain, attributes: ["name"] }
             ]
         });
+
         return ReS(res, { success: true, data: previews }, 200);
     } catch (error) {
+        console.error("Fetch All CoursePreviews Error:", error);
         return ReE(res, error.message, 500);
     }
 };
