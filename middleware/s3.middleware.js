@@ -39,21 +39,21 @@ const imageFileFilter = (req, file, cb) => {
 
 // ✅ Profile Picture Upload (to eduroom.registration.details/profile)
 const uploadProfilePicture = multer({
-  storage: buildS3Storage("eduroom.registration.details/profile"),
+  storage: buildS3Storage("eduroom-registration-details/profile"),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: imageFileFilter,
 });
 
 // ✅ General Domain Images Upload (to eduroom.registration.details/domain-images)
 const uploadGeneralFile = multer({
-  storage: buildS3Storage("eduroom.registration.details/domain-images"),
+  storage: buildS3Storage("eduroom-registration-details/domain-images"),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: imageFileFilter,
 });
 
 // ✅ General Course Images Upload (to eduroom.registration.details/course-images)
 const uploadGeneralFile2 = multer({
-  storage: buildS3Storage("eduroom.registration.details/course-images"),
+  storage: buildS3Storage("eduroom-registration-details/course-images"),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
   fileFilter: imageFileFilter,
 });
