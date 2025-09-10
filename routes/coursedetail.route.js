@@ -50,5 +50,6 @@ router.get(
   coursedetailController.getDailyStatusPerUser
 );
 
+router.post("/course/start-end-dates", coursedetailController.setCourseStartEndDates);
 
 module.exports = router;
