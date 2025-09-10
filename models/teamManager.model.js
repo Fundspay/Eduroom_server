@@ -13,7 +13,8 @@ module.exports = (sequelize, Sequelize) => {
 
             // 🔹 Work Info
             department: { type: Sequelize.STRING, allowNull: false }, // hardcoded values, no enums
-            position: { type: Sequelize.STRING, allowNull: false },   // hardcoded values, no enums
+            position: { type: Sequelize.STRING, allowNull: false },
+            internshipStatus: { type: Sequelize.STRING, allowNull: true},   // hardcoded values, no enums
 
             // 🔹 Auth & System
             password: { type: Sequelize.STRING, allowNull: false },
