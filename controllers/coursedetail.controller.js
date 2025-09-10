@@ -463,80 +463,84 @@ module.exports.getOverallCourseStatus = getOverallCourseStatus;
 
 // ✅ Daily status per user
 const getDailyStatusPerUser = async (req, res) => {
-    try {
-        const { courseId, coursePreviewId, userId } = req.params;
-        if (!userId) return ReE(res, "userId is required", 400);
+  try {
+    const { courseId, coursePreviewId, userId } = req.params;
+    if (!userId) return ReE(res, "userId is required", 400);
 
-        const sessions = await model.CourseDetail.findAll({
-            where: { courseId, coursePreviewId, isDeleted: false },
-            order: [["day", "ASC"], ["sessionNumber", "ASC"]]
-        });
+    const sessions = await model.CourseDetail.findAll({
+      where: { courseId, coursePreviewId, isDeleted: false },
+      order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+    });
 
-        if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
+    if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
 
-        const daysMap = {};
-        let totalSessions = 0;
-        let completedSessions = 0;
+    const daysMap = {};
+    let totalSessions = 0;
+    let completedSessions = 0;
 
-        // Build sessions and day stats
-        sessions.forEach(session => {
-            totalSessions++;
+    sessions.forEach((session) => {
+      const progress = session.userProgress?.[userId];
+      const attempted = !!progress;
+      const sessionMCQs = progress?.totalMCQs || 0;
+      const correctMCQs = progress?.correctMCQs || 0;
+      const sessionCompletionPercentage = sessionMCQs
+        ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
+        : 0;
 
-            const progress = session.userProgress?.[userId];
-            const attempted = !!progress;
-            const isCompleted = attempted && progress.correctMCQs === progress.totalMCQs;
+      if (!daysMap[session.day]) {
+        daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+      }
 
-            if (isCompleted) completedSessions++;
+      daysMap[session.day].total++;
+      totalSessions++;
+      if (attempted && correctMCQs === sessionMCQs) {
+        daysMap[session.day].completed++;
+        completedSessions++;
+      }
 
-            if (!daysMap[session.day]) {
-                daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
-            }
+      daysMap[session.day].sessions.push({
+        sessionNumber: session.sessionNumber,
+        title: session.title,
+        attempted,
+        status: attempted && correctMCQs === sessionMCQs ? "Completed" : "In Progress",
+        correctMCQs,
+        totalMCQs: sessionMCQs,
+        sessionDuration: session.sessionDuration || null,
+        sessionCompletionPercentage: Number(sessionCompletionPercentage),
+      });
+    });
 
-            daysMap[session.day].total++;
-            if (isCompleted) daysMap[session.day].completed++;
+    const dailyStatus = Object.keys(daysMap).map((dayKey) => {
+      const d = daysMap[dayKey];
+      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+      return {
+        day: Number(dayKey),
+        totalSessions: d.total,
+        completedSessions: d.completed,
+        fullyCompleted: d.completed === d.total,
+        dayCompletionPercentage: Number(dayCompletionPercentage),
+        status: d.completed === d.total ? "Completed" : "In Progress",
+        sessions: d.sessions,
+      };
+    });
 
-            daysMap[session.day].sessions.push({
-                sessionNumber: session.sessionNumber,
-                title: session.title,
-                attempted,
-                status: isCompleted ? "Completed" : "In Progress",
-                correctMCQs: progress?.correctMCQs || 0,
-                totalMCQs: progress?.totalMCQs || 0
-            });
-        });
+    const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2);
 
-        // Build daily stats array
-        const dailyStatus = Object.keys(daysMap).map(dayKey => {
-            const d = daysMap[dayKey];
-            return {
-                day: Number(dayKey),
-                totalSessions: d.total,
-                completedSessions: d.completed,
-                fullyCompleted: d.completed === d.total,
-                status: d.completed === d.total ? "Completed" : "In Progress",
-                sessions: d.sessions
-            };
-        });
-
-        const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2) + "%";
-        const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
-
-        return ReS(res, {
-            success: true,
-            summary: {
-                totalSessions,
-                completedSessions,
-                remainingSessions: totalSessions - completedSessions,
-                overallCompletionRate,
-                overallStatus
-            },
-            dailyStatus
-        }, 200);
-
-    } catch (error) {
-        console.error("Get Daily Status Error:", error);
-        return ReE(res, error.message, 500);
-    }
+    return ReS(res, {
+      success: true,
+      summary: {
+        totalSessions,
+        completedSessions,
+        remainingSessions: totalSessions - completedSessions,
+        overallCompletionRate: Number(overallCompletionRate),
+        overallStatus: completedSessions === totalSessions ? "Completed" : "In Progress",
+      },
+      dailyStatus,
+    }, 200);
+  } catch (error) {
+    console.error("Get Daily Status Error:", error);
+    return ReE(res, error.message, 500);
+  }
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
