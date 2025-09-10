@@ -698,3 +698,42 @@ const fetchAllUsers = async (req, res) => {
 module.exports.fetchAllUsers = fetchAllUsers;
 
 
+const getReferralPaymentStatus = async (req, res) => {
+  try {
+    let { userId } = req.params;
+
+    // Convert userId to integer
+    userId = parseInt(userId, 10);
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
+
+    // Fetch user
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    if (!user.referralCode) {
+      return ReS(res, {
+        success: true,
+        message: "User has no referral code",
+        data: null
+      }, 200);
+    }
+
+    // Call external Lambda
+    const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
+    const apiResponse = await axios.get(apiUrl);
+
+    // Return Lambda response as-is
+    return ReS(res, {
+      success: true,
+      data: apiResponse.data
+    }, 200);
+
+  } catch (error) {
+    console.error("Get Referral Payment Status Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
+
+
