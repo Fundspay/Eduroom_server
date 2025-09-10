@@ -157,7 +157,7 @@ const generateOfferLetter = async (userId) => {
 
     // Store in DB
     const created = await model.OfferLetter.create({
-      user: userId,
+      userId,
       position,
       startDate,
       location: workLocation,
