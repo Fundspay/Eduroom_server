@@ -7,7 +7,7 @@ const { ReE, ReS } = require("../utils/util.service.js");
 // Register Team Manager
 var registerTeamManager = async function (req, res) {
     try {
-        const { name, email, mobileNumber, department, position, password } = req.body;
+        const { name, email, mobileNumber, department, position, password, internshipStatus } = req.body;
 
         //  Validate required fields
         if (!name || !email || !mobileNumber || !department || !position || !password) {
@@ -47,6 +47,7 @@ var registerTeamManager = async function (req, res) {
             department,
             position,
             password: hashedPassword,
+            internshipStatus: internshipStatus || null,
         });
 
         return ReS(res, { success: true, managerId: manager.managerId }, 201);
@@ -110,3 +111,55 @@ var getAllTeamManagers = async function (req, res) {
 };
 
 module.exports.getAllTeamManagers = getAllTeamManagers;
+
+// ✅ Update Team Manager
+var updateTeamManager = async function (req, res) {
+    try {
+        const { managerId } = req.params;
+        const { name, email, mobileNumber, department, position, password, internshipStatus } = req.body;
+
+        if (!managerId) return ReE(res, "managerId is required", 400);
+
+        // Find manager
+        const manager = await model.TeamManager.findOne({
+            where: { managerId, isDeleted: false }
+        });
+
+        if (!manager) return ReE(res, "Manager not found", 404);
+
+        // Check for duplicate email (if email is being updated)
+        if (email && email !== manager.email) {
+            const existingManager = await model.TeamManager.findOne({
+                where: { email, isDeleted: false }
+            });
+            if (existingManager) {
+                return ReE(res, "Manager with this email already exists", 400);
+            }
+        }
+
+        // If password provided, hash it
+        let hashedPassword = manager.password;
+        if (password) {
+            hashedPassword = await bcrypt.hash(password, 10);
+        }
+
+        // Update fields
+        await manager.update({
+            name: name || manager.name,
+            email: email || manager.email,
+            mobileNumber: mobileNumber || manager.mobileNumber,
+            department: department || manager.department,
+            position: position || manager.position,
+            password: hashedPassword,
+            internshipStatus: internshipStatus ?? manager.internshipStatus
+        });
+
+        return ReS(res, { success: true, message: "Manager updated successfully" }, 200);
+    } catch (error) {
+        console.error("Error updating manager:", error);
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.updateTeamManager = updateTeamManager;
+
