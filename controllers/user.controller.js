@@ -750,4 +750,58 @@ const getReferralPaymentStatus = async (req, res) => {
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
 
+// ✅ Get internship status summary per managerId (userId of manager)
+const getInternshipStatusByUser = async (req, res) => {
+  try {
+    let { userId } = req.params;
+    userId = parseInt(userId, 10);
 
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
+
+    // Check if manager exists
+    const manager = await model.TeamManager.findOne({ where: { managerId: userId, isDeleted: false } });
+    if (!manager) return ReE(res, "Manager not found", 404);
+
+    // Fetch interns under this manager
+    const interns = await model.User.findAll({
+      where: { managerId: userId, isDeleted: false },
+      attributes: ["id", "firstName", "lastName", "internshipStatus"]
+    });
+
+    // Count by status
+    let completed = 0, onHold = 0, inProgress = 0;
+
+    interns.forEach(intern => {
+      switch ((intern.internshipStatus || "").toLowerCase()) {
+        case "completed":
+          completed++;
+          break;
+        case "on-hold":
+        case "hold":
+          onHold++;
+          break;
+        case "in-progress":
+        case "progress":
+          inProgress++;
+          break;
+      }
+    });
+
+    return ReS(res, {
+      success: true,
+      managerId: userId,
+      data: {
+        totalInterns: interns.length,
+        completed,
+        onHold,
+        inProgress
+      }
+    }, 200);
+
+  } catch (error) {
+    console.error("Get Internship Status By User Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getInternshipStatusByUser = getInternshipStatusByUser;
