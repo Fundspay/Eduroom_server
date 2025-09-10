@@ -33,5 +33,6 @@ router.post('/google-login', firebaseAuth, userController.loginWithGoogle);
 
 router.get("/profile/:id", userController.fetchSingleUserById);
 router.get("/:userId/referral-payment-status", userController.getReferralPaymentStatus);
+router.get("/:userId/internship-status", userController.getInternshipStatusByUser);
 
 module.exports = router;
