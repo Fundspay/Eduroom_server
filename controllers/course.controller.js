@@ -68,15 +68,24 @@ var fetchAllCourses = async (req, res) => {
         const courses = await model.Course.findAll({
             where: { isDeleted: false },
             attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }],
+            include: [
+                { model: model.Domain, attributes: ["name"] },
+                {
+                    model: model.CoursePreview,
+                    attributes: [["id", "coursePreviewId"], "dayCount"],
+                    where: { isDeleted: false },
+                    required: false // in case a course has no preview
+                }
+            ]
         });
+
         return ReS(res, { success: true, data: courses }, 200);
     } catch (error) {
+        console.error("Fetch All Courses Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 module.exports.fetchAllCourses = fetchAllCourses;
-
 // ✅ Fetch single Course by ID
 var fetchSingleCourse = async (req, res) => {
     const { id } = req.params;
