@@ -9,9 +9,12 @@ module.exports = (sequelize, Sequelize) => {
             coursePreviewId: { type: Sequelize.BIGINT, allowNull: false },
             userId: { type: Sequelize.BIGINT, allowNull: false },
             day: { type: Sequelize.INTEGER, allowNull: false }, // Day number
-            sessionNumber: { type: Sequelize.INTEGER, allowNull: false }, // 👈 New: Session per day
+            sessionNumber: { type: Sequelize.INTEGER, allowNull: false },
+            sessionDuration: { type: Sequelize.INTEGER, allowNull: true }, // 👈 New: Session duration in minutes
             title: { type: Sequelize.TEXT, allowNull: false },
             description: { type: Sequelize.TEXT, allowNull: true },
+            duration: { type: Sequelize.INTEGER, allowNull: true },
+            heading: { type: Sequelize.TEXT, allowNull: true },
             youtubeLink: { type: Sequelize.TEXT, allowNull: true },
             userProgress: { 
                 type: Sequelize.JSON, // e.g., { "eligibleForCaseStudy": true }
