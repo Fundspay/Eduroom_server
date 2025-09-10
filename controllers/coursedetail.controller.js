@@ -555,7 +555,8 @@ const getBusinessTarget = async (req, res) => {
         userId = parseInt(userId, 10);
         courseId = parseInt(courseId, 10);
 
-        if (isNaN(userId) || isNaN(courseId)) return ReE(res, "Invalid userId or courseId", 400);
+        if (isNaN(userId) || isNaN(courseId)) 
+            return ReE(res, "Invalid userId or courseId", 400);
 
         // 1️⃣ Fetch user
         const user = await model.User.findByPk(userId);
@@ -579,7 +580,13 @@ const getBusinessTarget = async (req, res) => {
         const achievedCount = referralCount * 10;
         const remaining = Math.max(businessTarget - achievedCount, 0);
 
-        // 5️⃣ Return response
+        // 5️⃣ Update user's subscriptionWallet with achieved count
+        await model.User.update(
+            { subscriptionWallet: achievedCount },
+            { where: { id: userId } }
+        );
+
+        // 6️⃣ Return response
         return ReS(res, {
             success: true,
             data: {
@@ -587,7 +594,8 @@ const getBusinessTarget = async (req, res) => {
                 courseId,
                 businessTarget,
                 achievedCount,
-                remaining
+                remaining,
+                subscriptionWallet: achievedCount
             }
         }, 200);
 
