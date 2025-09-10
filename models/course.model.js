@@ -26,6 +26,12 @@ module.exports = (sequelize, Sequelize) => {
             onUpdate: "RESTRICT",
             constraints: true,
         });
+
+        Course.hasMany(models.CoursePreview, {
+            foreignKey: "courseId",
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE"
+        });
     };
 
     return Course;
