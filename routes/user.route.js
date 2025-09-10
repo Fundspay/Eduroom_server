@@ -32,5 +32,6 @@ router.post("/logout", userController.logoutUser);
 router.post('/google-login', firebaseAuth, userController.loginWithGoogle);
 
 router.get("/profile/:id", userController.fetchSingleUserById);
+router.get("/:userId/referral-payment-status", userController.getReferralPaymentStatus);
 
 module.exports = router;
