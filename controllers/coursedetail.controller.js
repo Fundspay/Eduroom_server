@@ -590,17 +590,18 @@ const getDailyStatusPerUser = async (req, res) => {
     // Compute overall status
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
 
-    // ✅ Debug logs before updating
-    console.log("Before update:", JSON.stringify(user.courseStatuses));
-
-    // Safe update of courseStatuses
-    const existingStatuses = user.courseStatuses || {};
+    // ✅ Update courseStatuses in User table
+    const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
     const key = String(courseId);
     existingStatuses[key] = overallStatus;
 
-    await user.update({ courseStatuses: existingStatuses });
+    console.log("Before update:", JSON.stringify(existingStatuses));
 
-    // Reload instance to confirm DB update
+    await user.update(
+      { courseStatuses: existingStatuses },
+      { fields: ['courseStatuses'] } // ensures JSON is updated
+    );
+
     await user.reload();
     console.log("After update:", JSON.stringify(user.courseStatuses));
 
