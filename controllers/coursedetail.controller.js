@@ -587,7 +587,7 @@ const getDailyStatusPerUser = async (req, res) => {
     // Calculate overall status
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
 
-    // ✅ Update per-course status in User table
+    // ✅ Update per-course status in User table (JSON field)
     const existingStatuses = user.courseStatuses || {};
     existingStatuses[courseId] = overallStatus;
     await user.update({ courseStatuses: existingStatuses });
