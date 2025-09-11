@@ -627,12 +627,16 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
+"use strict";
+
+const model = require("../models");
+const { ReE, ReS } = require("../utils/util.service");
+
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
@@ -645,28 +649,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       courses: [],
     };
 
-    // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
-      // Fetch course details with domain
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
         attributes: ["id", "name", "businessTarget", "domainId"],
         include: [
-          {
-            model: model.Domain,
-            attributes: ["name"],
-          },
-          {
-            model: model.CoursePreview, // fetch all previews for this course
-            attributes: ["id", "name"], // add other fields as needed
-          },
+          { model: model.Domain, attributes: ["name"] },
+          { model: model.CoursePreview, attributes: ["id", "title", "heading"] }, // fetch title/heading
         ],
       });
-
       if (!course) continue;
 
-      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -732,7 +726,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         courseName: course.name,
         domainName: course.Domain?.name || null,
         businessTarget: course.businessTarget || 0,
-        coursePreviews: course.CoursePreviews.map((p) => ({ id: p.id, name: p.name })),
+        coursePreviews: course.CoursePreviews.map((p) => ({ id: p.id, title: p.title, heading: p.heading })),
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
