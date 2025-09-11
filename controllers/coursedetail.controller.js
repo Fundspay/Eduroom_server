@@ -521,9 +521,11 @@ const getDailyStatusPerUser = async (req, res) => {
     const { courseId, coursePreviewId, userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
+    // Fetch the user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
+    // Fetch all sessions for this course & preview
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
       order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -585,7 +587,7 @@ const getDailyStatusPerUser = async (req, res) => {
     // Calculate overall status
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
 
-    // ✅ Update per-course status in user table (JSON field)
+    // ✅ Update per-course status in User table
     const existingStatuses = user.courseStatuses || {};
     existingStatuses[courseId] = overallStatus;
     await user.update({ courseStatuses: existingStatuses });
@@ -611,6 +613,7 @@ const getDailyStatusPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
