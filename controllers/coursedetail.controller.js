@@ -897,7 +897,7 @@ const setCourseStartEndDates = async (req, res) => {
 
     // Calculate end date
     const start = new Date(startDate);
-    const durationDays = parseInt(course.duration); // assuming duration is in days
+    const durationDays = parseInt(course.duration, 10); // assuming duration is in days
     const end = new Date(start);
     end.setDate(start.getDate() + durationDays);
 
@@ -908,7 +908,11 @@ const setCourseStartEndDates = async (req, res) => {
       endDate: end.toISOString().split("T")[0],
     };
 
-    await user.update({ courseDates });
+    // Update courseDates and mark started separately
+    await user.update({
+      courseDates,
+      started: true // separate field
+    });
 
     return ReS(res, {
       success: true,
@@ -917,6 +921,7 @@ const setCourseStartEndDates = async (req, res) => {
         courseId,
         startDate: courseDates[courseId].startDate,
         endDate: courseDates[courseId].endDate,
+        started: true
       },
     }, 200);
 
@@ -927,4 +932,3 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
-
