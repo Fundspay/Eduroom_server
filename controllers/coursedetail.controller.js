@@ -627,7 +627,6 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
-// ✅ Fetch daily & overall progress + wallet info per user (without updating User)
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -642,26 +641,30 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
       subscriptionWalletTotal: user.subscriptionWallet || 0,
       subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,
-      subscriptionLeft:
-        user.subscriptiondeductedWallet > 0
-          ? user.subscriptiondeductedWallet
-          : user.subscriptionWallet || 0, // initially equal to subscriptionWallet
+      subscriptionLeft: user.subscriptiondeductedWallet || user.subscriptionWallet || 0,
       courses: [],
     };
 
     // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
-      // Fetch course details including domain and coursePreviewId
+      // Fetch course details with domain name
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
-        attributes: ["id", "name", "businessTarget", "domainName", "coursePreviewId"],
+        attributes: ["id", "name", "businessTarget", "coursePreviewId", "domainId"],
+        include: [
+          {
+            model: model.Domain,
+            attributes: ["name"],
+          },
+        ],
       });
+
       if (!course) continue;
 
-      // Fetch all sessions for this course & preview
+      // Fetch all sessions for this course (ignoring coursePreviewId filter here)
       const sessions = await model.CourseDetail.findAll({
-        where: { courseId, coursePreviewId: course.coursePreviewId, isDeleted: false },
+        where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
@@ -723,9 +726,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       response.courses.push({
         courseId,
         courseName: course.name,
-        domainName: course.domainName || null,
-        coursePreviewId: course.coursePreviewId || null,
+        domainName: course.Domain?.name || null,
         businessTarget: course.businessTarget || 0,
+        coursePreviewId: course.coursePreviewId || null,
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
@@ -740,7 +743,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
 
 const getBusinessTarget = async (req, res) => {
   try {
