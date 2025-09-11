@@ -7,6 +7,7 @@ const { uploadProfilePicture} = require("../middleware/s3.middleware");
 
 
 router.post("/personal-info", userController.addPersonalInfo);
+router.get("/users/date-range", userController.fetchUsersByDateRange);
 router.put("/:userId/educational-details", userController.addEducationalDetails);
 router.put("/:userId/internship-details", userController.addInternshipDetails);
 router.post(
