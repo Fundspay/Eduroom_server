@@ -521,7 +521,7 @@ const getDailyStatusPerUser = async (req, res) => {
     const { courseId, coursePreviewId, userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch the user instance
+    // Fetch user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
@@ -537,7 +537,7 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // Core daily/session logic unchanged
+    // Core session logic (unchanged)
     sessions.forEach((session) => {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
@@ -584,13 +584,20 @@ const getDailyStatusPerUser = async (req, res) => {
       };
     });
 
-    // Calculate overall status
+    // Compute overall status
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
 
-    // ✅ Update per-course status in User table (JSON field)
+    // ✅ Debug logs before updating
+    console.log("Before update:", JSON.stringify(user.courseStatuses));
+
+    // Update courseStatuses in User table
     const existingStatuses = user.courseStatuses || {};
     existingStatuses[courseId] = overallStatus;
     await user.update({ courseStatuses: existingStatuses });
+
+    // Reload instance to confirm DB update
+    await user.reload();
+    console.log("After update:", JSON.stringify(user.courseStatuses));
 
     const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2);
 
@@ -608,12 +615,11 @@ const getDailyStatusPerUser = async (req, res) => {
 
   } catch (error) {
     console.error("Get Daily Status Error:", error);
-    return ReE(res, error.message, 500);
+    return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
-
 
 const getBusinessTarget = async (req, res) => {
   try {
