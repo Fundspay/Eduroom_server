@@ -648,21 +648,25 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
-      // Fetch course details with domain name
+      // Fetch course details with domain
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
-        attributes: ["id", "name", "businessTarget", "coursePreviewId", "domainId"],
+        attributes: ["id", "name", "businessTarget", "domainId"],
         include: [
           {
             model: model.Domain,
             attributes: ["name"],
+          },
+          {
+            model: model.CoursePreview, // fetch all previews for this course
+            attributes: ["id", "name"], // add other fields as needed
           },
         ],
       });
 
       if (!course) continue;
 
-      // Fetch all sessions for this course (ignoring coursePreviewId filter here)
+      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -728,7 +732,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         courseName: course.name,
         domainName: course.Domain?.name || null,
         businessTarget: course.businessTarget || 0,
-        coursePreviewId: course.coursePreviewId || null,
+        coursePreviews: course.CoursePreviews.map((p) => ({ id: p.id, name: p.name })),
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
