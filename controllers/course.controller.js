@@ -139,3 +139,79 @@ var fetchCoursesByDomain = async (req, res) => {
     }
 };
 module.exports.fetchCoursesByDomain = fetchCoursesByDomain;
+
+const getUserCourseStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "fullName",
+        "subscriptionWallet",
+        "subscriptiondeductedWallet",
+        "courseStatuses",
+        "courseDates"
+      ]
+    });
+
+    if (!user) return ReE(res, "User not found", 404);
+
+    const response = {
+      userId: user.id,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+      subscriptionWalletTotal: user.subscriptionWallet,
+      subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+      courses: []
+    };
+
+    // Loop through all courses in courseStatuses
+    for (const [courseId, status] of Object.entries(user.courseStatuses || {})) {
+      const courseEndDate = user.courseDates?.[courseId]?.endDate || null;
+
+      // Fetch course to check business target
+      const course = await model.Course.findOne({ where: { id: courseId, isDeleted: false } });
+      const businessTarget = course?.businessTarget || 0;
+
+      // Determine if business target is achieved
+      const businessTargetAchieved = (user.subscriptionWallet - user.subscriptiondeductedWallet) >= businessTarget;
+
+      // Check internship certificate
+      const internshipCertificate = await model.InternshipCertificate.findOne({
+        where: { userId, courseId }
+      });
+
+      // Check offer letter
+      const offerLetter = await model.OfferLetter.findOne({
+        where: { userId }
+      });
+
+      response.courses.push({
+        courseId,
+        courseName: course?.name || null,
+        courseStatus: status,
+        courseEndDate,
+        businessTarget,
+        businessTargetAchieved,
+        internshipCertificateSent: internshipCertificate ? internshipCertificate.isIssued : false,
+        internshipCertificateUrl: internshipCertificate ? internshipCertificate.certificateUrl : null,
+        offerLetterSent: offerLetter ? offerLetter.issent : false,
+        offerLetterUrl: offerLetter ? offerLetter.fileUrl : null
+      });
+    }
+
+    return ReS(res, { success: true, data: response }, 200);
+
+  } catch (error) {
+    console.error("getUserCourseStatus error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getUserCourseStatus = getUserCourseStatus;
+

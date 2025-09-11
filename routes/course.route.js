@@ -9,5 +9,6 @@ router.get("/list/:id", courseController.fetchSingleCourse);
 router.put("/update/:id", courseController.updateCourse);
 router.delete("/delete/:id", courseController.deleteCourse);
 router.get("/course/:domainId", courseController.fetchCoursesByDomain);
+router.get("/status/:userId", courseController.getUserCourseStatus);
 
 module.exports = router;
