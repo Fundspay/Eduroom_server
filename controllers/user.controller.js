@@ -792,10 +792,19 @@ const getReferralPaymentStatus = async (req, res) => {
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
 
-    // Return Lambda response as-is
+    // Modify registered_users to add isDownloaded: true
+    let modifiedData = { ...apiResponse.data };
+    if (modifiedData.registered_users && Array.isArray(modifiedData.registered_users)) {
+      modifiedData.registered_users = modifiedData.registered_users.map(u => ({
+        ...u,
+        isDownloaded: true
+      }));
+    }
+
+    // Return modified response
     return ReS(res, {
       success: true,
-      data: apiResponse.data
+      data: modifiedData
     }, 200);
 
   } catch (error) {
