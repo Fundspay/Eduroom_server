@@ -14,7 +14,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(400).json({ success: false, message: "userId and courseId are required" });
     }
 
-    // Fetch user with row lock for wallet deduction
+    // 🔹 Fetch user with row lock
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false },
       transaction,
@@ -25,7 +25,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // Fetch course
+    // 🔹 Fetch course
     const course = await model.Course.findOne({
       where: { id: courseId, isDeleted: false },
       transaction
@@ -37,8 +37,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     const businessTarget = course.businessTarget || 0;
 
-    // Check if user's subscription wallet has enough balance
-    if (!user.subscriptionWallet || user.subscriptionWallet < businessTarget) {
+    // 🔹 Calculate remaining balance
+    const subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet;
+
+    // ✅ Check if user has enough left to cover this businessTarget
+    if (subscriptionLeft < businessTarget) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -46,25 +49,25 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // Deduct wallet
-    const remainingWallet = user.subscriptionWallet - businessTarget;
-    user.subscriptiondeductedWallet = remainingWallet;
+    // ✅ Deduct for this course
+    user.subscriptiondeductedWallet = user.subscriptiondeductedWallet + businessTarget;
+    user.subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet; // update remaining
     await user.save({ transaction });
 
-    // Generate certificate PDF and S3 link
+    // 🔹 Generate certificate PDF + S3 link
     const certificateFile = await generateInternshipCertificate(userId, courseId);
 
-    // Create certificate record
+    // 🔹 Create certificate record
     const certificate = await model.InternshipCertificate.create({
       userId,
       courseId,
       certificateUrl: certificateFile.certificateUrl,
-      deductedWallet: businessTarget,
+      deductedWallet: businessTarget, // how much was deducted for THIS course
       isIssued: true,
       issuedDate: new Date()
     }, { transaction });
 
-    // Send certificate via email
+    // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
@@ -88,7 +91,9 @@ const createAndSendInternshipCertificate = async (req, res) => {
       message: "Internship Certificate created, wallet deducted, and sent successfully",
       certificateUrl: certificate.certificateUrl,
       deductedWallet: businessTarget,
-      remainingSubscriptionWallet: remainingWallet
+      subscriptionWallet: user.subscriptionWallet,             // total (unchanged)
+      subscriptiondeductedWallet: user.subscriptiondeductedWallet, // total deducted
+      subscriptionLeft: user.subscriptionLeft                  // updated remaining balance
     });
 
   } catch (error) {
