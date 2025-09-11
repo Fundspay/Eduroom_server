@@ -9,7 +9,6 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 const CONFIG = require("../config/config.js");
 const axios = require('axios');
-const { Op } = require("sequelize");
 const moment = require("moment");
 
 
