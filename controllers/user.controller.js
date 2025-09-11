@@ -272,6 +272,62 @@ var addConsent = async function (req, res) {
 };
 module.exports.addConsent = addConsent;
 
+var updatePersonalInfo = async function (req, res) {
+    try {
+        const {
+            userId,
+            firstName,
+            lastName,
+            fullName,
+            dateOfBirth,
+            gender,
+            phoneNumber,
+            alternatePhoneNumber,
+            email,
+            residentialAddress,
+            emergencyContactName,
+            emergencyContactNumber,
+            city,
+            state,
+            pinCode,
+            password,
+        } = req.body;
+
+        if (!userId) {
+            return ReE(res, "User ID is required", 400);
+        }
+
+        // Find user
+        const user = await model.User.findByPk(userId);
+        if (!user) {
+            return ReE(res, "User not found", 404);
+        }
+
+        // Update fields
+        await user.update({
+            firstName,
+            lastName,
+            fullName,
+            dateOfBirth,
+            gender,
+            phoneNumber,
+            alternatePhoneNumber,
+            email,
+            residentialAddress,
+            emergencyContactName,
+            emergencyContactNumber,
+            city,
+            state,
+            pinCode,
+            password,
+        });
+
+        return ReS(res, { success: true, message: "User info updated successfully" }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+module.exports.updatePersonalInfo = updatePersonalInfo;
 
 // ✅ Fetch Single User
 var fetchSingleUser = async (req, res) => {
