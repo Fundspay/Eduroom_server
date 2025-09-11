@@ -296,3 +296,130 @@ const getAllUsersCourseStatus = async (req, res) => {
 };
 
 module.exports.getAllUsersCourseStatus = getAllUsersCourseStatus;
+
+// ✅ For single user
+const getUserWalletDetails = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "fullName",
+        "subscriptionWallet",
+        "subscriptiondeductedWallet",
+        "courseStatuses"
+      ]
+    });
+    if (!user) return ReE(res, "User not found", 404);
+
+    const courseDetails = [];
+
+    for (const courseId of Object.keys(user.courseStatuses || {})) {
+      // Fetch course
+      const course = await model.Course.findOne({
+        where: { id: courseId, isDeleted: false },
+        attributes: ["id", "name", "businessTarget"]
+      });
+
+      // Sum deducted wallet from certificates for this course
+      const certificates = await model.InternshipCertificate.findAll({
+        where: { userId, courseId },
+        attributes: ["deductedWallet"]
+      });
+      const deductedWallet = certificates.reduce((sum, c) => sum + (c.deductedWallet || 0), 0);
+
+      courseDetails.push({
+        courseId,
+        courseName: course?.name || null,
+        businessTarget: course?.businessTarget || 0,
+        deductedWallet
+      });
+    }
+
+    const response = {
+      userId: user.id,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+      subscriptionWalletTotal: user.subscriptionWallet,
+      subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+      courses: courseDetails
+    };
+
+    return ReS(res, { success: true, data: response }, 200);
+  } catch (error) {
+    console.error("getUserWalletDetails error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getUserWalletDetails = getUserWalletDetails;
+
+// ✅ For all users
+const getAllUsersWalletDetails = async (req, res) => {
+  try {
+    const users = await model.User.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "fullName",
+        "subscriptionWallet",
+        "subscriptiondeductedWallet",
+        "courseStatuses"
+      ]
+    });
+
+    if (!users || users.length === 0) {
+      return ReE(res, "No users found", 404);
+    }
+
+    const response = [];
+
+    for (const user of users) {
+      const courseDetails = [];
+
+      for (const courseId of Object.keys(user.courseStatuses || {})) {
+        // Fetch course
+        const course = await model.Course.findOne({
+          where: { id: courseId, isDeleted: false },
+          attributes: ["id", "name", "businessTarget"]
+        });
+
+        // Sum deducted wallet from certificates for this course
+        const certificates = await model.InternshipCertificate.findAll({
+          where: { userId: user.id, courseId },
+          attributes: ["deductedWallet"]
+        });
+        const deductedWallet = certificates.reduce((sum, c) => sum + (c.deductedWallet || 0), 0);
+
+        courseDetails.push({
+          courseId,
+          courseName: course?.name || null,
+          businessTarget: course?.businessTarget || 0,
+          deductedWallet
+        });
+      }
+
+      response.push({
+        userId: user.id,
+        fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+        subscriptionWalletTotal: user.subscriptionWallet,
+        subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+        courses: courseDetails
+      });
+    }
+
+    return ReS(res, { success: true, data: response }, 200);
+  } catch (error) {
+    console.error("getAllUsersWalletDetails error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getAllUsersWalletDetails = getAllUsersWalletDetails;
