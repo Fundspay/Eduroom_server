@@ -329,6 +329,8 @@ var updatePersonalInfo = async function (req, res) {
 };
 module.exports.updatePersonalInfo = updatePersonalInfo;
 
+
+
 // ✅ Fetch Single User
 var fetchSingleUser = async (req, res) => {
     try {
