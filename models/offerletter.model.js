@@ -9,6 +9,7 @@ module.exports = (sequelize, Sequelize) => {
             startDate: { type: Sequelize.DATEONLY, allowNull: true },
             location: { type: Sequelize.STRING, allowNull: true },
             fileUrl: { type: Sequelize.STRING, allowNull: false },
+            issent: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
 
