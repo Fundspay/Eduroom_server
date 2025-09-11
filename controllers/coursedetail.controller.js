@@ -627,35 +627,40 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
+// ✅ Get daily status and wallet info for all courses of a user
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
+    // Fetch user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
+    // Prepare response with subscription info
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: user.subscriptionWallet || 0,
-      subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,
-      subscriptionLeft: user.subscriptiondeductedWallet || user.subscriptionWallet || 0,
+      subscriptionWalletTotal: user.subscriptionWallet || 0,                   // Total subscription
+      subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,       // Amount already deducted
+      subscriptionLeft: (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0), // Remaining usable subscription
       courses: [],
     };
 
+    // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
+      // Fetch course details
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
-        attributes: ["id", "name", "businessTarget", "domainId"],
         include: [
           { model: model.Domain, attributes: ["name"] },
-          { model: model.CoursePreview, attributes: ["id", "title", "heading"] }, // fetch title/heading
-        ],
+          { model: model.CoursePreview, attributes: ["id", "title", "heading"], where: { isDeleted: false }, required: false }
+        ]
       });
       if (!course) continue;
 
+      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -680,7 +685,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
         daysMap[session.day].total++;
         totalSessions++;
-        if (attempted && correctMCQs === sessionMCQs) {
+        if (attempted && correctMCQs === sessionMCQs && sessionMCQs > 0) {
           daysMap[session.day].completed++;
           completedSessions++;
         }
@@ -689,7 +694,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           sessionNumber: session.sessionNumber,
           title: session.title,
           attempted,
-          status: attempted && correctMCQs === sessionMCQs ? "Completed" : "In Progress",
+          status: attempted && correctMCQs === sessionMCQs && sessionMCQs > 0 ? "Completed" : "In Progress",
           correctMCQs,
           totalMCQs: sessionMCQs,
           sessionDuration: session.sessionDuration || null,
@@ -699,7 +704,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+        const dayCompletionPercentage = d.total
+          ? ((d.completed / d.total) * 100).toFixed(2)
+          : 0;
         return {
           day: Number(dayKey),
           totalSessions: d.total,
@@ -711,17 +718,17 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         };
       });
 
-      const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
+      const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
 
       response.courses.push({
         courseId,
         courseName: course.name,
         domainName: course.Domain?.name || null,
         businessTarget: course.businessTarget || 0,
-        coursePreviews: course.CoursePreviews.map((p) => ({ id: p.id, title: p.title, heading: p.heading })),
+        coursePreviews: course.CoursePreviews || [],
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
