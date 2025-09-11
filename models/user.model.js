@@ -81,6 +81,12 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         defaultValue: 0,
       },
+      subscriptiondeductedWallet:
+      {
+        type: Sequelize.BIGINT,
+        allowNull: false,
+        defaultValue: 0,
+      },
       courseDates: {
         type: Sequelize.JSON,
         allowNull: true,
