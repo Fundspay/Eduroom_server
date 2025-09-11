@@ -1,11 +1,11 @@
 "use strict";
-const { generateOfferLetter  } = require("../utils/offerletter.service"); 
+const { generateOfferLetter } = require("../utils/offerletter.service");
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
 
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
-    
+
   try {
     const { userId } = req.params;
     if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
@@ -38,6 +38,13 @@ const sendOfferLetter = async (req, res) => {
     if (!mailResult.success) {
       return res.status(500).json({ success: false, message: "Failed to send email", error: mailResult.error });
     }
+    await model.OfferLetter.update(
+      {
+        issent: true,
+        updatedAt: new Date()
+      },
+      { where: { id: offerLetter.id } }
+    );
 
     return res.status(200).json({
       success: true,
