@@ -297,10 +297,6 @@ const getAllUsersCourseStatus = async (req, res) => {
 
 module.exports.getAllUsersCourseStatus = getAllUsersCourseStatus;
 
-"use strict";
-const model = require("../models");
-const { ReE, ReS } = require("../utils/util.service");
-
 // ✅ For single user
 const getUserWalletDetails = async (req, res) => {
   try {
