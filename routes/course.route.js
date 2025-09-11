@@ -11,5 +11,7 @@ router.delete("/delete/:id", courseController.deleteCourse);
 router.get("/course/:domainId", courseController.fetchCoursesByDomain);
 router.get("/status/:userId", courseController.getUserCourseStatus);
 router.get("/status", courseController.getAllUsersCourseStatus);
+router.get("/wallet/:userId", courseController.getUserWalletDetails);
+router.get("/wallet", courseController.getAllUsersWalletDetails);
 
 module.exports = router;
