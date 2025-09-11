@@ -109,7 +109,6 @@ module.exports = (sequelize, Sequelize) => {
       resetToken: { type: Sequelize.STRING, allowNull: true },
       resetTokenExpiry: { type: Sequelize.DATE, allowNull: true },
       assignedTeamManager: { type: Sequelize.STRING, allowNull: true },
-      started: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       lastLoginAt: { type: Sequelize.DATE, allowNull: true },
       lastLogoutAt: { type: Sequelize.DATE, allowNull: true },
       isActive: {
