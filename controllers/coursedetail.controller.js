@@ -628,6 +628,11 @@ const getDailyStatusPerUser = async (req, res) => {
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
 // ✅ Fetch daily & overall progress + wallet info per user (without updating User)
+"use strict";
+const model = require("../models");
+const { ReE, ReS } = require("../utils/util.service");
+
+// ✅ Fetch daily & overall progress + wallet info per user (without updating User)
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -642,23 +647,26 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
       subscriptionWalletTotal: user.subscriptionWallet || 0,
       subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,
-      subscriptionLeft: user.subscriptiondeductedWallet || 0,
+      subscriptionLeft:
+        user.subscriptiondeductedWallet > 0
+          ? user.subscriptiondeductedWallet
+          : user.subscriptionWallet || 0, // initially equal to subscriptionWallet
       courses: [],
     };
 
     // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
-      // Fetch course details
+      // Fetch course details including domain and coursePreviewId
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
-        attributes: ["id", "name", "businessTarget"],
+        attributes: ["id", "name", "businessTarget", "domainName", "coursePreviewId"],
       });
       if (!course) continue;
 
-      // Fetch all sessions for this course
+      // Fetch all sessions for this course & preview
       const sessions = await model.CourseDetail.findAll({
-        where: { courseId, isDeleted: false },
+        where: { courseId, coursePreviewId: course.coursePreviewId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
@@ -720,6 +728,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       response.courses.push({
         courseId,
         courseName: course.name,
+        domainName: course.domainName || null,
+        coursePreviewId: course.coursePreviewId || null,
         businessTarget: course.businessTarget || 0,
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
@@ -735,7 +745,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
 
 
 const getBusinessTarget = async (req, res) => {
