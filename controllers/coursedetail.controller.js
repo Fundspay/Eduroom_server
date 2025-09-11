@@ -521,6 +521,9 @@ const getDailyStatusPerUser = async (req, res) => {
     const { courseId, coursePreviewId, userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
       order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -532,6 +535,7 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
+    // Core daily/session logic unchanged
     sessions.forEach((session) => {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
@@ -578,6 +582,14 @@ const getDailyStatusPerUser = async (req, res) => {
       };
     });
 
+    // Calculate overall status
+    const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+
+    // ✅ Update per-course status in user table (JSON field)
+    const existingStatuses = user.courseStatuses || {};
+    existingStatuses[courseId] = overallStatus;
+    await user.update({ courseStatuses: existingStatuses });
+
     const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2);
 
     return ReS(res, {
@@ -587,10 +599,11 @@ const getDailyStatusPerUser = async (req, res) => {
         completedSessions,
         remainingSessions: totalSessions - completedSessions,
         overallCompletionRate: Number(overallCompletionRate),
-        overallStatus: completedSessions === totalSessions ? "Completed" : "In Progress",
+        overallStatus,
       },
       dailyStatus,
     }, 200);
+
   } catch (error) {
     console.error("Get Daily Status Error:", error);
     return ReE(res, error.message, 500);
@@ -598,8 +611,6 @@ const getDailyStatusPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
-
-
 
 const getBusinessTarget = async (req, res) => {
   try {

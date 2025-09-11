@@ -86,6 +86,11 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
         defaultValue: {}
       },
+      courseStatuses: {
+        type: DataTypes.JSON, // or DataTypes.JSON if your DB doesn't support JSONB
+        allowNull: false,
+        defaultValue: {},      // start with empty object
+      },
 
 
       // 🔹 Auth & System
