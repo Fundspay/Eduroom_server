@@ -627,11 +627,6 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
-"use strict";
-
-const model = require("../models");
-const { ReE, ReS } = require("../utils/util.service");
-
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
