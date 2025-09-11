@@ -215,3 +215,84 @@ const getUserCourseStatus = async (req, res) => {
 
 module.exports.getUserCourseStatus = getUserCourseStatus;
 
+const getAllUsersCourseStatus = async (req, res) => {
+  try {
+    // Fetch all users
+    const users = await model.User.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "fullName",
+        "subscriptionWallet",
+        "subscriptiondeductedWallet",
+        "courseStatuses",
+        "courseDates"
+      ]
+    });
+
+    if (!users || users.length === 0) {
+      return ReE(res, "No users found", 404);
+    }
+
+    const response = [];
+
+    for (const user of users) {
+      const userData = {
+        userId: user.id,
+        fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+        subscriptionWalletTotal: user.subscriptionWallet,
+        subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+        courses: []
+      };
+
+      // Loop through all courses in courseStatuses for this user
+      for (const [courseId, status] of Object.entries(user.courseStatuses || {})) {
+        const courseEndDate = user.courseDates?.[courseId]?.endDate || null;
+
+        // Fetch course to check business target
+        const course = await model.Course.findOne({
+          where: { id: courseId, isDeleted: false }
+        });
+        const businessTarget = course?.businessTarget || 0;
+
+        // ✅ Check if business target achieved (based on remaining balance)
+        const businessTargetAchieved = user.subscriptiondeductedWallet >= businessTarget;
+
+        // Check internship certificate
+        const internshipCertificate = await model.InternshipCertificate.findOne({
+          where: { userId: user.id, courseId }
+        });
+
+        // Check offer letter
+        const offerLetter = await model.OfferLetter.findOne({
+          where: { userId: user.id }
+        });
+
+        userData.courses.push({
+          courseId,
+          courseName: course?.name || null,
+          courseStatus: status,
+          courseEndDate,
+          businessTarget,
+          businessTargetAchieved,
+          internshipCertificateSent: internshipCertificate ? internshipCertificate.isIssued : false,
+          internshipCertificateUrl: internshipCertificate ? internshipCertificate.certificateUrl : null,
+          offerLetterSent: offerLetter ? offerLetter.issent : false,
+          offerLetterUrl: offerLetter ? offerLetter.fileUrl : null
+        });
+      }
+
+      response.push(userData);
+    }
+
+    return ReS(res, { success: true, data: response }, 200);
+
+  } catch (error) {
+    console.error("getAllUsersCourseStatus error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getAllUsersCourseStatus = getAllUsersCourseStatus;
