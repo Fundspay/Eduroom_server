@@ -297,6 +297,10 @@ const getAllUsersCourseStatus = async (req, res) => {
 
 module.exports.getAllUsersCourseStatus = getAllUsersCourseStatus;
 
+"use strict";
+const model = require("../models");
+const { ReE, ReS } = require("../utils/util.service");
+
 // ✅ For single user
 const getUserWalletDetails = async (req, res) => {
   try {
@@ -332,7 +336,10 @@ const getUserWalletDetails = async (req, res) => {
         where: { userId, courseId },
         attributes: ["deductedWallet"]
       });
-      const deductedWallet = certificates.reduce((sum, c) => sum + (c.deductedWallet || 0), 0);
+      const deductedWallet = certificates.reduce(
+        (sum, c) => sum + (c.deductedWallet || 0),
+        0
+      );
 
       courseDetails.push({
         courseId,
@@ -342,11 +349,16 @@ const getUserWalletDetails = async (req, res) => {
       });
     }
 
+    const subscriptionWalletTotal = user.subscriptionWallet || 0;
+    const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
+    const subscriptionLeft = subscriptionWalletTotal - subscriptiondeductedWallet;
+
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: user.subscriptionWallet,
-      subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+      subscriptionWalletTotal,
+      subscriptiondeductedWallet,
+      subscriptionLeft,
       courses: courseDetails
     };
 
@@ -396,7 +408,10 @@ const getAllUsersWalletDetails = async (req, res) => {
           where: { userId: user.id, courseId },
           attributes: ["deductedWallet"]
         });
-        const deductedWallet = certificates.reduce((sum, c) => sum + (c.deductedWallet || 0), 0);
+        const deductedWallet = certificates.reduce(
+          (sum, c) => sum + (c.deductedWallet || 0),
+          0
+        );
 
         courseDetails.push({
           courseId,
@@ -406,11 +421,16 @@ const getAllUsersWalletDetails = async (req, res) => {
         });
       }
 
+      const subscriptionWalletTotal = user.subscriptionWallet || 0;
+      const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
+      const subscriptionLeft = subscriptionWalletTotal - subscriptiondeductedWallet;
+
       response.push({
         userId: user.id,
         fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-        subscriptionWalletTotal: user.subscriptionWallet,
-        subscriptionWalletRemaining: user.subscriptiondeductedWallet,
+        subscriptionWalletTotal,
+        subscriptiondeductedWallet,
+        subscriptionLeft,
         courses: courseDetails
       });
     }
