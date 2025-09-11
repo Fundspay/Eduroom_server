@@ -627,10 +627,6 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
-"use strict";
-const model = require("../models");
-const { ReE, ReS } = require("../utils/util.service");
-
 // ✅ Fetch daily & overall progress + wallet info per user (without updating User)
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
