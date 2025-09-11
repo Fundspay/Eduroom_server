@@ -63,29 +63,71 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
-var fetchAllCourses = async (req, res) => {
-    try {
-        const courses = await model.Course.findAll({
-            where: { isDeleted: false },
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [
-                { model: model.Domain, attributes: ["name"] },
-                {
-                    model: model.CoursePreview,
-                    attributes: [["id", "coursePreviewId"], "dayCount"],
-                    where: { isDeleted: false },
-                    required: false // in case a course has no preview
-                }
-            ]
-        });
+const fetchAllCourses = async (req, res) => {
+  try {
+    const { userId } = req.query;
+    if (!userId) return ReE(res, "userId is required", 400);
 
-        return ReS(res, { success: true, data: courses }, 200);
-    } catch (error) {
-        console.error("Fetch All Courses Error:", error);
-        return ReE(res, error.message, 500);
-    }
+    // Fetch user with assigned TeamManager
+    const user = await model.User.findByPk(userId, {
+      include: [
+        {
+          model: model.TeamManager,
+          as: "teamManager",
+          attributes: ["internshipStatus", "name", "email"],
+        },
+      ],
+    });
+
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Fetch all courses
+    const courses = await model.Course.findAll({
+      where: { isDeleted: false },
+      attributes: { exclude: ["createdAt", "updatedAt"] },
+      include: [
+        { model: model.Domain, attributes: ["name"] },
+        {
+          model: model.CoursePreview,
+          attributes: [["id", "coursePreviewId"], "dayCount"],
+          where: { isDeleted: false },
+          required: false,
+        },
+      ],
+    });
+
+    const coursesWithStatus = courses.map((course) => {
+      let status = "Not Started";
+
+      // 1️⃣ Check TeamManager internshipStatus
+      if (user.teamManager && user.teamManager.internshipStatus) {
+        status = user.teamManager.internshipStatus;
+      } else {
+        const courseDates = user.courseDates || {};
+        const courseStatuses = user.courseStatuses || {};
+
+        // 2️⃣ Check if course has been started
+        if (courseDates[course.id] && courseDates[course.id].started) {
+          // 3️⃣ If started, check courseStatuses for updated status
+          status = courseStatuses[course.id] || "Started";
+        }
+      }
+
+      return {
+        ...course.toJSON(),
+        status,
+      };
+    });
+
+    return ReS(res, { success: true, data: coursesWithStatus }, 200);
+  } catch (error) {
+    console.error("Fetch All Courses Error:", error);
+    return ReE(res, error.message, 500);
+  }
 };
+
 module.exports.fetchAllCourses = fetchAllCourses;
+
 // ✅ Fetch single Course by ID
 var fetchSingleCourse = async (req, res) => {
     const { id } = req.params;
