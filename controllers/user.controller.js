@@ -199,32 +199,33 @@ const addVerificationDocs = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Debug log incoming files
     console.log("Uploaded files:", req.files);
 
-    // Extract file URLs from multer-S3
-    const studentIdCard = req.files?.studentIdCard?.[0]?.location || null;
-    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location || null;
-    const passportPhoto = req.files?.passportPhoto?.[0]?.location || null;
+    // Extract file URLs safely, only if they exist
+    const studentIdCard = req.files?.studentIdCard?.[0]?.location;
+    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location;
+    const passportPhoto = req.files?.passportPhoto?.[0]?.location;
 
-    // Ensure all files are uploaded
-    if (!studentIdCard || !governmentIdProof || !passportPhoto) {
-      return ReE(res, "All 3 documents (Student ID, Government ID, Passport Photo) are required", 400);
+    // Check if at least one file is uploaded
+    if (!studentIdCard && !governmentIdProof && !passportPhoto) {
+      return ReE(res, "At least one document must be uploaded", 400);
     }
 
+    // Prepare update object dynamically
+    const updateData = {};
+    if (studentIdCard) updateData.studentIdCard = studentIdCard;
+    if (governmentIdProof) updateData.governmentIdProof = governmentIdProof;
+    if (passportPhoto) updateData.passportPhoto = passportPhoto;
+
     // Save to DB
-    await user.update({
-      studentIdCard,
-      governmentIdProof,
-      passportPhoto,
-    });
+    await user.update(updateData);
 
     return ReS(
       res,
       {
         success: true,
         message: "Verification docs uploaded successfully",
-        data: { studentIdCard, governmentIdProof, passportPhoto },
+        data: updateData,
       },
       200
     );
@@ -235,9 +236,6 @@ const addVerificationDocs = async (req, res) => {
 };
 
 module.exports.addVerificationDocs = addVerificationDocs;
-
-
-
 
 //✅  STEP 5: Add Bank Details
 
