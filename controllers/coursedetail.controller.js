@@ -906,13 +906,10 @@ const setCourseStartEndDates = async (req, res) => {
     courseDates[courseId] = {
       startDate: start.toISOString().split("T")[0],
       endDate: end.toISOString().split("T")[0],
+      started: true, // per-course started flag
     };
 
-    // Update courseDates and mark started separately
-    await user.update({
-      courseDates,
-      started: true // separate field
-    });
+    await user.update({ courseDates });
 
     return ReS(res, {
       success: true,
@@ -921,7 +918,7 @@ const setCourseStartEndDates = async (req, res) => {
         courseId,
         startDate: courseDates[courseId].startDate,
         endDate: courseDates[courseId].endDate,
-        started: true
+        started: courseDates[courseId].started,
       },
     }, 200);
 
@@ -932,3 +929,4 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
+
