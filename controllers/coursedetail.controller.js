@@ -520,10 +520,13 @@ const getDailyStatusPerUser = async (req, res) => {
   try {
     const { courseId, coursePreviewId, userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
+    if (!courseId) return ReE(res, "courseId is required", 400);
 
     // Fetch user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
+
+    console.log("User fetched:", userId);
 
     // Fetch all sessions for this course & preview
     const sessions = await model.CourseDetail.findAll({
@@ -590,9 +593,11 @@ const getDailyStatusPerUser = async (req, res) => {
     // ✅ Debug logs before updating
     console.log("Before update:", JSON.stringify(user.courseStatuses));
 
-    // Update courseStatuses in User table
+    // Safe update of courseStatuses
     const existingStatuses = user.courseStatuses || {};
-    existingStatuses[courseId] = overallStatus;
+    const key = String(courseId);
+    existingStatuses[key] = overallStatus;
+
     await user.update({ courseStatuses: existingStatuses });
 
     // Reload instance to confirm DB update
@@ -620,6 +625,7 @@ const getDailyStatusPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
