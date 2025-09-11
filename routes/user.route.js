@@ -22,7 +22,7 @@ router.put("/:userId/bank-details", userController.addBankDetails);
 router.put("/:userId/communication", userController.addCommunicationPreferences);
 router.put("/:userId/consent", userController.addConsent);
 router.post("/login", userController.loginWithEmailPassword);
-router.put("/updated/:id", userController.updatePersonalInfo);
+router.put("/update-info/:id", userController.updatePersonalInfo);
 router.get("/list", userController.fetchAllUsers);
 router.get("/list/:id", userController.fetchSingleUser);
 router.put("/update/:id", userController.updateUser);
