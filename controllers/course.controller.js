@@ -3,62 +3,91 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { uploadGeneralFile } = require("../middleware/s3.middleware.js"); // adjust path if needed
 
-// ✅ Add a new Course with optional image upload
 var addCourse = async (req, res) => {
-    uploadGeneralFile.single("img")(req, res, async function (err) {
-        if (err) return ReE(res, err.message, 422);
+  // Accept two files: img and img2
+  uploadGeneralFile.fields([
+    { name: "img", maxCount: 1 },
+    { name: "img2", maxCount: 1 }
+  ])(req, res, async function (err) {
+    if (err) return ReE(res, err.message, 422);
 
-        const { name, domainId, description, businessTarget, totalDays, duration, certificateCount } = req.body;
-        if (!name) return ReE(res, "Course name is required", 400);
-        if (!domainId) return ReE(res, "Domain ID is required", 400);
+    const {
+      name,
+      domainId,
+      description,
+      businessTarget,
+      totalDays,
+      duration,
+      certificateCount,
+      domainSkills,
+      interpersonalSkills,
+      managerName,
+      managerPosition
+    } = req.body;
 
-        try {
-            const domain = await model.Domain.findByPk(domainId);
-            if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
+    if (!name) return ReE(res, "Course name is required", 400);
+    if (!domainId) return ReE(res, "Domain ID is required", 400);
 
-            const course = await model.Course.create({
-                name,
-                domainId,
-                description: description || null,
-                businessTarget: businessTarget || null,
-                totalDays: totalDays || null,
-                duration: duration || null,
-                certificateCount: certificateCount || null,
-                img: req.file ? req.file.location : null, // S3 URL
-            });
+    try {
+      const domain = await model.Domain.findByPk(domainId);
+      if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
 
-            return ReS(res, course, 201);
-        } catch (error) {
-            return ReE(res, error.message, 422);
-        }
-    });
+      const course = await model.Course.create({
+        name,
+        domainId,
+        description: description || null,
+        businessTarget: businessTarget || null,
+        totalDays: totalDays || null,
+        duration: duration || null,
+        certificateCount: certificateCount || null,
+        img: req.files?.img ? req.files.img[0].location : null,
+        img2: req.files?.img2 ? req.files.img2[0].location : null,
+        domainSkills: domainSkills || null,
+        interpersonalSkills: interpersonalSkills || null,
+        managerName: managerName || null,
+        managerPosition: managerPosition || null
+      });
+
+      return ReS(res, course, 201);
+    } catch (error) {
+      return ReE(res, error.message, 422);
+    }
+  });
 };
 module.exports.addCourse = addCourse;
 
-// ✅ Update Course with optional image upload
 var updateCourse = async (req, res) => {
-    uploadGeneralFile.single("img")(req, res, async function (err) {
-        if (err) return ReE(res, err.message, 422);
+  uploadGeneralFile.fields([
+    { name: "img", maxCount: 1 },
+    { name: "img2", maxCount: 1 }
+  ])(req, res, async function (err) {
+    if (err) return ReE(res, err.message, 422);
 
-        try {
-            const course = await model.Course.findByPk(req.params.id);
-            if (!course) return ReE(res, "Course not found", 404);
+    try {
+      const course = await model.Course.findByPk(req.params.id);
+      if (!course) return ReE(res, "Course not found", 404);
 
-            await course.update({
-                name: req.body.name || course.name,
-                domainId: req.body.domainId || course.domainId,
-                description: req.body.description !== undefined ? req.body.description : course.description,
-                businessTarget: req.body.businessTarget !== undefined ? req.body.businessTarget : course.businessTarget,
-                totalDays: req.body.totalDays !== undefined ? req.body.totalDays : course.totalDays,
-                duration: req.body.duration !== undefined ? req.body.duration : course.duration,
-                img: req.file ? req.file.location : course.img, // update image if uploaded
-            });
+      await course.update({
+        name: req.body.name || course.name,
+        domainId: req.body.domainId || course.domainId,
+        description: req.body.description !== undefined ? req.body.description : course.description,
+        businessTarget: req.body.businessTarget !== undefined ? req.body.businessTarget : course.businessTarget,
+        totalDays: req.body.totalDays !== undefined ? req.body.totalDays : course.totalDays,
+        duration: req.body.duration !== undefined ? req.body.duration : course.duration,
+        certificateCount: req.body.certificateCount !== undefined ? req.body.certificateCount : course.certificateCount,
+        img: req.files?.img ? req.files.img[0].location : course.img,
+        img2: req.files?.img2 ? req.files.img2[0].location : course.img2,
+        domainSkills: req.body.domainSkills !== undefined ? req.body.domainSkills : course.domainSkills,
+        interpersonalSkills: req.body.interpersonalSkills !== undefined ? req.body.interpersonalSkills : course.interpersonalSkills,
+        managerName: req.body.managerName !== undefined ? req.body.managerName : course.managerName,
+        managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition
+      });
 
-            return ReS(res, course, 200);
-        } catch (error) {
-            return ReE(res, error.message, 500);
-        }
-    });
+      return ReS(res, course, 200);
+    } catch (error) {
+      return ReE(res, error.message, 500);
+    }
+  });
 };
 module.exports.updateCourse = updateCourse;
 
