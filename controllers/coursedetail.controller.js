@@ -627,6 +627,120 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
+"use strict";
+const model = require("../models");
+const { ReE, ReS } = require("../utils/util.service");
+
+// ✅ Fetch daily & overall progress + wallet info per user (without updating User)
+const getDailyStatusAllCoursesPerUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Fetch user instance
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    const response = {
+      userId: user.id,
+      fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+      subscriptionWalletTotal: user.subscriptionWallet || 0,
+      subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,
+      subscriptionLeft: user.subscriptiondeductedWallet || 0,
+      courses: [],
+    };
+
+    // Loop through all courses in user's courseStatuses
+    const courseIds = Object.keys(user.courseStatuses || {});
+    for (const courseId of courseIds) {
+      // Fetch course details
+      const course = await model.Course.findOne({
+        where: { id: courseId, isDeleted: false },
+        attributes: ["id", "name", "businessTarget"],
+      });
+      if (!course) continue;
+
+      // Fetch all sessions for this course
+      const sessions = await model.CourseDetail.findAll({
+        where: { courseId, isDeleted: false },
+        order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+      });
+
+      const daysMap = {};
+      let totalSessions = 0;
+      let completedSessions = 0;
+
+      sessions.forEach((session) => {
+        const progress = session.userProgress?.[userId];
+        const attempted = !!progress;
+        const sessionMCQs = progress?.totalMCQs || 0;
+        const correctMCQs = progress?.correctMCQs || 0;
+        const sessionCompletionPercentage = sessionMCQs
+          ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
+          : 0;
+
+        if (!daysMap[session.day]) {
+          daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+        }
+
+        daysMap[session.day].total++;
+        totalSessions++;
+        if (attempted && correctMCQs === sessionMCQs) {
+          daysMap[session.day].completed++;
+          completedSessions++;
+        }
+
+        daysMap[session.day].sessions.push({
+          sessionNumber: session.sessionNumber,
+          title: session.title,
+          attempted,
+          status: attempted && correctMCQs === sessionMCQs ? "Completed" : "In Progress",
+          correctMCQs,
+          totalMCQs: sessionMCQs,
+          sessionDuration: session.sessionDuration || null,
+          sessionCompletionPercentage: Number(sessionCompletionPercentage),
+        });
+      });
+
+      const dailyStatus = Object.keys(daysMap).map((dayKey) => {
+        const d = daysMap[dayKey];
+        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+        return {
+          day: Number(dayKey),
+          totalSessions: d.total,
+          completedSessions: d.completed,
+          fullyCompleted: d.completed === d.total,
+          dayCompletionPercentage: Number(dayCompletionPercentage),
+          status: d.completed === d.total ? "Completed" : "In Progress",
+          sessions: d.sessions,
+        };
+      });
+
+      const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+      const overallCompletionRate = totalSessions
+        ? ((completedSessions / totalSessions) * 100).toFixed(2)
+        : 0;
+
+      response.courses.push({
+        courseId,
+        courseName: course.name,
+        businessTarget: course.businessTarget || 0,
+        overallStatus,
+        overallCompletionRate: Number(overallCompletionRate),
+        dailyStatus,
+      });
+    }
+
+    return ReS(res, { success: true, data: response }, 200);
+  } catch (error) {
+    console.error("getDailyStatusAllCoursesPerUser error:", error);
+    return ReE(res, error.message || "Internal Server Error", 500);
+  }
+};
+
+module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
+
 
 const getBusinessTarget = async (req, res) => {
   try {
