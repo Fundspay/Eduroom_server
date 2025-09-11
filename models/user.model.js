@@ -85,7 +85,12 @@ module.exports = (sequelize, Sequelize) => {
       {
         type: Sequelize.BIGINT,
         allowNull: false,
-        defaultValue: 0,
+        defaultValue: 0,i
+      },
+        subscriptionLeft: {
+        type: Sequelize.BIGINT,
+        allowNull: false,
+        defaultValue: 0, // will be synced on create
       },
       courseDates: {
         type: Sequelize.JSON,
