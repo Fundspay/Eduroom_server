@@ -5,6 +5,10 @@ const coursedetailController = require("../controllers/coursedetail.controller")
 //  Add new CourseDetail (per session)
 router.post("/course-detail", coursedetailController.addOrUpdateCourseDetail);
 
+// delete
+
+router.delete("/delete/:id", coursedetailController.deleteCourseDetail);
+
 //  Fetch all sessions by coursePreviewId (with MCQs)
 router.get("/course-preview/:coursePreviewId/details", coursedetailController.fetchCourseDetailsByPreview);
 
