@@ -169,25 +169,42 @@ var updateCoursePreview = async (req, res) => {
         const preview = await model.CoursePreview.findByPk(req.params.id);
         if (!preview) return ReE(res, "CoursePreview not found", 404);
 
+        // Parse whatYouWillLearn safely 
+        let whatYouWillLearnJson = preview.whatYouWillLearn;
+        if (req.body.whatYouWillLearn) {
+            if (typeof req.body.whatYouWillLearn === "string") {
+                try {
+                    whatYouWillLearnJson = JSON.parse(req.body.whatYouWillLearn);
+                } catch (err) {
+                    return ReE(res, "Invalid JSON for whatYouWillLearn", 400);
+                }
+            } else if (typeof req.body.whatYouWillLearn === "object") {
+                whatYouWillLearnJson = req.body.whatYouWillLearn;
+            }
+        }
+
         await preview.update({
-            courseId: req.body.courseId || preview.courseId,
-            domainId: req.body.domainId || preview.domainId,
-            title: req.body.title || preview.title,
-            heading: req.body.heading || preview.heading,
-            youtubeLink: req.body.youtubeLink !== undefined ? req.body.youtubeLink : preview.youtubeLink,
-            description: req.body.description !== undefined ? req.body.description : preview.description,
-            totalLectures: req.body.totalLectures !== undefined ? req.body.totalLectures : preview.totalLectures,
-            language: req.body.language !== undefined ? req.body.language : preview.language,
-            whatYouWillLearn: req.body.whatYouWillLearn !== undefined ? req.body.whatYouWillLearn : preview.whatYouWillLearn,
-            durationPerDay: req.body.durationPerDay !== undefined ? req.body.durationPerDay : preview.durationPerDay
+            courseId: req.body.courseId !== undefined ? req.body.courseId : preview.courseId,
+            domainId: req.body.domainId !== undefined ? req.body.domainId : preview.domainId,
+            title: req.body.title !== undefined ? req.body.title.trim() : preview.title,
+            heading: req.body.heading !== undefined ? req.body.heading.trim() : preview.heading,
+            youtubeLink: req.body.youtubeLink !== undefined ? req.body.youtubeLink.trim() : preview.youtubeLink,
+            description: req.body.description !== undefined ? req.body.description.trim() : preview.description,
+            dayCount: req.body.dayCount !== undefined ? req.body.dayCount : preview.dayCount,
+            language: req.body.language !== undefined ? req.body.language.trim() : preview.language,
+            level: req.body.level !== undefined ? req.body.level.trim() : preview.level,
+            whatYouWillLearn: whatYouWillLearnJson,
+            duration: req.body.duration !== undefined ? req.body.duration.trim() : preview.duration
         });
 
-        return ReS(res, preview, 200);
+        return ReS(res, { success: true, data: preview }, 200);
     } catch (error) {
+        console.error("Update CoursePreview Error:", error);
         return ReE(res, error.message, 500);
     }
 };
 module.exports.updateCoursePreview = updateCoursePreview;
+
 
 // ✅ Soft delete CoursePreview
 var deleteCoursePreview = async (req, res) => {
