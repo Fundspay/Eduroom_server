@@ -7,15 +7,13 @@ const { sendMail } = require("../middleware/mailer.middleware.js");
 // Add ContactUs entry
 var add = async (req, res) => {
   try {
-    const { userId, Name, email, phone, message } = req.body;
+    const { Name, email, phone, message } = req.body;
 
-    if (!userId || !Name || !email) {
+    if ( !Name || !email) {
       return ReE(res, "Missing required fields", 400);
     }
 
-    // Fetch user
-    const user = await model.User.findOne({ where: { id: userId } });
-    if (!user || !user.email) return ReE(res, "User email not found", 404);
+
 
     // Create ContactUs entry
     const contactEntry = await model.ContactUs.create({
@@ -23,7 +21,7 @@ var add = async (req, res) => {
       email: email.toString(),
       phone: phone ? phone.toString() : null,
       message: message ? message.toString() : null,
-      user: userId
+  
     });
 
     // Send confirmation email using mailer middleware
