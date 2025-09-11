@@ -9,6 +9,10 @@ const jwt = require('jsonwebtoken');
 const admin = require('firebase-admin');
 const CONFIG = require("../config/config.js");
 const axios = require('axios');
+const { Op } = require("sequelize");
+const moment = require("moment");
+
+
 
 if (!admin.apps.length) {
     admin.initializeApp({
@@ -68,6 +72,47 @@ var addPersonalInfo = async function (req, res) {
     }
 };
 module.exports.addPersonalInfo = addPersonalInfo;
+
+// Fetch users created within a date range (DD-MM-YYYY)
+const fetchUsersByDateRange = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) return ReE(res, "Both 'from' and 'to' dates are required", 400);
+
+    // Parse dates using DD-MM-YYYY
+    const fromDate = moment(from, "DD-MM-YYYY").startOf("day").toDate();
+    const toDate = moment(to, "DD-MM-YYYY").endOf("day").toDate();
+
+    if (!fromDate || !toDate) return ReE(res, "Invalid date format. Use DD-MM-YYYY", 400);
+
+    // Fetch users within range
+    const users = await model.User.findAll({
+      where: {
+        isDeleted: false,
+        createdAt: {
+          [Op.between]: [fromDate, toDate]
+        }
+      },
+      include: [
+        { model: model.Gender, attributes: { exclude: ["createdAt", "updatedAt"] } }
+      ]
+    });
+
+    return ReS(res, {
+      success: true,
+      count: users.length,
+      users: users.map(u => u.get({ plain: true }))
+    }, 200);
+
+  } catch (error) {
+    console.error("Fetch Users By Date Range Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.fetchUsersByDateRange = fetchUsersByDateRange;
+
 
 
 //  ✅ STEP 2: Add Educational Details
