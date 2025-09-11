@@ -85,7 +85,7 @@ module.exports = (sequelize, Sequelize) => {
       {
         type: Sequelize.BIGINT,
         allowNull: false,
-        defaultValue: 0,i
+        defaultValue: 0,
       },
         subscriptionLeft: {
         type: Sequelize.BIGINT,
