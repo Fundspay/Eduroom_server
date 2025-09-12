@@ -839,7 +839,9 @@ const getReferralPaymentStatus = async (req, res) => {
     const apiResponse = await axios.get(apiUrl);
     let modifiedData = { ...apiResponse.data };
 
-    const regUsers = Array.isArray(modifiedData.registered_users) ? modifiedData.registered_users.map(u => ({ ...u })) : [];
+    const regUsers = Array.isArray(modifiedData.registered_users)
+      ? modifiedData.registered_users.map(u => ({ ...u }))
+      : [];
 
     if (regUsers.length === 0) {
       modifiedData.registered_users = [];
@@ -850,9 +852,9 @@ const getReferralPaymentStatus = async (req, res) => {
     const pickExternalId = (u) => u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
     // 1) Split numeric (likely local DB id) vs external (string) ids
-    const numericIndexToLocalId = new Map(); // map regUsers index -> local numeric id
-    const externalValues = new Set(); // unique external id strings
-    const indexByExternal = {}; // external id -> array of indexes in regUsers
+    const numericIndexToLocalId = new Map();
+    const externalValues = new Set();
+    const indexByExternal = {};
 
     regUsers.forEach((u, idx) => {
       const ext = pickExternalId(u);
@@ -870,17 +872,14 @@ const getReferralPaymentStatus = async (req, res) => {
 
     // 2) Try to resolve external ids to local User.id by checking common columns
     const externalList = [...externalValues];
-    const localIdByExternal = {}; // ext -> localUserId
+    const localIdByExternal = {};
 
     if (externalList.length > 0) {
-      // Candidate columns in your User model that might store external IDs.
       const candidateUserCols = ['firebaseUid', 'externalId', 'authId', 'uuid', 'uid', 'userUid'];
-
       const userAttrs = Object.keys(model.User.rawAttributes || {});
       const availableUserCols = candidateUserCols.filter(c => userAttrs.includes(c));
 
       if (availableUserCols.length > 0) {
-        // Build an OR where clause: any of these columns is IN externalList
         const userWhere = { [Op.or]: availableUserCols.map(col => ({ [col]: { [Op.in]: externalList } })) };
 
         const foundUsers = await model.User.findAll({
@@ -889,7 +888,6 @@ const getReferralPaymentStatus = async (req, res) => {
           raw: true,
         });
 
-        // Map each found user's external value(s) back to local id
         for (const fu of foundUsers) {
           for (const col of availableUserCols) {
             const val = fu[col];
@@ -903,15 +901,11 @@ const getReferralPaymentStatus = async (req, res) => {
 
     // 3) Build a set of all local user IDs we can query RaiseQuery with
     const candidateLocalIds = new Set();
-    // from numeric IDs directly provided
     for (const lid of numericIndexToLocalId.values()) candidateLocalIds.add(lid);
-    // from resolved external -> local mapping
     for (const lid of Object.values(localIdByExternal)) candidateLocalIds.add(lid);
 
-    // If no candidate local ids, we can't query RaiseQuery meaningfully
     let raiseQueries = [];
     if (candidateLocalIds.size > 0) {
-      // Determine which columns exist on RaiseQuery to match against (so we can check userId or other fields)
       const possibleRQCols = [
         'userId',
         'fundsAuditUserId',
@@ -924,27 +918,22 @@ const getReferralPaymentStatus = async (req, res) => {
       ];
       const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
       const matchedRQCols = possibleRQCols.filter(c => rqAttrs.includes(c));
-      // Ensure we have at least userId
       if (matchedRQCols.length === 0 && rqAttrs.includes('userId')) matchedRQCols.push('userId');
-      if (matchedRQCols.length === 0) matchedRQCols.push('userId'); // fallback; may throw if really doesn't exist
+      if (matchedRQCols.length === 0) matchedRQCols.push('userId');
 
-      // Build where: any of the matched columns IN candidateLocalIds
       const whereClause = {
         [Op.or]: matchedRQCols.map(col => ({ [col]: { [Op.in]: [...candidateLocalIds] } }))
       };
 
-      // Grab recent RaiseQuery rows (we'll pick latest per user later)
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
         attributes: ['id', 'queryStatus', 'isQueryRaised', 'createdAt', ...matchedRQCols],
         order: [['createdAt', 'DESC']],
         raw: true,
       });
-
-      // raiseQueries is an array ordered newest -> oldest
     }
 
-    // 4) For each registered user, attach queryStatus (latest matching RaiseQuery) and isDownloaded
+    // 4) Map latest RaiseQuery per user
     const getCandidateLocalIdForIndex = (idx) => {
       if (numericIndexToLocalId.has(idx)) return numericIndexToLocalId.get(idx);
       const ext = pickExternalId(regUsers[idx]);
@@ -952,33 +941,33 @@ const getReferralPaymentStatus = async (req, res) => {
       return null;
     };
 
-    // create fast lookup by scanning raiseQueries once
-    // We'll map localId -> first (latest) raiseQuery found where any matched column equals localId
     const latestRQByLocalId = {};
     if (raiseQueries.length > 0) {
       const rqCols = Object.keys(raiseQueries[0]).filter(k => k !== 'id' && k !== 'queryStatus' && k !== 'createdAt');
       for (const rq of raiseQueries) {
-        // find which of the matched rqCols hold a local id
         for (const col of rqCols) {
           const colVal = rq[col];
           if (colVal == null) continue;
           const key = String(colVal);
           if (!latestRQByLocalId[key]) {
-            latestRQByLocalId[key] = rq; // first occurrence is the latest due to order
+            latestRQByLocalId[key] = rq;
           }
         }
       }
     }
 
-    // Attach statuses
+    // 5) Attach statuses
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
       const localId = getCandidateLocalIdForIndex(idx);
+
       if (localId != null) {
         const rq = latestRQByLocalId[String(localId)];
         cloned.queryStatus = rq ? rq.queryStatus : null;
+        cloned.isQueryRaised = rq ? rq.isQueryRaised : false; // ✅ added field
       } else {
         cloned.queryStatus = null;
+        cloned.isQueryRaised = false;
       }
       return cloned;
     });
