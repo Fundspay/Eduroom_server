@@ -63,7 +63,6 @@ const sendOfferLetter = async (req, res) => {
 
 module.exports = { sendOfferLetter };
 
-
 const listAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
@@ -71,7 +70,7 @@ const listAllUsers = async (req, res) => {
         {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "internshipStatus"]
+          attributes: ["id", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         },
         {
           model: InternshipCertificate,
@@ -124,7 +123,18 @@ const listAllUsers = async (req, res) => {
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      const internshipStatus = user.teamManager ? user.teamManager.internshipStatus : null;
+      // ✅ Team Manager info
+      const teamManager = user.teamManager
+        ? {
+            id: user.teamManager.id,
+            name: user.teamManager.name,
+            email: user.teamManager.email,
+            mobileNumber: user.teamManager.mobileNumber,
+            department: user.teamManager.department,
+            position: user.teamManager.position,
+            internshipStatus: user.teamManager.internshipStatus
+          }
+        : null;
 
       // ✅ Offer Letter info
       const offerLetterSent =
@@ -147,9 +157,10 @@ const listAllUsers = async (req, res) => {
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
         internshipIssued,
-        internshipStatus,
+        internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
-        offerLetterFile
+        offerLetterFile,
+        teamManager // 👈 returning full team manager details
       });
     }
 
