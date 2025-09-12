@@ -98,6 +98,7 @@ var fetchAllRaiseQueries = async (req, res) => {
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
 // ✅ Fetch Raise Queries by userId
+// ✅ Fetch Raise Queries by userId with Team Manager info
 var fetchRaiseQueriesByUser = async (req, res) => {
     const { userId } = req.params;
 
@@ -111,7 +112,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
             include: [
                 {
                     model: model.User,
-                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber", "teamManagerId"],
                 },
             ],
         });
@@ -124,9 +125,26 @@ var fetchRaiseQueriesByUser = async (req, res) => {
             { where: { userId, isDeleted: false } }
         );
 
+        // Fetch all team managers for this user's queries
+        const teamManagerIds = queries
+            .map(q => q.User?.teamManagerId)
+            .filter(id => id); // only truthy IDs
+
+        const teamManagers = await model.TeamManager.findAll({
+            where: { id: teamManagerIds },
+            attributes: ["id", "name"],
+            raw: true,
+        });
+
+        const managerMap = {};
+        teamManagers.forEach(tm => {
+            managerMap[tm.id] = tm.name;
+        });
+
         // Format response
         const formattedQueries = queries.map((q) => {
             const plainQ = q.toJSON();
+            const userTeamManagerId = plainQ.User?.teamManagerId;
             return {
                 ...plainQ,
                 queryCount, // ensure latest total count
@@ -137,6 +155,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
                     lastName: plainQ.User?.lastName || null,
                     email: plainQ.User?.email || null,
                     phoneNumber: plainQ.User?.phoneNumber || null,
+                    teamManagerName: userTeamManagerId ? managerMap[userTeamManagerId] : null
                 },
             };
         });
