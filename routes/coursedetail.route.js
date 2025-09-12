@@ -12,11 +12,10 @@ router.delete("/delete/:id", coursedetailController.deleteCourseDetail);
 //  Fetch all sessions by coursePreviewId (with MCQs)
 router.get("/course-preview/:coursePreviewId/details", coursedetailController.fetchCourseDetailsByPreview);
 
-// New API: fetch full course structure (domains → courses → previews → days → sessions → questions)
+// Fetch CourseDetails by coursePreviewId, day, and sessionNumber (with MCQs)
 router.get(
-  "/full-structure",
-  coursedetailController.fetchFullCourseStructure
-);
+  "/course-preview/:coursePreviewId/details-by-session",coursedetailController.fetchCourseDetailsByDayAndSession);
+
 
 //  Evaluate MCQs for a session
 router.post(

@@ -229,73 +229,77 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 };
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
-// GET /api/v1/course-full-structure
-var fetchFullCourseStructure = async (req, res) => {
+// ✅ Fetch CourseDetails by coursePreviewId, day, and sessionNumber (GET request)
+var fetchCourseDetailsByDayAndSession = async (req, res) => {
+  const { coursePreviewId } = req.params;
+  const { day, sessionNumber } = req.query; // frontend will send these as query params
+
+  if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
+  if (!day) return ReE(res, "day is required", 400);
+  if (!sessionNumber) return ReE(res, "sessionNumber is required", 400);
+
   try {
-    // 1️⃣ Fetch all domains
-    const domains = await model.Domain.findAll({
-      where: { isDeleted: false },
-      attributes: ["id", "name"],
+    // Get the course preview first
+    const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
+    if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
+
+    // Fetch all course details like existing API
+    const courseDetails = await model.CourseDetail.findAll({
+      where: { coursePreviewId, isDeleted: false },
+      order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+      attributes: [
+        "id",
+        "day",
+        "sessionNumber",
+        "title",
+        "heading",
+        "description",
+        "youtubeLink",
+        "duration",
+        "sessionDuration",
+        "createdAt",
+        "updatedAt"
+      ],
       include: [
         {
-          model: model.Course,
+          model: model.QuestionModel,
           where: { isDeleted: false },
           required: false,
-          attributes: ["id", "name", "domainId"],
-          include: [
-            {
-              model: model.CoursePreview,
-              where: { isDeleted: false },
-              required: false,
-              attributes: ["id", "title", "dayCount", "courseId", "domainId"],
-              include: [
-                {
-                  model: model.CourseDetail,
-                  where: { isDeleted: false },
-                  required: false,
-                  attributes: [
-                    "id",
-                    "day",
-                    "sessionNumber",
-                    "title",
-                    "description",
-                    "youtubeLink",
-                  ],
-                  include: [
-                    {
-                      model: model.QuestionModel,
-                      where: { isDeleted: false },
-                      required: false,
-                      attributes: [
-                        "id",
-                        "question",
-                        "optionA",
-                        "optionB",
-                        "optionC",
-                        "optionD",
-                        "answer",
-                        "keywords",
-                        "caseStudy",
-                        "sessionNumber"
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
+          attributes: [
+            "id",
+            "question",
+            "optionA",
+            "optionB",
+            "optionC",
+            "optionD",
+            "answer",
+            "keywords",
+            "caseStudy",
+            "sessionNumber"
           ]
+        },
+        {
+          model: model.Course,
+          attributes: ["id", "name"]
+        },
+        {
+          model: model.Domain,
+          attributes: ["id", "name"]
         }
       ]
     });
 
-    return ReS(res, { success: true, data: domains }, 200);
+    // Filter by day and sessionNumber
+    const filteredDetails = courseDetails.filter(cd => cd.day == day && cd.sessionNumber == sessionNumber);
+
+    return ReS(res, { success: true, data: filteredDetails }, 200);
   } catch (error) {
-    console.error("Fetch Full Course Structure Error:", error);
+    console.error("Fetch Course Details by Day/Session Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
-module.exports.fetchFullCourseStructure = fetchFullCourseStructure;
+module.exports.fetchCourseDetailsByDayAndSession = fetchCourseDetailsByDayAndSession;
 
 // ✅ Evaluate MCQs for a specific course + course preview + day
 
