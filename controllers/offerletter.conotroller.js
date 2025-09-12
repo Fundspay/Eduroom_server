@@ -131,4 +131,4 @@ const listAllUsers = async (req, res) => {
   }
 };
 
-module.exports = { listAllUsers };
+module.exports . listAllUsers = listAllUsers;
