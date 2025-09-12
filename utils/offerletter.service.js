@@ -16,14 +16,13 @@ const generateOfferLetter = async (userId) => {
   try {
     if (!userId) throw new Error("Missing userId");
 
-    // Load user
+    // --- Load User ---
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false }
     });
     if (!user) throw new Error("User not found");
 
-    const candidateName =
-      user.fullName || `${user.firstName} ${user.lastName}`;
+    const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
     const position = user.internshipProgram || "Intern";
     const startDate = user.preferredStartDate
       ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
@@ -34,12 +33,12 @@ const generateOfferLetter = async (userId) => {
       : "To Be Decided";
     const workLocation = user.residentialAddress || "Work from Home";
 
-    // Metadata
+    // --- Metadata ---
     const timestamp = Date.now();
     const fileName = `offerletter-${timestamp}.pdf`;
     const s3Key = `offerletters/${userId}/${fileName}`;
 
-    // PDF → S3 stream
+    // --- PDF Stream ---
     const doc = new PDFDocument({ margin: 50, size: "A4" });
     const passStream = new PassThrough();
     const s3Upload = s3
@@ -52,7 +51,7 @@ const generateOfferLetter = async (userId) => {
       .promise();
     doc.pipe(passStream);
 
-    // Assets
+    // --- Assets ---
     const logoUrl =
       "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.png";
     const stampUrl =
@@ -62,7 +61,6 @@ const generateOfferLetter = async (userId) => {
     const watermarkUrl =
       "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png";
 
-    // Helper: load images
     const loadImage = async (url) => {
       try {
         const res = await axios.get(url, { responseType: "arraybuffer" });
@@ -81,45 +79,42 @@ const generateOfferLetter = async (userId) => {
         loadImage(watermarkUrl)
       ]);
 
-    // --- Add watermark ---
+    // --- Watermark ---
     if (watermarkBuffer) {
       doc.save();
-      doc.opacity(0.05).image(watermarkBuffer, 150, 220, { width: 300 });
-      doc.opacity(1).restore();
+      doc.opacity(0.05).image(watermarkBuffer, 150, 220, { width: 300 }).opacity(1);
+      doc.restore();
     }
 
-    // --- Add Eduroom Logo (top left) ---
+    // --- Logo ---
     if (logoBuffer) {
       doc.image(logoBuffer, 40, 30, { width: 120 });
     }
 
-    // Move below logo space
-    doc.moveDown(5);
-
-    // Date
+    // --- Date (top-right) ---
     const today = new Date();
     const formattedDate = today.toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric"
     });
-    doc.fontSize(11).text(`Date: ${formattedDate}`, { align: "left" });
-    doc.moveDown(2);
+    doc.fontSize(11).text(`Date: ${formattedDate}`, 400, 60);
 
-    // Title
-    doc
-      .fontSize(14)
-      .text("OFFER LETTER FOR INTERNSHIP", {
-        align: "center",
-        underline: true
-      });
-    doc.moveDown(2);
+    doc.moveDown(4);
 
-    // Body
-    doc.fontSize(11).text(`Dear ${candidateName},`);
+    // --- Title ---
+    doc.fontSize(16).text("OFFER LETTER FOR INTERNSHIP", {
+      align: "center",
+      underline: true
+    });
+    doc.moveDown(3);
+
+    // --- Greeting ---
+    doc.fontSize(12).text(`Dear ${candidateName},`, { align: "left" });
     doc.moveDown(1);
 
-    doc.text(
+    // --- Body Content ---
+    doc.fontSize(11).text(
       `Congratulations! We are pleased to confirm that you have been selected for the role of ${position} at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.`,
       { align: "justify" }
     );
@@ -142,10 +137,10 @@ const generateOfferLetter = async (userId) => {
     );
     doc.moveDown(2);
 
-    // Footer text
+    // --- Closing ---
     doc.text("Thank you!", { align: "left" });
     doc.moveDown(1);
-    doc.text("Yours Sincerely", { align: "left" });
+    doc.text("Yours Sincerely,", { align: "left" });
     doc.moveDown(1);
     doc.text("Eduroom");
 
@@ -153,8 +148,8 @@ const generateOfferLetter = async (userId) => {
     if (signatureBuffer) {
       doc.image(signatureBuffer, 40, doc.y + 10, { width: 100 });
     }
-    doc.moveDown(4);
 
+    doc.moveDown(4);
     doc.text("Mrs. Pooja Shedge", { align: "left" });
     doc.text("Branch Manager");
     doc.moveDown(1);
@@ -164,44 +159,42 @@ const generateOfferLetter = async (userId) => {
       doc.image(stampBuffer, 350, doc.y - 80, { width: 120 });
     }
 
-    // --- Footer strip ---
-    doc.moveDown(4);
-    doc
-      .fontSize(9)
-      .fillColor("white")
-      .rect(0, doc.page.height - 60, doc.page.width, 60)
-      .fill("#009688"); // green strip
+    // --- Footer Strip ---
+    const footerHeight = 60;
+    doc.rect(0, doc.page.height - footerHeight, doc.page.width, footerHeight)
+      .fill("#009688");
+    doc.fillColor("white").fontSize(9);
 
-    doc.fillColor("white").text(
+    doc.text(
       "FUNDSROOM\nReg: Fundsroom Infotech Pvt Ltd, Pune-411001\nCIN: U62099PN2025PTC245778",
       40,
-      doc.page.height - 55,
+      doc.page.height - footerHeight + 10,
       { align: "left" }
     );
 
-    doc.fillColor("white").text(
+    doc.text(
       "Fundsroom HQ, 804 Nucleus Mall, Pune-411001\nconnect@eduroom.in\nwww.eduroom.in",
-      300,
-      doc.page.height - 55,
+      -40,
+      doc.page.height - footerHeight + 10,
       { align: "right" }
     );
 
-    // Finalize PDF
+    // --- Finalize PDF ---
     doc.end();
-    const s3Result = await s3Upload;
+    await s3Upload;
 
-    // Store in DB
-    const created = await model.OfferLetter.create({
+    // --- Save Record ---
+    const offerLetter = await model.OfferLetter.create({
       userId,
       position,
       startDate,
       location: workLocation,
-      fileUrl: s3Result.Location
+      fileUrl: `https://fundsweb.s3.${CONFIG.awsRegion}.amazonaws.com/${s3Key}`
     });
 
-    return created;
+    return offerLetter;
   } catch (err) {
-    console.error("generateOfferLetter error:", err);
+    console.error("Error generating offer letter:", err);
     throw err;
   }
 };
