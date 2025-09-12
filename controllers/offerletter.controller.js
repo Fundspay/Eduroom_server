@@ -2,7 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain } = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,RaiseQuery } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
