@@ -830,6 +830,7 @@ const getReferralPaymentStatus = async (req, res) => {
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
+
     if (!user.referralCode) {
       return ReS(res, { success: true, message: "User has no referral code", data: null }, 200);
     }
@@ -848,17 +849,16 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Helper: pick a sensible external id field from the registered user object
+    // Helper: pick a sensible external id field
     const pickExternalId = (u) => u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
-    // 1) Split numeric (likely local DB id) vs external (string) ids
+    // Split numeric (local) vs external (string) ids
     const numericIndexToLocalId = new Map();
     const externalValues = new Set();
 
     regUsers.forEach((u, idx) => {
       const ext = pickExternalId(u);
       if (!ext) return;
-
       const sExt = String(ext);
       if (/^\d+$/.test(sExt)) {
         numericIndexToLocalId.set(idx, parseInt(sExt, 10));
@@ -867,10 +867,9 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     });
 
-    // 2) Try to resolve external ids to local User.id
+    // Map external IDs to local User.id
     const externalList = [...externalValues];
     const localIdByExternal = {};
-
     if (externalList.length > 0) {
       const candidateUserCols = ['firebaseUid', 'externalId', 'authId', 'uuid', 'uid', 'userUid'];
       const userAttrs = Object.keys(model.User.rawAttributes || {});
@@ -896,17 +895,13 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     }
 
-    // 3) Build candidate IDs for RaiseQuery search
-    const candidateLocalIds = new Set();
-    for (const lid of numericIndexToLocalId.values()) candidateLocalIds.add(lid);
-    for (const lid of Object.values(localIdByExternal)) candidateLocalIds.add(lid);
-
-    const candidateExternalIds = externalList; // external IDs to match against fundsAuditUserId
+    // Build candidate IDs for RaiseQuery
+    const candidateLocalIds = new Set([...numericIndexToLocalId.values(), ...Object.values(localIdByExternal)]);
+    const candidateExternalIds = externalList;
 
     let raiseQueries = [];
     if (candidateLocalIds.size > 0 || candidateExternalIds.length > 0) {
       const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
-
       const whereClause = { [Op.or]: [] };
 
       if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
@@ -925,10 +920,9 @@ const getReferralPaymentStatus = async (req, res) => {
       });
     }
 
-    // 4) Attach RaiseQuery info to registered users
+    // Attach RaiseQuery info to registered users
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
-
       const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
       const extId = pickExternalId(u);
 
@@ -940,7 +934,8 @@ const getReferralPaymentStatus = async (req, res) => {
         rq = raiseQueries.find(r => String(r.fundsAuditUserId) === String(extId));
       }
 
-      cloned.queryStatus = rq ? rq.queryStatus : null;
+      // ✅ Default logic
+      cloned.queryStatus = rq ? (rq.queryStatus || "Pending") : null;
       cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
 
       return cloned;
