@@ -68,84 +68,67 @@ const listAllUsers = async (req, res) => {
     const users = await User.findAll({
       include: [
         {
+          model: Course,
+          attributes: ["id", "name", "duration", "domainId"],
+          include: [
+            {
+              model: Domain,
+              attributes: ["id", "name"]
+            }
+          ]
+        },
+        {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "internshipStatus"]
-        },
-        {
-          model: InternshipCertificate,
-          attributes: ["id", "courseId", "certificateUrl", "isIssued", "issuedDate"]
-        },
-        {
-          model: OfferLetter,
-          attributes: ["id", "fileUrl", "issent", "startDate"]
+          attributes: ["id", "name", "email", "mobileNumber", "internshipStatus"]
         }
       ]
     });
 
-    const response = [];
-
-    for (const user of users) {
-      // ✅ Map courseStatuses + courseDates into courses array
-      const courses = [];
-      if (user.courseStatuses && typeof user.courseStatuses === "object") {
-        for (const [courseId, status] of Object.entries(user.courseStatuses)) {
-          const course = await Course.findByPk(courseId, {
-            attributes: ["id", "name"]
-          });
-
-          courses.push({
-            courseId,
-            courseName: course ? course.name : null,
-            status,
-            startDate:
-              user.courseDates && user.courseDates[courseId]
-                ? user.courseDates[courseId].startDate
-                : null,
-            endDate:
-              user.courseDates && user.courseDates[courseId]
-                ? user.courseDates[courseId].endDate
-                : null
-          });
-        }
-      }
-
-      // ✅ Internship info
-      const internshipIssued =
-        user.InternshipCertificates && user.InternshipCertificates.length > 0
-          ? user.InternshipCertificates.some(cert => cert.isIssued)
-          : null;
-
-      const internshipStatus = user.teamManager ? user.teamManager.internshipStatus : null;
-
-      // ✅ Offer Letter info
-      const offerLetterSent =
-        user.OfferLetters && user.OfferLetters.length > 0
-          ? user.OfferLetters[0].issent
-          : false;
-
-      const offerLetterFile =
-        user.OfferLetters && user.OfferLetters.length > 0
-          ? user.OfferLetters[0].fileUrl
-          : null;
-
-      response.push({
+    const formatted = users.map((user) => {
+      return {
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
-        subscriptionWallet: user.subscriptionWallet,
-        subscriptionLeft: user.subscriptionLeft,
-        courses, // now populated instead of []
-        internshipIssued,
-        internshipStatus,
-        offerLetterSent,
-        offerLetterFile
-      });
-    }
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        collegeName: user.collegeName,
 
-    return ReS(res, { success: true, data: response }, 200);
+        // 🔹 Courses + Domain + Duration
+        courses: user.Courses?.map((course) => ({
+          courseId: course.id,
+          courseName: course.name,
+          duration: course.duration,
+          domainName: course.Domain ? course.Domain.name : null,
+          status: user.courseStatuses ? user.courseStatuses[course.id] : null,
+          startDate: user.courseDates ? user.courseDates[course.id]?.startDate : null,
+          endDate: user.courseDates ? user.courseDates[course.id]?.endDate : null
+        })) || [],
+
+        // 🔹 Team Manager Info
+        teamManager: user.teamManager
+          ? {
+              id: user.teamManager.id,
+              name: user.teamManager.name,
+              email: user.teamManager.email,
+              mobileNumber: user.teamManager.mobileNumber,
+              internshipStatus: user.teamManager.internshipStatus
+            }
+          : null,
+
+        subscriptionWallet: user.subscriptionWallet,
+        subscriptionLeft: user.subscriptionLeft
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      totalUsers: formatted.length,
+      data: formatted
+    });
   } catch (err) {
-    return ReE(res, err.message, 500);
+    console.error("Error in listAllUsers:", err);
+    return res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-module.exports.listAllUsers = listAllUsers;
+module.exports = { listAllUsers };
