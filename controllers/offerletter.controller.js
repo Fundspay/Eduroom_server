@@ -65,13 +65,12 @@ module.exports = { sendOfferLetter };
 
 const listAllUsers = async (req, res) => {
   try {
-    // Fetch users along with relevant associations
     const users = await User.findAll({
       include: [
         {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "internshipStatus"] // Use actual associated manager
+          attributes: ["id", "name", "internshipStatus"]
         },
         {
           model: InternshipCertificate,
@@ -84,16 +83,30 @@ const listAllUsers = async (req, res) => {
       ]
     });
 
-    // Fetch all courses with domains
     const courses = await Course.findAll({
       attributes: ["id", "name", "duration", "businessTarget", "domainId"],
       include: [{ model: Domain, attributes: ["id", "name"] }]
     });
 
-    // Fetch all team managers for the response
     const allTeamManagers = await TeamManager.findAll({
       where: { isDeleted: false },
       attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+    });
+
+    // Fetch RaiseQuery status for all users
+    const userIds = users.map(u => u.id);
+    const raiseQueries = await RaiseQuery.findAll({
+      where: { userId: userIds, isDeleted: false },
+      attributes: ["userId", "isQueryRaised", "queryStatus"]
+    });
+
+    // Map query info by userId
+    const queryInfoByUser = {};
+    raiseQueries.forEach(q => {
+      queryInfoByUser[q.userId] = {
+        isQueryRaised: q.isQueryRaised,
+        queryStatus: q.queryStatus
+      };
     });
 
     const response = [];
@@ -129,7 +142,7 @@ const listAllUsers = async (req, res) => {
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      // Team Manager info (using the exact associated manager)
+      // Team Manager info
       const teamManager = user.teamManager
         ? {
             id: user.teamManager.id,
@@ -149,7 +162,10 @@ const listAllUsers = async (req, res) => {
           ? user.OfferLetters[0].fileUrl
           : null;
 
-      // ✅ Create Status record
+      // Query info for this user
+      const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null };
+
+      // ✅ Create Status record including query info
       const statusRecord = await Status.create({
         userId: user.id,
         userName: `${user.firstName} ${user.lastName}`,
@@ -163,7 +179,9 @@ const listAllUsers = async (req, res) => {
         internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManager ? teamManager.name : null
+        teamManager: teamManager ? teamManager.name : null,
+        queryStatus: queryInfo.queryStatus,
+        isQueryRaised: queryInfo.isQueryRaised
       });
 
       response.push({
@@ -180,7 +198,9 @@ const listAllUsers = async (req, res) => {
         internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManager ? teamManager.name : null
+        teamManager: teamManager ? teamManager.name : null,
+        isQueryRaised: queryInfo.isQueryRaised,
+        queryStatus: queryInfo.queryStatus
       });
     }
 
