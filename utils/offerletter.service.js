@@ -189,7 +189,7 @@ const generateOfferLetter = async (userId) => {
       position,
       startDate,
       location: workLocation,
-      fileUrl: `https://fundsweb.s3.${CONFIG.awsRegion}.amazonaws.com/${s3Key}`
+      fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`
     });
 
     return offerLetter;
