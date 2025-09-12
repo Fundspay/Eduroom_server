@@ -84,9 +84,9 @@ const listAllUsers = async (req, res) => {
       ]
     });
 
-    // fetch all courses with domain once to avoid repeated DB calls
+    // fetch all courses with domain once
     const courses = await Course.findAll({
-      attributes: ["id", "name", "duration", "domainId"],
+      attributes: ["id", "name", "duration", "businessTarget", "domainId"],
       include: [{ model: Domain, attributes: ["id", "name"] }]
     });
 
@@ -103,6 +103,7 @@ const listAllUsers = async (req, res) => {
             courseId,
             courseName: course ? course.name : null,
             duration: course ? course.duration : null,
+            businessTarget: course ? course.businessTarget : null,
             domainName: course && course.Domain ? course.Domain.name : null,
             status,
             startDate:
