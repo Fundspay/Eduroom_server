@@ -36,56 +36,76 @@ const generateOfferLetter = async (userId) => {
     year: "numeric"
   });
 
-  // 2. Build HTML
+  // 2. Build HTML Template
   const html = `
   <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; }
-        .header { display:flex; justify-content:space-between; align-items:center; }
-        .logo { width:160px; }
-        .date { font-size:13px; margin-top:20px; }
-        .title { text-align:center; font-weight:bold; font-size:16px; margin:40px 0 20px 0; text-decoration: underline; }
+        body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; position: relative; }
+
+        /* Header */
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; }
+        .logo { width:150px; }
+        .date { font-size:13px; }
+
+        /* Title */
+        .title { text-align:center; font-weight:bold; font-size:15px; margin:30px 0 20px 0; text-decoration: underline; }
+
+        /* Paragraphs */
         p { margin: 8px 0; text-align: justify; }
-        .signature { margin-top:60px; }
+
+        /* Signature + stamp */
+        .signature { margin-top:60px; position: relative; }
         .signature img { width:120px; }
-        .stamp { position:absolute; bottom:180px; right:100px; width:120px; opacity:0.9; }
+        .stamp {
+          position:absolute;
+          right:120px;
+          bottom: -10px;   /* aligned with signature baseline */
+          width:120px;
+          opacity:0.9;
+        }
+
+        /* Watermark */
         .watermark {
           position: fixed;
           top: 200px;
           left: 50%;
           transform: translateX(-50%);
-          opacity: 0.08;
+          opacity: 0.06;
           width: 400px;
           z-index: -1;
         }
+
+        /* Footer strip */
         .footer {
           background:#009688;
           color:white;
           padding:15px 30px;
           font-size:11px;
           line-height:1.5;
-          display:flex;
-          justify-content:space-between;
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
+          display:flex;
+          justify-content:space-between;
         }
       </style>
     </head>
     <body>
+      <!-- watermark -->
       <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
 
+      <!-- header -->
       <div class="header">
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.jpg" class="logo"/>
         <div class="date">Date: ${today}</div>
       </div>
 
+      <!-- Title -->
       <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
       <p>Dear ${candidateName},</p>
-
       <p>
         Congratulations! We are pleased to confirm that you have been selected
         for the role of <b>${position}</b> at Eduroom. We believe that your skills,
@@ -107,13 +127,14 @@ const generateOfferLetter = async (userId) => {
 
       <p>Thank you!<br/>Yours sincerely,<br/>Eduroom</p>
 
+      <!-- Signature + Stamp -->
       <div class="signature">
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/><br/>
         Mrs. Pooja Shedge<br/>Branch Manager
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
       </div>
 
-      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
-
+      <!-- Footer strip -->
       <div class="footer">
         <div>
           FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001<br/>
@@ -128,7 +149,7 @@ const generateOfferLetter = async (userId) => {
   </html>
   `;
 
-  // 3. Generate PDF
+  // 3. Generate PDF from HTML
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"]
@@ -144,7 +165,7 @@ const generateOfferLetter = async (userId) => {
 
   await browser.close();
 
-  // 4. Upload
+  // 4. Upload to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
