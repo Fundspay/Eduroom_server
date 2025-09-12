@@ -3,6 +3,7 @@ const model = require("../models/index");
 const bcrypt = require("bcrypt");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { sequelize, User, TeamManager } = require("../models");
+const { User} = require("../models");
 
 
 // Register Team Manager
@@ -58,6 +59,26 @@ var registerTeamManager = async function (req, res) {
     }
 };
 module.exports.registerTeamManager = registerTeamManager;
+
+
+// Get All Team Managers
+var getTeamManagers = async function (req, res) {
+    try {
+        // Fetch all managers that are not deleted
+        const managers = await model.TeamManager.findAll({
+            where: { isDeleted: false },
+            attributes: ['managerId', 'name', 'email', 'mobileNumber', 'department', 'position', 'internshipStatus', 'createdAt']
+        });
+
+        return ReS(res, { success: true, managers }, 200);
+    } catch (error) {
+        console.error("Error fetching managers:", error);
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.getTeamManagers = getTeamManagers;
+
 
 //  Fetch All Team Managers
 var getAllTeamManagers = async function (req, res) {
@@ -166,64 +187,51 @@ module.exports.updateTeamManager = updateTeamManager;
 
 
 
-const updateInternshipAndManager = async (req, res) => {
-  const { userId, managerId, internshipStatus } = req.body;
+const updateManagerAssignment = async (req, res) => {
+  const { managerId, internshipStatus } = req.body;
 
-  if (!userId) {
-    return ReE(res, "userId is required", 400);
-  }
+  if (!managerId) return ReE(res, "managerId is required", 400);
 
   const t = await sequelize.transaction();
-
   try {
-    // Fetch user
-    const user = await User.findByPk(userId, { transaction: t });
-    if (!user) {
+    const manager = await TeamManager.findOne({ where: { managerId }, transaction: t });
+    if (!manager) {
       await t.rollback();
-      return ReE(res, "User not found", 404);
+      return ReE(res, "Team Manager not found", 404);
     }
 
-    let manager = null;
-    // If managerId is provided, fetch and update manager
-    if (managerId) {
-      manager = await TeamManager.findOne({ where: { managerId }, transaction: t });
-      if (!manager) {
-        await t.rollback();
-        return ReE(res, "Team Manager not found", 404);
-      }
+    // ✅ Update all users to have this assigned manager
+    const users = await User.findAll({ where: { assignedTeamManager: null }, transaction: t });
 
-      await user.update({ assignedTeamManager: manager.managerId }, { transaction: t });
+    for (const user of users) {
+      await user.update({ assignedTeamManager: manager.id }, { transaction: t });
     }
 
-    // If internshipStatus is provided, update manager's internshipStatus
-    if (internshipStatus && manager) {
+    // ✅ Update internship status for the manager if provided
+    if (internshipStatus) {
       await manager.update({ internshipStatus }, { transaction: t });
-    } else if (internshipStatus && !manager && user.assignedTeamManager) {
-      // If internshipStatus is provided but managerId not given, update existing assigned manager
-      manager = await TeamManager.findOne({ where: { managerId: user.assignedTeamManager }, transaction: t });
-      if (manager) {
-        await manager.update({ internshipStatus }, { transaction: t });
-      }
     }
 
     await t.commit();
 
     return ReS(res, {
       success: true,
-      message: "Internship status and/or assigned team manager updated successfully",
+      message: "Assigned team manager updated successfully",
       data: {
-        userId: user.id,
-        assignedTeamManager: user.assignedTeamManager,
-        managerId: manager ? manager.managerId : null,
-        internshipStatus: manager ? manager.internshipStatus : null,
-      },
+        managerId: manager.managerId,
+        internshipStatus: manager.internshipStatus,
+        assignedUsers: users.map(u => ({
+          userId: u.id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email
+        }))
+      }
     }, 200);
-
   } catch (error) {
     await t.rollback();
-    console.error("Update Internship & Manager Error:", error);
+    console.error("Update Manager Assignment Error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
 
-module.exports.updateInternshipAndManager = updateInternshipAndManager;
+module.exports.updateManagerAssignment = updateManagerAssignment;
