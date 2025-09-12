@@ -11,7 +11,8 @@ var addRaiseQuery = async (req, res) => {
         queryStatus,
         first_name,
         last_name,
-        phone_number
+        phone_number,
+        email
     } = req.body;
 
     if (!userId || !fundsAuditUserId) 
@@ -33,6 +34,7 @@ var addRaiseQuery = async (req, res) => {
             first_name: first_name || user.firstName,
             last_name: last_name || user.lastName,
             phone_number: phone_number || user.phoneNumber,
+            email: email || null,
             isQueryRaised: true,         // always true
             queryStatus: finalQueryStatus // default to "Pending"
         });
@@ -48,7 +50,7 @@ module.exports.addRaiseQuery = addRaiseQuery;
 // ✅ Update the latest Raise Query by userId
 var updateRaiseQueryByUser = async (req, res) => {
     const { userId } = req.params;
-    const { fundsAuditUserId, queryStatus, first_name, last_name, phone_number } = req.body;
+    const { fundsAuditUserId, queryStatus, first_name, last_name, phone_number,email } = req.body;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
@@ -68,6 +70,7 @@ var updateRaiseQueryByUser = async (req, res) => {
             queryStatus: queryStatus || "Pending",   // default to "Pending" if not provided
             first_name: first_name || raiseQuery.first_name,
             last_name: last_name || raiseQuery.last_name,
+            email: email || raiseQuery.email,
             phone_number: phone_number || raiseQuery.phone_number
         });
 
