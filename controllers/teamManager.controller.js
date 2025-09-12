@@ -3,7 +3,7 @@ const model = require("../models/index");
 const bcrypt = require("bcrypt");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { sequelize, User, TeamManager } = require("../models");
-const { User} = require("../models");
+
 
 
 // Register Team Manager
