@@ -81,7 +81,7 @@ const generateOfferLetter = async (userId) => {
         /* Watermark */
         .watermark {
           position: fixed;
-          top: 200px;
+          top: 280px;
           left: 50%;
           transform: translateX(-50%);
           opacity: 0.06;
