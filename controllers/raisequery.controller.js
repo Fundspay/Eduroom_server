@@ -1,9 +1,9 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
+const { Op } = require("sequelize");
 
-
-// ✅ Add a new Raise Query with optional extra fields
+// ✅ Add a new Raise Query
 var addRaiseQuery = async (req, res) => {
     const {
         userId,
@@ -34,7 +34,7 @@ var addRaiseQuery = async (req, res) => {
             last_name: last_name || user.lastName,
             phone_number: phone_number || user.phoneNumber,
             isQueryRaised: true,         // always true
-            queryStatus: finalQueryStatus // default to "Pending" if not provided
+            queryStatus: finalQueryStatus // default to "Pending"
         });
 
         return ReS(res, { success: true, query: raiseQuery }, 201);
@@ -45,10 +45,10 @@ var addRaiseQuery = async (req, res) => {
 
 module.exports.addRaiseQuery = addRaiseQuery;
 
-// ✅ Update Raise Query by userId (latest query)
+// ✅ Update the latest Raise Query by userId
 var updateRaiseQueryByUser = async (req, res) => {
     const { userId } = req.params;
-    const { fundsAuditUserId, isQueryRaised, queryStatus, first_name, last_name, phone_number } = req.body;
+    const { fundsAuditUserId, queryStatus, first_name, last_name, phone_number } = req.body;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
@@ -61,11 +61,11 @@ var updateRaiseQueryByUser = async (req, res) => {
 
         if (!raiseQuery) return ReE(res, "No RaiseQuery found for this user", 404);
 
-        // Update fields, fallback to existing values if not provided
+        // Update fields, always mark query as raised
         await raiseQuery.update({
             fundsAuditUserId: fundsAuditUserId || raiseQuery.fundsAuditUserId,
-            isQueryRaised: isQueryRaised !== undefined ? isQueryRaised : raiseQuery.isQueryRaised,
-            queryStatus: queryStatus || raiseQuery.queryStatus,
+            isQueryRaised: true,                     // always true on update
+            queryStatus: queryStatus || "Pending",   // default to "Pending" if not provided
             first_name: first_name || raiseQuery.first_name,
             last_name: last_name || raiseQuery.last_name,
             phone_number: phone_number || raiseQuery.phone_number
@@ -78,9 +78,8 @@ var updateRaiseQueryByUser = async (req, res) => {
 };
 
 module.exports.updateRaiseQueryByUser = updateRaiseQueryByUser;
+
 // ✅ Fetch all Raise Queries
-
-
 var fetchAllRaiseQueries = async (req, res) => {
     try {
         const queries = await model.RaiseQuery.findAll({
@@ -98,54 +97,54 @@ var fetchAllRaiseQueries = async (req, res) => {
 };
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
+// ✅ Fetch Raise Queries by userId
 var fetchRaiseQueriesByUser = async (req, res) => {
-  const { userId } = req.params;
+    const { userId } = req.params;
 
-  if (!userId) return ReE(res, "userId is required", 400);
+    if (!userId) return ReE(res, "userId is required", 400);
 
-  try {
-    // Fetch all queries for this user + include linked User info
-    const queries = await model.RaiseQuery.findAll({
-      where: { userId, isDeleted: false },
-      order: [["updatedAt", "DESC"]],
-      include: [
-        {
-          model: model.User,
-          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"], // adjust to your User model fields
-        },
-      ],
-    });
+    try {
+        // Fetch all queries for this user + include User info
+        const queries = await model.RaiseQuery.findAll({
+            where: { userId, isDeleted: false },
+            order: [["updatedAt", "DESC"]],
+            include: [
+                {
+                    model: model.User,
+                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+                },
+            ],
+        });
 
-    const queryCount = queries.length;
+        const queryCount = queries.length;
 
-    // ✅ Update queryCount in DB
-    await model.RaiseQuery.update(
-      { queryCount },
-      { where: { userId, isDeleted: false } }
-    );
+        // Update queryCount in DB for all this user's RaiseQuery rows
+        await model.RaiseQuery.update(
+            { queryCount },
+            { where: { userId, isDeleted: false } }
+        );
 
-    // ✅ Format response (override queryCount so response is always fresh)
-    const formattedQueries = queries.map((q) => {
-      const plainQ = q.toJSON();
+        // Format response
+        const formattedQueries = queries.map((q) => {
+            const plainQ = q.toJSON();
+            return {
+                ...plainQ,
+                queryCount, // latest total queries
+                queryDate: plainQ.createdAt,
+                userDetails: {
+                    id: plainQ.User?.id || null,
+                    firstName: plainQ.User?.firstName || null,
+                    lastName: plainQ.User?.lastName || null,
+                    email: plainQ.User?.email || null,
+                    phoneNumber: plainQ.User?.phoneNumber || null,
+                },
+            };
+        });
 
-      return {
-        ...plainQ,
-        queryCount, // always show the latest count
-        queryDate: plainQ.createdAt,
-        userDetails: {
-          id: plainQ.User?.id || null,
-          firstName: plainQ.User?.firstName || null,
-          lastName: plainQ.User?.lastName || null,
-          email: plainQ.User?.email || null,
-          phoneNumber: plainQ.User?.phoneNumber || null,
-        },
-      };
-    });
-
-    return ReS(res, { success: true, count: queryCount, queries: formattedQueries }, 200);
-  } catch (error) {
-    return ReE(res, error.message, 500);
-  }
+        return ReS(res, { success: true, count: queryCount, queries: formattedQueries }, 200);
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
 };
 
 module.exports.fetchRaiseQueriesByUser = fetchRaiseQueriesByUser;
