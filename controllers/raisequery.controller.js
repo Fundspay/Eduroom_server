@@ -96,22 +96,51 @@ var fetchAllRaiseQueries = async (req, res) => {
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
 var fetchRaiseQueriesByUser = async (req, res) => {
-    const { userId } = req.params;
+  const { userId } = req.params;
 
-    if (!userId) return ReE(res, "userId is required", 400);
+  if (!userId) return ReE(res, "userId is required", 400);
 
-    try {
-        const queries = await model.RaiseQuery.findAll({
-            where: { userId, isDeleted: false },
-            order: [["updatedAt", "DESC"]]
-        });
+  try {
+    // Fetch all queries for this user + include linked User info
+    const queries = await model.RaiseQuery.findAll({
+      where: { userId, isDeleted: false },
+      order: [["updatedAt", "DESC"]],
+      include: [
+        {
+          model: model.User,
+          attributes: ["id", "name", "email", "phone"], // adjust to your User model fields
+        },
+      ],
+    });
 
-        const queryCount = queries.length; // total queries for this user
+    const queryCount = queries.length;
 
-        return ReS(res, { success: true, count: queryCount, queries }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+    // ✅ Update queryCount in all RaiseQuery rows for this user
+    await model.RaiseQuery.update(
+      { queryCount },
+      { where: { userId, isDeleted: false } }
+    );
+
+    // Format response
+    const formattedQueries = queries.map((q) => {
+      const plainQ = q.toJSON();
+
+      return {
+        ...plainQ, // keep all RaiseQuery fields (id, queryStatus, first_name, last_name, phone_number, etc.)
+        queryDate: plainQ.createdAt, // attach human-readable query date
+        userDetails: {
+          id: plainQ.User?.id || null,
+          name: plainQ.User?.name || null,
+          email: plainQ.User?.email || null,
+          phone: plainQ.User?.phone || null,
+        },
+      };
+    });
+
+    return ReS(res, { success: true, count: queryCount, queries: formattedQueries }, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
 };
 
 module.exports.fetchRaiseQueriesByUser = fetchRaiseQueriesByUser;
