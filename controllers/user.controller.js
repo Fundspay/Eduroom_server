@@ -10,6 +10,7 @@ const admin = require('firebase-admin');
 const CONFIG = require("../config/config.js");
 const axios = require('axios');
 const moment = require("moment");
+const { Op } = require('sequelize');
 
 
 
@@ -821,70 +822,173 @@ const fetchAllUsers = async (req, res) => {
 
 module.exports.fetchAllUsers = fetchAllUsers;
 
-
 const getReferralPaymentStatus = async (req, res) => {
   try {
     let { userId } = req.params;
-
-    // Convert userId to integer
     userId = parseInt(userId, 10);
     if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
-    // Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
-
     if (!user.referralCode) {
-      return ReS(
-        res,
-        {
-          success: true,
-          message: "User has no referral code",
-          data: null,
-        },
-        200
-      );
+      return ReS(res, { success: true, message: "User has no referral code", data: null }, 200);
     }
 
     // Call external Lambda
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
-
-    // Modify registered_users
     let modifiedData = { ...apiResponse.data };
 
-    if (modifiedData.registered_users && Array.isArray(modifiedData.registered_users)) {
-      // Map through registered users
-      modifiedData.registered_users = await Promise.all(
-        modifiedData.registered_users.map(async (u) => {
-          // Fetch queryStatus for this registered user
-          const raiseQuery = await model.RaiseQuery.findOne({
-            where: { userId: u.user_id }, // Assuming API returns user_id field
-            attributes: ["queryStatus"],
-            order: [["createdAt", "DESC"]],
-          });
+    const regUsers = Array.isArray(modifiedData.registered_users) ? modifiedData.registered_users.map(u => ({ ...u })) : [];
 
-          return {
-            ...u,
-            isDownloaded: true,
-            queryStatus: raiseQuery ? raiseQuery.queryStatus : null,
-          };
-        })
-      );
+    if (regUsers.length === 0) {
+      modifiedData.registered_users = [];
+      return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Return modified response
-    return ReS(
-      res,
-      {
-        success: true,
-        data: modifiedData,
-      },
-      200
-    );
+    // Helper: pick a sensible external id field from the registered user object
+    const pickExternalId = (u) => u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
+
+    // 1) Split numeric (likely local DB id) vs external (string) ids
+    const numericIndexToLocalId = new Map(); // map regUsers index -> local numeric id
+    const externalValues = new Set(); // unique external id strings
+    const indexByExternal = {}; // external id -> array of indexes in regUsers
+
+    regUsers.forEach((u, idx) => {
+      const ext = pickExternalId(u);
+      if (!ext) return;
+
+      const sExt = String(ext);
+      if (/^\d+$/.test(sExt)) {
+        numericIndexToLocalId.set(idx, parseInt(sExt, 10));
+      } else {
+        externalValues.add(sExt);
+        indexByExternal[sExt] = indexByExternal[sExt] || [];
+        indexByExternal[sExt].push(idx);
+      }
+    });
+
+    // 2) Try to resolve external ids to local User.id by checking common columns
+    const externalList = [...externalValues];
+    const localIdByExternal = {}; // ext -> localUserId
+
+    if (externalList.length > 0) {
+      // Candidate columns in your User model that might store external IDs.
+      const candidateUserCols = ['firebaseUid', 'externalId', 'authId', 'uuid', 'uid', 'userUid'];
+
+      const userAttrs = Object.keys(model.User.rawAttributes || {});
+      const availableUserCols = candidateUserCols.filter(c => userAttrs.includes(c));
+
+      if (availableUserCols.length > 0) {
+        // Build an OR where clause: any of these columns is IN externalList
+        const userWhere = { [Op.or]: availableUserCols.map(col => ({ [col]: { [Op.in]: externalList } })) };
+
+        const foundUsers = await model.User.findAll({
+          where: userWhere,
+          attributes: ['id', ...availableUserCols],
+          raw: true,
+        });
+
+        // Map each found user's external value(s) back to local id
+        for (const fu of foundUsers) {
+          for (const col of availableUserCols) {
+            const val = fu[col];
+            if (val && externalValues.has(String(val))) {
+              localIdByExternal[String(val)] = fu.id;
+            }
+          }
+        }
+      }
+    }
+
+    // 3) Build a set of all local user IDs we can query RaiseQuery with
+    const candidateLocalIds = new Set();
+    // from numeric IDs directly provided
+    for (const lid of numericIndexToLocalId.values()) candidateLocalIds.add(lid);
+    // from resolved external -> local mapping
+    for (const lid of Object.values(localIdByExternal)) candidateLocalIds.add(lid);
+
+    // If no candidate local ids, we can't query RaiseQuery meaningfully
+    let raiseQueries = [];
+    if (candidateLocalIds.size > 0) {
+      // Determine which columns exist on RaiseQuery to match against (so we can check userId or other fields)
+      const possibleRQCols = [
+        'userId',
+        'fundsAuditUserId',
+        'fundsPaidUserId',
+        'funds_audit_user_id',
+        'fund_audit_user_id',
+        'referredUserId',
+        'referred_user_id',
+        'user_id'
+      ];
+      const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
+      const matchedRQCols = possibleRQCols.filter(c => rqAttrs.includes(c));
+      // Ensure we have at least userId
+      if (matchedRQCols.length === 0 && rqAttrs.includes('userId')) matchedRQCols.push('userId');
+      if (matchedRQCols.length === 0) matchedRQCols.push('userId'); // fallback; may throw if really doesn't exist
+
+      // Build where: any of the matched columns IN candidateLocalIds
+      const whereClause = {
+        [Op.or]: matchedRQCols.map(col => ({ [col]: { [Op.in]: [...candidateLocalIds] } }))
+      };
+
+      // Grab recent RaiseQuery rows (we'll pick latest per user later)
+      raiseQueries = await model.RaiseQuery.findAll({
+        where: whereClause,
+        attributes: ['id', 'queryStatus', 'createdAt', ...matchedRQCols],
+        order: [['createdAt', 'DESC']],
+        raw: true,
+      });
+
+      // raiseQueries is an array ordered newest -> oldest
+    }
+
+    // 4) For each registered user, attach queryStatus (latest matching RaiseQuery) and isDownloaded
+    const getCandidateLocalIdForIndex = (idx) => {
+      if (numericIndexToLocalId.has(idx)) return numericIndexToLocalId.get(idx);
+      const ext = pickExternalId(regUsers[idx]);
+      if (ext && localIdByExternal[String(ext)]) return localIdByExternal[String(ext)];
+      return null;
+    };
+
+    // create fast lookup by scanning raiseQueries once
+    // We'll map localId -> first (latest) raiseQuery found where any matched column equals localId
+    const latestRQByLocalId = {};
+    if (raiseQueries.length > 0) {
+      const rqCols = Object.keys(raiseQueries[0]).filter(k => k !== 'id' && k !== 'queryStatus' && k !== 'createdAt');
+      for (const rq of raiseQueries) {
+        // find which of the matched rqCols hold a local id
+        for (const col of rqCols) {
+          const colVal = rq[col];
+          if (colVal == null) continue;
+          const key = String(colVal);
+          if (!latestRQByLocalId[key]) {
+            latestRQByLocalId[key] = rq; // first occurrence is the latest due to order
+          }
+        }
+      }
+    }
+
+    // Attach statuses
+    const updatedRegisteredUsers = regUsers.map((u, idx) => {
+      const cloned = { ...u, isDownloaded: true };
+      const localId = getCandidateLocalIdForIndex(idx);
+      if (localId != null) {
+        const rq = latestRQByLocalId[String(localId)];
+        cloned.queryStatus = rq ? rq.queryStatus : null;
+      } else {
+        cloned.queryStatus = null;
+      }
+      return cloned;
+    });
+
+    modifiedData.registered_users = updatedRegisteredUsers;
+
+    return ReS(res, { success: true, data: modifiedData }, 200);
   } catch (error) {
     console.error("Get Referral Payment Status Error:", error);
-    return ReE(res, error.message, 500);
+    return ReE(res, error.message || "Internal error", 500);
   }
 };
 
