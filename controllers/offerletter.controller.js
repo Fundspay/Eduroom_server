@@ -229,4 +229,3 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
-s
