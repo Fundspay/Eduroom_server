@@ -16,7 +16,10 @@ module.exports = (sequelize, Sequelize) => {
             internshipStatus: { type: Sequelize.STRING, allowNull: true },
             offerLetterSent: { type: Sequelize.BOOLEAN, allowNull: true },
             offerLetterFile: { type: Sequelize.STRING, allowNull: true },
-            teamManager: { type: Sequelize.STRING, allowNull: true }, // store only team manager name
+            teamManager: { type: Sequelize.STRING, allowNull: true },
+            queryRaised: { type: Sequelize.BOOLEAN, allowNull: true },
+            queryStatus: { type: Sequelize.STRING, allowNull: true },
+            isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
         },
