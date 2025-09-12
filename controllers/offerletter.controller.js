@@ -2,7 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain } = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,RaiseQuery,Status } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
@@ -70,7 +70,7 @@ const listAllUsers = async (req, res) => {
         {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["name"] // Only include the name here
+          attributes: ["id", "name", "internshipStatus"]
         },
         {
           model: InternshipCertificate,
@@ -93,11 +93,34 @@ const listAllUsers = async (req, res) => {
       attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
     });
 
+    // Fetch RaiseQuery status for all users
+    const userIds = users.map(u => u.id);
+    const raiseQueries = await RaiseQuery.findAll({
+      where: { userId: userIds, isDeleted: false },
+      attributes: ["userId", "isQueryRaised", "queryStatus"]
+    });
+
+    // Map query info by userId with queryCount
+    const queryInfoByUser = {};
+    raiseQueries.forEach(q => {
+      if (!queryInfoByUser[q.userId]) {
+        queryInfoByUser[q.userId] = {
+          isQueryRaised: q.isQueryRaised || false,
+          queryStatus: q.queryStatus || null,
+          queryCount: 1
+        };
+      } else {
+        queryInfoByUser[q.userId].queryCount += 1;
+        queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
+        queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
+      }
+    });
+
     const response = [];
 
     for (const user of users) {
+      // Build course details
       const courseDetails = [];
-
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
           const course = courses.find(c => c.id.toString() === courseId);
@@ -120,13 +143,22 @@ const listAllUsers = async (req, res) => {
         }
       }
 
+      // Internship info
       const internshipIssued =
         user.InternshipCertificates && user.InternshipCertificates.length > 0
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      const teamManagerName = user.teamManager ? user.teamManager.name : null;
+      // Team Manager info
+      const teamManager = user.teamManager
+        ? {
+            id: user.teamManager.id,
+            name: user.teamManager.name,
+            internshipStatus: user.teamManager.internshipStatus
+          }
+        : null;
 
+      // Offer Letter info
       const offerLetterSent =
         user.OfferLetters && user.OfferLetters.length > 0
           ? user.OfferLetters[0].issent
@@ -137,7 +169,10 @@ const listAllUsers = async (req, res) => {
           ? user.OfferLetters[0].fileUrl
           : null;
 
-      // ✅ Create Status record in the database
+      // Query info for this user
+      const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
+
+      // ✅ Create Status record including query info
       const statusRecord = await Status.create({
         userId: user.id,
         userName: `${user.firstName} ${user.lastName}`,
@@ -148,14 +183,17 @@ const listAllUsers = async (req, res) => {
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
         internshipIssued,
-        internshipStatus: teamManagerName ? allTeamManagers.find(tm => tm.name === teamManagerName)?.internshipStatus : null,
+        internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManagerName
+        teamManager: teamManager ? teamManager.name : null,
+        queryStatus: queryInfo.queryStatus,
+        isQueryRaised: queryInfo.isQueryRaised,
+        queryCount: queryInfo.queryCount
       });
 
       response.push({
-        statusId: statusRecord.id, // include the newly created Status id
+        statusId: statusRecord.id,
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
@@ -165,10 +203,13 @@ const listAllUsers = async (req, res) => {
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
         internshipIssued,
-        internshipStatus: teamManagerName ? allTeamManagers.find(tm => tm.name === teamManagerName)?.internshipStatus : null,
+        internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManagerName // only name
+        teamManager: teamManager ? teamManager.name : null,
+        isQueryRaised: queryInfo.isQueryRaised,
+        queryStatus: queryInfo.queryStatus,
+        queryCount: queryInfo.queryCount
       });
     }
 

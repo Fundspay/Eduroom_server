@@ -4,10 +4,15 @@ module.exports = (sequelize, Sequelize) => {
     "RaiseQuery",
     {
       id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
-      userId: { type: Sequelize.BIGINT, allowNull: false },
-      fundsAuditUserId: { type: Sequelize.BIGINT, allowNull: true }, // user assigned for funds audit
+      userId: { type: Sequelize.BIGINT, allowNull: false }, // reference to user
+      fundsAuditUserId: { type: Sequelize.STRING, allowNull: true }, // user assigned for funds audit
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
-      internshipStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., Active, Completed, Pending
+      queryStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., Active, Completed, Pending
+      first_name: { type: Sequelize.STRING, allowNull: true }, // store user's first name
+      last_name: { type: Sequelize.STRING, allowNull: true },  // store user's last name
+      phone_number: { type: Sequelize.STRING, allowNull: true },
+      email: { type: Sequelize.STRING, allowNull: true },
+      queryCount: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },

@@ -16,6 +16,7 @@ const teamManagerRouter = require("./teamManager.route");
 const offerletterRouter = require("./offerletter.route");
 const contactusRouter = require("./contactus.route");
 const internshipcertificateRouter = require("./internshipcertificate.route");
+const raisequeryRouter = require("./raisequery.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -37,5 +38,6 @@ router.use("/teammanager", teamManagerRouter);
 router.use("/offerletter", offerletterRouter);
 router.use("/contactus", contactusRouter);
 router.use("/internshipcertificate", internshipcertificateRouter);
+router.use("/raisequery", raisequeryRouter);
 
 module.exports = router;

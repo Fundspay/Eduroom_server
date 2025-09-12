@@ -13,6 +13,7 @@ const moment = require("moment");
 
 
 
+
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert(require("../config/firebase-service-account.json"))
@@ -821,49 +822,133 @@ const fetchAllUsers = async (req, res) => {
 
 module.exports.fetchAllUsers = fetchAllUsers;
 
-
 const getReferralPaymentStatus = async (req, res) => {
   try {
     let { userId } = req.params;
-
-    // Convert userId to integer
     userId = parseInt(userId, 10);
     if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
-    // Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
-
     if (!user.referralCode) {
-      return ReS(res, {
-        success: true,
-        message: "User has no referral code",
-        data: null
-      }, 200);
+      return ReS(res, { success: true, message: "User has no referral code", data: null }, 200);
     }
 
     // Call external Lambda
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
-
-    // Modify registered_users to add isDownloaded: true
     let modifiedData = { ...apiResponse.data };
-    if (modifiedData.registered_users && Array.isArray(modifiedData.registered_users)) {
-      modifiedData.registered_users = modifiedData.registered_users.map(u => ({
-        ...u,
-        isDownloaded: true
-      }));
+
+    const regUsers = Array.isArray(modifiedData.registered_users)
+      ? modifiedData.registered_users.map(u => ({ ...u }))
+      : [];
+
+    if (regUsers.length === 0) {
+      modifiedData.registered_users = [];
+      return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Return modified response
-    return ReS(res, {
-      success: true,
-      data: modifiedData
-    }, 200);
+    // Helper: pick a sensible external id field from the registered user object
+    const pickExternalId = (u) => u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
+    // 1) Split numeric (likely local DB id) vs external (string) ids
+    const numericIndexToLocalId = new Map();
+    const externalValues = new Set();
+
+    regUsers.forEach((u, idx) => {
+      const ext = pickExternalId(u);
+      if (!ext) return;
+
+      const sExt = String(ext);
+      if (/^\d+$/.test(sExt)) {
+        numericIndexToLocalId.set(idx, parseInt(sExt, 10));
+      } else {
+        externalValues.add(sExt);
+      }
+    });
+
+    // 2) Resolve external ids to local User.id
+    const externalList = [...externalValues];
+    const localIdByExternal = {};
+
+    if (externalList.length > 0) {
+      const candidateUserCols = ['firebaseUid', 'externalId', 'authId', 'uuid', 'uid', 'userUid'];
+      const userAttrs = Object.keys(model.User.rawAttributes || {});
+      const availableUserCols = candidateUserCols.filter(c => userAttrs.includes(c));
+
+      if (availableUserCols.length > 0) {
+        const userWhere = { [Op.or]: availableUserCols.map(col => ({ [col]: { [Op.in]: externalList } })) };
+        const foundUsers = await model.User.findAll({
+          where: userWhere,
+          attributes: ['id', ...availableUserCols],
+          raw: true,
+        });
+
+        for (const fu of foundUsers) {
+          for (const col of availableUserCols) {
+            const val = fu[col];
+            if (val && externalValues.has(String(val))) {
+              localIdByExternal[String(val)] = fu.id;
+            }
+          }
+        }
+      }
+    }
+
+    // 3) Build candidate IDs for RaiseQuery search
+    const candidateLocalIds = new Set([...numericIndexToLocalId.values(), ...Object.values(localIdByExternal)]);
+    const candidateExternalIds = externalList;
+
+    let raiseQueries = [];
+    if (candidateLocalIds.size > 0 || candidateExternalIds.length > 0) {
+      const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
+      const whereClause = { [Op.or]: [] };
+
+      if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
+        whereClause[Op.or].push({ userId: { [Op.in]: [...candidateLocalIds] } });
+      }
+      if (rqAttrs.includes("fundsAuditUserId") && candidateExternalIds.length > 0) {
+        whereClause[Op.or].push({ fundsAuditUserId: { [Op.in]: candidateExternalIds } });
+      }
+
+      raiseQueries = await model.RaiseQuery.findAll({
+        where: whereClause,
+        attributes: ["id", "queryStatus", "isQueryRaised", "createdAt", "userId", "fundsAuditUserId"],
+        order: [["createdAt", "DESC"]],
+        raw: true,
+      });
+    }
+
+    // 4) Attach RaiseQuery info to registered users and normalize queryStatus
+    const updatedRegisteredUsers = regUsers.map((u, idx) => {
+      const cloned = { ...u, isDownloaded: true };
+
+      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
+      const extId = pickExternalId(u);
+
+      let rq = null;
+      if (localId != null) {
+        rq = raiseQueries.find(r => String(r.userId) === String(localId));
+      }
+      if (!rq && extId) {
+        rq = raiseQueries.find(r => String(r.fundsAuditUserId) === String(extId));
+      }
+
+      // ✅ Normalize queryStatus: default to "Pending" if null, empty, or "No Query"
+      cloned.queryStatus = rq
+        ? (!rq.queryStatus || rq.queryStatus.trim() === "" || rq.queryStatus === "No Query" ? "Pending" : rq.queryStatus)
+        : "Pending";
+      cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
+
+      return cloned;
+    });
+
+    modifiedData.registered_users = updatedRegisteredUsers;
+
+    return ReS(res, { success: true, data: modifiedData }, 200);
   } catch (error) {
     console.error("Get Referral Payment Status Error:", error);
-    return ReE(res, error.message, 500);
+    return ReE(res, error.message || "Internal error", 500);
   }
 };
 

@@ -41,24 +41,39 @@ const generateOfferLetter = async (userId) => {
   <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; margin: 50px; font-size: 12px; line-height: 1.6; position: relative; }
+        body { font-family: Arial, sans-serif; margin: 60px; font-size: 12px; line-height: 1.6; position: relative; }
         .header { display:flex; justify-content:space-between; align-items:center; }
-        .logo { width:150px; }
-        .title { text-align:center; font-weight:bold; font-size:18px; margin:30px 0; text-decoration: underline; }
+        .logo { width:140px; }
+        .date { font-size:12px; }
+        .title { text-align:center; font-weight:bold; font-size:16px; margin:40px 0 20px 0; text-decoration: underline; }
+        p { text-align: justify; margin: 8px 0; }
         .footer {
           background:#009688; color:white; padding:10px 30px;
           position:fixed; bottom:0; left:0; right:0;
-          font-size:10px; line-height:1.4;
+          font-size:10px; line-height:1.5;
+          display:flex; justify-content:space-between;
         }
-        .stamp { position:absolute; bottom:150px; right:100px; opacity:0.85; width:120px; }
-        .signature { margin-top:50px; }
-        .signature img { width:120px; }
+        .stamp { position:absolute; bottom:160px; right:100px; opacity:0.9; width:120px; }
+        .signature { margin-top:60px; }
+        .signature img { width:100px; }
+        .watermark {
+          position: fixed;
+          top: 200px;
+          left: 50%;
+          transform: translateX(-50%);
+          opacity: 0.05;
+          z-index: -1;
+          width: 300px;
+        }
       </style>
     </head>
     <body>
+      <!-- watermark -->
+      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
+
       <div class="header">
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.png" class="logo"/>
-        <div>Date: ${today}</div>
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.jpg" class="logo"/>
+        <div class="date">Date: ${today}</div>
       </div>
 
       <div class="title">OFFER LETTER FOR INTERNSHIP</div>
@@ -93,11 +108,17 @@ const generateOfferLetter = async (userId) => {
         Mrs. Pooja Shedge<br/>Branch Manager
       </div>
 
-      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.png" class="stamp"/>
+      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
 
       <div class="footer">
-        FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001 · CIN: U62099PN2025PTC245778<br/>
-        Fundsroom HQ, 804 Nucleus Mall, Pune-411001 · connect@eduroom.in · www.eduroom.in
+        <div>
+          FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001<br/>
+          CIN: U62099PN2025PTC245778
+        </div>
+        <div style="text-align:right;">
+          Fundsroom HQ, 804 Nucleus Mall, Pune-411001<br/>
+          connect@eduroom.in · www.eduroom.in
+        </div>
       </div>
     </body>
   </html>
@@ -114,7 +135,7 @@ const generateOfferLetter = async (userId) => {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
-    margin: { top: "40px", bottom: "100px", left: "40px", right: "40px" }
+    margin: { top: "60px", bottom: "120px", left: "50px", right: "50px" }
   });
 
   await browser.close();
