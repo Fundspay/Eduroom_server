@@ -115,19 +115,20 @@ var fetchRaiseQueriesByUser = async (req, res) => {
 
     const queryCount = queries.length;
 
-    // ✅ Update queryCount in all RaiseQuery rows for this user
+    // ✅ Update queryCount in DB
     await model.RaiseQuery.update(
       { queryCount },
       { where: { userId, isDeleted: false } }
     );
 
-    // Format response
+    // ✅ Format response (override queryCount so response is always fresh)
     const formattedQueries = queries.map((q) => {
       const plainQ = q.toJSON();
 
       return {
-        ...plainQ, // keep all RaiseQuery fields (id, queryStatus, first_name, last_name, phone_number, etc.)
-        queryDate: plainQ.createdAt, // attach human-readable query date
+        ...plainQ,
+        queryCount, // always show the latest count
+        queryDate: plainQ.createdAt,
         userDetails: {
           id: plainQ.User?.id || null,
           firstName: plainQ.User?.firstName || null,
