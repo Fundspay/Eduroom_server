@@ -10,7 +10,7 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion,
 });
 
-// Helpers for "12th September, 2025"
+// helpers for "12th September, 2025"
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
@@ -59,7 +59,14 @@ const generateOfferLetter = async (userId) => {
       <style>
         @page { size: A4; margin: 0; }
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { margin: 0; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #111; box-sizing: border-box; }
+        body {
+          margin: 0;
+          font-family: "Times New Roman", Times, serif;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #111;
+          box-sizing: border-box;
+        }
 
         /* Header/Footer images only */
         .header-img {
@@ -75,17 +82,28 @@ const generateOfferLetter = async (userId) => {
           display: block; z-index: 1; background: #fff;
         }
 
-        /* Content is padded to avoid the header/footer */
+        /* Content padded to avoid header/footer overlap */
         .content {
           position: relative; z-index: 2;
-          padding: ${HEADER_H + 60}px 60px ${FOOTER_H + 34}px 60px; /* moved further down */
+          /* more space from header to date by adding +80 instead of +60 */
+          padding: ${HEADER_H + 80}px 60px ${FOOTER_H + 34}px 60px;
         }
 
-        .title {
-          text-align: center; font-weight: bold; font-size: 16px;
-          margin: 0 0 18px 0; text-decoration: underline;
+        /* Date back to top-right, with space above/below */
+        .date-line {
+          text-align: right;
+          margin: 0 0 24px 0;  /* space below date before title */
         }
-        .date-line { margin: 0 0 20px 0; } /* Date ABOVE Dear ... */
+
+        /* Title (no underline now) */
+        .title {
+          text-align: center;
+          font-weight: bold;
+          font-size: 16px;
+          margin: 0 0 18px 0;
+          /* no text-decoration */
+        }
+
         p { margin: 8px 0; text-align: justify; }
 
         /* Watermark lower */
@@ -113,17 +131,18 @@ const generateOfferLetter = async (userId) => {
     </head>
     <body>
       <!-- header/footer images -->
-      <img src="${ASSET_BASE}/header.png" class="header-img" />
+      <img src="${ASSET_BASE}/headernew.png" class="header-img" />
       <img src="${ASSET_BASE}/footer.png" class="footer-img" />
 
       <!-- watermark -->
       <img src="${ASSET_BASE}/eduroom-watermark.png" class="watermark" />
 
       <div class="content">
-        <div class="title">OFFER LETTER FOR INTERNSHIP</div>
-
-        <!-- Date ABOVE the greeting -->
+        <!-- DATE at top-right with extra space from header -->
         <div class="date-line">Date: ${today}</div>
+
+        <!-- Title WITHOUT underline -->
+        <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
         <p>Dear ${candidateName},</p>
 
@@ -164,7 +183,7 @@ const generateOfferLetter = async (userId) => {
   </html>
   `;
 
-  // 4) Render PDF (A4 single page). Margins 0; content padding handles spacing.
+  // 4) Render PDF
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
