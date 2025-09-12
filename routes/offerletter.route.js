@@ -1,7 +1,7 @@
 "use strict";
 const express = require("express");
 const router = express.Router();
-const offerletterController = require("../controllers/offerletter.conotroller");
+const offerletterController = require("../controllers/offerletter.controller");
 
 
 // ✅ Offer Letter Routes

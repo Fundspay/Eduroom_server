@@ -1,8 +1,8 @@
 "use strict";
-const { generateOfferLetter } = require("../utils/offerletter.service");
-const { sendMail } = require("../middleware/mailer.middleware");
-const model = require("../models");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain } = require("../models");
+const { generateOfferLetter } = require("../utils/offerletter.service.js");
+const { sendMail } = require("../middleware/mailer.middleware.js");
+const model = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
@@ -70,7 +70,7 @@ const listAllUsers = async (req, res) => {
         {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+          attributes: ["name"] // Only include the name here
         },
         {
           model: InternshipCertificate,
@@ -83,13 +83,11 @@ const listAllUsers = async (req, res) => {
       ]
     });
 
-    // Fetch all courses with domain once
     const courses = await Course.findAll({
       attributes: ["id", "name", "duration", "businessTarget", "domainId"],
       include: [{ model: Domain, attributes: ["id", "name"] }]
     });
 
-    // Fetch all Team Managers for the response
     const allTeamManagers = await TeamManager.findAll({
       where: { isDeleted: false },
       attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
@@ -103,7 +101,6 @@ const listAllUsers = async (req, res) => {
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
           const course = courses.find(c => c.id.toString() === courseId);
-
           courseDetails.push({
             courseId,
             courseName: course ? course.name : null,
@@ -123,26 +120,14 @@ const listAllUsers = async (req, res) => {
         }
       }
 
-      // Internship info
       const internshipIssued =
         user.InternshipCertificates && user.InternshipCertificates.length > 0
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      // Team Manager info
-      const teamManager = user.teamManager
-        ? {
-            id: user.teamManager.id,
-            name: user.teamManager.name,
-            email: user.teamManager.email,
-            mobileNumber: user.teamManager.mobileNumber,
-            department: user.teamManager.department,
-            position: user.teamManager.position,
-            internshipStatus: user.teamManager.internshipStatus
-          }
-        : null;
+      // Only include team manager name
+      const teamManagerName = user.teamManager ? user.teamManager.name : null;
 
-      // Offer Letter info
       const offerLetterSent =
         user.OfferLetters && user.OfferLetters.length > 0
           ? user.OfferLetters[0].issent
@@ -163,10 +148,10 @@ const listAllUsers = async (req, res) => {
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
         internshipIssued,
-        internshipStatus: teamManager ? teamManager.internshipStatus : null,
+        internshipStatus: teamManagerName ? allTeamManagers.find(tm => tm.name === teamManagerName)?.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager // returning full team manager details
+        teamManager: teamManagerName // only name here
       });
     }
 
