@@ -228,6 +228,75 @@ var fetchCourseDetailsByPreview = async (req, res) => {
   }
 };
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
+
+// GET /api/v1/course-full-structure
+var fetchFullCourseStructure = async (req, res) => {
+  try {
+    // 1️⃣ Fetch all domains
+    const domains = await model.Domain.findAll({
+      where: { isDeleted: false },
+      attributes: ["id", "name"],
+      include: [
+        {
+          model: model.Course,
+          where: { isDeleted: false },
+          required: false,
+          attributes: ["id", "name", "domainId"],
+          include: [
+            {
+              model: model.CoursePreview,
+              where: { isDeleted: false },
+              required: false,
+              attributes: ["id", "title", "dayCount", "courseId", "domainId"],
+              include: [
+                {
+                  model: model.CourseDetail,
+                  where: { isDeleted: false },
+                  required: false,
+                  attributes: [
+                    "id",
+                    "day",
+                    "sessionNumber",
+                    "title",
+                    "description",
+                    "youtubeLink",
+                  ],
+                  include: [
+                    {
+                      model: model.QuestionModel,
+                      where: { isDeleted: false },
+                      required: false,
+                      attributes: [
+                        "id",
+                        "question",
+                        "optionA",
+                        "optionB",
+                        "optionC",
+                        "optionD",
+                        "answer",
+                        "keywords",
+                        "caseStudy",
+                        "sessionNumber"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+
+    return ReS(res, { success: true, data: domains }, 200);
+  } catch (error) {
+    console.error("Fetch Full Course Structure Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.fetchFullCourseStructure = fetchFullCourseStructure;
+
 // ✅ Evaluate MCQs for a specific course + course preview + day
 
 const evaluateSessionMCQ = async (req, res) => {
