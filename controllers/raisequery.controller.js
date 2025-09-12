@@ -104,10 +104,10 @@ var fetchRaiseQueriesByUser = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
 
     try {
-        // Fetch all queries for this user + include User info
+        // Fetch all queries for this user + include linked User info
         const queries = await model.RaiseQuery.findAll({
             where: { userId, isDeleted: false },
-            order: [["updatedAt", "DESC"]],
+            order: [["createdAt", "ASC"]], // or DESC if you want latest first
             include: [
                 {
                     model: model.User,
@@ -118,7 +118,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
 
         const queryCount = queries.length;
 
-        // Update queryCount in DB for all this user's RaiseQuery rows
+        // Update queryCount for all queries of this user
         await model.RaiseQuery.update(
             { queryCount },
             { where: { userId, isDeleted: false } }
@@ -129,7 +129,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
             const plainQ = q.toJSON();
             return {
                 ...plainQ,
-                queryCount, // latest total queries
+                queryCount, // ensure latest total count
                 queryDate: plainQ.createdAt,
                 userDetails: {
                     id: plainQ.User?.id || null,
