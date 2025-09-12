@@ -78,11 +78,14 @@ const generateOfferLetter = async (userId) => {
       loadImage(watermarkUrl)
     ]);
 
-    // Watermark (center, faded)
+    // Watermark + Stamp in center
     if (watermarkBuffer) {
       doc.save();
       doc.opacity(0.07).image(watermarkBuffer, 150, 250, { width: 300 });
       doc.restore();
+    }
+    if (stampBuffer) {
+      doc.image(stampBuffer, 260, 300, { width: 120 });
     }
 
     // Header bar + logo
@@ -133,14 +136,13 @@ const generateOfferLetter = async (userId) => {
     );
     doc.moveDown(2);
 
-    // Signature + stamp
+    // Signature only (stamp is already on watermark)
     doc.text("Thank you!", { align: "left" });
     doc.text("Yours Sincerely,", { align: "left" });
     doc.text("Eduroom", { align: "left" });
     doc.moveDown(2);
 
     if (signatureBuffer) doc.image(signatureBuffer, 60, doc.y, { width: 100 });
-    if (stampBuffer) doc.image(stampBuffer, 300, doc.y - 20, { width: 120 });
 
     doc.moveDown(5);
     doc.text("Mrs. Pooja Shedge", { align: "left" });
