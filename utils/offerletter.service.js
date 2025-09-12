@@ -43,8 +43,19 @@ const generateOfferLetter = async (userId) => {
       <style>
         body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; position: relative; }
 
+        /* Top green bar */
+        .topbar {
+          background:#009688;
+          color:white;
+          padding:10px 30px;
+          font-size:11px;
+          line-height:1.5;
+          display:flex;
+          justify-content:space-between;
+        }
+
         /* Header */
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; }
+        .header { display:flex; justify-content:space-between; align-items:center; margin:40px 0; }
         .logo { width:150px; }
         .date { font-size:13px; }
 
@@ -93,6 +104,18 @@ const generateOfferLetter = async (userId) => {
       </style>
     </head>
     <body>
+      <!-- Top Green Bar -->
+      <div class="topbar">
+        <div>
+          FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001<br/>
+          CIN: U62099PN2025PTC245778
+        </div>
+        <div style="text-align:right;">
+          Fundsroom HQ, 804 Nucleus Mall, Pune-411001<br/>
+          connect@eduroom.in · www.eduroom.in
+        </div>
+      </div>
+
       <!-- watermark -->
       <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
 
@@ -160,7 +183,7 @@ const generateOfferLetter = async (userId) => {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
-    margin: { top: "60px", bottom: "140px", left: "50px", right: "50px" }
+    margin: { top: "100px", bottom: "140px", left: "50px", right: "50px" }
   });
 
   await browser.close();
