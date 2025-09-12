@@ -854,7 +854,6 @@ const getReferralPaymentStatus = async (req, res) => {
     // 1) Split numeric (likely local DB id) vs external (string) ids
     const numericIndexToLocalId = new Map();
     const externalValues = new Set();
-    const indexByExternal = {};
 
     regUsers.forEach((u, idx) => {
       const ext = pickExternalId(u);
@@ -865,12 +864,10 @@ const getReferralPaymentStatus = async (req, res) => {
         numericIndexToLocalId.set(idx, parseInt(sExt, 10));
       } else {
         externalValues.add(sExt);
-        indexByExternal[sExt] = indexByExternal[sExt] || [];
-        indexByExternal[sExt].push(idx);
       }
     });
 
-    // 2) Try to resolve external ids to local User.id by checking common columns
+    // 2) Try to resolve external ids to local User.id
     const externalList = [...externalValues];
     const localIdByExternal = {};
 
@@ -899,76 +896,53 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     }
 
-    // 3) Build a set of all local user IDs we can query RaiseQuery with
+    // 3) Build candidate IDs for RaiseQuery search
     const candidateLocalIds = new Set();
     for (const lid of numericIndexToLocalId.values()) candidateLocalIds.add(lid);
     for (const lid of Object.values(localIdByExternal)) candidateLocalIds.add(lid);
 
-    let raiseQueries = [];
-    if (candidateLocalIds.size > 0) {
-      const possibleRQCols = [
-        'userId',
-        'fundsAuditUserId',
-        'fundsPaidUserId',
-        'funds_audit_user_id',
-        'fund_audit_user_id',
-        'referredUserId',
-        'referred_user_id',
-        'user_id'
-      ];
-      const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
-      const matchedRQCols = possibleRQCols.filter(c => rqAttrs.includes(c));
-      if (matchedRQCols.length === 0 && rqAttrs.includes('userId')) matchedRQCols.push('userId');
-      if (matchedRQCols.length === 0) matchedRQCols.push('userId');
+    const candidateExternalIds = externalList; // external IDs to match against fundsAuditUserId
 
-      const whereClause = {
-        [Op.or]: matchedRQCols.map(col => ({ [col]: { [Op.in]: [...candidateLocalIds] } }))
-      };
+    let raiseQueries = [];
+    if (candidateLocalIds.size > 0 || candidateExternalIds.length > 0) {
+      const rqAttrs = Object.keys(model.RaiseQuery.rawAttributes || {});
+
+      const whereClause = { [Op.or]: [] };
+
+      if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
+        whereClause[Op.or].push({ userId: { [Op.in]: [...candidateLocalIds] } });
+      }
+
+      if (rqAttrs.includes("fundsAuditUserId") && candidateExternalIds.length > 0) {
+        whereClause[Op.or].push({ fundsAuditUserId: { [Op.in]: candidateExternalIds } });
+      }
 
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
-        attributes: ['id', 'queryStatus', 'isQueryRaised', 'createdAt', ...matchedRQCols],
-        order: [['createdAt', 'DESC']],
+        attributes: ["id", "queryStatus", "isQueryRaised", "createdAt", "userId", "fundsAuditUserId"],
+        order: [["createdAt", "DESC"]],
         raw: true,
       });
     }
 
-    // 4) Map latest RaiseQuery per user
-    const getCandidateLocalIdForIndex = (idx) => {
-      if (numericIndexToLocalId.has(idx)) return numericIndexToLocalId.get(idx);
-      const ext = pickExternalId(regUsers[idx]);
-      if (ext && localIdByExternal[String(ext)]) return localIdByExternal[String(ext)];
-      return null;
-    };
-
-    const latestRQByLocalId = {};
-    if (raiseQueries.length > 0) {
-      const rqCols = Object.keys(raiseQueries[0]).filter(k => k !== 'id' && k !== 'queryStatus' && k !== 'createdAt');
-      for (const rq of raiseQueries) {
-        for (const col of rqCols) {
-          const colVal = rq[col];
-          if (colVal == null) continue;
-          const key = String(colVal);
-          if (!latestRQByLocalId[key]) {
-            latestRQByLocalId[key] = rq;
-          }
-        }
-      }
-    }
-
-    // 5) Attach statuses
+    // 4) Attach RaiseQuery info to registered users
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
-      const localId = getCandidateLocalIdForIndex(idx);
 
+      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
+      const extId = pickExternalId(u);
+
+      let rq = null;
       if (localId != null) {
-        const rq = latestRQByLocalId[String(localId)];
-        cloned.queryStatus = rq ? rq.queryStatus : null;
-        cloned.isQueryRaised = rq ? rq.isQueryRaised : false; // ✅ added field
-      } else {
-        cloned.queryStatus = null;
-        cloned.isQueryRaised = false;
+        rq = raiseQueries.find(r => String(r.userId) === String(localId));
       }
+      if (!rq && extId) {
+        rq = raiseQueries.find(r => String(r.fundsAuditUserId) === String(extId));
+      }
+
+      cloned.queryStatus = rq ? rq.queryStatus : null;
+      cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
+
       return cloned;
     });
 
