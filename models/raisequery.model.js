@@ -5,7 +5,7 @@ module.exports = (sequelize, Sequelize) => {
     {
       id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
       userId: { type: Sequelize.BIGINT, allowNull: false }, // reference to user
-      fundsAuditUserId: { type: Sequelize.BIGINT, allowNull: true }, // user assigned for funds audit
+      fundsAuditUserId: { type: Sequelize.STRING, allowNull: true }, // user assigned for funds audit
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       queryStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., Active, Completed, Pending
       first_name: { type: Sequelize.STRING, allowNull: true }, // store user's first name
