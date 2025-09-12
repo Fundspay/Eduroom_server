@@ -24,14 +24,17 @@ var addRaiseQuery = async (req, res) => {
         });
         if (!user) return ReE(res, "User not found", 404);
 
+        // Default queryStatus to "Pending" if not provided
+        const finalQueryStatus = queryStatus || "Pending";
+
         const raiseQuery = await model.RaiseQuery.create({
             userId,
             fundsAuditUserId,
             first_name: first_name || user.firstName,
             last_name: last_name || user.lastName,
             phone_number: phone_number || user.phoneNumber,
-            isQueryRaised: true, // mark as raised
-            queryStatus: queryStatus || null
+            isQueryRaised: true,         // always true
+            queryStatus: finalQueryStatus // default to "Pending" if not provided
         });
 
         return ReS(res, { success: true, query: raiseQuery }, 201);
