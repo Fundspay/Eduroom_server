@@ -6,7 +6,7 @@ const raisequeryController = require("../controllers/raisequery.controller");
 router.post("/add", raisequeryController.addRaiseQuery);
 router.get("/list", raisequeryController.fetchAllRaiseQueries);
 router.get("/list/:userId", raisequeryController.fetchRaiseQueriesByUser);
-router.get("/list/:id", raisequeryController.fetchSingleRaiseQuery);
+router.get("/list/:id", raisequeryController.fetchRaiseQueriesByUser);
 router.put("/update/:userId", raisequeryController.updateRaiseQueryByUser);
 
 module.exports = router;
