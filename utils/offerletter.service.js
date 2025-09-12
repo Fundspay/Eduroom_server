@@ -46,7 +46,7 @@ const generateOfferLetter = async (userId) => {
         /* Top green bar (empty, same as footer) */
         .topbar {
           background:#009688;
-          height: 30px;
+          padding:15px 30px;
           width: 100%;
           margin-bottom: 20px;
         }
@@ -63,15 +63,16 @@ const generateOfferLetter = async (userId) => {
         p { margin: 8px 0; text-align: justify; }
 
         /* Signature + stamp */
-        .signature { margin-top:60px; position: relative; }
-        .signature img { width:120px; }
-        .stamp {
-          position:absolute;
-          right:120px;
-          bottom: -10px;   /* aligned with signature baseline */
-          width:120px;
-          opacity:0.9;
+        .signature {
+          margin-top:60px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
         }
+        .signature-left { text-align: left; }
+        .signature-left img { width:120px; display:block; }
+        .signature-left span { display:block; margin-top:5px; }
+        .stamp { width:120px; opacity:0.9; }
 
         /* Watermark */
         .watermark {
@@ -140,8 +141,10 @@ const generateOfferLetter = async (userId) => {
 
       <!-- Signature + Stamp -->
       <div class="signature">
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/><br/>
-        Mrs. Pooja Shedge<br/>Branch Manager
+        <div class="signature-left">
+          <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/>
+          <span>Mrs. Pooja Shedge<br/>Branch Manager</span>
+        </div>
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
       </div>
 
