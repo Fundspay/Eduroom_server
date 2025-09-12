@@ -23,10 +23,10 @@ const generateOfferLetter = async (userId) => {
   const position = user.internshipProgram || "Intern";
   const startDate = user.preferredStartDate
     ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      })
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    })
     : "To Be Decided";
   const workLocation = user.residentialAddress || "Work from Home";
 
@@ -62,18 +62,22 @@ const generateOfferLetter = async (userId) => {
         /* Paragraphs */
         p { margin: 8px 0; text-align: justify; }
 
-        /* Signature + stamp */
         .signature {
-          margin-top:60px;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
-        .signature-left { text-align: left; }
-        .signature-left img { width:120px; display:block; }
-        .signature-left span { display:block; margin-top:5px; }
-        .stamp { width:120px; opacity:0.9; }
+  margin-top: 30px;
+  margin-bottom: 60px;  /* keeps block above footer */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
+.signature-left { text-align: left; }
+.signature-left img { width:120px; display:block; }
+.signature-left span { display:block; margin-top:5px; }
+
+.stamp {
+  width: 100px;   /* reduced from 120px */
+  opacity: 0.9;
+}
         /* Watermark */
         .watermark {
           position: fixed;
