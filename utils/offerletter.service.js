@@ -20,79 +20,142 @@ const generateOfferLetter = async (userId) => {
   if (!user) throw new Error("User not found");
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
-  const position = user.internshipProgram || "Intern";
-  const startDate = user.preferredStartDate
-    ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
+
+  // 2. Get Start Date
+  const startDateRaw = user.preferredStartDate;
+  const startDate = startDateRaw
+    ? new Date(startDateRaw).toLocaleDateString("en-GB", {
         day: "numeric",
         month: "long",
-        year: "numeric"
+        year: "numeric",
       })
     : "To Be Decided";
-  const workLocation = user.residentialAddress || "Work from Home";
+
+  // 3. Find matching courseId from courseDates JSON
+  let courseName = "Intern"; // default
+  if (startDateRaw && user.courseDates) {
+    const entry = Object.entries(user.courseDates).find(
+      ([courseId, date]) =>
+        new Date(date).toISOString().split("T")[0] === startDateRaw
+    );
+
+    if (entry) {
+      const [courseId] = entry;
+
+      // 4. Fetch Course Name
+      const course = await model.Course.findOne({
+        where: { id: courseId },
+      });
+      if (course) {
+        courseName = course.name;
+      }
+    }
+  }
+
+  const workLocation =  "Work from Home";
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
-    year: "numeric"
+    year: "numeric",
   });
-
-  // 2. Build HTML template
+  // 2. Build HTML Template
   const html = `
   <html>
     <head>
       <style>
-        body { font-family: Arial, sans-serif; margin: 60px; font-size: 12px; line-height: 1.6; position: relative; }
-        .header { display:flex; justify-content:space-between; align-items:center; }
-        .logo { width:140px; }
-        .date { font-size:12px; }
-        .title { text-align:center; font-weight:bold; font-size:16px; margin:40px 0 20px 0; text-decoration: underline; }
-        p { text-align: justify; margin: 8px 0; }
-        .footer {
-          background:#009688; color:white; padding:10px 30px;
-          position:fixed; bottom:0; left:0; right:0;
-          font-size:10px; line-height:1.5;
-          display:flex; justify-content:space-between;
+        body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; position: relative; }
+
+        /* Top green bar (empty, same as footer) */
+        .topbar {
+          background:#009688;
+          padding:15px 30px;
+          width: 100%;
+          margin-bottom: 20px;
         }
-        .stamp { position:absolute; bottom:160px; right:100px; opacity:0.9; width:120px; }
-        .signature { margin-top:60px; }
-        .signature img { width:100px; }
+
+        /* Header */
+        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; }
+        .logo { width:150px; }
+        .date { font-size:13px; }
+
+        /* Title */
+        .title { text-align:center; font-weight:bold; font-size:15px; margin:30px 0 20px 0; text-decoration: underline; }
+
+        /* Paragraphs */
+        p { margin: 8px 0; text-align: justify; }
+
+        .signature {
+  margin-top: 30px;
+  margin-bottom: 60px;  /* keeps block above footer */
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.signature-left { text-align: left; }
+.signature-left img { width:120px; display:block; }
+.signature-left span { display:block; margin-top:5px; }
+
+.stamp {
+  width: 100px;   /* reduced from 120px */
+  opacity: 0.9;
+}
+        /* Watermark */
         .watermark {
           position: fixed;
-          top: 200px;
+          top: 280px;
           left: 50%;
           transform: translateX(-50%);
-          opacity: 0.05;
+          opacity: 0.06;
+          width: 400px;
           z-index: -1;
-          width: 300px;
+        }
+
+        /* Footer strip */
+        .footer {
+          background:#009688;
+          color:white;
+          padding:15px 30px;
+          font-size:11px;
+          line-height:1.5;
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          display:flex;
+          justify-content:space-between;
         }
       </style>
     </head>
     <body>
+      <!-- Top green bar -->
+      <div class="topbar"></div>
+
       <!-- watermark -->
       <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
 
+      <!-- header -->
       <div class="header">
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.jpg" class="logo"/>
         <div class="date">Date: ${today}</div>
       </div>
 
+      <!-- Title -->
       <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
       <p>Dear ${candidateName},</p>
       <p>
         Congratulations! We are pleased to confirm that you have been selected
-        for the role of <b>${position}</b> at Eduroom. We believe that your skills,
+        for the role of <b>${courseName}</b> at Eduroom. We believe that your skills,
         experience, and qualifications make you an excellent fit for this role.
       </p>
 
       <p><b>Starting Date:</b> ${startDate}</p>
-      <p><b>Position:</b> ${position}</p>
+      <p><b>Position:</b>  ${courseName}</p>
       <p><b>Work Location:</b> ${workLocation}</p>
 
-      <p>
-        Benefits for the position include Certification of Internship and LOA
-        (performance-based).
-      </p>
+      <p>Benefits for the position include Certification of Internship and LOA (performance-based).</p>
 
       <p>
         We eagerly anticipate welcoming you to our team and embarking on this journey together.
@@ -103,13 +166,16 @@ const generateOfferLetter = async (userId) => {
 
       <p>Thank you!<br/>Yours sincerely,<br/>Eduroom</p>
 
+      <!-- Signature + Stamp -->
       <div class="signature">
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/><br/>
-        Mrs. Pooja Shedge<br/>Branch Manager
+        <div class="signature-left">
+          <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/>
+          <span>Mrs. Pooja Shedge<br/>Branch Manager</span>
+        </div>
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
       </div>
 
-      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
-
+      <!-- Footer strip -->
       <div class="footer">
         <div>
           FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001<br/>
@@ -135,7 +201,7 @@ const generateOfferLetter = async (userId) => {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
-    margin: { top: "60px", bottom: "120px", left: "50px", right: "50px" }
+    margin: { top: "60px", bottom: "140px", left: "50px", right: "50px" }
   });
 
   await browser.close();
