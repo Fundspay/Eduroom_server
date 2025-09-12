@@ -43,6 +43,14 @@ const generateOfferLetter = async (userId) => {
       <style>
         body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; position: relative; }
 
+        /* Top green bar (empty, same as footer) */
+        .topbar {
+          background:#009688;
+          height: 30px;
+          width: 100%;
+          margin-bottom: 20px;
+        }
+
         /* Header */
         .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; }
         .logo { width:150px; }
@@ -93,19 +101,12 @@ const generateOfferLetter = async (userId) => {
       </style>
     </head>
     <body>
+      <!-- Top green bar -->
+      <div class="topbar"></div>
+
       <!-- watermark -->
       <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
-  
 
-      <!-- Footer strip -->
-      <div class="footer">
-        <div>
-          
-        </div>
-        <div style="text-align:right;">
-          
-        </div>
-      </div>
       <!-- header -->
       <div class="header">
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.jpg" class="logo"/>
