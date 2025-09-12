@@ -936,7 +936,7 @@ const getReferralPaymentStatus = async (req, res) => {
       // Grab recent RaiseQuery rows (we'll pick latest per user later)
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
-        attributes: ['id', 'queryStatus', 'createdAt', ...matchedRQCols],
+        attributes: ['id', 'queryStatus', 'isQueryRaised', 'createdAt', ...matchedRQCols],
         order: [['createdAt', 'DESC']],
         raw: true,
       });
