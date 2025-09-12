@@ -143,7 +143,6 @@ const getCoursePreviewId = async (req, res) => {
 module.exports.getCoursePreviewId = getCoursePreviewId;
 
 
-// ✅ Fetch single CoursePreview by ID
 var fetchSingleCoursePreview = async (req, res) => {
     const { id } = req.params;
     if (!id) return ReE(res, "CoursePreview ID is required", 400);
@@ -156,13 +155,16 @@ var fetchSingleCoursePreview = async (req, res) => {
             ]
         });
         if (!preview) return ReE(res, "CoursePreview not found", 404);
-        return ReS(res, preview, 200);
+
+        // Convert to plain object
+        const plainPreview = preview.toJSON();
+
+        return ReS(res, plainPreview, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
 module.exports.fetchSingleCoursePreview = fetchSingleCoursePreview;
-
 // ✅ Update CoursePreview
 var updateCoursePreview = async (req, res) => {
     try {
