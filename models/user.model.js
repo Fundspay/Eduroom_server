@@ -121,13 +121,11 @@ module.exports = (sequelize, Sequelize) => {
     });
     User.hasMany(models.OfferLetter, {
       foreignKey: "userId",
-      as: "OfferLetters",
       onDelete: "CASCADE",
       onUpdate: "CASCADE"
     });
     User.hasMany(models.InternshipCertificate, {
       foreignKey: "userId",
-      as: "InternshipCertificates",
       onDelete: "CASCADE",
       onUpdate: "CASCADE"
     });
