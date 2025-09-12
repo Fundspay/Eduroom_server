@@ -119,6 +119,12 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "SET NULL",
       onUpdate: "CASCADE"
     });
+    User.hasMany(models.OfferLetter, {
+      foreignKey: "userId",
+      as: "OfferLetters",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE"
+    });
   };
 
   return User;
