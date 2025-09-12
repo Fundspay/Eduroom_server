@@ -693,9 +693,18 @@ const fetchSingleUserById = async (req, res) => {
             return ReE(res, "Missing user ID", 400);
         }
 
-        const user = await model.User.findByPk(id);
+        const user = await model.User.findOne({
+            where: { id, isDeleted: false },
+            include: [
+                {
+                    model: model.TeamManager,
+                    as: "teamManager",
+                    attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+                }
+            ]
+        });
 
-        if (!user || user.isDeleted) {
+        if (!user) {
             return ReE(res, "User not found", 404);
         }
 
@@ -737,7 +746,8 @@ const fetchSingleUserById = async (req, res) => {
             ReferralLink: userData.referralLink,
             ProfileCompletion: profileCompletion,
             TotalSubscriptions: totalSubscriptions,
-            InternshipStatus: userData.internshipStatus || null
+            InternshipStatus: userData.internshipStatus || null,
+            TeamManager: userData.teamManager || null
         };
 
         return ReS(res, { success: true, data: filteredData }, 200);
