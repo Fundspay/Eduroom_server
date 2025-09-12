@@ -113,7 +113,7 @@ var fetchAllCoursePreviews = async (req, res) => {
 };
 module.exports.fetchAllCoursePreviews = fetchAllCoursePreviews;
 
-// ✅ Get full CoursePreview by domainId + courseId
+// ✅ Get CoursePreviewId by domainId + courseId
 const getCoursePreviewId = async (req, res) => {
     try {
         const { domainId, courseId } = req.query;
@@ -122,18 +122,13 @@ const getCoursePreviewId = async (req, res) => {
             return ReE(res, "domainId and courseId are required", 400);
         }
 
-        // Fetch full preview details
         const preview = await model.CoursePreview.findOne({
             where: {
                 domainId: parseInt(domainId, 10),
                 courseId: parseInt(courseId, 10),
                 isDeleted: false
             },
-            // No attributes filter, fetch all fields
-            include: [
-                { model: model.Course, attributes: ["name"] },
-                { model: model.Domain, attributes: ["name"] }
-            ]
+            attributes: [["id", "coursePreviewId"]] // alias id
         });
 
         if (!preview) return ReE(res, "CoursePreview not found", 404);
@@ -146,7 +141,6 @@ const getCoursePreviewId = async (req, res) => {
 };
 
 module.exports.getCoursePreviewId = getCoursePreviewId;
-
 
 
 // ✅ Fetch single CoursePreview by ID
