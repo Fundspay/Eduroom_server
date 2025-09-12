@@ -65,80 +65,87 @@ module.exports = { sendOfferLetter };
 
 const listAllUsers = async (req, res) => {
   try {
-    const users = await User.findAll({
+    // Fetch all users with associations
+    const users = await model.User.findAll({
+      where: { isDeleted: false },
       include: [
         {
-          model: TeamManager,
+          model: model.TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "position", "internshipStatus"]
+          attributes: ["internshipStatus", "name", "email"],
         },
         {
-          model: InternshipCertificate,
-          attributes: ["id", "courseId", "isIssued", "certificateUrl", "issuedDate"]
+          model: model.InternshipCertificate,
+          attributes: ["isIssued", "courseId"],
         },
         {
-          model: OfferLetter,
-          attributes: ["id", "issent", "startDate", "fileUrl", "position"]
-        }
-      ]
+          model: model.OfferLetter,
+          attributes: ["issent", "fileUrl"],
+        },
+      ],
     });
 
-    const response = [];
+    const userData = [];
 
-    for (let user of users) {
-      let courseStatusInfo = null;
-      let selectedCourseId = null;
-      let selectedCourseName = null;
-      let internshipIssued = null;
+    for (const user of users) {
+      const courseDates = user.courseDates || {};
+      const courseStatuses = user.courseStatuses || {};
 
-      // 🔹 Check Internship Certificate first
-      if (user.InternshipCertificates && user.InternshipCertificates.length > 0) {
-        const cert = user.InternshipCertificates[0]; // take first (or latest if you want)
-        selectedCourseId = cert.courseId;
-        internshipIssued = cert.isIssued;
-        const course = await Course.findByPk(cert.courseId, { attributes: ["id", "name"] });
-        selectedCourseName = course ? course.name : null;
-        courseStatusInfo = { from: "internship", status: cert.isIssued ? "completed" : "pending" };
-      } else {
-        // 🔹 Check User courseStatuses JSON
-        if (user.courseStatuses && Object.keys(user.courseStatuses).length > 0) {
-          for (let [courseId, status] of Object.entries(user.courseStatuses)) {
-            selectedCourseId = courseId;
-            const course = await Course.findByPk(courseId, { attributes: ["id", "name"] });
-            selectedCourseName = course ? course.name : null;
-            courseStatusInfo = { from: "userCourseStatus", status };
-            break; // take first found
-          }
-        } else {
-          // 🔹 Fallback: if isStarted true (fake info)
-          if (user.isStarted) {
-            courseStatusInfo = { from: "userStarted", status: "started" };
-          }
+      const coursesInfo = [];
+
+      // Loop through all courses stored in user.courseDates
+      for (const courseId of Object.keys(courseDates)) {
+        const course = await model.Course.findByPk(courseId);
+        if (!course) continue;
+
+        const { startDate, endDate, started } = courseDates[courseId];
+        let status = null;
+
+        // 🔹 Status Priority
+        if (user.teamManager?.internshipStatus) {
+          status = { from: "teamManager", status: user.teamManager.internshipStatus };
+        } else if (courseStatuses[courseId]) {
+          status = { from: "userCourseStatus", status: courseStatuses[courseId] };
+        } else if (started) {
+          status = { from: "userCourseDates", status: "Started" };
         }
+
+        coursesInfo.push({
+          courseId: course.id,
+          courseName: course.name,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          courseStatus: status,
+        });
       }
 
-      // 🔹 Build user response
-      response.push({
+      // Internship issued?
+      const internshipIssued =
+        user.InternshipCertificates?.length > 0
+          ? user.InternshipCertificates.some((cert) => cert.isIssued)
+          : null;
+
+      // Offer letter
+      const offerLetter = user.OfferLetters?.[0] || null;
+
+      userData.push({
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
-        courseId: selectedCourseId,
-        courseName: selectedCourseName,
-        courseStatus: courseStatusInfo,
-        internshipIssued, // ✅ internship certificate issued or not
-        internshipStatus: user.teamManager ? user.teamManager.internshipStatus : null,
-        offerLetterSent: user.OfferLetters?.length > 0 ? user.OfferLetters[0].issent : false,
-        offerLetterFile: user.OfferLetters?.length > 0 ? user.OfferLetters[0].fileUrl : null
+        courses: coursesInfo, // 🔹 Array of courses
+        internshipIssued,
+        internshipStatus: user.teamManager?.internshipStatus || null,
+        offerLetterSent: offerLetter ? offerLetter.issent : false,
+        offerLetterFile: offerLetter ? offerLetter.fileUrl : null,
       });
     }
 
-    return res.status(200).json({ success: true, data: response });
+    return ReS(res, { success: true, data: userData }, 200);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: error.message });
+    console.error("List All Users Error:", error);
+    return ReE(res, error.message, 500);
   }
 };
 
 module.exports.listAllUsers = listAllUsers;
-
