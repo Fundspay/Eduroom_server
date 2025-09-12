@@ -22,7 +22,8 @@ const generateOfferLetter = async (userId) => {
     });
     if (!user) throw new Error("User not found");
 
-    const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
+    const candidateName =
+      user.fullName || `${user.firstName} ${user.lastName}`;
     const position = user.internshipProgram || "Intern";
     const startDate = user.preferredStartDate
       ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
@@ -61,7 +62,7 @@ const generateOfferLetter = async (userId) => {
     const watermarkUrl =
       "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png";
 
-    let logoBuffer, stampBuffer, signatureBuffer, watermarkBuffer;
+    // Helper: load images
     const loadImage = async (url) => {
       try {
         const res = await axios.get(url, { responseType: "arraybuffer" });
@@ -71,27 +72,29 @@ const generateOfferLetter = async (userId) => {
         return null;
       }
     };
-    [logoBuffer, stampBuffer, signatureBuffer, watermarkBuffer] = await Promise.all([
-      loadImage(logoUrl),
-      loadImage(stampUrl),
-      loadImage(signatureUrl),
-      loadImage(watermarkUrl)
-    ]);
 
-    // Watermark + Stamp in center
+    const [logoBuffer, stampBuffer, signatureBuffer, watermarkBuffer] =
+      await Promise.all([
+        loadImage(logoUrl),
+        loadImage(stampUrl),
+        loadImage(signatureUrl),
+        loadImage(watermarkUrl)
+      ]);
+
+    // --- Add watermark ---
     if (watermarkBuffer) {
       doc.save();
-      doc.opacity(0.07).image(watermarkBuffer, 150, 250, { width: 300 });
-      doc.restore();
-    }
-    if (stampBuffer) {
-      doc.image(stampBuffer, 260, 300, { width: 120 });
+      doc.opacity(0.05).image(watermarkBuffer, 150, 220, { width: 300 });
+      doc.opacity(1).restore();
     }
 
-    // Header bar + logo
-    doc.rect(0, 0, doc.page.width, 70).fill("#009688"); // teal bar
-    if (logoBuffer) doc.image(logoBuffer, 40, 15, { width: 120 });
-    doc.fillColor("black").moveDown(4);
+    // --- Add Eduroom Logo (top left) ---
+    if (logoBuffer) {
+      doc.image(logoBuffer, 40, 30, { width: 120 });
+    }
+
+    // Move below logo space
+    doc.moveDown(5);
 
     // Date
     const today = new Date();
@@ -104,13 +107,16 @@ const generateOfferLetter = async (userId) => {
     doc.moveDown(2);
 
     // Title
-    doc.fontSize(14).font("Helvetica-Bold").text("OFFER LETTER FOR INTERNSHIP", {
-      align: "center"
-    });
+    doc
+      .fontSize(14)
+      .text("OFFER LETTER FOR INTERNSHIP", {
+        align: "center",
+        underline: true
+      });
     doc.moveDown(2);
 
     // Body
-    doc.font("Helvetica").fontSize(11).text(`Dear ${candidateName},`);
+    doc.fontSize(11).text(`Dear ${candidateName},`);
     doc.moveDown(1);
 
     doc.text(
@@ -131,35 +137,56 @@ const generateOfferLetter = async (userId) => {
     doc.moveDown(1);
 
     doc.text(
-      "We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company's success.",
+      "We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company’s success.",
       { align: "justify" }
     );
     doc.moveDown(2);
 
-    // Signature only (stamp is already on watermark)
+    // Footer text
     doc.text("Thank you!", { align: "left" });
-    doc.text("Yours Sincerely,", { align: "left" });
-    doc.text("Eduroom", { align: "left" });
-    doc.moveDown(2);
+    doc.moveDown(1);
+    doc.text("Yours Sincerely", { align: "left" });
+    doc.moveDown(1);
+    doc.text("Eduroom");
 
-    if (signatureBuffer) doc.image(signatureBuffer, 60, doc.y, { width: 100 });
+    // --- Signature ---
+    if (signatureBuffer) {
+      doc.image(signatureBuffer, 40, doc.y + 10, { width: 100 });
+    }
+    doc.moveDown(4);
 
-    doc.moveDown(5);
     doc.text("Mrs. Pooja Shedge", { align: "left" });
-    doc.text("Branch Manager", { align: "left" });
+    doc.text("Branch Manager");
+    doc.moveDown(1);
 
-    // Footer bar
-    const footerY = doc.page.height - 100;
-    doc.rect(0, footerY, doc.page.width, 70).fill("#009688");
-    doc.fillColor("white").fontSize(9);
-    doc.text("FUNDSROOM", 50, footerY + 10);
-    doc.text("Reg: Fundsroom Infotech Pvt Ltd, Pune-411001", 50, footerY + 25);
-    doc.text("CIN: U62099PN2025PTC245778", 50, footerY + 40);
-    doc.text("Fundsroom HQ, 804 Nucleus Mall, Pune-411001", 300, footerY + 10);
-    doc.text("connect@eduroom.in", 300, footerY + 25);
-    doc.text("www.eduroom.in", 300, footerY + 40);
+    // --- Stamp ---
+    if (stampBuffer) {
+      doc.image(stampBuffer, 350, doc.y - 80, { width: 120 });
+    }
 
-    // Finish PDF
+    // --- Footer strip ---
+    doc.moveDown(4);
+    doc
+      .fontSize(9)
+      .fillColor("white")
+      .rect(0, doc.page.height - 60, doc.page.width, 60)
+      .fill("#009688"); // green strip
+
+    doc.fillColor("white").text(
+      "FUNDSROOM\nReg: Fundsroom Infotech Pvt Ltd, Pune-411001\nCIN: U62099PN2025PTC245778",
+      40,
+      doc.page.height - 55,
+      { align: "left" }
+    );
+
+    doc.fillColor("white").text(
+      "Fundsroom HQ, 804 Nucleus Mall, Pune-411001\nconnect@eduroom.in\nwww.eduroom.in",
+      300,
+      doc.page.height - 55,
+      { align: "right" }
+    );
+
+    // Finalize PDF
     doc.end();
     const s3Result = await s3Upload;
 
