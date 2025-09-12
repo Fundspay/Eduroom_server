@@ -83,10 +83,16 @@ const listAllUsers = async (req, res) => {
       ]
     });
 
-    // fetch all courses with domain once
+    // Fetch all courses with domain once
     const courses = await Course.findAll({
       attributes: ["id", "name", "duration", "businessTarget", "domainId"],
       include: [{ model: Domain, attributes: ["id", "name"] }]
+    });
+
+    // Fetch all Team Managers for the response
+    const allTeamManagers = await TeamManager.findAll({
+      where: { isDeleted: false },
+      attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
     });
 
     const response = [];
@@ -117,13 +123,13 @@ const listAllUsers = async (req, res) => {
         }
       }
 
-      // ✅ Internship info
+      // Internship info
       const internshipIssued =
         user.InternshipCertificates && user.InternshipCertificates.length > 0
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      // ✅ Team Manager info
+      // Team Manager info
       const teamManager = user.teamManager
         ? {
             id: user.teamManager.id,
@@ -136,7 +142,7 @@ const listAllUsers = async (req, res) => {
           }
         : null;
 
-      // ✅ Offer Letter info
+      // Offer Letter info
       const offerLetterSent =
         user.OfferLetters && user.OfferLetters.length > 0
           ? user.OfferLetters[0].issent
@@ -160,11 +166,19 @@ const listAllUsers = async (req, res) => {
         internshipStatus: teamManager ? teamManager.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager // 👈 returning full team manager details
+        teamManager // returning full team manager details
       });
     }
 
-    return ReS(res, { success: true, data: response }, 200);
+    return ReS(res, {
+      success: true,
+      data: response,
+      teamManagers: {
+        total: allTeamManagers.length,
+        list: allTeamManagers
+      }
+    }, 200);
+
   } catch (err) {
     console.error("Error in listAllUsers:", err);
     return ReE(res, err.message, 500);
