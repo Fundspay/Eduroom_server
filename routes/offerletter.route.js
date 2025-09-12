@@ -6,5 +6,6 @@ const offerletterController = require("../controllers/offerletter.conotroller");
 
 // ✅ Offer Letter Routes
 router.post("/send/:userId", offerletterController.sendOfferLetter);
+router.get("/users/all", offerletterController.listAllUsers);
 
 module.exports = router;
