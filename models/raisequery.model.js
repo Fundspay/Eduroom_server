@@ -11,6 +11,7 @@ module.exports = (sequelize, Sequelize) => {
       first_name: { type: Sequelize.STRING, allowNull: true }, // store user's first name
       last_name: { type: Sequelize.STRING, allowNull: true },  // store user's last name
       phone_number: { type: Sequelize.STRING, allowNull: true },
+      email: { type: Sequelize.STRING, allowNull: true },
       queryCount: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
