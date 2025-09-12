@@ -20,22 +20,45 @@ const generateOfferLetter = async (userId) => {
   if (!user) throw new Error("User not found");
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
-  const position = user.internshipProgram || "Intern";
-  const startDate = user.preferredStartDate
-    ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    })
+
+  // 2. Get Start Date
+  const startDateRaw = user.preferredStartDate;
+  const startDate = startDateRaw
+    ? new Date(startDateRaw).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
     : "To Be Decided";
-  const workLocation = user.residentialAddress || "Work from Home";
+
+  // 3. Find matching courseId from courseDates JSON
+  let courseName = "Intern"; // default
+  if (startDateRaw && user.courseDates) {
+    const entry = Object.entries(user.courseDates).find(
+      ([courseId, date]) =>
+        new Date(date).toISOString().split("T")[0] === startDateRaw
+    );
+
+    if (entry) {
+      const [courseId] = entry;
+
+      // 4. Fetch Course Name
+      const course = await model.Course.findOne({
+        where: { id: courseId },
+      });
+      if (course) {
+        courseName = course.name;
+      }
+    }
+  }
+
+  const workLocation =  "Work from Home";
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
-    year: "numeric"
+    year: "numeric",
   });
-
   // 2. Build HTML Template
   const html = `
   <html>
@@ -124,12 +147,12 @@ const generateOfferLetter = async (userId) => {
       <p>Dear ${candidateName},</p>
       <p>
         Congratulations! We are pleased to confirm that you have been selected
-        for the role of <b>${position}</b> at Eduroom. We believe that your skills,
+        for the role of <b>${courseName}</b> at Eduroom. We believe that your skills,
         experience, and qualifications make you an excellent fit for this role.
       </p>
 
       <p><b>Starting Date:</b> ${startDate}</p>
-      <p><b>Position:</b> ${position}</p>
+      <p><b>Position:</b>  ${courseName}</p>
       <p><b>Work Location:</b> ${workLocation}</p>
 
       <p>Benefits for the position include Certification of Internship and LOA (performance-based).</p>
