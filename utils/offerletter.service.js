@@ -1,8 +1,6 @@
 "use strict";
-const PDFDocument = require("pdfkit");
-const axios = require("axios");
 const AWS = require("aws-sdk");
-const { PassThrough } = require("stream");
+const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
 const model = require("../models");
 
@@ -13,190 +11,132 @@ const s3 = new AWS.S3({
 });
 
 const generateOfferLetter = async (userId) => {
-  try {
-    if (!userId) throw new Error("Missing userId");
+  if (!userId) throw new Error("Missing userId");
 
-    // --- Load User ---
-    const user = await model.User.findOne({
-      where: { id: userId, isDeleted: false }
-    });
-    if (!user) throw new Error("User not found");
+  // 1. Load user
+  const user = await model.User.findOne({
+    where: { id: userId, isDeleted: false }
+  });
+  if (!user) throw new Error("User not found");
 
-    const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
-    const position = user.internshipProgram || "Intern";
-    const startDate = user.preferredStartDate
-      ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
-          day: "numeric",
-          month: "long",
-          year: "numeric"
-        })
-      : "To Be Decided";
-    const workLocation = user.residentialAddress || "Work from Home";
-
-    // --- Metadata ---
-    const timestamp = Date.now();
-    const fileName = `offerletter-${timestamp}.pdf`;
-    const s3Key = `offerletters/${userId}/${fileName}`;
-
-    // --- PDF Stream ---
-    const doc = new PDFDocument({ margin: 50, size: "A4" });
-    const passStream = new PassThrough();
-    const s3Upload = s3
-      .upload({
-        Bucket: "fundsweb",
-        Key: s3Key,
-        Body: passStream,
-        ContentType: "application/pdf"
+  const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
+  const position = user.internshipProgram || "Intern";
+  const startDate = user.preferredStartDate
+    ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
       })
-      .promise();
-    doc.pipe(passStream);
+    : "To Be Decided";
+  const workLocation = user.residentialAddress || "Work from Home";
 
-    // --- Assets ---
-    const logoUrl =
-      "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.png";
-    const stampUrl =
-      "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.png";
-    const signatureUrl =
-      "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png";
-    const watermarkUrl =
-      "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png";
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
 
-    const loadImage = async (url) => {
-      try {
-        const res = await axios.get(url, { responseType: "arraybuffer" });
-        return res.data;
-      } catch (err) {
-        console.warn("Could not load image:", url, err.message);
-        return null;
-      }
-    };
+  // 2. Build HTML template
+  const html = `
+  <html>
+    <head>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 50px; font-size: 12px; line-height: 1.6; position: relative; }
+        .header { display:flex; justify-content:space-between; align-items:center; }
+        .logo { width:150px; }
+        .title { text-align:center; font-weight:bold; font-size:18px; margin:30px 0; text-decoration: underline; }
+        .footer {
+          background:#009688; color:white; padding:10px 30px;
+          position:fixed; bottom:0; left:0; right:0;
+          font-size:10px; line-height:1.4;
+        }
+        .stamp { position:absolute; bottom:150px; right:100px; opacity:0.85; width:120px; }
+        .signature { margin-top:50px; }
+        .signature img { width:120px; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.png" class="logo"/>
+        <div>Date: ${today}</div>
+      </div>
 
-    const [logoBuffer, stampBuffer, signatureBuffer, watermarkBuffer] =
-      await Promise.all([
-        loadImage(logoUrl),
-        loadImage(stampUrl),
-        loadImage(signatureUrl),
-        loadImage(watermarkUrl)
-      ]);
+      <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
-    // --- Watermark ---
-    if (watermarkBuffer) {
-      doc.save();
-      doc.opacity(0.05).image(watermarkBuffer, 150, 220, { width: 300 }).opacity(1);
-      doc.restore();
-    }
+      <p>Dear ${candidateName},</p>
+      <p>
+        Congratulations! We are pleased to confirm that you have been selected
+        for the role of <b>${position}</b> at Eduroom. We believe that your skills,
+        experience, and qualifications make you an excellent fit for this role.
+      </p>
 
-    // --- Logo ---
-    if (logoBuffer) {
-      doc.image(logoBuffer, 40, 30, { width: 120 });
-    }
+      <p><b>Starting Date:</b> ${startDate}</p>
+      <p><b>Position:</b> ${position}</p>
+      <p><b>Work Location:</b> ${workLocation}</p>
 
-    // --- Date (top-right) ---
-    const today = new Date();
-    const formattedDate = today.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
-    doc.fontSize(11).text(`Date: ${formattedDate}`, 400, 60);
+      <p>
+        Benefits for the position include Certification of Internship and LOA
+        (performance-based).
+      </p>
 
-    doc.moveDown(4);
+      <p>
+        We eagerly anticipate welcoming you to our team and embarking on this journey together.
+        Your talents and expertise will enrich our collaborative efforts as we work towards our
+        shared goals. We are excited about the opportunity to leverage your skills and contributions
+        to drive our company’s success.
+      </p>
 
-    // --- Title ---
-    doc.fontSize(16).text("OFFER LETTER FOR INTERNSHIP", {
-      align: "center",
-      underline: true
-    });
-    doc.moveDown(3);
+      <p>Thank you!<br/>Yours sincerely,<br/>Eduroom</p>
 
-    // --- Greeting ---
-    doc.fontSize(12).text(`Dear ${candidateName},`, { align: "left" });
-    doc.moveDown(1);
+      <div class="signature">
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/><br/>
+        Mrs. Pooja Shedge<br/>Branch Manager
+      </div>
 
-    // --- Body Content ---
-    doc.fontSize(11).text(
-      `Congratulations! We are pleased to confirm that you have been selected for the role of ${position} at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.`,
-      { align: "justify" }
-    );
-    doc.moveDown(1);
+      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.png" class="stamp"/>
 
-    doc.text(`Starting Date: ${startDate}`);
-    doc.text(`Position: ${position}`);
-    doc.text(`Work Location: ${workLocation}`);
-    doc.moveDown(1);
+      <div class="footer">
+        FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001 · CIN: U62099PN2025PTC245778<br/>
+        Fundsroom HQ, 804 Nucleus Mall, Pune-411001 · connect@eduroom.in · www.eduroom.in
+      </div>
+    </body>
+  </html>
+  `;
 
-    doc.text(
-      "Benefits for the position include Certification of Internship and LOA (performance-based).",
-      { align: "justify" }
-    );
-    doc.moveDown(1);
+  // 3. Generate PDF from HTML
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+  });
+  const page = await browser.newPage();
+  await page.setContent(html, { waitUntil: "networkidle0" });
 
-    doc.text(
-      "We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company’s success.",
-      { align: "justify" }
-    );
-    doc.moveDown(2);
+  const pdfBuffer = await page.pdf({
+    format: "A4",
+    printBackground: true,
+    margin: { top: "40px", bottom: "100px", left: "40px", right: "40px" }
+  });
 
-    // --- Closing ---
-    doc.text("Thank you!", { align: "left" });
-    doc.moveDown(1);
-    doc.text("Yours Sincerely,", { align: "left" });
-    doc.moveDown(1);
-    doc.text("Eduroom");
+  await browser.close();
 
-    // --- Signature ---
-    if (signatureBuffer) {
-      doc.image(signatureBuffer, 40, doc.y + 10, { width: 100 });
-    }
+  // 4. Upload to S3
+  const timestamp = Date.now();
+  const fileName = `offerletter-${timestamp}.pdf`;
+  const s3Key = `offerletters/${userId}/${fileName}`;
 
-    doc.moveDown(4);
-    doc.text("Mrs. Pooja Shedge", { align: "left" });
-    doc.text("Branch Manager");
-    doc.moveDown(1);
+  await s3
+    .putObject({
+      Bucket: "fundsweb",
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: "application/pdf"
+    })
+    .promise();
 
-    // --- Stamp ---
-    if (stampBuffer) {
-      doc.image(stampBuffer, 350, doc.y - 80, { width: 120 });
-    }
-
-    // --- Footer Strip ---
-    const footerHeight = 60;
-    doc.rect(0, doc.page.height - footerHeight, doc.page.width, footerHeight)
-      .fill("#009688");
-    doc.fillColor("white").fontSize(9);
-
-    doc.text(
-      "FUNDSROOM\nReg: Fundsroom Infotech Pvt Ltd, Pune-411001\nCIN: U62099PN2025PTC245778",
-      40,
-      doc.page.height - footerHeight + 10,
-      { align: "left" }
-    );
-
-    doc.text(
-      "Fundsroom HQ, 804 Nucleus Mall, Pune-411001\nconnect@eduroom.in\nwww.eduroom.in",
-      -40,
-      doc.page.height - footerHeight + 10,
-      { align: "right" }
-    );
-
-    // --- Finalize PDF ---
-    doc.end();
-    await s3Upload;
-
-    // --- Save Record ---
-    const offerLetter = await model.OfferLetter.create({
-      userId,
-      position,
-      startDate,
-      location: workLocation,
-      fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`
-    });
-
-    return offerLetter;
-  } catch (err) {
-    console.error("Error generating offer letter:", err);
-    throw err;
-  }
+  return {
+    fileName,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`
+  };
 };
 
 module.exports = { generateOfferLetter };
