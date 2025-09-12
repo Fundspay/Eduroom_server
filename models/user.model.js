@@ -125,6 +125,13 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "CASCADE",
       onUpdate: "CASCADE"
     });
+    User.hasMany(models.InternshipCertificate, {
+      foreignKey: "userId",
+      as: "InternshipCertificates",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE"
+    });
+
   };
 
   return User;
