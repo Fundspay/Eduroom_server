@@ -108,7 +108,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
       include: [
         {
           model: model.User,
-          attributes: ["id", "firstName", "lastName", "email", "phone"], // adjust to your User model fields
+          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"], // adjust to your User model fields
         },
       ],
     });
@@ -133,7 +133,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
           firstName: plainQ.User?.firstName || null,
           lastName: plainQ.User?.lastName || null,
           email: plainQ.User?.email || null,
-          phone: plainQ.User?.phone || null,
+          phoneNumber: plainQ.User?.phoneNumber || null,
         },
       };
     });
