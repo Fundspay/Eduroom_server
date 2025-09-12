@@ -835,32 +835,53 @@ const getReferralPaymentStatus = async (req, res) => {
     if (!user) return ReE(res, "User not found", 404);
 
     if (!user.referralCode) {
-      return ReS(res, {
-        success: true,
-        message: "User has no referral code",
-        data: null
-      }, 200);
+      return ReS(
+        res,
+        {
+          success: true,
+          message: "User has no referral code",
+          data: null,
+        },
+        200
+      );
     }
 
     // Call external Lambda
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
 
-    // Modify registered_users to add isDownloaded: true
+    // Modify registered_users
     let modifiedData = { ...apiResponse.data };
+
     if (modifiedData.registered_users && Array.isArray(modifiedData.registered_users)) {
-      modifiedData.registered_users = modifiedData.registered_users.map(u => ({
-        ...u,
-        isDownloaded: true
-      }));
+      // Map through registered users
+      modifiedData.registered_users = await Promise.all(
+        modifiedData.registered_users.map(async (u) => {
+          // Fetch queryStatus for this registered user
+          const raiseQuery = await model.RaiseQuery.findOne({
+            where: { userId: u.user_id }, // Assuming API returns user_id field
+            attributes: ["queryStatus"],
+            order: [["createdAt", "DESC"]],
+          });
+
+          return {
+            ...u,
+            isDownloaded: true,
+            queryStatus: raiseQuery ? raiseQuery.queryStatus : null,
+          };
+        })
+      );
     }
 
     // Return modified response
-    return ReS(res, {
-      success: true,
-      data: modifiedData
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        data: modifiedData,
+      },
+      200
+    );
   } catch (error) {
     console.error("Get Referral Payment Status Error:", error);
     return ReE(res, error.message, 500);
