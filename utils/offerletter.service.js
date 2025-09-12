@@ -10,7 +10,7 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion,
 });
 
-// helpers for "12th September, 2025"
+// Helpers for "12th September, 2025"
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
@@ -46,12 +46,10 @@ const generateOfferLetter = async (userId) => {
   const workLocation = user.residentialAddress || "Work from Home";
   const today = formatDateOrdinal(new Date());
 
-  // 2) S3 asset base (must contain header.png, footer.png, eduroom-watermark.png, signature.png, stamp.jpg)
+  // 2) S3 assets
   const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
-
-  // Tune these to your PNG artwork. Increased FOOTER_H to avoid cropping.
-  const HEADER_H = 120; // px
-  const FOOTER_H = 170; // px  (↑ bigger so the full footer art is visible)
+  const HEADER_H = 120; // px: visible height of header.png
+  const FOOTER_H = 170; // px: visible height of footer.png
 
   // 3) HTML
   const html = `
@@ -63,7 +61,7 @@ const generateOfferLetter = async (userId) => {
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body { margin: 0; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #111; box-sizing: border-box; }
 
-        /* Header/Footer images — only images, no extra elements */
+        /* Header/Footer images only */
         .header-img {
           position: fixed; top: 0; left: 0; right: 0;
           width: 100%; height: ${HEADER_H}px;
@@ -77,40 +75,44 @@ const generateOfferLetter = async (userId) => {
           display: block; z-index: 1; background: #fff;
         }
 
-        /* Content area padded so it never overlaps header/footer */
+        /* Content is padded to avoid the header/footer */
         .content {
           position: relative; z-index: 2;
-          padding: ${HEADER_H + 20}px 60px ${FOOTER_H + 34}px 60px; /* top | right | bottom | left */
+          padding: ${HEADER_H + 60}px 60px ${FOOTER_H + 34}px 60px; /* moved further down */
         }
-
-        .date-line { margin: 6px 0 28px 0; }  /* left-aligned date under header */
 
         .title {
           text-align: center; font-weight: bold; font-size: 16px;
           margin: 0 0 18px 0; text-decoration: underline;
         }
+        .date-line { margin: 0 0 20px 0; } /* Date ABOVE Dear ... */
         p { margin: 8px 0; text-align: justify; }
 
-        /* Watermark a bit lower than header */
+        /* Watermark lower */
         .watermark {
           position: fixed; left: 50%; transform: translateX(-50%);
-          top: ${HEADER_H + 190}px; width: 420px; opacity: 0.06; z-index: 0;
+          top: ${HEADER_H + 200}px; width: 420px; opacity: 0.06; z-index: 0;
         }
 
-        /* Signature + stamp row, kept well above footer */
-        .signature {
+        /* Signature row: left signature + centered stamp */
+        .sign-row {
           margin-top: 26px;
-          margin-bottom: 100px; /* ensures clear gap above footer art */
-          display: flex; justify-content: space-between; align-items: center;
+          margin-bottom: 100px; /* safe space above footer */
+          display: grid;
+          grid-template-columns: 1fr 1fr 1fr; /* left / center / spacer */
+          align-items: end;
+          column-gap: 20px;
         }
-        .signature-left { text-align: left; }
-        .signature-left img { width: 120px; display: block; }
-        .signature-left span { display: block; margin-top: 6px; }
-        .stamp { width: 105px; opacity: 0.95; }
+        .sig-left { justify-self: start; text-align: left; }
+        .sig-left img { width: 120px; display: block; }
+        .sig-left span { display: block; margin-top: 6px; }
+
+        .sig-center { justify-self: center; text-align: center; }
+        .stamp { width: 110px; opacity: 0.95; display: block; margin: 0 auto; }
       </style>
     </head>
     <body>
-      <!-- header/footer images only -->
+      <!-- header/footer images -->
       <img src="${ASSET_BASE}/header.png" class="header-img" />
       <img src="${ASSET_BASE}/footer.png" class="footer-img" />
 
@@ -118,11 +120,13 @@ const generateOfferLetter = async (userId) => {
       <img src="${ASSET_BASE}/eduroom-watermark.png" class="watermark" />
 
       <div class="content">
-        <div class="date-line">Date: ${today}</div>
-
         <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
+        <!-- Date ABOVE the greeting -->
+        <div class="date-line">Date: ${today}</div>
+
         <p>Dear ${candidateName},</p>
+
         <p>
           Congratulations! We are pleased to confirm that you have been selected
           for the role of <b>${position}</b> at Eduroom. We believe that your skills,
@@ -144,19 +148,23 @@ const generateOfferLetter = async (userId) => {
 
         <p>Thank you!<br/>Yours Sincerely,<br/>Eduroom</p>
 
-        <div class="signature">
-          <div class="signature-left">
+        <!-- Signature + centered stamp -->
+        <div class="sign-row">
+          <div class="sig-left">
             <img src="${ASSET_BASE}/signature.png" />
             <span>Mrs. Pooja Shedge<br/>Branch Manager</span>
           </div>
-          <img src="${ASSET_BASE}/stamp.jpg" class="stamp" />
+          <div class="sig-center">
+            <img src="${ASSET_BASE}/stamp.jpg" class="stamp" />
+          </div>
+          <div></div>
         </div>
       </div>
     </body>
   </html>
   `;
 
-  // PDF with background images and zero margins — content padding handles spacing
+  // 4) Render PDF (A4 single page). Margins 0; content padding handles spacing.
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -172,7 +180,7 @@ const generateOfferLetter = async (userId) => {
 
   await browser.close();
 
-  // Upload to S3
+  // 5) Upload to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
