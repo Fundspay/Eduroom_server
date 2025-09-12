@@ -2,19 +2,36 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
-// ✅ Add a new Raise Query
-var addRaiseQuery = async (req, res) => {
-    const { userId, fundsAuditUserId, description, internshipStatus } = req.body;
 
-    if (!userId || !fundsAuditUserId) return ReE(res, "userId and fundsAuditUserId are required", 400);
+// ✅ Add a new Raise Query with optional extra fields
+var addRaiseQuery = async (req, res) => {
+    const {
+        userId,
+        fundsAuditUserId,
+        queryStatus,
+        first_name,
+        last_name,
+        phone_number
+    } = req.body;
+
+    if (!userId || !fundsAuditUserId) 
+        return ReE(res, "userId and fundsAuditUserId are required", 400);
 
     try {
+        // Fetch user info for defaults
+        const user = await model.User.findByPk(userId, {
+            attributes: ["firstName", "lastName", "phoneNumber"]
+        });
+        if (!user) return ReE(res, "User not found", 404);
+
         const raiseQuery = await model.RaiseQuery.create({
             userId,
             fundsAuditUserId,
+            first_name: first_name || user.firstName,
+            last_name: last_name || user.lastName,
+            phone_number: phone_number || user.phoneNumber,
             isQueryRaised: true, // mark as raised
-            description: description || null,
-            internshipStatus: internshipStatus || null
+            queryStatus: queryStatus || null
         });
 
         return ReS(res, { success: true, query: raiseQuery }, 201);
@@ -22,24 +39,33 @@ var addRaiseQuery = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.addRaiseQuery = addRaiseQuery;
 
-// ✅ Update Raise Query by ID
-var updateRaiseQuery = async (req, res) => {
-    const { id } = req.params;
-    const { fundsAuditUserId, isQueryRaised, description, internshipStatus } = req.body;
+// ✅ Update Raise Query by userId (latest query)
+var updateRaiseQueryByUser = async (req, res) => {
+    const { userId } = req.params;
+    const { fundsAuditUserId, isQueryRaised, queryStatus, first_name, last_name, phone_number } = req.body;
 
-    if (!id) return ReE(res, "Query ID is required", 400);
+    if (!userId) return ReE(res, "userId is required", 400);
 
     try {
-        const raiseQuery = await model.RaiseQuery.findByPk(id);
-        if (!raiseQuery) return ReE(res, "RaiseQuery not found", 404);
+        // Find the latest RaiseQuery for the user
+        const raiseQuery = await model.RaiseQuery.findOne({
+            where: { userId, isDeleted: false },
+            order: [["updatedAt", "DESC"]]
+        });
 
+        if (!raiseQuery) return ReE(res, "No RaiseQuery found for this user", 404);
+
+        // Update fields, fallback to existing values if not provided
         await raiseQuery.update({
             fundsAuditUserId: fundsAuditUserId || raiseQuery.fundsAuditUserId,
             isQueryRaised: isQueryRaised !== undefined ? isQueryRaised : raiseQuery.isQueryRaised,
-            description: description || raiseQuery.description,
-            internshipStatus: internshipStatus || raiseQuery.internshipStatus
+            queryStatus: queryStatus || raiseQuery.queryStatus,
+            first_name: first_name || raiseQuery.first_name,
+            last_name: last_name || raiseQuery.last_name,
+            phone_number: phone_number || raiseQuery.phone_number
         });
 
         return ReS(res, { success: true, query: raiseQuery }, 200);
@@ -47,9 +73,11 @@ var updateRaiseQuery = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
-module.exports.updateRaiseQuery = updateRaiseQuery;
 
+module.exports.updateRaiseQueryByUser = updateRaiseQueryByUser;
 // ✅ Fetch all Raise Queries
+
+
 var fetchAllRaiseQueries = async (req, res) => {
     try {
         const queries = await model.RaiseQuery.findAll({
@@ -67,23 +95,23 @@ var fetchAllRaiseQueries = async (req, res) => {
 };
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
-// ✅ Fetch single Raise Query by ID
-var fetchSingleRaiseQuery = async (req, res) => {
-    const { id } = req.params;
-    if (!id) return ReE(res, "Query ID is required", 400);
+var fetchRaiseQueriesByUser = async (req, res) => {
+    const { userId } = req.params;
+
+    if (!userId) return ReE(res, "userId is required", 400);
 
     try {
-        const raiseQuery = await model.RaiseQuery.findByPk(id, {
-            include: [
-                { model: model.User, attributes: ["id", "firstName", "lastName", "email"] },
-                { model: model.User, as: "auditUser", attributes: ["id", "firstName", "lastName", "email"] }
-            ]
+        const queries = await model.RaiseQuery.findAll({
+            where: { userId, isDeleted: false },
+            order: [["updatedAt", "DESC"]]
         });
 
-        if (!raiseQuery) return ReE(res, "RaiseQuery not found", 404);
-        return ReS(res, { success: true, query: raiseQuery }, 200);
+        const queryCount = queries.length; // total queries for this user
+
+        return ReS(res, { success: true, count: queryCount, queries }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
-module.exports.fetchSingleRaiseQuery = fetchSingleRaiseQuery;
+
+module.exports.fetchRaiseQueriesByUser = fetchRaiseQueriesByUser;
