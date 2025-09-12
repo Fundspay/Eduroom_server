@@ -10,6 +10,7 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion,
 });
 
+// helpers for "12th September, 2025"
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
@@ -37,26 +38,20 @@ const generateOfferLetter = async (userId) => {
     `${user.firstName || ""} ${user.lastName || ""}`.trim() ||
     "Candidate";
 
-  // Position/program
   const position = user.internshipProgram || "Intern";
 
-  // Start date
   const startDateRaw = user.preferredStartDate; // "YYYY-MM-DD" or ISO
-  const startDate = startDateRaw
-    ? formatDateOrdinal(startDateRaw)
-    : "To Be Decided";
+  const startDate = startDateRaw ? formatDateOrdinal(startDateRaw) : "To Be Decided";
 
   const workLocation = user.residentialAddress || "Work from Home";
-
-  // Today with ordinal like sample
   const today = formatDateOrdinal(new Date());
 
-  // 2) Asset base (header/footer/watermark/signature/stamp)
+  // 2) S3 asset base (must contain header.png, footer.png, eduroom-watermark.png, signature.png, stamp.jpg)
   const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
-  // Tune these to your header/footer PNG proportions
-  const HEADER_H = 120; // px visible height for header.png
-  const FOOTER_H = 130; // px visible height for footer.png
+  // Tune these to your PNG artwork. Increased FOOTER_H to avoid cropping.
+  const HEADER_H = 120; // px
+  const FOOTER_H = 170; // px  (↑ bigger so the full footer art is visible)
 
   // 3) HTML
   const html = `
@@ -64,48 +59,48 @@ const generateOfferLetter = async (userId) => {
     <head>
       <meta charset="utf-8" />
       <style>
+        @page { size: A4; margin: 0; }
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        body { margin: 0; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #111; }
+        body { margin: 0; font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; color: #111; box-sizing: border-box; }
 
-        /* Fixed header/footer images (no extra content inside) */
+        /* Header/Footer images — only images, no extra elements */
         .header-img {
           position: fixed; top: 0; left: 0; right: 0;
-          width: 100%; height: ${HEADER_H}px; object-fit: cover; display: block; z-index: 1;
+          width: 100%; height: ${HEADER_H}px;
+          object-fit: contain; object-position: top center;
+          display: block; z-index: 1; background: #fff;
         }
         .footer-img {
-          position: fixed; bottom: 0; left: 0; right: 0;
-          width: 100%; height: ${FOOTER_H}px; object-fit: cover; display: block; z-index: 1;
+          position: fixed; left: 0; right: 0; bottom: 0;
+          width: 100%; height: ${FOOTER_H}px;
+          object-fit: contain; object-position: bottom center;
+          display: block; z-index: 1; background: #fff;
         }
 
-        /* Content padded so it never overlaps header/footer */
+        /* Content area padded so it never overlaps header/footer */
         .content {
-          padding: ${HEADER_H + 18}px 60px ${FOOTER_H + 28}px 60px; /* top | right | bottom | left */
           position: relative; z-index: 2;
+          padding: ${HEADER_H + 20}px 60px ${FOOTER_H + 34}px 60px; /* top | right | bottom | left */
         }
 
-        /* Date like sample (left under header) */
-        .date-line { margin: 6px 0 28px 0; }
+        .date-line { margin: 6px 0 28px 0; }  /* left-aligned date under header */
 
-        /* Title centered & underlined */
         .title {
           text-align: center; font-weight: bold; font-size: 16px;
           margin: 0 0 18px 0; text-decoration: underline;
         }
-
         p { margin: 8px 0; text-align: justify; }
 
-        /* Watermark slightly lower than header */
+        /* Watermark a bit lower than header */
         .watermark {
-          position: fixed;
-          top: ${HEADER_H + 190}px;  /* move down by increasing this value */
-          left: 50%; transform: translateX(-50%);
-          opacity: 0.06; width: 420px; z-index: 0;
+          position: fixed; left: 50%; transform: translateX(-50%);
+          top: ${HEADER_H + 190}px; width: 420px; opacity: 0.06; z-index: 0;
         }
 
-        /* Signature + Stamp on one line, comfortably above footer */
+        /* Signature + stamp row, kept well above footer */
         .signature {
           margin-top: 26px;
-          margin-bottom: 88px;   /* ensures clear gap above footer image */
+          margin-bottom: 100px; /* ensures clear gap above footer art */
           display: flex; justify-content: space-between; align-items: center;
         }
         .signature-left { text-align: left; }
@@ -115,11 +110,11 @@ const generateOfferLetter = async (userId) => {
       </style>
     </head>
     <body>
-      <!-- Only header/footer images -->
+      <!-- header/footer images only -->
       <img src="${ASSET_BASE}/header.png" class="header-img" />
       <img src="${ASSET_BASE}/footer.png" class="footer-img" />
 
-      <!-- Watermark -->
+      <!-- watermark -->
       <img src="${ASSET_BASE}/eduroom-watermark.png" class="watermark" />
 
       <div class="content">
@@ -128,7 +123,6 @@ const generateOfferLetter = async (userId) => {
         <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
         <p>Dear ${candidateName},</p>
-
         <p>
           Congratulations! We are pleased to confirm that you have been selected
           for the role of <b>${position}</b> at Eduroom. We believe that your skills,
@@ -162,7 +156,7 @@ const generateOfferLetter = async (userId) => {
   </html>
   `;
 
-  // 4) Generate PDF — margins 0, content padding handles header/footer space
+  // PDF with background images and zero margins — content padding handles spacing
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -178,7 +172,7 @@ const generateOfferLetter = async (userId) => {
 
   await browser.close();
 
-  // 5) Upload to S3
+  // Upload to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
