@@ -100,13 +100,20 @@ const listAllUsers = async (req, res) => {
       attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
-    // Map query info by userId
+    // Map query info by userId with queryCount
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
-      queryInfoByUser[q.userId] = {
-        isQueryRaised: q.isQueryRaised,
-        queryStatus: q.queryStatus
-      };
+      if (!queryInfoByUser[q.userId]) {
+        queryInfoByUser[q.userId] = {
+          isQueryRaised: q.isQueryRaised || false,
+          queryStatus: q.queryStatus || null,
+          queryCount: 1
+        };
+      } else {
+        queryInfoByUser[q.userId].queryCount += 1;
+        queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
+        queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
+      }
     });
 
     const response = [];
@@ -163,7 +170,7 @@ const listAllUsers = async (req, res) => {
           : null;
 
       // Query info for this user
-      const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null };
+      const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
       // ✅ Create Status record including query info
       const statusRecord = await Status.create({
@@ -181,7 +188,8 @@ const listAllUsers = async (req, res) => {
         offerLetterFile,
         teamManager: teamManager ? teamManager.name : null,
         queryStatus: queryInfo.queryStatus,
-        isQueryRaised: queryInfo.isQueryRaised
+        isQueryRaised: queryInfo.isQueryRaised,
+        queryCount: queryInfo.queryCount
       });
 
       response.push({
@@ -200,7 +208,8 @@ const listAllUsers = async (req, res) => {
         offerLetterFile,
         teamManager: teamManager ? teamManager.name : null,
         isQueryRaised: queryInfo.isQueryRaised,
-        queryStatus: queryInfo.queryStatus
+        queryStatus: queryInfo.queryStatus,
+        queryCount: queryInfo.queryCount
       });
     }
 
@@ -220,3 +229,4 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
+s
