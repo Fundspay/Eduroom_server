@@ -98,56 +98,42 @@ var fetchAllRaiseQueries = async (req, res) => {
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
 // ✅ Fetch Raise Queries by userId
-// ✅ Fetch Raise Queries by userId with Team Manager info
 var fetchRaiseQueriesByUser = async (req, res) => {
     const { userId } = req.params;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
     try {
-        // Fetch all queries for this user + include linked User info
         const queries = await model.RaiseQuery.findAll({
             where: { userId, isDeleted: false },
-            order: [["createdAt", "ASC"]], // or DESC if you want latest first
+            order: [["createdAt", "ASC"]],
             include: [
                 {
                     model: model.User,
-                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber", "teamManagerId"],
-                },
-            ],
+                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+                    include: [
+                        {
+                            model: model.TeamManager,
+                            as: "teamManager",
+                            attributes: ["id", "name"] // fetch the team manager name
+                        }
+                    ]
+                }
+            ]
         });
 
         const queryCount = queries.length;
 
-        // Update queryCount for all queries of this user
         await model.RaiseQuery.update(
             { queryCount },
             { where: { userId, isDeleted: false } }
         );
 
-        // Fetch all team managers for this user's queries
-        const teamManagerIds = queries
-            .map(q => q.User?.teamManagerId)
-            .filter(id => id); // only truthy IDs
-
-        const teamManagers = await model.TeamManager.findAll({
-            where: { id: teamManagerIds },
-            attributes: ["id", "name"],
-            raw: true,
-        });
-
-        const managerMap = {};
-        teamManagers.forEach(tm => {
-            managerMap[tm.id] = tm.name;
-        });
-
-        // Format response
         const formattedQueries = queries.map((q) => {
             const plainQ = q.toJSON();
-            const userTeamManagerId = plainQ.User?.teamManagerId;
             return {
                 ...plainQ,
-                queryCount, // ensure latest total count
+                queryCount,
                 queryDate: plainQ.createdAt,
                 userDetails: {
                     id: plainQ.User?.id || null,
@@ -155,7 +141,7 @@ var fetchRaiseQueriesByUser = async (req, res) => {
                     lastName: plainQ.User?.lastName || null,
                     email: plainQ.User?.email || null,
                     phoneNumber: plainQ.User?.phoneNumber || null,
-                    teamManagerName: userTeamManagerId ? managerMap[userTeamManagerId] : null
+                    teamManagerName: plainQ.User?.teamManager?.name || null
                 },
             };
         });
@@ -165,5 +151,4 @@ var fetchRaiseQueriesByUser = async (req, res) => {
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.fetchRaiseQueriesByUser = fetchRaiseQueriesByUser;
