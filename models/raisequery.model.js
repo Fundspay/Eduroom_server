@@ -7,7 +7,7 @@ module.exports = (sequelize, Sequelize) => {
       userId: { type: Sequelize.BIGINT, allowNull: false },
       fundsAuditUserId: { type: Sequelize.BIGINT, allowNull: true }, // user assigned for funds audit
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
-      internshipStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., Active, Completed, Pending
+      queryStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., Active, Completed, Pending
       isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
