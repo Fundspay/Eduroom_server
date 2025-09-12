@@ -2,7 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service");
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
-const { User, TeamManager, Course, InternshipCertificate, OfferLetter,Domain } = require("../models");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain } = require("../models");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
@@ -63,72 +63,100 @@ const sendOfferLetter = async (req, res) => {
 
 module.exports = { sendOfferLetter };
 
+
 const listAllUsers = async (req, res) => {
   try {
     const users = await User.findAll({
       include: [
         {
-          model: Course,
-          attributes: ["id", "name", "duration", "domainId"],
-          include: [
-            {
-              model: Domain,
-              attributes: ["id", "name"]
-            }
-          ]
-        },
-        {
           model: TeamManager,
           as: "teamManager",
-          attributes: ["id", "name", "email", "mobileNumber", "internshipStatus"]
+          attributes: ["id", "name", "internshipStatus"]
+        },
+        {
+          model: InternshipCertificate,
+          attributes: ["id", "courseId", "certificateUrl", "isIssued", "issuedDate"]
+        },
+        {
+          model: OfferLetter,
+          attributes: ["id", "fileUrl", "issent", "startDate"]
         }
       ]
     });
 
-    const formatted = users.map((user) => {
-      return {
+    // fetch all courses with domain once to avoid repeated DB calls
+    const courses = await Course.findAll({
+      attributes: ["id", "name", "duration", "domainId"],
+      include: [{ model: Domain, attributes: ["id", "name"] }]
+    });
+
+    const response = [];
+
+    for (const user of users) {
+      const courseDetails = [];
+
+      if (user.courseStatuses && typeof user.courseStatuses === "object") {
+        for (const [courseId, status] of Object.entries(user.courseStatuses)) {
+          const course = courses.find(c => c.id.toString() === courseId);
+
+          courseDetails.push({
+            courseId,
+            courseName: course ? course.name : null,
+            duration: course ? course.duration : null,
+            domainName: course && course.Domain ? course.Domain.name : null,
+            status,
+            startDate:
+              user.courseDates && user.courseDates[courseId]
+                ? user.courseDates[courseId].startDate
+                : null,
+            endDate:
+              user.courseDates && user.courseDates[courseId]
+                ? user.courseDates[courseId].endDate
+                : null
+          });
+        }
+      }
+
+      // ✅ Internship info
+      const internshipIssued =
+        user.InternshipCertificates && user.InternshipCertificates.length > 0
+          ? user.InternshipCertificates.some(cert => cert.isIssued)
+          : null;
+
+      const internshipStatus = user.teamManager ? user.teamManager.internshipStatus : null;
+
+      // ✅ Offer Letter info
+      const offerLetterSent =
+        user.OfferLetters && user.OfferLetters.length > 0
+          ? user.OfferLetters[0].issent
+          : false;
+
+      const offerLetterFile =
+        user.OfferLetters && user.OfferLetters.length > 0
+          ? user.OfferLetters[0].fileUrl
+          : null;
+
+      response.push({
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
         phoneNumber: user.phoneNumber,
         collegeName: user.collegeName,
-
-        // 🔹 Courses + Domain + Duration
-        courses: user.Courses?.map((course) => ({
-          courseId: course.id,
-          courseName: course.name,
-          duration: course.duration,
-          domainName: course.Domain ? course.Domain.name : null,
-          status: user.courseStatuses ? user.courseStatuses[course.id] : null,
-          startDate: user.courseDates ? user.courseDates[course.id]?.startDate : null,
-          endDate: user.courseDates ? user.courseDates[course.id]?.endDate : null
-        })) || [],
-
-        // 🔹 Team Manager Info
-        teamManager: user.teamManager
-          ? {
-              id: user.teamManager.id,
-              name: user.teamManager.name,
-              email: user.teamManager.email,
-              mobileNumber: user.teamManager.mobileNumber,
-              internshipStatus: user.teamManager.internshipStatus
-            }
-          : null,
-
         subscriptionWallet: user.subscriptionWallet,
-        subscriptionLeft: user.subscriptionLeft
-      };
-    });
+        subscriptionLeft: user.subscriptionLeft,
+        courses: courseDetails,
+        internshipIssued,
+        internshipStatus,
+        offerLetterSent,
+        offerLetterFile
+      });
+    }
 
-    return res.status(200).json({
-      success: true,
-      totalUsers: formatted.length,
-      data: formatted
-    });
+    return ReS(res, { success: true, data: response }, 200);
   } catch (err) {
     console.error("Error in listAllUsers:", err);
-    return res.status(500).json({ success: false, message: "Internal server error" });
+    return ReE(res, err.message, 500);
   }
 };
 
-module.exports . listAllUsers = listAllUsers;
+module.exports.listAllUsers = listAllUsers;
