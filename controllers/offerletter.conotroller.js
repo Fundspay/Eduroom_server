@@ -3,7 +3,7 @@ const { generateOfferLetter } = require("../utils/offerletter.service");
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
 const { User, TeamManager, Course, InternshipCertificate, OfferLetter } = require("../models");
-const { ReS, ReE } = require("../services/util.service"); 
+const { ReE, ReS } = require("../utils/util.service.js");
 
 
 // Controller: Send Offer Letter to User Email
