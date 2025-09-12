@@ -3,6 +3,8 @@ const { generateOfferLetter } = require("../utils/offerletter.service");
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
 const { User, TeamManager, Course, InternshipCertificate, OfferLetter } = require("../models");
+const { ReS, ReE } = require("../services/util.service"); 
+
 
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
