@@ -2,6 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service");
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
+const { User, TeamManager, Course, InternshipCertificate, OfferLetter } = require("../models");
 
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
@@ -59,3 +60,85 @@ const sendOfferLetter = async (req, res) => {
 };
 
 module.exports = { sendOfferLetter };
+
+
+
+const listAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      include: [
+        {
+          model: TeamManager,
+          as: "teamManager",
+          attributes: ["id", "name", "position", "internshipStatus"]
+        },
+        {
+          model: InternshipCertificate,
+          attributes: ["id", "courseId", "isIssued", "certificateUrl", "issuedDate"]
+        },
+        {
+          model: OfferLetter,
+          attributes: ["id", "issent", "startDate", "fileUrl", "position"]
+        }
+      ]
+    });
+
+    const response = [];
+
+    for (let user of users) {
+      let courseStatusInfo = null;
+      let selectedCourseId = null;
+      let selectedCourseName = null;
+      let internshipIssued = null;
+
+      // 🔹 Check Internship Certificate first
+      if (user.InternshipCertificates && user.InternshipCertificates.length > 0) {
+        const cert = user.InternshipCertificates[0]; // take first (or latest if you want)
+        selectedCourseId = cert.courseId;
+        internshipIssued = cert.isIssued;
+        const course = await Course.findByPk(cert.courseId, { attributes: ["id", "name"] });
+        selectedCourseName = course ? course.name : null;
+        courseStatusInfo = { from: "internship", status: cert.isIssued ? "completed" : "pending" };
+      } else {
+        // 🔹 Check User courseStatuses JSON
+        if (user.courseStatuses && Object.keys(user.courseStatuses).length > 0) {
+          for (let [courseId, status] of Object.entries(user.courseStatuses)) {
+            selectedCourseId = courseId;
+            const course = await Course.findByPk(courseId, { attributes: ["id", "name"] });
+            selectedCourseName = course ? course.name : null;
+            courseStatusInfo = { from: "userCourseStatus", status };
+            break; // take first found
+          }
+        } else {
+          // 🔹 Fallback: if isStarted true (fake info)
+          if (user.isStarted) {
+            courseStatusInfo = { from: "userStarted", status: "started" };
+          }
+        }
+      }
+
+      // 🔹 Build user response
+      response.push({
+        userId: user.id,
+        name: `${user.firstName} ${user.lastName}`,
+        subscriptionWallet: user.subscriptionWallet,
+        subscriptionLeft: user.subscriptionLeft,
+        courseId: selectedCourseId,
+        courseName: selectedCourseName,
+        courseStatus: courseStatusInfo,
+        internshipIssued, // ✅ internship certificate issued or not
+        internshipStatus: user.teamManager ? user.teamManager.internshipStatus : null,
+        offerLetterSent: user.OfferLetters?.length > 0 ? user.OfferLetters[0].issent : false,
+        offerLetterFile: user.OfferLetters?.length > 0 ? user.OfferLetters[0].fileUrl : null
+      });
+    }
+
+    return res.status(200).json({ success: true, data: response });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = { listAllUsers };
+
