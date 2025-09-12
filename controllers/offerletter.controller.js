@@ -125,7 +125,6 @@ const listAllUsers = async (req, res) => {
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      // Only include team manager name
       const teamManagerName = user.teamManager ? user.teamManager.name : null;
 
       const offerLetterSent =
@@ -138,7 +137,25 @@ const listAllUsers = async (req, res) => {
           ? user.OfferLetters[0].fileUrl
           : null;
 
+      // ✅ Create Status record in the database
+      const statusRecord = await Status.create({
+        userId: user.id,
+        userName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        collegeName: user.collegeName,
+        subscriptionWallet: user.subscriptionWallet,
+        subscriptionLeft: user.subscriptionLeft,
+        courses: courseDetails,
+        internshipIssued,
+        internshipStatus: teamManagerName ? allTeamManagers.find(tm => tm.name === teamManagerName)?.internshipStatus : null,
+        offerLetterSent,
+        offerLetterFile,
+        teamManager: teamManagerName
+      });
+
       response.push({
+        statusId: statusRecord.id, // include the newly created Status id
         userId: user.id,
         name: `${user.firstName} ${user.lastName}`,
         email: user.email,
@@ -151,7 +168,7 @@ const listAllUsers = async (req, res) => {
         internshipStatus: teamManagerName ? allTeamManagers.find(tm => tm.name === teamManagerName)?.internshipStatus : null,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManagerName // only name here
+        teamManager: teamManagerName // only name
       });
     }
 
