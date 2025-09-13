@@ -974,27 +974,34 @@ const setCourseStartEndDates = async (req, res) => {
     const end = new Date(start);
     end.setDate(start.getDate() + durationDays);
 
-    // Update user's courseDates JSON
-    const courseDates = user.courseDates || {};
+    // 🔹 Reload latest user data to avoid overwriting in concurrent updates
+    await user.reload();
+
+    // 🔹 Update user's courseDates JSON safely
+    const courseDates = { ...(user.courseDates || {}) };
     courseDates[courseId] = {
       startDate: start.toISOString().split("T")[0],
       endDate: end.toISOString().split("T")[0],
       started: true, // per-course started flag
     };
 
-    await user.update({ courseDates });
+    user.courseDates = courseDates;
+    await user.save(); // safer than user.update()
 
-    return ReS(res, {
-      success: true,
-      message: "Course start and end dates updated successfully",
-      data: {
-        courseId,
-        startDate: courseDates[courseId].startDate,
-        endDate: courseDates[courseId].endDate,
-        started: courseDates[courseId].started,
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Course start and end dates updated successfully",
+        data: {
+          courseId,
+          startDate: courseDates[courseId].startDate,
+          endDate: courseDates[courseId].endDate,
+          started: courseDates[courseId].started,
+        },
       },
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Set Course Start/End Dates Error:", error);
     return ReE(res, error.message, 500);
@@ -1002,4 +1009,3 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
-
