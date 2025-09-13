@@ -108,16 +108,13 @@ const fetchAllCourses = async (req, res) => {
         },
       ],
     });
-
     if (!user) return ReE(res, "User not found", 404);
 
     // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
-      include: [
-        { model: model.Domain, attributes: ["name"] },
-      ],
+      include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
     // 🔹 Fetch all CoursePreviews at once
@@ -141,16 +138,16 @@ const fetchAllCourses = async (req, res) => {
       if (user.teamManager && user.teamManager.internshipStatus) {
         status = user.teamManager.internshipStatus;
       } else {
+        // 2️⃣ Fall back to user's courseDates & courseStatuses
         const courseDates = user.courseDates || {};
         const courseStatuses = user.courseStatuses || {};
 
-        // 2️⃣ If course started, check per-course status
         if (courseDates[course.id] && courseDates[course.id].started) {
           status = courseStatuses[course.id] || "Started";
         }
       }
 
-      // 🔹 Attach previews by matching **domainId**
+      // 🔹 Attach previews by matching domainId
       const coursePreviews = previews
         .filter((p) => p.domainId === course.domainId)
         .map((p) => ({
