@@ -111,24 +111,27 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // 🔹 Fetch all courses with previews + domain
+    // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
       include: [
         { model: model.Domain, attributes: ["name"] },
-        {
-          model: model.CoursePreview,
-          attributes: [
-            ["id", "coursePreviewId"],
-            "dayCount",
-            "title",
-            "heading",
-          ],
-          where: { isDeleted: false },
-          required: false,
-        },
       ],
+    });
+
+    // 🔹 Fetch all CoursePreviews at once
+    const previews = await model.CoursePreview.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        ["id", "coursePreviewId"],
+        "courseId",
+        "domainId",
+        "title",
+        "heading",
+        "dayCount",
+      ],
+      raw: true,
     });
 
     const coursesWithStatus = courses.map((course) => {
@@ -147,15 +150,20 @@ const fetchAllCourses = async (req, res) => {
         }
       }
 
-      // 🔹 Keep CoursePreviews array intact
-      const coursePreviews = course.CoursePreviews || [];
-
-      const courseJson = course.toJSON();
+      // 🔹 Attach previews by matching **domainId**
+      const coursePreviews = previews
+        .filter((p) => p.domainId === course.domainId)
+        .map((p) => ({
+          coursePreviewId: p.coursePreviewId,
+          dayCount: p.dayCount,
+          title: p.title,
+          heading: p.heading,
+        }));
 
       return {
-        ...courseJson,
-        courseId: courseJson.id, // ✅ explicit courseId for frontend
-        CoursePreviews: coursePreviews, // ✅ do NOT modify
+        ...course.toJSON(),
+        courseId: course.id, // ✅ root-level courseId
+        CoursePreviews: coursePreviews, // ✅ preserve frontend expectations
         status,
       };
     });
@@ -168,6 +176,7 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
 
 
 // ✅ Fetch single Course by ID
