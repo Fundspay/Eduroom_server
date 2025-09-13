@@ -92,13 +92,12 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
-// ✅ Fetch all Courses
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // 🔹 Fetch user with TeamManager
+    // Fetch user with TeamManager
     const user = await model.User.findByPk(userId, {
       include: [
         {
@@ -108,16 +107,17 @@ const fetchAllCourses = async (req, res) => {
         },
       ],
     });
+
     if (!user) return ReE(res, "User not found", 404);
 
-    // 🔹 Fetch all courses with domain
+    // Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
       include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
-    // 🔹 Fetch all CoursePreviews at once
+    // Fetch all course previews
     const previews = await model.CoursePreview.findAll({
       where: { isDeleted: false },
       attributes: [
@@ -134,22 +134,22 @@ const fetchAllCourses = async (req, res) => {
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
-      // 1️⃣ Check internship status from manager
+      // 1️⃣ Check TeamManager internshipStatus first
       if (user.teamManager && user.teamManager.internshipStatus) {
         status = user.teamManager.internshipStatus;
       } else {
-        // 2️⃣ Fall back to user's courseDates & courseStatuses
         const courseDates = user.courseDates || {};
         const courseStatuses = user.courseStatuses || {};
 
+        // 2️⃣ Check if the course has been started
         if (courseDates[course.id] && courseDates[course.id].started) {
           status = courseStatuses[course.id] || "Started";
         }
       }
 
-      // 🔹 Attach previews by matching domainId
+      // 3️⃣ Attach only previews belonging to this course
       const coursePreviews = previews
-        .filter((p) => p.domainId === course.domainId)
+        .filter((p) => p.courseId === course.id)
         .map((p) => ({
           coursePreviewId: p.coursePreviewId,
           dayCount: p.dayCount,
@@ -159,8 +159,8 @@ const fetchAllCourses = async (req, res) => {
 
       return {
         ...course.toJSON(),
-        courseId: course.id, // ✅ root-level courseId
-        CoursePreviews: coursePreviews, // ✅ preserve frontend expectations
+        courseId: course.id,       // root-level courseId
+        CoursePreviews: coursePreviews, // frontend-friendly
         status,
       };
     });
@@ -173,7 +173,6 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
-
 
 
 // ✅ Fetch single Course by ID
