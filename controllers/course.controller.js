@@ -92,7 +92,6 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
-// ✅ Fetch all Courses
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -115,9 +114,7 @@ const fetchAllCourses = async (req, res) => {
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
-      include: [
-        { model: model.Domain, attributes: ["name"] },
-      ],
+      include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
     // 🔹 Fetch all CoursePreviews at once
@@ -134,25 +131,24 @@ const fetchAllCourses = async (req, res) => {
       raw: true,
     });
 
+    // 🔹 Map courses with status and previews
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
-      // 1️⃣ Check internship status from manager
-      if (user.teamManager && user.teamManager.internshipStatus) {
-        status = user.teamManager.internshipStatus;
-      } else {
-        const courseDates = user.courseDates || {};
-        const courseStatuses = user.courseStatuses || {};
+      const courseDates = user.courseDates || {};
+      const courseStatuses = user.courseStatuses || {};
+      const courseIdStr = String(course.id); // 🔹 Ensure string key access
 
-        // 2️⃣ If course started, check per-course status
-        if (courseDates[course.id] && courseDates[course.id].started) {
-          status = courseStatuses[course.id] || "Started";
-        }
+      // ✅ Check if course has started
+      if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
+        status = courseStatuses[courseIdStr] || "Started";
+      } else {
+        status = "Not Started";
       }
 
-      // 🔹 Attach previews by matching **domainId**
+      // 🔹 Attach previews specific to this course
       const coursePreviews = previews
-        .filter((p) => p.domainId === course.domainId)
+        .filter((p) => p.courseId === course.id)
         .map((p) => ({
           coursePreviewId: p.coursePreviewId,
           dayCount: p.dayCount,
@@ -162,8 +158,8 @@ const fetchAllCourses = async (req, res) => {
 
       return {
         ...course.toJSON(),
-        courseId: course.id, // ✅ root-level courseId
-        CoursePreviews: coursePreviews, // ✅ preserve frontend expectations
+        courseId: course.id,
+        CoursePreviews: coursePreviews,
         status,
       };
     });

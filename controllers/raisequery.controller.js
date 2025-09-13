@@ -101,57 +101,57 @@ var fetchAllRaiseQueries = async (req, res) => {
 module.exports.fetchAllRaiseQueries = fetchAllRaiseQueries;
 
 // ✅ Fetch Raise Queries by userId
-var fetchRaiseQueriesByUser = async (req, res) => {
-    const { userId } = req.params;
+const fetchRaiseQueriesByUser = async (req, res) => {
+  const { userId } = req.params;
 
-    if (!userId) return ReE(res, "userId is required", 400);
+  if (!userId) return ReE(res, "userId is required", 400);
 
-    try {
-        const queries = await model.RaiseQuery.findAll({
-            where: { userId, isDeleted: false },
-            order: [["createdAt", "ASC"]],
-            include: [
-                {
-                    model: model.User,
-                    attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
-                    include: [
-                        {
-                            model: model.TeamManager,
-                            as: "teamManager",
-                            attributes: ["id", "name"] // fetch the team manager name
-                        }
-                    ]
-                }
-            ]
-        });
+  try {
+    // Fetch all queries for the user, including user and team manager info
+    const queries = await model.RaiseQuery.findAll({
+      where: { userId, isDeleted: false },
+      order: [["createdAt", "ASC"]],
+      include: [
+        {
+          model: model.User,
+          attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+          include: [
+            {
+              model: model.TeamManager,
+              as: "teamManager",
+              attributes: ["id", "name"] // fetch the team manager name
+            }
+          ]
+        }
+      ]
+    });
 
-        const queryCount = queries.length;
+    const queryCount = queries.length;
 
-        await model.RaiseQuery.update(
-            { queryCount },
-            { where: { userId, isDeleted: false } }
-        );
+    // Format the response
+    const formattedQueries = queries.map(q => {
+      const plainQ = q.toJSON();
+      return {
+        ...plainQ,
+        status: plainQ.status ?? null,   // include query status
+        queryCount,                     // total queries for the user
+        queryDate: plainQ.createdAt,
+        userDetails: {
+          id: plainQ.User?.id ?? null,
+          firstName: plainQ.User?.firstName ?? null,
+          lastName: plainQ.User?.lastName ?? null,
+          email: plainQ.User?.email ?? null,
+          phoneNumber: plainQ.User?.phoneNumber ?? null,
+          teamManagerName: plainQ.User?.teamManager?.name ?? null
+        },
+      };
+    });
 
-        const formattedQueries = queries.map((q) => {
-            const plainQ = q.toJSON();
-            return {
-                ...plainQ,
-                queryCount,
-                queryDate: plainQ.createdAt,
-                userDetails: {
-                    id: plainQ.User?.id || null,
-                    firstName: plainQ.User?.firstName || null,
-                    lastName: plainQ.User?.lastName || null,
-                    email: plainQ.User?.email || null,
-                    phoneNumber: plainQ.User?.phoneNumber || null,
-                    teamManagerName: plainQ.User?.teamManager?.name || null
-                },
-            };
-        });
-
-        return ReS(res, { success: true, count: queryCount, queries: formattedQueries }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+    return ReS(res, { success: true, count: queryCount, queries: formattedQueries }, 200);
+  } catch (error) {
+    console.error("Error fetching raise queries:", error);
+    return ReE(res, error.message, 500);
+  }
 };
+
 module.exports.fetchRaiseQueriesByUser = fetchRaiseQueriesByUser;

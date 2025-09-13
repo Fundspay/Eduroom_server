@@ -21,110 +21,127 @@ const addOrUpdateCourseDetail = async (req, res) => {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
     if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
-    // One CourseDetail per coursePreviewId
-    let courseDetail = await model.CourseDetail.findOne({
-      where: { coursePreviewId, courseId },
-      transaction
-    });
-
-    if (!courseDetail) {
-      courseDetail = await model.CourseDetail.create({
-        domainId,
-        courseId,
-        coursePreviewId,
-        userId: userId || null
-      }, { transaction });
-    }
-
     const createdDays = [];
 
     for (const dayObj of days) {
       const { day, sessions } = dayObj;
-      if (!day) throw new Error("day is required for each day object");
+      if (day === undefined || day === null) throw new Error("day is required for each day object");
       if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
-      const createdSessions = [];
+      // Find or create course detail for the day
+      let courseDetail = await model.CourseDetail.findOne({
+        where: { courseId, coursePreviewId, day },
+        transaction
+      });
+
+      if (!courseDetail) {
+        courseDetail = await model.CourseDetail.create({
+          domainId,
+          courseId,
+          coursePreviewId,
+          userId: userId ?? null,
+          day,
+          sessionNumber: sessions[0].sessionNumber ?? 1,
+          title: sessions[0].title ?? `Day ${day} Overview`,
+          description: sessions[0].description ?? null,
+        }, { transaction });
+      }
+
+      const updatedSessions = [];
 
       for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, questions, duration, sessionDuration, heading } = session;
+        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
 
-        if (!sessionNumber) throw new Error("sessionNumber is required for each session");
+        if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Check for existing session in the same CourseDetail
-        let existingSession = await model.CourseDetail.findOne({
-          where: { coursePreviewId, courseId, day, sessionNumber },
-          transaction
-        });
-
-        if (!existingSession) {
+        // Update main CourseDetail fields for first session
+        if (sessionNumber === 1) {
           await courseDetail.update({
-            day,
             sessionNumber,
             title,
-            description: description || null,
-            youtubeLink: youtubeLink || null,
-            duration: duration || null,
-            sessionDuration: sessionDuration || null,
-            heading: heading || null
-          }, { transaction });
-        } else {
-          await existingSession.update({
-            title,
-            description: description || null,
-            youtubeLink: youtubeLink || null,
-            duration: duration || null,
-            sessionDuration: sessionDuration || null,
-            heading: heading || null
+            description: description ?? null,
+            youtubeLink: youtubeLink ?? null,
+            duration: duration ?? null,
+            sessionDuration: sessionDuration ?? null,
+            heading: heading ?? null
           }, { transaction });
         }
 
-        // MCQs: replace old questions for this session
         if (Array.isArray(questions)) {
-          await model.QuestionModel.destroy({
+          // Fetch existing questions for this session
+          const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: courseDetail.id, sessionNumber },
             transaction
           });
 
-          if (questions.length > 0) {
-            const questionRecords = questions.map(q => ({
-              courseDetailId: courseDetail.id,
-              domainId,
-              courseId,
-              coursePreviewId,
-              day,
-              sessionNumber,
-              question: q.question,
-              optionA: q.optionA,
-              optionB: q.optionB,
-              optionC: q.optionC,
-              optionD: q.optionD,
-              answer: q.answer,
-              keywords: q.keywords || null,
-              caseStudy: q.caseStudy || null
-            }));
-            await model.QuestionModel.bulkCreate(questionRecords, { transaction });
+          const existingQuestionMap = {};
+          existingQuestions.forEach(q => existingQuestionMap[Number(q.id)] = q);
+
+          const incomingIds = [];
+
+          for (const q of questions) {
+            const qId = Number(q.id);
+            if (qId && existingQuestionMap[qId]) {
+              // Update existing question
+              await existingQuestionMap[qId].update({
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(qId);
+            } else {
+              // Create new question
+              const newQ = await model.QuestionModel.create({
+                courseDetailId: courseDetail.id,
+                domainId,
+                courseId,
+                coursePreviewId,
+                day,
+                sessionNumber,
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(newQ.id);
+            }
+          }
+
+          // Delete old questions not present in payload
+          const toDelete = existingQuestions.filter(q => !incomingIds.includes(Number(q.id)));
+          if (toDelete.length > 0) {
+            const deleteIds = toDelete.map(q => q.id);
+            await model.QuestionModel.destroy({ where: { id: deleteIds }, transaction });
           }
         }
 
-        // Include all session details in response
-        createdSessions.push({
+        updatedSessions.push({
           sessionNumber,
           title,
-          description: description || null,
-          youtubeLink: youtubeLink || null,
-          duration: duration || null,
-          sessionDuration: sessionDuration || null,
-          heading: heading || null,
+          description: description ?? null,
+          youtubeLink: youtubeLink ?? null,
+          duration: duration ?? null,
+          sessionDuration: sessionDuration ?? null,
+          heading: heading ?? null,
           questions
         });
       }
 
-      createdDays.push({ day, sessions: createdSessions });
+      createdDays.push({ day, sessions: updatedSessions });
     }
 
     await transaction.commit();
-    return ReS(res, { success: true, courseDetailId: courseDetail.id, days: createdDays }, 201);
+    return ReS(res, { success: true, days: createdDays }, 201);
 
   } catch (error) {
     await transaction.rollback();
