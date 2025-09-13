@@ -61,7 +61,7 @@ const generateOfferLetter = async (userId) => {
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body {
           margin: 0;
-          font-family: "TeX Gyre Bonum", "Times New Roman", serif; // FONT CHANGE HERE
+          font-family: "TeXGyreBonum", "Times New Roman", serif; // FONT CHANGE HERE
           font-size: 13px;
           line-height: 1.6;
           color: #111;
