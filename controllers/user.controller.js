@@ -467,7 +467,6 @@ var deleteUser = async (req, res) => {
 module.exports.deleteUser = deleteUser;
 
 // ===================== LOGIN =====================
-// ===================== LOGIN =====================
 const loginWithEmailPassword = async (req, res) => {
     try {
         const { email, password } = req.body;
