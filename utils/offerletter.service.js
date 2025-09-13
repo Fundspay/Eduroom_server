@@ -61,12 +61,14 @@ const generateOfferLetter = async (userId) => {
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body {
           margin: 0;
-          font-family: "Calibri", "Arial", sans-serif;
+          font-family: "TeX Gyre Bonum", "Times New Roman", serif; // FONT CHANGE HERE
           font-size: 13px;
           line-height: 1.6;
           color: #111;
           box-sizing: border-box;
         }
+        
+        @import url('https://fonts.cdnfonts.com/css/tex-gyre-bonum');
 
         /* Header/Footer images only */
         .header-img {
