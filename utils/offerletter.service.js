@@ -48,8 +48,8 @@ const generateOfferLetter = async (userId) => {
 
   // 2) S3 assets
   const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
-  const HEADER_H = 120; // px: visible height of header.png
-  const FOOTER_H = 170; // px: visible height of footer.png
+  const HEADER_H = 120; 
+  const FOOTER_H = 170; 
 
   // 3) HTML
   const html = `
@@ -61,14 +61,15 @@ const generateOfferLetter = async (userId) => {
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body {
           margin: 0;
-          font-family: "Times New Roman", Times, serif;
+          background: #fff !important; /* ensure no grey bg */
+          font-family: "Times New Roman", Times, serif !important;
           font-size: 13px;
           line-height: 1.6;
           color: #111;
           box-sizing: border-box;
         }
 
-        /* Header/Footer images only */
+        /* Header/Footer images */
         .header-img {
           position: fixed; top: 0; left: 0; right: 0;
           width: 100%; height: ${HEADER_H}px;
@@ -82,66 +83,63 @@ const generateOfferLetter = async (userId) => {
           display: block; z-index: 1; background: #fff;
         }
 
-        /* Content padded to avoid header/footer overlap */
+        /* Content area */
         .content {
           position: relative; z-index: 2;
-          /* more space from header to date by adding +80 instead of +60 */
-          padding: ${HEADER_H + 80}px 60px ${FOOTER_H + 34}px 60px;
+          padding: ${HEADER_H + 40}px 60px ${FOOTER_H + 60}px 60px;
         }
 
-        /* Date back to top-right, with space above/below */
+        /* Date aligned to left */
         .date-line {
-          text-align: right;
-          margin: 0 0 24px 0;  /* space below date before title */
+          text-align: left;
+          margin: 0 0 24px 0;
         }
 
-        /* Title (no underline now) */
+        /* Title */
         .title {
           text-align: center;
           font-weight: bold;
           font-size: 16px;
           margin: 0 0 18px 0;
-          /* no text-decoration */
         }
 
         p { margin: 8px 0; text-align: justify; }
 
-        /* Watermark lower */
+        /* Watermark */
         .watermark {
           position: fixed; left: 50%; transform: translateX(-50%);
           top: ${HEADER_H + 200}px; width: 420px; opacity: 0.06; z-index: 0;
         }
 
-        /* Signature row: left signature + centered stamp */
+        /* Signature + Stamp */
         .sign-row {
-          margin-top: 26px;
-          margin-bottom: 100px; /* safe space above footer */
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr; /* left / center / spacer */
-          align-items: end;
-          column-gap: 20px;
+          margin-top: 30px;
+          margin-bottom: 120px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end; /* bottom alignment */
         }
-        .sig-left { justify-self: start; text-align: left; }
+        .sig-left { text-align: left; }
         .sig-left img { width: 120px; display: block; }
         .sig-left span { display: block; margin-top: 6px; }
 
-        .sig-center { justify-self: center; text-align: center; }
-        .stamp { width: 110px; opacity: 0.95; display: block; margin: 0 auto; }
+        .sig-center { text-align: center; }
+        .stamp { width: 110px; opacity: 0.95; margin-top: 30px; }
       </style>
     </head>
     <body>
       <!-- header/footer images -->
-      <img src="${ASSET_BASE}/headernew.png" class="header-img" />
+      <img src="${ASSET_BASE}/header.png" class="header-img" />
       <img src="${ASSET_BASE}/footer.png" class="footer-img" />
 
       <!-- watermark -->
       <img src="${ASSET_BASE}/eduroom-watermark.png" class="watermark" />
 
       <div class="content">
-        <!-- DATE at top-right with extra space from header -->
+        <!-- DATE on left -->
         <div class="date-line">Date: ${today}</div>
 
-        <!-- Title WITHOUT underline -->
+        <!-- Title -->
         <div class="title">OFFER LETTER FOR INTERNSHIP</div>
 
         <p>Dear ${candidateName},</p>
@@ -167,7 +165,7 @@ const generateOfferLetter = async (userId) => {
 
         <p>Thank you!<br/>Yours Sincerely,<br/>Eduroom</p>
 
-        <!-- Signature + centered stamp -->
+        <!-- Signature + Stamp -->
         <div class="sign-row">
           <div class="sig-left">
             <img src="${ASSET_BASE}/signature.png" />
@@ -176,7 +174,6 @@ const generateOfferLetter = async (userId) => {
           <div class="sig-center">
             <img src="${ASSET_BASE}/stamp.jpg" class="stamp" />
           </div>
-          <div></div>
         </div>
       </div>
     </body>
@@ -194,6 +191,7 @@ const generateOfferLetter = async (userId) => {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
+    preferCSSPageSize: true,
     margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
   });
 
