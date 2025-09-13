@@ -15,7 +15,6 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
   const transaction = await sequelize.transaction();
   try {
-    // Verify course and preview exist
     const course = await model.Course.findByPk(courseId);
     if (!course || course.isDeleted) throw new Error("Course not found");
 
@@ -29,24 +28,21 @@ const addOrUpdateCourseDetail = async (req, res) => {
       if (day === undefined || day === null) throw new Error("day is required for each day object");
       if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
-      // Find existing CourseDetail row for this coursePreview/day
       let courseDetail = await model.CourseDetail.findOne({
         where: { courseId, coursePreviewId, day },
         transaction
       });
 
       if (!courseDetail) {
-        // Create parent CourseDetail row
         courseDetail = await model.CourseDetail.create({
           domainId,
           courseId,
           coursePreviewId,
-          userId: userId || null,
+          userId: userId ?? null,
           day,
-          // Default placeholders; sessionNumber/title will be set for first session below
-          sessionNumber: sessions[0].sessionNumber || 1,
-          title: sessions[0].title || `Day ${day} Overview`,
-          description: sessions[0].description || null,
+          sessionNumber: sessions[0].sessionNumber ?? 1,
+          title: sessions[0].title ?? `Day ${day} Overview`,
+          description: sessions[0].description ?? null,
         }, { transaction });
       }
 
@@ -58,54 +54,86 @@ const addOrUpdateCourseDetail = async (req, res) => {
         if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Update main fields in CourseDetail (for first session or latest overview)
+        // Update main CourseDetail fields for first session
         if (sessionNumber === 1) {
           await courseDetail.update({
             sessionNumber,
             title,
-            description: description || null,
-            youtubeLink: youtubeLink || null,
-            duration: duration || null,
-            sessionDuration: sessionDuration || null,
-            heading: heading || null
+            description: description ?? null,
+            youtubeLink: youtubeLink ?? null,
+            duration: duration ?? null,
+            sessionDuration: sessionDuration ?? null,
+            heading: heading ?? null
           }, { transaction });
         }
 
-        // Delete old questions for this session
-        await model.QuestionModel.destroy({
-          where: { courseDetailId: courseDetail.id, sessionNumber },
-          transaction
-        });
+        if (Array.isArray(questions)) {
+          // Get existing questions for this session
+          const existingQuestions = await model.QuestionModel.findAll({
+            where: { courseDetailId: courseDetail.id, sessionNumber },
+            transaction
+          });
 
-        // Insert new questions
-        if (Array.isArray(questions) && questions.length > 0) {
-          const questionRecords = questions.map(q => ({
-            courseDetailId: courseDetail.id,
-            domainId,
-            courseId,
-            coursePreviewId,
-            day,
-            sessionNumber,
-            question: q.question,
-            optionA: q.optionA,
-            optionB: q.optionB,
-            optionC: q.optionC,
-            optionD: q.optionD,
-            answer: q.answer,
-            keywords: q.keywords || null,
-            caseStudy: q.caseStudy || null
-          }));
-          await model.QuestionModel.bulkCreate(questionRecords, { transaction });
+          const existingQuestionMap = {};
+          existingQuestions.forEach(q => existingQuestionMap[q.id] = q);
+
+          const incomingIds = [];
+
+          for (const q of questions) {
+            if (q.id && existingQuestionMap[q.id]) {
+              // Update existing question
+              await existingQuestionMap[q.id].update({
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(q.id);
+            } else {
+              // Create new question
+              const newQ = await model.QuestionModel.create({
+                courseDetailId: courseDetail.id,
+                domainId,
+                courseId,
+                coursePreviewId,
+                day,
+                sessionNumber,
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(newQ.id);
+            }
+          }
+
+          // Delete any old questions not present in payload
+          const toDelete = existingQuestions.filter(q => !incomingIds.includes(q.id));
+          if (toDelete.length > 0) {
+            const deleteIds = toDelete.map(q => q.id);
+            await model.QuestionModel.destroy({
+              where: { id: deleteIds },
+              transaction
+            });
+          }
         }
 
         updatedSessions.push({
           sessionNumber,
           title,
-          description: description || null,
-          youtubeLink: youtubeLink || null,
-          duration: duration || null,
-          sessionDuration: sessionDuration || null,
-          heading: heading || null,
+          description: description ?? null,
+          youtubeLink: youtubeLink ?? null,
+          duration: duration ?? null,
+          sessionDuration: sessionDuration ?? null,
+          heading: heading ?? null,
           questions
         });
       }
