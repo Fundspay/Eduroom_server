@@ -131,21 +131,22 @@ const fetchAllCourses = async (req, res) => {
       raw: true,
     });
 
+    // 🔹 Map courses with status and previews
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
       const courseDates = user.courseDates || {};
       const courseStatuses = user.courseStatuses || {};
+      const courseIdStr = String(course.id); // 🔹 Ensure string key access
 
-      // 1️⃣ Check internship status from manager
-      if (user.teamManager && user.teamManager.internshipStatus) {
-        status = user.teamManager.internshipStatus;
-      } else if (courseDates[course.id] && courseDates[course.id].started) {
-        // 2️⃣ Check per-course status from user table
-        status = courseStatuses[course.id] || "Started";
+      // ✅ Check if course has started
+      if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
+        status = courseStatuses[courseIdStr] || "Started";
+      } else {
+        status = "Not Started";
       }
 
-      // 🔹 Attach previews by matching courseId instead of domainId
+      // 🔹 Attach previews specific to this course
       const coursePreviews = previews
         .filter((p) => p.courseId === course.id)
         .map((p) => ({
@@ -157,8 +158,8 @@ const fetchAllCourses = async (req, res) => {
 
       return {
         ...course.toJSON(),
-        courseId: course.id,      // ✅ root-level courseId
-        CoursePreviews: coursePreviews, // ✅ keep frontend format
+        courseId: course.id,
+        CoursePreviews: coursePreviews,
         status,
       };
     });
