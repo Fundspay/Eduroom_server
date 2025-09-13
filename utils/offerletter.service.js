@@ -71,14 +71,14 @@ const generateOfferLetter = async (userId) => {
         /* Header/Footer images only */
         .header-img {
           position: fixed; top: 0; left: 0; right: 0;
-          width: 100%; height: ${HEADER_H}px;
-          object-fit: contain; object-position: top center;
+          width: 100%; height: auto; max-height:180px;
+          object-fit: cover; object-position: top center;
           display: block; z-index: 1; background: #fff;
         }
         .footer-img {
           position: fixed; left: 0; right: 0; bottom: 0;
           width: 100%; height: ${FOOTER_H}px;
-          object-fit: contain; object-position: bottom center;
+          object-fit: cover; object-position: bottom center;
           display: block; z-index: 1; background: #fff;
         }
 
@@ -91,7 +91,7 @@ const generateOfferLetter = async (userId) => {
 
         /* Date back to top-right, with space above/below */
         .date-line {
-          text-align: right;
+          text-align: left;
           margin: 0 0 24px 0;  /* space below date before title */
         }
 
