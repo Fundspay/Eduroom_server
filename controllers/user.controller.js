@@ -963,12 +963,14 @@ const getInternshipStatusByUser = async (req, res) => {
     if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
     // Check if manager exists
-    const manager = await model.TeamManager.findOne({ where: { managerId: userId, isDeleted: false } });
+    const manager = await model.TeamManager.findOne({
+      where: { managerId: userId, isDeleted: false }
+    });
     if (!manager) return ReE(res, "Manager not found", 404);
 
-    // Fetch interns under this manager
+    // ✅ Fetch interns using assignedTeamManager (not managerId)
     const interns = await model.User.findAll({
-      where: { managerId: userId, isDeleted: false },
+      where: { assignedTeamManager: userId, isDeleted: false },
       attributes: ["id", "firstName", "lastName", "internshipStatus"]
     });
 
@@ -976,7 +978,8 @@ const getInternshipStatusByUser = async (req, res) => {
     let completed = 0, onHold = 0, inProgress = 0;
 
     interns.forEach(intern => {
-      switch ((intern.internshipStatus || "").toLowerCase()) {
+      const status = (intern.internshipStatus || "").trim().toLowerCase();
+      switch (status) {
         case "completed":
           completed++;
           break;
