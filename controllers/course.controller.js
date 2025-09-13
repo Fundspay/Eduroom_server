@@ -92,6 +92,7 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
+// ✅ Fetch all Courses
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -110,19 +111,27 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // 🔹 Fetch all courses with previews + domain
+    // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
       include: [
         { model: model.Domain, attributes: ["name"] },
-        {
-          model: model.CoursePreview,
-          attributes: [["id", "coursePreviewId"], "dayCount", "title", "heading"],
-          where: { isDeleted: false },
-          required: false, // still return courses even if no previews
-        },
       ],
+    });
+
+    // 🔹 Fetch all CoursePreviews at once
+    const previews = await model.CoursePreview.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        ["id", "coursePreviewId"],
+        "courseId",
+        "domainId",
+        "title",
+        "heading",
+        "dayCount",
+      ],
+      raw: true,
     });
 
     const coursesWithStatus = courses.map((course) => {
@@ -141,17 +150,20 @@ const fetchAllCourses = async (req, res) => {
         }
       }
 
-      // 🔹 Normalize previews (empty array if none)
-      const previews = (course.CoursePreviews || []).map((p) => ({
-        coursePreviewId: p.coursePreviewId,
-        dayCount: p.dayCount,
-        title: p.title,
-        heading: p.heading,
-      }));
+      // 🔹 Attach previews by matching **domainId**
+      const coursePreviews = previews
+        .filter((p) => p.domainId === course.domainId)
+        .map((p) => ({
+          coursePreviewId: p.coursePreviewId,
+          dayCount: p.dayCount,
+          title: p.title,
+          heading: p.heading,
+        }));
 
       return {
         ...course.toJSON(),
-        previews,
+        courseId: course.id, // ✅ root-level courseId
+        CoursePreviews: coursePreviews, // ✅ preserve frontend expectations
         status,
       };
     });
@@ -164,6 +176,7 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
 
 
 // ✅ Fetch single Course by ID
