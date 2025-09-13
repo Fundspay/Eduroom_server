@@ -24,53 +24,76 @@ if (!admin.apps.length) {
 // ✅  STEP 1: Create Student Personal Information
 
 
-var addPersonalInfo = async function (req, res) {
-    try {
-        const {
-            firstName,
-            lastName,
-            fullName,
-            dateOfBirth,
-            gender,
-            phoneNumber,
-            alternatePhoneNumber,
-            email,
-            residentialAddress,
-            emergencyContactName,
-            emergencyContactNumber,
-            city,
-            state,
-            pinCode,
-            password,
-        } = req.body;
+const bcrypt = require("bcryptjs"); // make sure bcryptjs is installed
 
-        if (!firstName || !lastName || !email || !phoneNumber || !password) {
-            return ReE(res, "Required fields missing", 400);
-        }
+const addPersonalInfo = async (req, res) => {
+  try {
+    const {
+      firstName,
+      lastName,
+      fullName,
+      dateOfBirth,
+      gender,
+      phoneNumber,
+      alternatePhoneNumber,
+      email,
+      residentialAddress,
+      emergencyContactName,
+      emergencyContactNumber,
+      city,
+      state,
+      pinCode,
+      password,
+    } = req.body;
 
-        const user = await model.User.create({
-            firstName,
-            lastName,
-            fullName,
-            dateOfBirth,
-            gender,
-            phoneNumber,
-            alternatePhoneNumber,
-            email,
-            residentialAddress,
-            emergencyContactName,
-            emergencyContactNumber,
-            city,
-            state,
-            pinCode,
-            password,
-        });
-
-        return ReS(res, { success: true, userId: user.id }, 201);
-    } catch (error) {
-        return ReE(res, error.message, 500);
+    // ✅ Required fields validation
+    if (!firstName || !lastName || !email || !phoneNumber || !password) {
+      return ReE(res, "Required fields missing: firstName, lastName, email, phoneNumber, password", 400);
     }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = phoneNumber.trim();
+
+    // ✅ Check if email already exists
+    const existingEmail = await model.User.findOne({
+      where: { email: normalizedEmail, isDeleted: false }
+    });
+    if (existingEmail) return ReE(res, "User with this email already exists", 409);
+
+    // ✅ Check if phone number already exists
+    const existingPhone = await model.User.findOne({
+      where: { phoneNumber: normalizedPhone, isDeleted: false }
+    });
+    if (existingPhone) return ReE(res, "User with this phone number already exists", 409);
+
+    // ✅ Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await model.User.create({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      fullName: fullName ? fullName.trim() : null,
+      dateOfBirth,
+      gender,
+      phoneNumber: normalizedPhone,
+      alternatePhoneNumber: alternatePhoneNumber ? alternatePhoneNumber.trim() : null,
+      email: normalizedEmail,
+      residentialAddress: residentialAddress ? residentialAddress.trim() : null,
+      emergencyContactName: emergencyContactName ? emergencyContactName.trim() : null,
+      emergencyContactNumber: emergencyContactNumber ? emergencyContactNumber.trim() : null,
+      city: city ? city.trim() : null,
+      state: state ? state.trim() : null,
+      pinCode: pinCode ? pinCode.trim() : null,
+      password: hashedPassword,
+    });
+
+    return ReS(res, { success: true, userId: user.id }, 201);
+  } catch (error) {
+    console.error("Add Personal Info Error:", error);
+    return ReE(res, error.message, 500);
+  }
 };
+
 module.exports.addPersonalInfo = addPersonalInfo;
 
 // Fetch users created within a date range (DD-MM-YYYY)
