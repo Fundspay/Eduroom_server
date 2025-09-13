@@ -97,7 +97,7 @@ const fetchAllCourses = async (req, res) => {
     const { userId } = req.query;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user with assigned TeamManager
+    // 🔹 Fetch user with TeamManager
     const user = await model.User.findByPk(userId, {
       include: [
         {
@@ -110,7 +110,7 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // Fetch all courses
+    // 🔹 Fetch all courses with previews + domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
@@ -118,9 +118,9 @@ const fetchAllCourses = async (req, res) => {
         { model: model.Domain, attributes: ["name"] },
         {
           model: model.CoursePreview,
-          attributes: [["id", "coursePreviewId"], "dayCount"],
+          attributes: [["id", "coursePreviewId"], "dayCount", "title", "heading"],
           where: { isDeleted: false },
-          required: false,
+          required: false, // still return courses even if no previews
         },
       ],
     });
@@ -128,22 +128,30 @@ const fetchAllCourses = async (req, res) => {
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
-      // 1️⃣ Check TeamManager internshipStatus
+      // 1️⃣ Check internship status from manager
       if (user.teamManager && user.teamManager.internshipStatus) {
         status = user.teamManager.internshipStatus;
       } else {
         const courseDates = user.courseDates || {};
         const courseStatuses = user.courseStatuses || {};
 
-        // 2️⃣ Check if course has been started
+        // 2️⃣ If course started, check per-course status
         if (courseDates[course.id] && courseDates[course.id].started) {
-          // 3️⃣ If started, check courseStatuses for updated status
           status = courseStatuses[course.id] || "Started";
         }
       }
 
+      // 🔹 Normalize previews (empty array if none)
+      const previews = (course.CoursePreviews || []).map((p) => ({
+        coursePreviewId: p.coursePreviewId,
+        dayCount: p.dayCount,
+        title: p.title,
+        heading: p.heading,
+      }));
+
       return {
         ...course.toJSON(),
+        previews,
         status,
       };
     });
@@ -156,6 +164,7 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
 
 // ✅ Fetch single Course by ID
 var fetchSingleCourse = async (req, res) => {
