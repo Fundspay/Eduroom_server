@@ -129,7 +129,7 @@ const generateOfferLetter = async (userId) => {
     </head>
     <body>
       <!-- header/footer images -->
-      <img src="${ASSET_BASE}/header.png" class="header-img" />
+      <img src="${ASSET_BASE}/headernew.png" class="header-img" />
       <img src="${ASSET_BASE}/footer.png" class="footer-img" />
 
       <!-- watermark -->
