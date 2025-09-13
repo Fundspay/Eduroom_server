@@ -134,22 +134,20 @@ const fetchAllCourses = async (req, res) => {
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
+      const courseDates = user.courseDates || {};
+      const courseStatuses = user.courseStatuses || {};
+
       // 1️⃣ Check internship status from manager
       if (user.teamManager && user.teamManager.internshipStatus) {
         status = user.teamManager.internshipStatus;
-      } else {
+      } else if (courseDates[course.id] && courseDates[course.id].started) {
         // 2️⃣ Check per-course status from user table
-        const courseDates = user.courseDates || {};
-        const courseStatuses = user.courseStatuses || {};
-
-        if (courseDates[course.id] && courseDates[course.id].started) {
-          status = courseStatuses[course.id] || "Started";
-        }
+        status = courseStatuses[course.id] || "Started";
       }
 
-      // 🔹 Attach previews by matching domainId
+      // 🔹 Attach previews by matching courseId instead of domainId
       const coursePreviews = previews
-        .filter((p) => p.domainId === course.domainId)
+        .filter((p) => p.courseId === course.id)
         .map((p) => ({
           coursePreviewId: p.coursePreviewId,
           dayCount: p.dayCount,
@@ -173,6 +171,7 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
 
 
 // ✅ Fetch single Course by ID
