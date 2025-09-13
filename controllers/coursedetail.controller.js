@@ -15,7 +15,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
   const transaction = await sequelize.transaction();
   try {
-    // Check if course exists
+    // Verify course and preview exist
     const course = await model.Course.findByPk(courseId);
     if (!course || course.isDeleted) throw new Error("Course not found");
 
@@ -24,41 +24,63 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
     const createdDays = [];
 
-    // Loop over days
     for (const dayObj of days) {
       const { day, sessions } = dayObj;
       if (day === undefined || day === null) throw new Error("day is required for each day object");
       if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
-      const createdSessions = [];
+      // Find existing CourseDetail row for this coursePreview/day
+      let courseDetail = await model.CourseDetail.findOne({
+        where: { courseId, coursePreviewId, day },
+        transaction
+      });
 
-      // Loop over sessions
-      for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, questions, duration, sessionDuration, heading } = session;
-
-        if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
-        if (!title) throw new Error("title is required for each session");
-
-        // Create a new CourseDetail row for this session
-        const newSession = await model.CourseDetail.create({
+      if (!courseDetail) {
+        // Create parent CourseDetail row
+        courseDetail = await model.CourseDetail.create({
           domainId,
           courseId,
           coursePreviewId,
           userId: userId || null,
           day,
-          sessionNumber,
-          title,
-          description: description || null,
-          youtubeLink: youtubeLink || null,
-          duration: duration || null,
-          sessionDuration: sessionDuration || null,
-          heading: heading || null
+          // Default placeholders; sessionNumber/title will be set for first session below
+          sessionNumber: sessions[0].sessionNumber || 1,
+          title: sessions[0].title || `Day ${day} Overview`,
+          description: sessions[0].description || null,
         }, { transaction });
+      }
 
-        // Create MCQs/questions if any
+      const updatedSessions = [];
+
+      for (const session of sessions) {
+        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
+
+        if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
+        if (!title) throw new Error("title is required for each session");
+
+        // Update main fields in CourseDetail (for first session or latest overview)
+        if (sessionNumber === 1) {
+          await courseDetail.update({
+            sessionNumber,
+            title,
+            description: description || null,
+            youtubeLink: youtubeLink || null,
+            duration: duration || null,
+            sessionDuration: sessionDuration || null,
+            heading: heading || null
+          }, { transaction });
+        }
+
+        // Delete old questions for this session
+        await model.QuestionModel.destroy({
+          where: { courseDetailId: courseDetail.id, sessionNumber },
+          transaction
+        });
+
+        // Insert new questions
         if (Array.isArray(questions) && questions.length > 0) {
           const questionRecords = questions.map(q => ({
-            courseDetailId: newSession.id,
+            courseDetailId: courseDetail.id,
             domainId,
             courseId,
             coursePreviewId,
@@ -76,8 +98,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           await model.QuestionModel.bulkCreate(questionRecords, { transaction });
         }
 
-        // Add session to response
-        createdSessions.push({
+        updatedSessions.push({
           sessionNumber,
           title,
           description: description || null,
@@ -89,7 +110,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
         });
       }
 
-      createdDays.push({ day, sessions: createdSessions });
+      createdDays.push({ day, sessions: updatedSessions });
     }
 
     await transaction.commit();
