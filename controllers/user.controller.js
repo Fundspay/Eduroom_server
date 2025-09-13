@@ -23,7 +23,6 @@ if (!admin.apps.length) {
 
 // ✅  STEP 1: Create Student Personal Information
 
-
 const addPersonalInfo = async (req, res) => {
   try {
     const {
