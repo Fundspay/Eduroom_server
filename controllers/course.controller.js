@@ -97,7 +97,7 @@ const fetchAllCourses = async (req, res) => {
     const { userId } = req.query;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user with TeamManager
+    // 🔹 Fetch user with TeamManager
     const user = await model.User.findByPk(userId, {
       include: [
         {
@@ -110,14 +110,14 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // Fetch all courses with domain
+    // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
       include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
-    // Fetch all course previews
+    // 🔹 Fetch all CoursePreviews at once
     const previews = await model.CoursePreview.findAll({
       where: { isDeleted: false },
       attributes: [
@@ -134,22 +134,22 @@ const fetchAllCourses = async (req, res) => {
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
-      // 1️⃣ Check TeamManager internshipStatus first
+      // 1️⃣ Check internship status from manager
       if (user.teamManager && user.teamManager.internshipStatus) {
         status = user.teamManager.internshipStatus;
       } else {
+        // 2️⃣ Check per-course status from user table
         const courseDates = user.courseDates || {};
         const courseStatuses = user.courseStatuses || {};
 
-        // 2️⃣ Check if the course has been started
         if (courseDates[course.id] && courseDates[course.id].started) {
           status = courseStatuses[course.id] || "Started";
         }
       }
 
-      // 3️⃣ Attach only previews belonging to this course
+      // 🔹 Attach previews by matching domainId
       const coursePreviews = previews
-        .filter((p) => p.courseId === course.id)
+        .filter((p) => p.domainId === course.domainId)
         .map((p) => ({
           coursePreviewId: p.coursePreviewId,
           dayCount: p.dayCount,
@@ -159,8 +159,8 @@ const fetchAllCourses = async (req, res) => {
 
       return {
         ...course.toJSON(),
-        courseId: course.id,       // root-level courseId
-        CoursePreviews: coursePreviews, // frontend-friendly
+        courseId: course.id,      // ✅ root-level courseId
+        CoursePreviews: coursePreviews, // ✅ keep frontend format
         status,
       };
     });
