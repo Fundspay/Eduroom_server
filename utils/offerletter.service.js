@@ -59,21 +59,17 @@ const generateOfferLetter = async (userId) => {
       <style>
         @page { size: A4; margin: 0; }
         html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        @font-face {
-  font-family: "TeXGyreBonum";  
-  src: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/fonts/texgyrebonum-regular.ttf") format("truetype");  
-  font-weight: normal;
-  font-style: normal;
-}
-
-body {
-  margin: 0;
-  font-family: "TeXGyreBonum", "Times New Roman", serif;  /* FONT CHANGE HERE */
-  font-size: 13px;
-  line-height: 1.6;
-  color: #111;
-  box-sizing: border-box;
-}
+        @import url('https://fonts.googleapis.com/css2?family=EB+Garamond&display=swap');
+        body {
+          margin: 0;
+          font-family: "EB Garamond", "Times New Roman", serif;
+          font-size: 13px;
+          line-height: 1.6;
+          color: #111;
+          box-sizing: border-box;
+        }
+        
+        @import url('https://fonts.cdnfonts.com/css/tex-gyre-bonum');
 
         /* Header/Footer images only */
         .header-img {
