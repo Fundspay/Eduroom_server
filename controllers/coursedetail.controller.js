@@ -950,6 +950,7 @@ const getCourseStatus = async (req, res) => {
 
 module.exports.getCourseStatus = getCourseStatus;
 
+
 const setCourseStartEndDates = async (req, res) => {
   try {
     const { userId, courseId, startDate } = req.body;
@@ -987,6 +988,15 @@ const setCourseStartEndDates = async (req, res) => {
 
     user.courseDates = courseDates;
     await user.save(); // safer than user.update()
+
+    // 🔹 Trigger internal Offer Letter API (non-blocking)
+    try {
+      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}`);
+      console.log(`Offer letter triggered for user ${userId}`);
+    } catch (err) {
+      console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
+      // ⚠️ Don’t fail main request if offerletter fails
+    }
 
     return ReS(
       res,
