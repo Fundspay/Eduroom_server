@@ -24,8 +24,6 @@ if (!admin.apps.length) {
 // ✅  STEP 1: Create Student Personal Information
 
 
-const bcrypt = require("bcryptjs"); // make sure bcryptjs is installed
-
 const addPersonalInfo = async (req, res) => {
   try {
     const {
