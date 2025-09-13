@@ -28,6 +28,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
       if (day === undefined || day === null) throw new Error("day is required for each day object");
       if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
+      // Find or create course detail for the day
       let courseDetail = await model.CourseDetail.findOne({
         where: { courseId, coursePreviewId, day },
         transaction
@@ -68,21 +69,22 @@ const addOrUpdateCourseDetail = async (req, res) => {
         }
 
         if (Array.isArray(questions)) {
-          // Get existing questions for this session
+          // Fetch existing questions for this session
           const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: courseDetail.id, sessionNumber },
             transaction
           });
 
           const existingQuestionMap = {};
-          existingQuestions.forEach(q => existingQuestionMap[q.id] = q);
+          existingQuestions.forEach(q => existingQuestionMap[Number(q.id)] = q);
 
           const incomingIds = [];
 
           for (const q of questions) {
-            if (q.id && existingQuestionMap[q.id]) {
+            const qId = Number(q.id);
+            if (qId && existingQuestionMap[qId]) {
               // Update existing question
-              await existingQuestionMap[q.id].update({
+              await existingQuestionMap[qId].update({
                 question: q.question,
                 optionA: q.optionA,
                 optionB: q.optionB,
@@ -92,7 +94,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 keywords: q.keywords ?? null,
                 caseStudy: q.caseStudy ?? null
               }, { transaction });
-              incomingIds.push(q.id);
+              incomingIds.push(qId);
             } else {
               // Create new question
               const newQ = await model.QuestionModel.create({
@@ -115,14 +117,11 @@ const addOrUpdateCourseDetail = async (req, res) => {
             }
           }
 
-          // Delete any old questions not present in payload
-          const toDelete = existingQuestions.filter(q => !incomingIds.includes(q.id));
+          // Delete old questions not present in payload
+          const toDelete = existingQuestions.filter(q => !incomingIds.includes(Number(q.id)));
           if (toDelete.length > 0) {
             const deleteIds = toDelete.map(q => q.id);
-            await model.QuestionModel.destroy({
-              where: { id: deleteIds },
-              transaction
-            });
+            await model.QuestionModel.destroy({ where: { id: deleteIds }, transaction });
           }
         }
 
