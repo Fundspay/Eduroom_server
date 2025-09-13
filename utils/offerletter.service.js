@@ -73,13 +73,13 @@ const generateOfferLetter = async (userId) => {
         .header-img {
           position: fixed; top: 0; left: 0; right: 0;
           width: 100%; height: ${HEADER_H}px;
-          object-fit: contain; object-position: top center;
+          object-fit: cover; object-position: top center;
           display: block; z-index: 1; background: #fff;
         }
         .footer-img {
           position: fixed; left: 0; right: 0; bottom: 0;
           width: 100%; height: ${FOOTER_H}px;
-          object-fit: contain; object-position: bottom center;
+          object-fit: cover; object-position: bottom center;
           display: block; z-index: 1; background: #fff;
         }
 
