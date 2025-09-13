@@ -1,6 +1,6 @@
 "use strict";
 const model = require("../models/index");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcrypt");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const crypto = require("crypto");
@@ -22,6 +22,8 @@ if (!admin.apps.length) {
 
 
 // ✅  STEP 1: Create Student Personal Information
+
+
 const addPersonalInfo = async (req, res) => {
   try {
     const {
