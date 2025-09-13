@@ -48,8 +48,8 @@ const generateOfferLetter = async (userId) => {
 
   // 2) S3 assets
   const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
-  const HEADER_H = 120; 
-  const FOOTER_H = 170; 
+  const HEADER_H = 120;
+  const FOOTER_H = 170;
 
   // 3) HTML
   const html = `
@@ -69,19 +69,28 @@ const generateOfferLetter = async (userId) => {
           box-sizing: border-box;
         }
 
-        /* Header/Footer images */
         .header-img {
-          position: fixed; top: 0; left: 0; right: 0;
-          width: 100%; height: ${HEADER_H}px;
-          object-fit: contain; object-position: top center;
-          display: block; z-index: 1; background: #fff;
-        }
-        .footer-img {
-          position: fixed; left: 0; right: 0; bottom: 0;
-          width: 100%; height: ${FOOTER_H}px;
-          object-fit: contain; object-position: bottom center;
-          display: block; z-index: 1; background: #fff;
-        }
+  position: fixed; 
+  top: 0; 
+  left: 0; 
+  right: 0;
+  width: 100%; 
+  height: auto;       /* keep natural aspect ratio */
+  display: block; 
+  z-index: 1;
+}
+
+.footer-img {
+  position: fixed; 
+  left: 0; 
+  right: 0; 
+  bottom: 0;
+  width: 100%; 
+  height: auto;       /* keep natural aspect ratio */
+  display: block; 
+  z-index: 1;
+}
+
 
         /* Content area */
         .content {
