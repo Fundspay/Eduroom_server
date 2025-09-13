@@ -1,12 +1,12 @@
 "use strict";
 const model = require("../models/index");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const crypto = require("crypto");
 const { Op } = require("sequelize");
 const jwt = require('jsonwebtoken');
-const admin = require('firebase-admin');
+const admin = require('firebase-admin'); 
 const CONFIG = require("../config/config.js");
 const axios = require('axios');
 const moment = require("moment");
@@ -22,8 +22,6 @@ if (!admin.apps.length) {
 
 
 // ✅  STEP 1: Create Student Personal Information
-
-
 const addPersonalInfo = async (req, res) => {
   try {
     const {
