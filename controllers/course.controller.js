@@ -92,6 +92,7 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
+// ✅ Fetch all Courses
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
@@ -118,9 +119,14 @@ const fetchAllCourses = async (req, res) => {
         { model: model.Domain, attributes: ["name"] },
         {
           model: model.CoursePreview,
-          attributes: [["id", "coursePreviewId"], "dayCount", "title", "heading"],
+          attributes: [
+            ["id", "coursePreviewId"],
+            "dayCount",
+            "title",
+            "heading",
+          ],
           where: { isDeleted: false },
-          required: false, // still return courses even if no previews
+          required: false,
         },
       ],
     });
@@ -141,17 +147,15 @@ const fetchAllCourses = async (req, res) => {
         }
       }
 
-      // 🔹 Normalize previews (empty array if none)
-      const previews = (course.CoursePreviews || []).map((p) => ({
-        coursePreviewId: p.coursePreviewId,
-        dayCount: p.dayCount,
-        title: p.title,
-        heading: p.heading,
-      }));
+      // 🔹 Keep CoursePreviews array intact
+      const coursePreviews = course.CoursePreviews || [];
+
+      const courseJson = course.toJSON();
 
       return {
-        ...course.toJSON(),
-        previews,
+        ...courseJson,
+        courseId: courseJson.id, // ✅ explicit courseId for frontend
+        CoursePreviews: coursePreviews, // ✅ do NOT modify
         status,
       };
     });
