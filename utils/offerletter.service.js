@@ -267,51 +267,57 @@ const generateOfferLetter = async (userId) => {
 
   // 2. Determine the earliest course start date from courseDates
   let startDate = null;
-  let courseName = null;
+let endDate = null;
+let courseName = null;
 
-  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
-    let earliestStart = null;
-    let courseIdForStart = null;
+if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+  let earliestStart = null;
+  let courseIdForStart = null;
 
-    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
-      if (!courseObj.startDate) continue;
-      const courseStartISO = normalizeDateToISO(courseObj.startDate);
-      if (!courseStartISO) continue;
+  for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+    if (!courseObj.startDate) continue;
+    const courseStartISO = normalizeDateToISO(courseObj.startDate);
+    if (!courseStartISO) continue;
 
-      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
-        earliestStart = courseStartISO;
-        courseIdForStart = cid;
-      }
-    }
-
-    startDate = earliestStart;
-
-    if (courseIdForStart) {
-      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
-      if (course && course.name) {
-        courseName = course.name;
-      }
+    if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+      earliestStart = courseStartISO;
+      courseIdForStart = cid;
     }
   }
 
-  // 3. Fallbacks
-  startDate = startDate
-    ? new Date(startDate).toLocaleDateString("en-GB", {
+  startDate = earliestStart;
+
+  if (courseIdForStart) {
+    const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+    if (course && course.name) {
+      courseName = course.name;
+    }
+
+    // Set endDate from the same course
+    const selectedCourseObj = user.courseDates[courseIdForStart];
+    if (selectedCourseObj.endDate) {
+      endDate = normalizeDateToISO(selectedCourseObj.endDate);
+    }
+  }
+}
+
+// Fallback formatting
+startDate = startDate
+  ? new Date(startDate).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric"
     })
-    : "To Be Decided";
+  : "To Be Decided";
 
-  const position = courseName || "Intern";
-  const role = courseName || "Intern";
-  const workLocation = "Work from Home";
+endDate = endDate
+  ? new Date(endDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    })
+  : "To Be Decided";
 
-  const today = new Date().toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  });
 
   // 5) HTML content (your CSS untouched, only background path fixed)
  // 5) HTML content (updated text)
