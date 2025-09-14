@@ -87,7 +87,8 @@ const generateOfferLetter = async (userId) => {
     <meta charset="UTF-8">
     <title>Offer Letter</title>
 
-    <link rel="stylesheet" media="screen" href="https://fontlibrary.org//face/tex-gyre-bonum" type="text/css" />
+    <!-- Removed media="screen" so Puppeteer can load the font -->
+    <link rel="stylesheet" href="https://fontlibrary.org/face/tex-gyre-bonum" type="text/css" />
 
     <style>
         body {
@@ -111,7 +112,8 @@ const generateOfferLetter = async (userId) => {
         .date,
         .title,
         .content {
-            font-family: 'TeXGyreBonumRegular', 'Times New Roman', serif;
+            /* Updated font-family to match font library name */
+            font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
         }
 
         .date {
@@ -184,7 +186,8 @@ const generateOfferLetter = async (userId) => {
     </div>
 </body>
 
-</html> 
+</html>
+
 `;
 
   // 6) Render PDF with Puppeteer
