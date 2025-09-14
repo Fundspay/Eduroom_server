@@ -36,19 +36,20 @@ const createAndSendInternshipCertificate = async (req, res) => {
     }
 
     // 🔹 Check if current date is >= course end date
-    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-    const courseEndDate = user.courseDates?.[courseId]?.endDate;
-
-    if (!courseEndDate) {
+    const today = new Date();
+    const courseEndDateStr = user.courseDates?.[courseId]?.endDate;
+    if (!courseEndDateStr) {
       await transaction.rollback();
       return res.status(400).json({ success: false, message: "Course end date not found for this user" });
     }
+
+    const courseEndDate = new Date(courseEndDateStr);
 
     if (today < courseEndDate) {
       await transaction.rollback();
       return res.status(400).json({ 
         success: false, 
-        message: `You cannot download the certificate before the course end date (${courseEndDate})` 
+        message: `You cannot download the certificate before the course end date (${courseEndDate.toISOString().split('T')[0]})` 
       });
     }
 
@@ -75,6 +76,14 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     // 🔹 Generate certificate PDF + S3 link
     const certificateFile = await generateInternshipCertificate(userId, courseId);
+
+    if (!certificateFile?.certificateUrl) {
+      await transaction.rollback();
+      return res.status(500).json({
+        success: false,
+        message: "Certificate generation failed: certificateUrl is missing"
+      });
+    }
 
     // 🔹 Create certificate record
     const certificate = await model.InternshipCertificate.create({
