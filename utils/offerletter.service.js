@@ -271,7 +271,7 @@ const formatDateOrdinal = (date) => {
 /**
  * Generate an offer letter PDF for a given user and upload it to S3.
  */
-const generateCourseLetter = async (userId) => {
+const generateOfferLetter = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1) Load user
@@ -402,4 +402,4 @@ const generateCourseLetter = async (userId) => {
   };
 };
 
-module.exports = { generateCourseLetter };
+module.exports = { generateOfferLetter };
