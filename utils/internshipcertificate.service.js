@@ -19,7 +19,7 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const generateOfferLetter = async (userId) => {
+const  generateInternshipCertificate = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1. Load user
