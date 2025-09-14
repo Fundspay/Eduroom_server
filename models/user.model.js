@@ -53,7 +53,7 @@ module.exports = (sequelize, Sequelize) => {
       bankName: { type: Sequelize.STRING, allowNull: true },
       branchAddress: { type: Sequelize.STRING, allowNull: true },
       ifscCode: { type: Sequelize.STRING, allowNull: true },
-      accountNumber: { type: Sequelize.STRING, allowNull: true, unique: true },
+      accountNumber: { type: Sequelize.STRING, allowNull: true},
 
       // 🔹 Communication
       preferredCommunicationId: { type: Sequelize.BIGINT, allowNull: true },
