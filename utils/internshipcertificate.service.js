@@ -1,8 +1,6 @@
 "use strict";
-const PDFDocument = require("pdfkit");
-const axios = require("axios");
 const AWS = require("aws-sdk");
-const { PassThrough } = require("stream");
+const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
 const model = require("../models");
 
@@ -12,130 +10,207 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion
 });
 
-const generateInternshipCertificate = async (userId, courseId) => {
-  try {
-    if (!userId) throw new Error("Missing userId");
-    if (!courseId) throw new Error("Missing courseId");
+const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
-    // Load user
-    const user = await model.User.findOne({
-      where: { id: userId, isDeleted: false }
-    });
-    if (!user) throw new Error("User not found");
+const normalizeDateToISO = (input) => {
+  if (!input) return null;
+  const d = new Date(input);
+  if (isNaN(d)) return null;
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD
+};
 
-    // Load course
-    const course = await model.Course.findOne({
-      where: { id: courseId, isDeleted: false }
-    });
-    if (!course) throw new Error("Course not found");
+const generateOfferLetter = async (userId) => {
+  if (!userId) throw new Error("Missing userId");
 
-    // Candidate & Course details
-    const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
-    const courseName = course.name;
-    const completionDate = new Date().toLocaleDateString("en-GB", {
+  // 1. Load user
+  const user = await model.User.findOne({
+    where: { id: userId, isDeleted: false }
+  });
+  if (!user) throw new Error("User not found");
+
+  const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
+
+  // 2. Determine the earliest course start date from courseDates
+  let startDate = null;
+  let courseName = null;
+
+  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+    let earliestStart = null;
+    let courseIdForStart = null;
+
+    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+      if (!courseObj.startDate) continue;
+      const courseStartISO = normalizeDateToISO(courseObj.startDate);
+      if (!courseStartISO) continue;
+
+      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+        earliestStart = courseStartISO;
+        courseIdForStart = cid;
+      }
+    }
+
+    startDate = earliestStart;
+
+    if (courseIdForStart) {
+      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+      if (course && course.name) {
+        courseName = course.name;
+      }
+    }
+  }
+
+  // 3. Fallbacks
+  startDate = startDate
+    ? new Date(startDate).toLocaleDateString("en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric"
+    })
+    : "To Be Decided";
+
+  const position = courseName || "Intern";
+  const role = courseName || "Intern";
+  const workLocation = "Work from Home";
+
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  // 5) HTML content (your CSS untouched, only background path fixed)
+ // 5) HTML content (updated text)
+const html = `
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Internship Completion Certificate</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Times New Roman', serif;
+            background: #f5f5f5;
+        }
+
+        .letter-container {
+            width: 800px;
+            margin: 20px auto;
+            padding: 80px 100px;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background-size: cover;
+            min-height: 1100px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .date,
+        .content {
+            font-family: 'Times New Roman', serif;
+        }
+
+        .date {
+            text-align: left;
+            margin-top: 100px;
+            margin-bottom: 87px;
+            margin-left: -65px;
+            font-size: 16px;
+        }
+
+        .content {
+            font-size: 15.5px;
+            margin-left: -65px;
+            line-height: 1.6;
+            text-align: justify;
+        }
+
+        .signature {
+            margin-top: 60px;
+            font-size: 16px;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 30px;
+            left: 100px;
+            right: 100px;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="letter-container">
+        <div class="date">Date: <b>${today}</b></div>
+
+        <div class="content">
+            To <b>${candidateName}</b>,<br><br>
+
+            We are pleased to confirm that ${candidateName} has successfully undertaken her role as a <b>${role}</b> and completed her internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
+
+            During her internship at Eduroom, she demonstrated key traits like obedience, leadership, and strong communication skills, creating a positive and productive work environment. She demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
+
+            Her contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
+
+            Thank you!<br>
+            Yours Sincerely,<br>
+            <b>Eduroom</b><br><br>
+
+            We wish her the best of luck in her future endeavors and firmly believe she will become an integral part of a future workplace.
+        </div>
+    </div>
+</body>
+
+</html>
+`;
+
+  // 5) Render PDF with Puppeteer
+  let pdfBuffer;
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    // Wait until fonts are fully loaded
+    await page.evaluateHandle('document.fonts.ready');
+    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
+
+    pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
     });
 
-    // Metadata
-    const timestamp = Date.now();
-    const fileName = `internship-certificate-${timestamp}.pdf`;
-    const s3Key = `internshipcertificates/${userId}/${fileName}`;
-
-    // PDF → S3 stream
-    const doc = new PDFDocument({ margin: 40, size: "A4" });
-    const passStream = new PassThrough();
-    const s3Upload = s3
-      .upload({
-        Bucket: CONFIG.awsBucketName || "fundsweb",
-        Key: s3Key,
-        Body: passStream,
-        ContentType: "application/pdf"
-      })
-      .promise();
-    doc.pipe(passStream);
-
-    // Load watermark/logo
-    const watermarkUrl = CONFIG.watermarkUrl || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/fundsroom-logo.png";
-    const logoUrl = CONFIG.logoUrl || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/fundsweb-logo.png";
-
-    let watermarkBuffer, logoBuffer;
-    try {
-      const wmResponse = await axios.get(watermarkUrl, { responseType: "arraybuffer" });
-      watermarkBuffer = wmResponse.data;
-    } catch (err) {
-      console.warn("Could not load watermark:", err.message);
-    }
-    try {
-      const logoResponse = await axios.get(logoUrl, { responseType: "arraybuffer" });
-      logoBuffer = logoResponse.data;
-    } catch (err) {
-      console.warn("Could not load logo:", err.message);
-    }
-
-    // Watermark
-    if (watermarkBuffer) {
-      doc.save();
-      doc.opacity(0.05).image(watermarkBuffer, 170, 250, { width: 250 }).opacity(1);
-      doc.restore();
-    }
-
-    // Logo & header
-    if (logoBuffer) doc.image(logoBuffer, 50, 30, { width: 80 });
-    doc.fontSize(14).text("Fundsroom Investment Services", { align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(10).text("Registered at Pune, India", { align: "center" });
-    doc.moveDown(1);
-
-    // Title
-    doc.fontSize(16).text("INTERNSHIP CERTIFICATE", { align: "center", underline: true });
-    doc.moveDown(2);
-
-    // Body content
-    doc.fontSize(12).text(`This is to certify that`, { align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(14).text(candidateName, { align: "center", underline: true });
-    doc.moveDown(0.5);
-    doc.fontSize(12).text(`has successfully completed the internship for the course:`, { align: "center" });
-    doc.moveDown(0.5);
-    doc.fontSize(14).text(courseName, { align: "center", underline: true });
-    doc.moveDown(1);
-
-    doc.fontSize(12).text(
-      `This certificate is awarded in recognition of the dedication, hard work, and successful completion of the internship program. The internship included practical and theoretical training as per the curriculum of Fundsroom Investment Services.`,
-      { align: "justify" }
-    );
-    doc.moveDown(2);
-
-    doc.fontSize(12).text(`Date of Completion: ${completionDate}`, { align: "left" });
-    doc.moveDown(2);
-
-    // Footer
-    doc.fontSize(12).text("Best Regards,", { align: "left" });
-    doc.moveDown(1);
-    doc.text("Fundsroom Investment Services", { align: "left" });
-    doc.moveDown(1);
-    doc.text("HR & Internship Team", { align: "left" });
-
-    // Finish PDF
-    doc.end();
-    const s3Result = await s3Upload;
-
-    // Store in DB
-    const created = await model.InternshipCertificate.create({
-      userId,
-      courseId,
-      certificateUrl: s3Result.Location,
-      deductedWallet: 0, // initially zero
-      isIssued: false
-    });
-
-    return created;
+    await browser.close();
   } catch (err) {
-    console.error("generateInternshipCertificate error:", err);
-    throw err;
+    throw new Error("PDF generation failed: " + err.message);
   }
+
+  // 6) Upload PDF to S3
+  const timestamp = Date.now();
+  const fileName = `offerletter-${timestamp}.pdf`;
+  const s3Key = `offerletters/${userId}/${fileName}`;
+
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
+
+  return {
+    fileName,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+  };
 };
 
-module.exports = { generateInternshipCertificate };
+module.exports = { generateOfferLetter };
