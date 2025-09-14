@@ -275,6 +275,7 @@ const addBankDetails = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
+    // Build update object dynamically; allow null values
     const updateData = {};
     if (accountHolderName !== undefined) updateData.accountHolderName = accountHolderName;
     if (bankName !== undefined) updateData.bankName = bankName;
@@ -286,29 +287,36 @@ const addBankDetails = async (req, res) => {
       return ReE(res, "No bank details provided to update", 400);
     }
 
-    try {
-      await user.update(updateData);
-    } catch (err) {
-      if (
-        err.name === "SequelizeUniqueConstraintError" &&
-        accountNumber !== null &&
-        accountNumber !== undefined
-      ) {
-        return ReE(res, "This account number is already in use by another user", 400);
+    // Optional: lightweight validation (does not make fields mandatory)
+    if (accountNumber !== undefined && accountNumber !== null) {
+      if (!/^\d{9,18}$/.test(accountNumber)) {
+        return ReE(res, "Account number must be numeric and 9-18 digits", 400);
       }
-      throw err;
+    }
+    if (ifscCode !== undefined && ifscCode !== null) {
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscCode)) {
+        return ReE(res, "Invalid IFSC code format", 400);
+      }
     }
 
+    // Update user
+    await user.update(updateData);
     await user.reload();
 
-    return ReS(res, { success: true, message: "Bank details updated successfully", user }, 200);
+    return ReS(res, {
+      success: true,
+      message: "Bank details updated successfully",
+      user,
+    }, 200);
 
   } catch (error) {
     console.error("addBankDetails error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
+
 module.exports.addBankDetails = addBankDetails;
+
 // ✅  STEP 6: Add Communication Preferences
 
 var addCommunicationPreferences = async function (req, res) {
