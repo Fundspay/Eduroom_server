@@ -349,7 +349,7 @@ const html = `
             width: 800px;
             margin: 20px auto;
             padding: 80px 100px;
-            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/2.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
             box-sizing: border-box;
