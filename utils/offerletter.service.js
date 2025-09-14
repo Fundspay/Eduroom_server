@@ -264,12 +264,18 @@ const generateOfferLetter = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Determine pronouns based on gender
-  let pronouns = { subject: "They", object: "them", possessive: "their" };
-  if (user.gender === 1) pronouns = { subject: "He", object: "him", possessive: "his" };
-  else if (user.gender === 2) pronouns = { subject: "She", object: "her", possessive: "her" };
+  // 2. Set gender-specific pronouns
+  let pronouns;
+  if (user.gender === 1) {
+    pronouns = { subject: "He", object: "him", possessive: "his" };
+  } else if (user.gender === 2) {
+    pronouns = { subject: "She", object: "her", possessive: "her" };
+  } else {
+    // Default fallback (just in case, but you said gender is 1 or 2)
+    pronouns = { subject: "He", object: "him", possessive: "his" };
+  }
 
-  // 3. Determine earliest course start date
+  // 3. Determine earliest course start date and end date
   let startDate = null;
   let endDate = null;
   let courseName = null;
@@ -286,9 +292,7 @@ const generateOfferLetter = async (userId) => {
       if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
         earliestStart = courseStartISO;
         courseIdForStart = cid;
-        if (courseObj.endDate) {
-          endDate = normalizeDateToISO(courseObj.endDate);
-        }
+        if (courseObj.endDate) endDate = normalizeDateToISO(courseObj.endDate);
       }
     }
 
@@ -309,9 +313,7 @@ const generateOfferLetter = async (userId) => {
     ? new Date(endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
     : "To Be Decided";
 
-  const position = courseName || "Intern";
   const role = courseName || "Intern";
-  const workLocation = "Work from Home";
 
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
