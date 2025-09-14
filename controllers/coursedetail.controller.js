@@ -868,10 +868,8 @@ const getBusinessTarget = async (req, res) => {
     const remaining = Math.max(businessTarget - achievedCount, 0);
 
     // 5️⃣ Update user's subscriptionWallet with achieved count
-    await model.User.update(
-      { subscriptionWallet: achievedCount },
-      { where: { id: userId } }
-    );
+    user.subscriptionWallet = achievedCount;
+    await user.save(); // ✅ Save changes to DB
 
     // 6️⃣ Return response
     return ReS(res, {
@@ -882,7 +880,7 @@ const getBusinessTarget = async (req, res) => {
         businessTarget,
         achievedCount,
         remaining,
-        subscriptionWallet: achievedCount
+        subscriptionWallet: user.subscriptionWallet
       }
     }, 200);
 
