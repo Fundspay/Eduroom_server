@@ -39,7 +39,7 @@ module.exports = (sequelize, Sequelize) => {
       internshipDuration: { type: Sequelize.STRING, allowNull: true },
       internshipModeId: { type: Sequelize.BIGINT, allowNull: true },
       preferredStartDate: { type: Sequelize.DATEONLY, allowNull: true },
-      referralCode: { type: Sequelize.STRING, allowNull: true, unique: true },
+      referralCode: { type: Sequelize.STRING, allowNull: true},
       referralLink: { type: Sequelize.STRING, allowNull: true },
       referralSource: { type: Sequelize.STRING, allowNull: true },
 
