@@ -319,7 +319,7 @@ const generateOfferLetter = async (userId) => {
       top: 290px;
       left: 65%;
       transform: translateX(-50%);
-      font-size: 98px;
+      font-size: 78px;
       font-family: "Brush Script MT", cursive;
       color: #b08d2e;
     }
