@@ -233,7 +233,7 @@
 
 // module.exports = { generateOfferLetter };
 
-// "use strict";
+ "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
