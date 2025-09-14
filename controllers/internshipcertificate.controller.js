@@ -35,24 +35,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    // 🔹 Check if current date is >= course end date
-    const today = new Date();
-    const courseEndDateStr = user.courseDates?.[courseId]?.endDate;
-    if (!courseEndDateStr) {
-      await transaction.rollback();
-      return res.status(400).json({ success: false, message: "Course end date not found for this user" });
-    }
-
-    const courseEndDate = new Date(courseEndDateStr);
-
-    if (today < courseEndDate) {
-      await transaction.rollback();
-      return res.status(400).json({ 
-        success: false, 
-        message: `You cannot download the certificate before the course end date (${courseEndDate.toISOString().split('T')[0]})` 
-      });
-    }
-
     // 🔹 Use user's business target
     const businessTarget = Number(user.businessTargets) || 0;
 
