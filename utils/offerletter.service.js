@@ -62,10 +62,10 @@ const generateOfferLetter = async (userId) => {
   // 3. Fallbacks
   startDate = startDate
     ? new Date(startDate).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      })
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    })
     : "To Be Decided";
 
   const position = courseName || "Intern";
@@ -87,14 +87,20 @@ const generateOfferLetter = async (userId) => {
     <meta charset="UTF-8">
     <title>Offer Letter</title>
 
-    <!-- Removed media="screen" so Puppeteer can load the font -->
-    <link rel="stylesheet" href="https://fontlibrary.org/face/tex-gyre-bonum" type="text/css" />
-
+    <!-- Embed TeX Gyre Bonum directly via @font-face -->
     <style>
+        @font-face {
+            font-family: 'TeX Gyre Bonum';
+            src: url('https://fontlibrary.org/assets/fonts/tex-gyre-bonum/texgyrebonum-regular.woff2') format('woff2'),
+                 url('https://fontlibrary.org/assets/fonts/tex-gyre-bonum/texgyrebonum-regular.woff') format('woff');
+            font-weight: normal;
+            font-style: normal;
+        }
+
         body {
             margin: 0;
             padding: 0;
-            font-family: "Times New Roman", serif;
+            font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
             background: #f5f5f5;
         }
 
@@ -112,7 +118,6 @@ const generateOfferLetter = async (userId) => {
         .date,
         .title,
         .content {
-            /* Updated font-family to match font library name */
             font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
         }
 
@@ -200,13 +205,17 @@ const generateOfferLetter = async (userId) => {
     const page = await browser.newPage();
 
     await page.setContent(html, { waitUntil: "networkidle0" });
-    await page.evaluateHandle("document.fonts.ready");
+
+    // Wait until fonts are fully loaded
+    await page.evaluateHandle('document.fonts.ready');
+    await page.waitForTimeout(500); // extra small delay to ensure font loads
 
     pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
     });
+
 
     await browser.close();
   } catch (err) {
