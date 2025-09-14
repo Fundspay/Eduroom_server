@@ -185,15 +185,15 @@ var addInternshipDetails = async function (req, res) {
     const {
       internshipProgram,
       internshipDuration,
-      internshipModeId,
+      internshipModeId, // optional now
       preferredStartDate,
       referralCode,
       referralLink,
       referralSource,
     } = req.body;
 
-    // Validate required fields
-    if (!internshipProgram || !internshipDuration || !internshipModeId) {
+    // Validate required fields (except internshipModeId)
+    if (!internshipProgram || !internshipDuration) {
       return ReE(res, "Missing required internship details", 400);
     }
 
@@ -203,7 +203,7 @@ var addInternshipDetails = async function (req, res) {
     await user.update({
       internshipProgram,
       internshipDuration,
-      internshipModeId,
+      internshipModeId, // can be undefined/null
       preferredStartDate,
       referralCode,
       referralLink,
@@ -218,8 +218,6 @@ var addInternshipDetails = async function (req, res) {
 };
 
 module.exports.addInternshipDetails = addInternshipDetails;
-
-
 // ✅ STEP 4: Add Verification Docs
 
 const addVerificationDocs = async (req, res) => {
