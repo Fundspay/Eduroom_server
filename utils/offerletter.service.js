@@ -105,7 +105,7 @@ const generateOfferLetter = async (userId) => {
             width: 800px;
             margin: 20px auto;
             padding: 80px 100px;
-            background: url("${ASSET_BASE}/background.png") no-repeat center top;
+            background: url("${ASSET_BASE}/offerbg.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
             box-sizing: border-box;
