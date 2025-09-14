@@ -105,13 +105,14 @@ const generateOfferLetter = async (userId) => {
             width: 800px;
             margin: 20px auto;
             padding: 80px 100px;
-            background: url("${ASSET_BASE}/offerbg.png") no-repeat center top;
+            background: url("${ASSET_BASE}/background.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
             box-sizing: border-box;
             position: relative;
         }
  
+        /* Load TeX Gyre Bonum font (if hosted locally) */
         @font-face {
             font-family: 'TeX Gyre Bonum';
             src: url('fonts/texgyrebonum.woff2') format('woff2'),
@@ -121,6 +122,7 @@ const generateOfferLetter = async (userId) => {
             font-style: normal;
         }
  
+        /* Apply font to all your classes */
         .date,
         .title,
         .content {
