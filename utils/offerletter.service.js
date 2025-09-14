@@ -206,8 +206,7 @@ const generateOfferLetter = async (userId) => {
       Bucket: "fundsweb",
       Key: s3Key,
       Body: pdfBuffer,
-      ContentType: "application/pdf",
-      ACL: "public-read", // make sure it's accessible
+      ContentType: "application/pdf"
     })
     .promise();
 
