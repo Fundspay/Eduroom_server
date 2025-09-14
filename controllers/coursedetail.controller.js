@@ -872,6 +872,7 @@ const getBusinessTarget = async (req, res) => {
     // 5️⃣ Update subscriptionWallet
     user.subscriptionWallet = achievedCount;
     await user.save();
+      console.log(`Updated subscriptionWallet for user ${user.id}:`, user.subscriptionWallet);
 
     // 6️⃣ Return response
     return ReS(res, {
