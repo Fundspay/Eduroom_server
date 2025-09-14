@@ -267,34 +267,47 @@ module.exports.addVerificationDocs = addVerificationDocs;
 
 //✅  STEP 5: Add Bank Details
 
-var addBankDetails = async function (req, res) {
+const addBankDetails = async (req, res) => {
   try {
     const { userId } = req.params;
-    const {
-      accountHolderName,
-      bankName,
-      branchAddress,
-      ifscCode,
-      accountNumber,
-    } = req.body;
+    const { accountHolderName, bankName, branchAddress, ifscCode, accountNumber } = req.body;
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    await user.update({
-      accountHolderName,
-      bankName,
-      branchAddress,
-      ifscCode,
-      accountNumber,
-    });
+    // Build update object dynamically
+    const updateData = {};
+    if (accountHolderName !== undefined) updateData.accountHolderName = accountHolderName;
+    if (bankName !== undefined) updateData.bankName = bankName;
+    if (branchAddress !== undefined) updateData.branchAddress = branchAddress;
+    if (ifscCode !== undefined) updateData.ifscCode = ifscCode;
+    if (accountNumber !== undefined) updateData.accountNumber = accountNumber;
 
-    return ReS(res, { success: true, message: "Bank details updated" }, 200);
+    if (Object.keys(updateData).length === 0) {
+      return ReE(res, "No bank details provided to update", 400);
+    }
+
+    try {
+      await user.update(updateData);
+    } catch (err) {
+      // Handle unique constraint violation
+      if (err.name === "SequelizeUniqueConstraintError") {
+        return ReE(res, "This account number is already in use by another user", 400);
+      }
+      throw err; // rethrow for other errors
+    }
+
+    await user.reload();
+
+    return ReS(res, { success: true, message: "Bank details updated", user }, 200);
   } catch (error) {
-    return ReE(res, error.message, 500);
+    console.error("addBankDetails error:", error);
+    return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
+
 module.exports.addBankDetails = addBankDetails;
+
 
 
 // ✅  STEP 6: Add Communication Preferences
