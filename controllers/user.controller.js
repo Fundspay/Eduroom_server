@@ -275,7 +275,7 @@ const addBankDetails = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Build update object dynamically
+    // Build update object dynamically; allow null values
     const updateData = {};
     if (accountHolderName !== undefined) updateData.accountHolderName = accountHolderName;
     if (bankName !== undefined) updateData.bankName = bankName;
@@ -290,16 +290,25 @@ const addBankDetails = async (req, res) => {
     try {
       await user.update(updateData);
     } catch (err) {
-      // Handle unique constraint violation
-      if (err.name === "SequelizeUniqueConstraintError") {
+      // Handle unique constraint violation only if accountNumber is not null
+      if (
+        err.name === "SequelizeUniqueConstraintError" &&
+        accountNumber !== null &&
+        accountNumber !== undefined
+      ) {
         return ReE(res, "This account number is already in use by another user", 400);
       }
-      throw err; // rethrow for other errors
+      throw err; // rethrow other errors
     }
 
     await user.reload();
 
-    return ReS(res, { success: true, message: "Bank details updated", user }, 200);
+    return ReS(res, {
+      success: true,
+      message: "Bank details updated successfully",
+      user,
+    }, 200);
+
   } catch (error) {
     console.error("addBankDetails error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
@@ -307,8 +316,6 @@ const addBankDetails = async (req, res) => {
 };
 
 module.exports.addBankDetails = addBankDetails;
-
-
 
 // ✅  STEP 6: Add Communication Preferences
 
