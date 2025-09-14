@@ -1,4 +1,4 @@
-"use strict";
+ "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
@@ -19,7 +19,7 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const generateOfferLetter = async (userId) => {
+const  generateInternshipCertificate = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1. Load user
@@ -30,8 +30,9 @@ const generateOfferLetter = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Determine the earliest course start date from courseDates
+  // 2. Determine the earliest course start date and corresponding end date from courseDates
   let startDate = null;
+  let endDate = null;
   let courseName = null;
 
   if (user.courseDates && Object.keys(user.courseDates).length > 0) {
@@ -56,22 +57,35 @@ const generateOfferLetter = async (userId) => {
       if (course && course.name) {
         courseName = course.name;
       }
+
+      // Set endDate from the same course
+      const selectedCourseObj = user.courseDates[courseIdForStart];
+      if (selectedCourseObj.endDate) {
+        endDate = normalizeDateToISO(selectedCourseObj.endDate);
+      }
     }
   }
 
-  // 3. Fallbacks
+  // 3. Fallback formatting
   startDate = startDate
     ? new Date(startDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    })
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      })
     : "To Be Decided";
 
-  const position = courseName || "Intern";
-  const role = courseName || "Intern";
-  const workLocation = "Work from Home";
+  endDate = endDate
+    ? new Date(endDate).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      })
+    : "To Be Decided";
 
+  const role = courseName || "Intern";
+
+  // 4. Today’s date
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -100,7 +114,7 @@ const html = `
             width: 800px;
             margin: 20px auto;
             padding: 80px 100px;
-            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/2.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
             box-sizing: border-box;
@@ -157,10 +171,6 @@ const html = `
 
             Her contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
 
-            Thank you!<br>
-            Yours Sincerely,<br>
-            <b>Eduroom</b><br><br>
-
             We wish her the best of luck in her future endeavors and firmly believe she will become an integral part of a future workplace.
         </div>
     </div>
@@ -213,4 +223,4 @@ const html = `
   };
 };
 
-module.exports = { generateOfferLetter };
+module.exports = { generateInternshipCertificate };
