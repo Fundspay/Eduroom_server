@@ -10,7 +10,6 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion
 });
 
-// Asset base URL for S3 images
 const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
 const normalizeDateToISO = (input) => {
@@ -31,53 +30,47 @@ const generateOfferLetter = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Determine position from courseDates -> Course model
+  // 2. Determine the earliest course start date from courseDates
+  let startDate = null;
   let courseName = null;
 
-  try {
-    const prefRaw = user.preferredStartDate; // e.g. "2025-09-12"
-    const prefISO = normalizeDateToISO(prefRaw);
+  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+    let earliestStart = null;
+    let courseIdForStart = null;
 
-    if (prefISO && user.courseDates && Object.keys(user.courseDates).length > 0) {
-      let matchedCourseId = null;
+    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+      if (!courseObj.startDate) continue;
+      const courseStartISO = normalizeDateToISO(courseObj.startDate);
+      if (!courseStartISO) continue;
 
-      for (const [cid, dateVal] of Object.entries(user.courseDates)) {
-        if (!dateVal) continue;
-        const entryISO = normalizeDateToISO(dateVal) || (typeof dateVal === "string" ? dateVal.trim() : null);
-        if (!entryISO) continue;
-        if (entryISO === prefISO) {
-          matchedCourseId = cid;
-          break;
-        }
-      }
-
-      if (matchedCourseId != null) {
-        const courseWhereId = isNaN(Number(matchedCourseId)) ? matchedCourseId : Number(matchedCourseId);
-
-        if (courseWhereId !== undefined && courseWhereId !== null) {
-          const course = await model.Course.findOne({ where: { id: courseWhereId } });
-          if (course && course.name) {
-            courseName = course.name;
-          }
-        }
+      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+        earliestStart = courseStartISO;
+        courseIdForStart = cid;
       }
     }
-  } catch (err) {
-    console.warn("Could not resolve course from courseDates:", err.message);
+
+    startDate = earliestStart;
+
+    if (courseIdForStart) {
+      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+      if (course && course.name) {
+        courseName = course.name;
+      }
+    }
   }
 
-  // 3. Fallback position
-  const position = courseName || user.course || user.internshipProgram || "Intern";
-
-  // 4. Format start date
-  const startDate = user.preferredStartDate
-    ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
+  // 3. Fallbacks
+  startDate = startDate
+    ? new Date(startDate).toLocaleDateString("en-GB", {
         day: "numeric",
         month: "long",
         year: "numeric"
       })
     : "To Be Decided";
-  const workLocation = user.residentialAddress || "Work from Home";
+
+  const position = courseName || "Intern";
+  const role = courseName || "Intern";
+  const workLocation = "Work from Home";
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
@@ -183,7 +176,7 @@ const generateOfferLetter = async (userId) => {
         <div class="content">
             Dear <b>${candidateName}</b>,<br><br>
  
-            Congratulations! We are pleased to confirm that you have been selected for the role of <b>${position}</b> at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.
+            Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.
             <br><br>
             <b>Starting Date:</b> ${startDate}<br>
             <b>Position:</b> ${position}<br>
