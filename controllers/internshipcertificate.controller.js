@@ -35,12 +35,28 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
+    // 🔹 Check if current date is >= course end date
+    const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+    const courseEndDate = user.courseDates?.[courseId]?.endDate;
+
+    if (!courseEndDate) {
+      await transaction.rollback();
+      return res.status(400).json({ success: false, message: "Course end date not found for this user" });
+    }
+
+    if (today < courseEndDate) {
+      await transaction.rollback();
+      return res.status(400).json({ 
+        success: false, 
+        message: `You cannot download the certificate before the course end date (${courseEndDate})` 
+      });
+    }
+
     const businessTarget = course.businessTarget || 0;
 
     // 🔹 Calculate remaining balance
     const subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet;
 
-    // ✅ Check if user has enough left to cover this businessTarget
     if (subscriptionLeft < businessTarget) {
       await transaction.rollback();
       return res.status(400).json({
@@ -50,8 +66,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
     }
 
     // ✅ Deduct for this course
-    user.subscriptiondeductedWallet = user.subscriptiondeductedWallet + businessTarget;
-    user.subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet; // update remaining
+    user.subscriptiondeductedWallet += businessTarget;
+    user.subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet;
     await user.save({ transaction });
 
     // 🔹 Generate certificate PDF + S3 link
@@ -62,7 +78,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       userId,
       courseId,
       certificateUrl: certificateFile.certificateUrl,
-      deductedWallet: businessTarget, // how much was deducted for THIS course
+      deductedWallet: businessTarget,
       isIssued: true,
       issuedDate: new Date()
     }, { transaction });
@@ -91,9 +107,9 @@ const createAndSendInternshipCertificate = async (req, res) => {
       message: "Internship Certificate created, wallet deducted, and sent successfully",
       certificateUrl: certificate.certificateUrl,
       deductedWallet: businessTarget,
-      subscriptionWallet: user.subscriptionWallet,             // total (unchanged)
-      subscriptiondeductedWallet: user.subscriptiondeductedWallet, // total deducted
-      subscriptionLeft: user.subscriptionLeft                  // updated remaining balance
+      subscriptionWallet: user.subscriptionWallet,
+      subscriptiondeductedWallet: user.subscriptiondeductedWallet,
+      subscriptionLeft: user.subscriptionLeft
     });
 
   } catch (error) {
@@ -102,5 +118,4 @@ const createAndSendInternshipCertificate = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
-
-module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
+module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate
