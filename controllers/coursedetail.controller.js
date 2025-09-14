@@ -889,12 +889,10 @@ const getBusinessTarget = async (req, res) => {
     const remaining = Math.max(businessTarget - achievedCount, 0);
     console.log("Calculated remaining:", remaining);
 
-    // 5️⃣ Force update subscriptionWallet every time
-    await model.User.update(
-      { subscriptionWallet: achievedCount },
-      { where: { id: user.id }, fields: ['subscriptionWallet'] }
-    );
-    console.log(`Forced update subscriptionWallet for user ${user.id}:`, achievedCount);
+    // 5️⃣ Update subscriptionWallet properly
+    user.subscriptionWallet = achievedCount;
+    await user.save({ fields: ['subscriptionWallet'] });
+    console.log(`Updated subscriptionWallet for user ${user.id}:`, achievedCount);
 
     // 6️⃣ Return response
     return ReS(res, {
