@@ -89,12 +89,6 @@ const generateOfferLetter = async (userId) => {
 
     <!-- Embed TeX Gyre Bonum directly via @font-face -->
     <style>
-      @font-face {
-  font-family: 'TeX Gyre Bonum';
-  src: src: url(data:font/otf;base64,YOUR_FULL_BASE64_STRING_HERE) format('opentype');
-  font-weight: normal;
-  font-style: normal;
-}
 
         body {
             margin: 0;
