@@ -194,8 +194,7 @@ const generateOfferLetter = async (userId) => {
 </html>
 
 `;
-
-  // 6) Render PDF with Puppeteer
+  // 5) Render PDF with Puppeteer
   let pdfBuffer;
   try {
     const browser = await puppeteer.launch({
@@ -208,7 +207,7 @@ const generateOfferLetter = async (userId) => {
 
     // Wait until fonts are fully loaded
     await page.evaluateHandle('document.fonts.ready');
-    await page.waitFor(500); // extra small delay to ensure font loads
+    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
 
     pdfBuffer = await page.pdf({
       format: "A4",
@@ -216,25 +215,22 @@ const generateOfferLetter = async (userId) => {
       margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
     });
 
-
     await browser.close();
   } catch (err) {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // 7) Upload PDF to S3 (no ACL, since bucket policy handles public access)
+  // 6) Upload PDF to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
