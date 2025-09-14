@@ -174,16 +174,11 @@ var addEducationalDetails = async function (req, res) {
 };
 module.exports.addEducationalDetails = addEducationalDetails;
 
-
-// ✅ STEP 3: Add Internship Details
-
-"use strict";
-
 var addInternshipDetails = async function (req, res) {
   try {
-    // Ensure the route parameter matches your route definition
-    const { id } = req.params;
-    if (!id || isNaN(id)) {
+    // Use the correct route parameter name
+    const { userId } = req.params;
+    if (!userId || isNaN(userId)) {
       return ReE(res, "Valid user ID is required", 400);
     }
 
@@ -197,12 +192,12 @@ var addInternshipDetails = async function (req, res) {
       referralSource,
     } = req.body;
 
-    // Validate required fields if necessary
+    // Validate required fields
     if (!internshipProgram || !internshipDuration || !internshipModeId) {
       return ReE(res, "Missing required internship details", 400);
     }
 
-    const user = await model.User.findByPk(id);
+    const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.update({
@@ -215,11 +210,7 @@ var addInternshipDetails = async function (req, res) {
       referralSource,
     });
 
-    return ReS(
-      res,
-      { success: true, message: "Internship details updated" },
-      200
-    );
+    return ReS(res, { success: true, message: "Internship details updated" }, 200);
   } catch (error) {
     console.error("Error updating internship details:", error);
     return ReE(res, error.message || "Server error", 500);
