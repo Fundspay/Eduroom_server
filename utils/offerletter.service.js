@@ -208,7 +208,7 @@ const generateOfferLetter = async (userId) => {
 
     // Wait until fonts are fully loaded
     await page.evaluateHandle('document.fonts.ready');
-    await page.waitForTimeout(500); // extra small delay to ensure font loads
+    await page.waitFor(500); // extra small delay to ensure font loads
 
     pdfBuffer = await page.pdf({
       format: "A4",
