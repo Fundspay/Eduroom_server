@@ -14,7 +14,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(400).json({ success: false, message: "userId and courseId are required" });
     }
 
-    // 🔹 Fetch user with row lock
+    // 🔹 Fetch user
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false },
       transaction,
@@ -35,27 +35,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    // 🔹 Use user's business target
-    const businessTarget = Number(user.businessTargets) || 0;
-
-    // 🔹 Calculate remaining balance
-    const subscriptionWallet = Number(user.subscriptionWallet) || 0;
-    const subscriptiondeductedWallet = Number(user.subscriptiondeductedWallet) || 0;
-    const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
-
-    if (subscriptionLeft < businessTarget) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "You have not completed the business target assigned to this course. Complete it to get the certificate."
-      });
-    }
-
-    // ✅ Deduct for this course
-    user.subscriptiondeductedWallet = subscriptiondeductedWallet + businessTarget;
-    user.subscriptionLeft = subscriptionWallet - user.subscriptiondeductedWallet;
-    await user.save({ transaction });
-
     // 🔹 Generate certificate PDF + S3 link
     const certificateFile = await generateInternshipCertificate(userId, courseId);
 
@@ -72,7 +51,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
       userId,
       courseId,
       certificateUrl: certificateFile.certificateUrl,
-      deductedWallet: businessTarget,
       isIssued: true,
       issuedDate: new Date()
     }, { transaction });
@@ -98,12 +76,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Internship Certificate created, wallet deducted, and sent successfully",
-      certificateUrl: certificate.certificateUrl,
-      deductedWallet: businessTarget,
-      subscriptionWallet: user.subscriptionWallet,
-      subscriptiondeductedWallet: user.subscriptiondeductedWallet,
-      subscriptionLeft: user.subscriptionLeft
+      message: "Internship Certificate created and sent successfully",
+      certificateUrl: certificate.certificateUrl
     });
 
   } catch (error) {
