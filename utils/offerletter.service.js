@@ -88,18 +88,18 @@ const generateOfferLetter = async (userId) => {
     <title>Offer Letter</title>
 
     <!-- Embed TeX Gyre Bonum directly via @font-face -->
-  @font-face {
-    font-family: 'TeX Gyre Bonum';
-    /* REPLACE THIS EXAMPLE BASE64 with your full Base64 from convertFont.js */
-    src: url(data:font/woff2;base64,d09GMgABAAAAAA...) format('woff2');
-    font-weight: normal;
-    font-style: normal;
-  }
+    <style>
+      @font-face {
+  font-family: 'TeX Gyre Bonum';
+  src: src: url(data:font/otf;base64,YOUR_FULL_BASE64_STRING_HERE) format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
 
         body {
             margin: 0;
             padding: 0;
-            font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
+            font-family: 'Times New Roman', serif;
             background: #f5f5f5;
         }
 
@@ -117,7 +117,7 @@ const generateOfferLetter = async (userId) => {
         .date,
         .title,
         .content {
-            font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
+            font-family: 'Times New Roman', serif;
         }
 
         .date {
