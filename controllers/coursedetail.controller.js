@@ -834,8 +834,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-const axios = require("axios");
-
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
