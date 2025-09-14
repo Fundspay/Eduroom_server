@@ -177,9 +177,16 @@ module.exports.addEducationalDetails = addEducationalDetails;
 
 // ✅ STEP 3: Add Internship Details
 
+"use strict";
+
 var addInternshipDetails = async function (req, res) {
   try {
-    const { userId } = req.params;
+    // Ensure the route parameter matches your route definition
+    const { id } = req.params;
+    if (!id || isNaN(id)) {
+      return ReE(res, "Valid user ID is required", 400);
+    }
+
     const {
       internshipProgram,
       internshipDuration,
@@ -190,7 +197,12 @@ var addInternshipDetails = async function (req, res) {
       referralSource,
     } = req.body;
 
-    const user = await model.User.findByPk(userId);
+    // Validate required fields if necessary
+    if (!internshipProgram || !internshipDuration || !internshipModeId) {
+      return ReE(res, "Missing required internship details", 400);
+    }
+
+    const user = await model.User.findByPk(id);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.update({
@@ -203,12 +215,19 @@ var addInternshipDetails = async function (req, res) {
       referralSource,
     });
 
-    return ReS(res, { success: true, message: "Internship details updated" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "Internship details updated" },
+      200
+    );
   } catch (error) {
-    return ReE(res, error.message, 500);
+    console.error("Error updating internship details:", error);
+    return ReE(res, error.message || "Server error", 500);
   }
 };
+
 module.exports.addInternshipDetails = addInternshipDetails;
+
 
 // ✅ STEP 4: Add Verification Docs
 
