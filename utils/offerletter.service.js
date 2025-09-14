@@ -184,7 +184,7 @@ const generateOfferLetter = async (userId) => {
     </div>
 </body>
 
-</html>
+</html> 
 `;
 
   // 6) Render PDF with Puppeteer
