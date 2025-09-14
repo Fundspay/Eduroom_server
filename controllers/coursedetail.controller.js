@@ -834,6 +834,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
+const axios = require("axios");
+
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
@@ -889,11 +891,12 @@ const getBusinessTarget = async (req, res) => {
     const remaining = Math.max(businessTarget - achievedCount, 0);
     console.log("Calculated remaining:", remaining);
 
-    // 5️⃣ Update subscriptionWallet
-    console.log("Current subscriptionWallet:", user.subscriptionWallet);
-    user.subscriptionWallet = Number(achievedCount);
-    await user.save();
-    console.log(`Saved subscriptionWallet for user ${user.id}:`, user.subscriptionWallet);
+    // 5️⃣ Force update subscriptionWallet every time
+    await model.User.update(
+      { subscriptionWallet: achievedCount },
+      { where: { id: user.id }, fields: ['subscriptionWallet'] }
+    );
+    console.log(`Forced update subscriptionWallet for user ${user.id}:`, achievedCount);
 
     // 6️⃣ Return response
     return ReS(res, {
@@ -904,7 +907,7 @@ const getBusinessTarget = async (req, res) => {
         businessTarget,
         achievedCount,
         remaining,
-        subscriptionWallet: user.subscriptionWallet
+        subscriptionWallet: achievedCount
       }
     }, 200);
 
@@ -915,6 +918,7 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
+
 const getCourseStatus = async (req, res) => {
   try {
     const { courseId, coursePreviewId, userId } = req.params;
