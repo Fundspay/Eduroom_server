@@ -19,7 +19,7 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const  generateInternshipCertificate = async (userId) => {
+const generateOfferLetter = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1. Load user
@@ -30,9 +30,21 @@ const  generateInternshipCertificate = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Determine the earliest course start date and corresponding end date from courseDates
+  // 2. Determine pronouns based on gender
+  let pronouns = {
+    subject: "They",
+    object: "them",
+    possessive: "their"
+  };
+
+  if (user.gender === 1) {
+    pronouns = { subject: "He", object: "him", possessive: "his" };
+  } else if (user.gender === 2) {
+    pronouns = { subject: "She", object: "her", possessive: "her" };
+  }
+
+  // 3. Determine the earliest course start date from courseDates
   let startDate = null;
-  let endDate = null;
   let courseName = null;
 
   if (user.courseDates && Object.keys(user.courseDates).length > 0) {
@@ -57,16 +69,10 @@ const  generateInternshipCertificate = async (userId) => {
       if (course && course.name) {
         courseName = course.name;
       }
-
-      // Set endDate from the same course
-      const selectedCourseObj = user.courseDates[courseIdForStart];
-      if (selectedCourseObj.endDate) {
-        endDate = normalizeDateToISO(selectedCourseObj.endDate);
-      }
     }
   }
 
-  // 3. Fallback formatting
+  // 4. Fallbacks
   startDate = startDate
     ? new Date(startDate).toLocaleDateString("en-GB", {
         day: "numeric",
@@ -75,17 +81,10 @@ const  generateInternshipCertificate = async (userId) => {
       })
     : "To Be Decided";
 
-  endDate = endDate
-    ? new Date(endDate).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      })
-    : "To Be Decided";
-
+  const position = courseName || "Intern";
   const role = courseName || "Intern";
+  const workLocation = "Work from Home";
 
-  // 4. Today’s date
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
@@ -165,13 +164,13 @@ const html = `
         <div class="content">
             To <b>${candidateName}</b>,<br><br>
 
-            We are pleased to confirm that ${candidateName} has successfully undertaken her role as a <b>${role}</b> and completed her internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
+            We are pleased to confirm that ${candidateName} has successfully undertaken ${pronouns.possessive} role as a <b>${role}</b> and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> to <b>${endDate || 'To Be Decided'}</b>.<br><br>
 
-            During her internship at Eduroom, she demonstrated key traits like obedience, leadership, and strong communication skills, creating a positive and productive work environment. She demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
+            During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like obedience, leadership, and strong communication skills, creating a positive and productive work environment. ${pronouns.subject} demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
 
-            Her contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
+            ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
 
-            We wish her the best of luck in her future endeavors and firmly believe she will become an integral part of a future workplace.
+            We wish ${pronouns.object} the best of luck in ${pronouns.possessive} future endeavors and firmly believe ${pronouns.subject.toLowerCase()} will become an integral part of a future workplace.
         </div>
     </div>
 </body>
