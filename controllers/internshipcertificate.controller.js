@@ -52,10 +52,13 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    const businessTarget = course.businessTarget || 0;
+    // 🔹 Use user's business target
+    const businessTarget = Number(user.businessTargets) || 0;
 
     // 🔹 Calculate remaining balance
-    const subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet;
+    const subscriptionWallet = Number(user.subscriptionWallet) || 0;
+    const subscriptiondeductedWallet = Number(user.subscriptiondeductedWallet) || 0;
+    const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
 
     if (subscriptionLeft < businessTarget) {
       await transaction.rollback();
@@ -66,8 +69,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
     }
 
     // ✅ Deduct for this course
-    user.subscriptiondeductedWallet += businessTarget;
-    user.subscriptionLeft = user.subscriptionWallet - user.subscriptiondeductedWallet;
+    user.subscriptiondeductedWallet = subscriptiondeductedWallet + businessTarget;
+    user.subscriptionLeft = subscriptionWallet - user.subscriptiondeductedWallet;
     await user.save({ transaction });
 
     // 🔹 Generate certificate PDF + S3 link
@@ -118,4 +121,5 @@ const createAndSendInternshipCertificate = async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
-module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate
+
+module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
