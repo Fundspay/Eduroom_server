@@ -68,7 +68,7 @@
 //           color: #111;
 //           box-sizing: border-box;
 //         }
-        
+
 //         @import url('https://fonts.cdnfonts.com/css/tex-gyre-bonum');
 
 //         /* Header/Footer images only */
@@ -262,10 +262,10 @@ const formatDateOrdinal = (date) => {
     day % 10 === 1 && day !== 11
       ? "st"
       : day % 10 === 2 && day !== 12
-      ? "nd"
-      : day % 10 === 3 && day !== 13
-      ? "rd"
-      : "th";
+        ? "nd"
+        : day % 10 === 3 && day !== 13
+          ? "rd"
+          : "th";
 
   return `${day}${suffix} ${month} ${year}`;
 };
@@ -328,10 +328,10 @@ const generateOfferLetter = async (userId) => {
   // 4) Format start date + today
   const startDate = user.preferredStartDate
     ? new Date(user.preferredStartDate).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
     : "To Be Decided";
 
   const workLocation = user.residentialAddress || "Work from Home";
@@ -353,14 +353,19 @@ const generateOfferLetter = async (userId) => {
       background: #f5f5f5;
     }
     .certificate {
-      position: relative;
-      width: 1086px;
-      height: 768px;
-      background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/background.png") no-repeat center;
-      background-size: cover;
-      margin: 20px auto;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    }
+  position: relative;
+  width: 1086px;
+  height: 768px;
+  background-image: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/background.png");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+  margin: 20px auto;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
     .certificate .name {
       position: absolute;
       top: 290px;
