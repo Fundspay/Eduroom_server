@@ -233,133 +233,178 @@
 
 // module.exports = { generateOfferLetter };
 
-"use strict";
-
+// "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
 const model = require("../models");
 
-// Configure AWS S3 client
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
   secretAccessKey: CONFIG.awsSecretAccessKey,
-  region: CONFIG.awsRegion,
+  region: CONFIG.awsRegion
 });
 
-/**
- * Format date with ordinal suffix (e.g., "14th September 2025").
- */
-const formatDateOrdinal = (date) => {
-  if (!(date instanceof Date) || isNaN(date)) return "Invalid Date";
-  const day = date.getDate();
-  const month = date.toLocaleString("en-GB", { month: "long" });
-  const year = date.getFullYear();
+const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
-  const suffix =
-    day % 10 === 1 && day !== 11
-      ? "st"
-      : day % 10 === 2 && day !== 12
-      ? "nd"
-      : day % 10 === 3 && day !== 13
-      ? "rd"
-      : "th";
-
-  return `${day}${suffix} ${month} ${year}`;
+const normalizeDateToISO = (input) => {
+  if (!input) return null;
+  const d = new Date(input);
+  if (isNaN(d)) return null;
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-/**
- * Generate an offer letter PDF for a given user and upload it to S3.
- */
 const generateOfferLetter = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
-  // 1) Load user
+  // 1. Load user
   const user = await model.User.findOne({
-    where: { id: userId, isDeleted: false },
+    where: { id: userId, isDeleted: false }
   });
   if (!user) throw new Error("User not found");
 
-  const candidateName =
-    user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim();
+  const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  const position = user.course || user.internshipProgram || "Intern";
-  const today = formatDateOrdinal(new Date());
+  // 2. Determine the earliest course start date from courseDates
+  let startDate = null;
+  let courseName = null;
 
-  // 2) Asset base
-  const ASSET_BASE =
-    "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+    let earliestStart = null;
+    let courseIdForStart = null;
 
-  // 3) HTML content
-  const html = `
+    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+      if (!courseObj.startDate) continue;
+      const courseStartISO = normalizeDateToISO(courseObj.startDate);
+      if (!courseStartISO) continue;
+
+      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+        earliestStart = courseStartISO;
+        courseIdForStart = cid;
+      }
+    }
+
+    startDate = earliestStart;
+
+    if (courseIdForStart) {
+      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+      if (course && course.name) {
+        courseName = course.name;
+      }
+    }
+  }
+
+  // 3. Fallbacks
+  startDate = startDate
+    ? new Date(startDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    })
+    : "To Be Decided";
+
+  const position = courseName || "Intern";
+  const role = courseName || "Intern";
+  const workLocation = "Work from Home";
+
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+
+  // 5) HTML content (your CSS untouched, only background path fixed)
+ // 5) HTML content (updated text)
+const html = `
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <title>Offer Letter</title>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Times New Roman', serif;
-      background: #f5f5f5;
-    }
-    .certificate {
-      position: relative;
-      width: 1086px;
-      height: 768px;
-      background: url("${ASSET_BASE}/backgroud.png") no-repeat center center;
-      background-size: cover;
-      margin: 20px auto;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-    }
-    .certificate .name {
-      position: absolute;
-      top: 290px;
-      left: 65%;
-      transform: translateX(-50%);
-      font-size: 78px;
-      font-family: "Brush Script MT", cursive;
-      color: #b08d2e;
-    }
-    .certificate .description {
-      position: absolute;
-      top: 420px;
-      left: 65%;
-      transform: translateX(-50%);
-      width: 70%;
-      font-size: 18px;
-      text-align: center;
-      color: #004225;
-      line-height: 1.5em;
-      font-family: 'Poppins', sans-serif;
-    }
-    .certificate .date {
-      position: absolute;
-      bottom: 190px;
-      left: 620px;
-      font-size: 18px;
-      font-weight: bold;
-      color: #004225;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <title>Internship Completion Certificate</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Times New Roman', serif;
+            background: #f5f5f5;
+        }
+
+        .letter-container {
+            width: 800px;
+            margin: 20px auto;
+            padding: 80px 100px;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background-size: cover;
+            min-height: 1100px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .date,
+        .content {
+            font-family: 'Times New Roman', serif;
+        }
+
+        .date {
+            text-align: left;
+            margin-top: 100px;
+            margin-bottom: 87px;
+            margin-left: -65px;
+            font-size: 16px;
+        }
+
+        .content {
+            font-size: 15.5px;
+            margin-left: -65px;
+            line-height: 1.6;
+            text-align: justify;
+        }
+
+        .signature {
+            margin-top: 60px;
+            font-size: 16px;
+        }
+
+        .footer {
+            position: absolute;
+            bottom: 30px;
+            left: 100px;
+            right: 100px;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
+        }
+    </style>
 </head>
+
 <body>
-  <div class="certificate">
-    <div class="name">${candidateName}</div>
-    <div class="description">
-      In appreciation of his/her exceptional achievements and<br/>
-      contributions in ${position}, which have greatly enhanced the<br/>
-      values of Eduroom.
+    <div class="letter-container">
+        <div class="date">Date: <b>${today}</b></div>
+
+        <div class="content">
+            To <b>${candidateName}</b>,<br><br>
+
+            We are pleased to confirm that ${candidateName} has successfully undertaken her role as a <b>${role}</b> and completed her internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
+
+            During her internship at Eduroom, she demonstrated key traits like obedience, leadership, and strong communication skills, creating a positive and productive work environment. She demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
+
+            Her contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
+
+            Thank you!<br>
+            Yours Sincerely,<br>
+            <b>Eduroom</b><br><br>
+
+            We wish her the best of luck in her future endeavors and firmly believe she will become an integral part of a future workplace.
+        </div>
     </div>
-    <div class="date">${today}</div>
-  </div>
 </body>
+
 </html>
 `;
 
-  // 4) Render PDF with Puppeteer
+  // 5) Render PDF with Puppeteer
   let pdfBuffer;
   try {
     const browser = await puppeteer.launch({
@@ -369,7 +414,10 @@ const generateOfferLetter = async (userId) => {
     const page = await browser.newPage();
 
     await page.setContent(html, { waitUntil: "networkidle0" });
-    await page.evaluateHandle("document.fonts.ready"); // ensure fonts & bg load
+
+    // Wait until fonts are fully loaded
+    await page.evaluateHandle('document.fonts.ready');
+    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
 
     pdfBuffer = await page.pdf({
       format: "A4",
@@ -382,19 +430,17 @@ const generateOfferLetter = async (userId) => {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // 5) Upload PDF to S3 (no ACL, since bucket policy handles public access)
+  // 6) Upload PDF to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
