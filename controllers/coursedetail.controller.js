@@ -834,6 +834,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
+const axios = require('axios');
+const { model } = require('../models'); // adjust path if needed
+const { ReS, ReE } = require('../utils/response'); // your response helpers
+
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
@@ -865,7 +869,8 @@ const getBusinessTarget = async (req, res) => {
     }
     console.log("Fetched course:", course.toJSON());
 
-    const businessTarget = course.businessTarget || 0;
+    // Convert businessTarget to number
+    const businessTarget = parseInt(course.businessTarget, 10) || 0;
 
     // 3️⃣ Fetch referral count from external API
     let achievedCount = 0;
@@ -876,11 +881,8 @@ const getBusinessTarget = async (req, res) => {
       const apiResponse = await axios.get(apiUrl);
       console.log("API response:", apiResponse.data);
 
-      const registeredUsers = apiResponse.data?.data?.registered_users || [];
-      console.log("Registered users array:", registeredUsers);
-
-      achievedCount = registeredUsers.length;
-      console.log("Calculated achievedCount:", achievedCount);
+      achievedCount = apiResponse.data?.referral_count || 0;
+      console.log("Calculated achievedCount from referral_count:", achievedCount);
     } else {
       console.log("User has no referralCode");
     }
@@ -889,7 +891,7 @@ const getBusinessTarget = async (req, res) => {
     const remaining = Math.max(businessTarget - achievedCount, 0);
     console.log("Calculated remaining:", remaining);
 
-    // 5️⃣ Update subscriptionWallet properly
+    // 5️⃣ Update subscriptionWallet
     user.subscriptionWallet = achievedCount;
     await user.save({ fields: ['subscriptionWallet'] });
     console.log(`Updated subscriptionWallet for user ${user.id}:`, achievedCount);
