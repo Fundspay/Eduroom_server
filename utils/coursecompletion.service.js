@@ -82,7 +82,7 @@ const generateCourseLetter = async (userId) => {
     .certificate .name {
       position: absolute;
       top: 290px;
-      left: 50%;
+      left: 65%;
       transform: translateX(-50%);
       font-size: 98px;
       font-family: "Brush Script MT", cursive;
@@ -91,7 +91,7 @@ const generateCourseLetter = async (userId) => {
     .certificate .description {
       position: absolute;
       top: 420px;
-      left: 50%;
+      left: 65%;
       transform: translateX(-50%);
       width: 70%;
       font-size: 18px;
@@ -103,7 +103,7 @@ const generateCourseLetter = async (userId) => {
     .certificate .date {
       position: absolute;
       bottom: 190px;
-      left: 630px;
+      left: 660px;
       font-size: 18px;
       font-weight: bold;
       color: #004225;
