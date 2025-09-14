@@ -834,11 +834,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
+const axios = require("axios");
+
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
-    // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
@@ -856,31 +857,32 @@ const getBusinessTarget = async (req, res) => {
     const businessTarget = course.businessTarget || 0;
 
     // 3️⃣ Fetch referral count from external API
-    let referralCount = 0;
+    let achievedCount = 0;
     if (user.referralCode) {
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
       const apiResponse = await axios.get(apiUrl);
-      referralCount = Number(apiResponse.data?.referral_count) || 0;
+      const registeredUsers = apiResponse.data?.registered_users || [];
+
+      // ✅ Count all registered users
+      achievedCount = registeredUsers.length;
     }
 
-    // 4️⃣ Calculate achieved units 
-    const achievedCount = referralCount;
     const remaining = Math.max(businessTarget - achievedCount, 0);
 
-    // 5️⃣ Update user's subscriptionWallet with achieved count
+    // 4️⃣ Update subscriptionWallet
     user.subscriptionWallet = achievedCount;
-    await user.save(); // ✅ Save changes to DB
+    await user.save();
 
-    // 6️⃣ Return response
+    // 5️⃣ Return response
     return ReS(res, {
       success: true,
       data: {
-        userId,
+        userId: user.id,
         courseId,
         businessTarget,
         achievedCount,
         remaining,
-        subscriptionWallet: user.subscriptionWallet
+        subscriptionWallet: achievedCount
       }
     }, 200);
 
@@ -891,6 +893,7 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
+
 
 const getCourseStatus = async (req, res) => {
   try {
