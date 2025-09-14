@@ -38,11 +38,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
     // 🔹 Generate certificate PDF + S3 link
     const certificateFile = await generateInternshipCertificate(userId, courseId);
 
-    if (!certificateFile?.certificateUrl) {
+    if (!certificateFile?.fileUrl) {
       await transaction.rollback();
       return res.status(500).json({
         success: false,
-        message: "Certificate generation failed: certificateUrl is missing"
+        message: "Certificate generation failed: fileUrl is missing"
       });
     }
 
@@ -50,7 +50,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const certificate = await model.InternshipCertificate.create({
       userId,
       courseId,
-      certificateUrl: certificateFile.certificateUrl,
+      certificateUrl: certificateFile.fileUrl,
       isIssued: true,
       issuedDate: new Date()
     }, { transaction });
@@ -58,13 +58,13 @@ const createAndSendInternshipCertificate = async (req, res) => {
     // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
-      <p>Dear ${user.fullName || user.firstName},</p>
-      <p>Congratulations! Please find attached your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
-      <p>Access it here:</p>
-      <p><a href="${certificate.certificateUrl}" target="_blank">${certificate.certificateUrl}</a></p>
-      <br/>
-      <p>Best Regards,<br/>${course.name} Team</p>
-    `;
+  <p>Dear ${user.fullName || user.firstName},</p>
+  <p>Congratulations! Please find attached your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
+  <p>Access it here:</p>
+  <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
+  <br/>
+  <p>Best Regards,<br/>${course.name} Team</p>
+`;
 
     const mailResult = await sendMail(user.email, subject, html);
     if (!mailResult.success) {
