@@ -338,7 +338,7 @@ const generateOfferLetter = async (userId) => {
     .certificate .date {
       position: absolute;
       bottom: 190px;
-      left: 640px;
+      left: 620px;
       font-size: 18px;
       font-weight: bold;
       color: #004225;
