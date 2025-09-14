@@ -220,19 +220,25 @@ const addVerificationDocs = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    console.log("Uploaded files:", req.files);
+    // Log received files for debugging
+    console.log("Received req.files:", req.files);
 
-    // Extract file URLs safely, only if they exist
-    const studentIdCard = req.files?.studentIdCard?.[0]?.location;
-    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location;
-    const passportPhoto = req.files?.passportPhoto?.[0]?.location;
+    // Ensure req.files exists
+    if (!req.files || Object.keys(req.files).length === 0) {
+      return ReE(res, "No files uploaded. Make sure you are sending multipart/form-data with correct field names.", 400);
+    }
+
+    // Safely extract file URLs if present
+    const studentIdCard = req.files?.studentIdCard?.[0]?.location || null;
+    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location || null;
+    const passportPhoto = req.files?.passportPhoto?.[0]?.location || null;
 
     // Check if at least one file is uploaded
     if (!studentIdCard && !governmentIdProof && !passportPhoto) {
       return ReE(res, "At least one document must be uploaded", 400);
     }
 
-    // Prepare update object dynamically
+    // Build update object dynamically
     const updateData = {};
     if (studentIdCard) updateData.studentIdCard = studentIdCard;
     if (governmentIdProof) updateData.governmentIdProof = governmentIdProof;
@@ -241,15 +247,16 @@ const addVerificationDocs = async (req, res) => {
     // Save to DB
     await user.update(updateData);
 
-    return ReS(
-      res,
-      {
-        success: true,
-        message: "Verification docs uploaded successfully",
-        data: updateData,
-      },
-      200
-    );
+    // Reload user to get latest info
+    await user.reload();
+
+    return ReS(res, {
+      success: true,
+      message: "Verification documents uploaded successfully",
+      data: updateData,
+      user
+    }, 200);
+
   } catch (error) {
     console.error("Error uploading verification docs:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
