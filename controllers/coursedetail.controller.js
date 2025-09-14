@@ -838,20 +838,32 @@ const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
+    console.log("Received params:", { userId, courseId });
+
     // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
-    if (isNaN(userId) || isNaN(courseId))
+    if (isNaN(userId) || isNaN(courseId)) {
+      console.log("Invalid IDs provided");
       return ReE(res, "Invalid userId or courseId", 400);
+    }
 
     // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
+    if (!user) {
+      console.log(`User not found for ID: ${userId}`);
+      return ReE(res, "User not found", 404);
+    }
+    console.log("Fetched user:", user.toJSON());
 
     // 2️⃣ Fetch course
     const course = await model.Course.findByPk(courseId);
-    if (!course) return ReE(res, "Course not found", 404);
+    if (!course) {
+      console.log(`Course not found for ID: ${courseId}`);
+      return ReE(res, "Course not found", 404);
+    }
+    console.log("Fetched course:", course.toJSON());
 
     const businessTarget = course.businessTarget || 0;
 
@@ -859,20 +871,29 @@ const getBusinessTarget = async (req, res) => {
     let achievedCount = 0;
     if (user.referralCode) {
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-      const apiResponse = await axios.get(apiUrl);
+      console.log("Calling referral API:", apiUrl);
 
-      // ✅ Correct path to registered_users
+      const apiResponse = await axios.get(apiUrl);
+      console.log("API response:", apiResponse.data);
+
       const registeredUsers = apiResponse.data?.data?.registered_users || [];
+      console.log("Registered users array:", registeredUsers);
+
       achievedCount = registeredUsers.length;
+      console.log("Calculated achievedCount:", achievedCount);
+    } else {
+      console.log("User has no referralCode");
     }
 
     // 4️⃣ Calculate remaining
     const remaining = Math.max(businessTarget - achievedCount, 0);
+    console.log("Calculated remaining:", remaining);
 
     // 5️⃣ Update subscriptionWallet
-    user.subscriptionWallet = achievedCount;
+    console.log("Current subscriptionWallet:", user.subscriptionWallet);
+    user.subscriptionWallet = Number(achievedCount);
     await user.save();
-      console.log(`Updated subscriptionWallet for user ${user.id}:`, user.subscriptionWallet);
+    console.log(`Saved subscriptionWallet for user ${user.id}:`, user.subscriptionWallet);
 
     // 6️⃣ Return response
     return ReS(res, {
@@ -883,7 +904,7 @@ const getBusinessTarget = async (req, res) => {
         businessTarget,
         achievedCount,
         remaining,
-        subscriptionWallet: achievedCount
+        subscriptionWallet: user.subscriptionWallet
       }
     }, 200);
 
