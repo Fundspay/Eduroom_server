@@ -391,14 +391,14 @@ const generateOfferLetter = async (userId) => {
  
          <div class="content">
             To <b>${candidateName}</b>,<br><br>
+We are pleased to confirm that ${candidateName} has successfully undertaken ${pronouns.possessive} role as a <b>${role}</b> and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
 
-            We are pleased to confirm that ${candidateName} has successfully undertaken ${pronouns.possessive} role as a <b>${role}</b> and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
+During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like obedience, leadership, and strong communication skills. ${pronouns.subject} demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
 
-            During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like obedience, leadership, and strong communication skills, creating a positive and productive work environment. ${pronouns.subject} demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
+${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported our marketing efforts and contributed immensely to business development.<br><br>
 
-            ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
+We wish ${pronouns.object} the best of luck in ${pronouns.possessive} future endeavors.
 
-            We wish ${pronouns.object} the best of luck in ${pronouns.possessive} future endeavors and firmly believe ${pronouns.subject.toLowerCase()} will become an integral part of a future workplace.
         </div>
      </div>
  </body>
