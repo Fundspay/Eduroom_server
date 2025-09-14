@@ -232,21 +232,21 @@
 // };
 
 // module.exports = { generateOfferLetter };
-  "use strict";
- const AWS = require("aws-sdk");
- const puppeteer = require("puppeteer");
- const CONFIG = require("../config/config");
- const model = require("../models");
- 
- const s3 = new AWS.S3({
-   accessKeyId: CONFIG.awsAccessKeyId,
-   secretAccessKey: CONFIG.awsSecretAccessKey,
-   region: CONFIG.awsRegion
- });
- 
- const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
- 
- const normalizeDateToISO = (input) => {
+"use strict";
+const AWS = require("aws-sdk");
+const puppeteer = require("puppeteer");
+const CONFIG = require("../config/config");
+const model = require("../models");
+
+const s3 = new AWS.S3({
+  accessKeyId: CONFIG.awsAccessKeyId,
+  secretAccessKey: CONFIG.awsSecretAccessKey,
+  region: CONFIG.awsRegion
+});
+
+const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+
+const normalizeDateToISO = (input) => {
   if (!input) return null;
   const d = new Date(input);
   if (isNaN(d)) return null;
@@ -265,14 +265,15 @@ const generateOfferLetter = async (userId) => {
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
   // 2. Set gender-specific pronouns
+
+  const genderVal = String(user.gender);
   let pronouns;
-  if (user.gender === 1) {
+  if (genderVal === "1") {
     pronouns = { subject: "He", object: "him", possessive: "his" };
-  } else if (user.gender === 2) {
+  } else if (genderVal === "2") {
     pronouns = { subject: "She", object: "her", possessive: "her" };
   } else {
-    // Default fallback (just in case, but you said gender is 1 or 2)
-    pronouns = { subject: "He", object: "him", possessive: "his" };
+    pronouns = { subject: "They", object: "them", possessive: "their" }; // fallback
   }
 
   // 3. Determine earliest course start date and end date
@@ -317,10 +318,10 @@ const generateOfferLetter = async (userId) => {
 
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
- 
-   // 5) HTML content (your CSS untouched, only background path fixed)
+
+  // 5) HTML content (your CSS untouched, only background path fixed)
   // 5) HTML content (updated text)
- const html = `
+  const html = `
  <!DOCTYPE html>
  <html lang="en">
  
@@ -404,49 +405,49 @@ const generateOfferLetter = async (userId) => {
  
  </html>
  `;
- 
-   // 5) Render PDF with Puppeteer
-   let pdfBuffer;
-   try {
-     const browser = await puppeteer.launch({
-       headless: true,
-       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-     });
-     const page = await browser.newPage();
- 
-     await page.setContent(html, { waitUntil: "networkidle0" });
- 
-     // Wait until fonts are fully loaded
-     await page.evaluateHandle('document.fonts.ready');
-     await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
- 
-     pdfBuffer = await page.pdf({
-       format: "A4",
-       printBackground: true,
-       margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
-     });
- 
-     await browser.close();
-   } catch (err) {
-     throw new Error("PDF generation failed: " + err.message);
-   }
- 
-   // 6) Upload PDF to S3
-   const timestamp = Date.now();
-   const fileName = `offerletter-${timestamp}.pdf`;
-   const s3Key = `offerletters/${userId}/${fileName}`;
- 
-   await s3.putObject({
-     Bucket: "fundsweb",
-     Key: s3Key,
-     Body: pdfBuffer,
-     ContentType: "application/pdf",
-   }).promise();
- 
-   return {
-     fileName,
-     fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
-   };
- };
- 
- module.exports = { generateOfferLetter };
+
+  // 5) Render PDF with Puppeteer
+  let pdfBuffer;
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: "networkidle0" });
+
+    // Wait until fonts are fully loaded
+    await page.evaluateHandle('document.fonts.ready');
+    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
+
+    pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+    });
+
+    await browser.close();
+  } catch (err) {
+    throw new Error("PDF generation failed: " + err.message);
+  }
+
+  // 6) Upload PDF to S3
+  const timestamp = Date.now();
+  const fileName = `offerletter-${timestamp}.pdf`;
+  const s3Key = `offerletters/${userId}/${fileName}`;
+
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
+
+  return {
+    fileName,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+  };
+};
+
+module.exports = { generateOfferLetter };
