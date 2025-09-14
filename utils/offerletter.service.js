@@ -406,10 +406,6 @@ const html = `
 
             Her contributions have supported our marketing efforts and strategic initiatives and contributed immensely to business development.<br><br>
 
-            Thank you!<br>
-            Yours Sincerely,<br>
-            <b>Eduroom</b><br><br>
-
             We wish her the best of luck in her future endeavors and firmly believe she will become an integral part of a future workplace.
         </div>
     </div>
