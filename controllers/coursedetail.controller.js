@@ -838,6 +838,7 @@ const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
+    // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
@@ -859,19 +860,20 @@ const getBusinessTarget = async (req, res) => {
     if (user.referralCode) {
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
       const apiResponse = await axios.get(apiUrl);
-      const registeredUsers = apiResponse.data?.registered_users || [];
 
-      // ✅ Count all registered users
+      // ✅ Correct path to registered_users
+      const registeredUsers = apiResponse.data?.data?.registered_users || [];
       achievedCount = registeredUsers.length;
     }
 
+    // 4️⃣ Calculate remaining
     const remaining = Math.max(businessTarget - achievedCount, 0);
 
-    // 4️⃣ Update subscriptionWallet
+    // 5️⃣ Update subscriptionWallet
     user.subscriptionWallet = achievedCount;
     await user.save();
 
-    // 5️⃣ Return response
+    // 6️⃣ Return response
     return ReS(res, {
       success: true,
       data: {
@@ -891,8 +893,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
-
 const getCourseStatus = async (req, res) => {
   try {
     const { courseId, coursePreviewId, userId } = req.params;
