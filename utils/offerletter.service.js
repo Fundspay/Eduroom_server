@@ -82,10 +82,13 @@ const generateOfferLetter = async (userId) => {
   const html = `
 <!DOCTYPE html>
 <html lang="en">
- 
+
 <head>
     <meta charset="UTF-8">
     <title>Offer Letter</title>
+
+    <link rel="stylesheet" media="screen" href="https://fontlibrary.org//face/tex-gyre-bonum" type="text/css" />
+
     <style>
         body {
             margin: 0;
@@ -93,35 +96,24 @@ const generateOfferLetter = async (userId) => {
             font-family: "Times New Roman", serif;
             background: #f5f5f5;
         }
- 
+
         .letter-container {
             width: 800px;
             margin: 20px auto;
             padding: 80px 100px;
-            background: url("${ASSET_BASE}/offerbg.png") no-repeat center top;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
             box-sizing: border-box;
             position: relative;
         }
- 
-        /* Load TeX Gyre Bonum font (if hosted locally) */
-        @font-face {
-            font-family: 'TeX Gyre Bonum';
-            src: url('fonts/texgyrebonum.woff2') format('woff2'),
-                url('fonts/texgyrebonum.woff') format('woff'),
-                url('fonts/texgyrebonum.ttf') format('truetype');
-            font-weight: normal;
-            font-style: normal;
-        }
- 
-        /* Apply font to all your classes */
+
         .date,
         .title,
         .content {
-            font-family: 'TeX Gyre Bonum', 'Times New Roman', serif;
+            font-family: 'TeXGyreBonumRegular', 'Times New Roman', serif;
         }
- 
+
         .date {
             text-align: left;
             margin-top: 100px;
@@ -129,7 +121,7 @@ const generateOfferLetter = async (userId) => {
             margin-left: -65px;
             font-size: 16px;
         }
- 
+
         .title {
             text-align: center;
             font-weight: bold;
@@ -138,25 +130,25 @@ const generateOfferLetter = async (userId) => {
             margin-bottom: 40px;
             text-transform: uppercase;
         }
- 
+
         .content {
             font-size: 15.5px;
             margin-left: -65px;
             line-height: 1.6;
             text-align: justify;
         }
- 
+
         .signature {
             margin-top: 60px;
             font-size: 16px;
         }
- 
+
         .signature img {
             height: 60px;
             display: block;
             margin-top: 10px;
         }
- 
+
         .footer {
             position: absolute;
             bottom: 30px;
@@ -168,25 +160,30 @@ const generateOfferLetter = async (userId) => {
         }
     </style>
 </head>
- 
+
 <body>
     <div class="letter-container">
         <div class="date">Date: <b>${today}</b></div>
- 
+
         <div class="content">
             Dear <b>${candidateName}</b>,<br><br>
- 
-            Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.
+
+            Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at
+            Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this
+            role.
             <br><br>
             <b>Starting Date:</b> ${startDate}<br>
             <b>Position:</b> ${position}<br>
             <b>Work Location:</b> ${workLocation}<br>
             <b>Benefits:</b> Certification of Internship and LOA (performance-based).<br><br>
- 
-            We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company's success.
+
+            We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and
+            expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about
+            the opportunity to leverage your skills and contributions to drive our company's success.
         </div>
     </div>
 </body>
+
 </html>
 `;
 
