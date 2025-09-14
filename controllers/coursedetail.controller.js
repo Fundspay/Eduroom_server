@@ -834,10 +834,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-const axios = require('axios');
-const { model } = require('../models'); // adjust path if needed
-const { ReS, ReE } = require('../utils/response'); // your response helpers
-
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
