@@ -6,7 +6,7 @@ module.exports = (sequelize, Sequelize) => {
       id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
       userId: { type: Sequelize.BIGINT, allowNull: false },
       courseId: { type: Sequelize.BIGINT, allowNull: false }, // link to Course
-      certificateUrl: { type: Sequelize.STRING, allowNull: false },
+      certificateUrl: { type: Sequelize.STRING, allowNull: true },
       issuedDate: { type: Sequelize.DATEONLY, allowNull: true },
       deductedWallet: { type: Sequelize.FLOAT, allowNull: false, defaultValue: 0 },
       isIssued: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
