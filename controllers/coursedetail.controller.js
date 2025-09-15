@@ -855,7 +855,6 @@ const getBusinessTarget = async (req, res) => {
       console.log(`User not found for ID: ${userId}`);
       return ReE(res, "User not found", 404);
     }
-    console.log("Fetched user:", user.toJSON());
 
     // 2️⃣ Fetch course
     const course = await model.Course.findByPk(courseId);
@@ -863,59 +862,44 @@ const getBusinessTarget = async (req, res) => {
       console.log(`Course not found for ID: ${courseId}`);
       return ReE(res, "Course not found", 404);
     }
-    console.log("Fetched course:", course.toJSON());
 
-    // Convert businessTarget to number
+    // 3️⃣ Extract business target
     const businessTarget = parseInt(course.businessTarget, 10) || 0;
 
-    // 🔹 2.1 Update businessTargets in User table
-    const currentTargets = user.businessTargets || {};
-    currentTargets[courseId] = businessTarget; // store per courseId
-    user.businessTargets = currentTargets;
-    await user.save({ fields: ["businessTargets"] });
-    console.log(`Updated businessTargets for user ${user.id}:`, currentTargets);
-
-    // 3️⃣ Fetch referral count from external API
+    // 4️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-      console.log("Calling referral API:", apiUrl);
-
       const apiResponse = await axios.get(apiUrl);
-      console.log("API response:", apiResponse.data);
-
       achievedCount = apiResponse.data?.referral_count || 0;
-      console.log("Calculated achievedCount from referral_count:", achievedCount);
-    } else {
-      console.log("User has no referralCode");
     }
 
-    // 4️⃣ Calculate remaining
+    // 5️⃣ Calculate remaining
     const remaining = Math.max(businessTarget - achievedCount, 0);
-    console.log("Calculated remaining:", remaining);
 
-    // 5️⃣ Update subscriptionWallet
-    user.subscriptionWallet = achievedCount;
-    await user.save({ fields: ["subscriptionWallet"] });
-    console.log(`Updated subscriptionWallet for user ${user.id}:`, achievedCount);
+    // 6️⃣ Update User table correctly
+    user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
+    user.subscriptionWallet = Number(achievedCount);
+    user.subscriptionLeft = Number(remaining);
 
-    // 6️⃣ Return response
-    return ReS(
-      res,
-      {
-        success: true,
-        data: {
-          userId: user.id,
-          courseId,
-          businessTarget,
-          achievedCount,
-          remaining,
-          subscriptionWallet: achievedCount,
-          businessTargets: currentTargets, // send back updated targets
-        },
+    await user.save({
+      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
+    });
+
+    // 7️⃣ Return response **exactly in same structure**
+    return ReS(res, {
+      success: true,
+      data: {
+        userId: user.id,
+        courseId,
+        businessTarget,
+        achievedCount,
+        remaining,
+        subscriptionWallet: user.subscriptionWallet,
+        businessTargets: user.businessTargets,
       },
-      200
-    );
+    }, 200);
+
   } catch (error) {
     console.error("Get Business Target Error:", error);
     return ReE(res, error.message, 500);
@@ -923,7 +907,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
 
 const getCourseStatus = async (req, res) => {
   try {
