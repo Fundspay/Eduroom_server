@@ -869,33 +869,43 @@ const getBusinessTarget = async (req, res) => {
     // 4️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
-      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-      const apiResponse = await axios.get(apiUrl);
-      achievedCount = apiResponse.data?.referral_count || 0;
+      try {
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        const apiResponse = await axios.get(apiUrl);
+        achievedCount = apiResponse.data?.referral_count || 0;
+      } catch (apiError) {
+        console.warn("Referral API error:", apiError.message);
+        achievedCount = 0;
+      }
     }
 
     // 5️⃣ Calculate remaining
     const remaining = Math.max(businessTarget - achievedCount, 0);
 
-    // 6️⃣ Update User table correctly
+    // 6️⃣ Ensure safe numbers for BIGINT fields
+    const achievedCountNum = Number(achievedCount) || 0;
+    const remainingNum = Number(remaining) || 0;
+
+    // 7️⃣ Update User table
     user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
-    user.subscriptionWallet = Number(achievedCount);
-    user.subscriptionLeft = Number(remaining);
+    user.subscriptionWallet = achievedCountNum;
+    user.subscriptionLeft = remainingNum;
 
     await user.save({
       fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
     });
+    console.log(`Updated user ${user.id} with business target info`);
 
-    // 7️⃣ Return response **exactly in same structure**
+    // 8️⃣ Return response exactly as before
     return ReS(res, {
       success: true,
       data: {
         userId: user.id,
         courseId,
         businessTarget,
-        achievedCount,
-        remaining,
-        subscriptionWallet: user.subscriptionWallet,
+        achievedCount: achievedCountNum,
+        remaining: remainingNum,
+        subscriptionWallet: achievedCountNum,
         businessTargets: user.businessTargets,
       },
     }, 200);
