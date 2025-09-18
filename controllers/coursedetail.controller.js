@@ -727,13 +727,16 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Prepare response with subscription info
+    // Correct subscription logic
+    const totalSubscriptions = user.TotalSubscriptions || 0; // total given
+    const deductedSubscriptions = user.subscriptiondeductedWallet || 0; // already used
+
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: user.subscriptionWallet || 0,                   // Total subscription
-      subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,       // Amount already deducted
-      subscriptionLeft: (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0), // Remaining usable subscription
+      subscriptionWalletTotal: totalSubscriptions, // keep same name
+      subscriptionWalletRemaining: deductedSubscriptions, // keep same name (used)
+      subscriptionLeft: Math.max(totalSubscriptions - deductedSubscriptions, 0), // no negatives
       courses: [],
     };
 
@@ -745,8 +748,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         where: { id: courseId, isDeleted: false },
         include: [
           { model: model.Domain, attributes: ["name"] },
-          { model: model.CoursePreview, attributes: ["id", "title", "heading"], where: { isDeleted: false }, required: false }
-        ]
+          {
+            model: model.CoursePreview,
+            attributes: ["id", "title", "heading"],
+            where: { isDeleted: false },
+            required: false,
+          },
+        ],
       });
       if (!course) continue;
 
@@ -784,7 +792,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           sessionNumber: session.sessionNumber,
           title: session.title,
           attempted,
-          status: attempted && correctMCQs === sessionMCQs && sessionMCQs > 0 ? "Completed" : "In Progress",
+          status:
+            attempted && correctMCQs === sessionMCQs && sessionMCQs > 0
+              ? "Completed"
+              : "In Progress",
           correctMCQs,
           totalMCQs: sessionMCQs,
           sessionDuration: session.sessionDuration || null,
@@ -811,7 +822,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
-      const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+      const overallStatus =
+        completedSessions === totalSessions ? "Completed" : "In Progress";
 
       response.courses.push({
         courseId,
