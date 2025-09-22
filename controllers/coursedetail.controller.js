@@ -3,6 +3,8 @@ const model = require("../models/index");
 const sequelize = model.sequelize;
 const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
+const { Op } = require("sequelize");
+
 
 
 const addOrUpdateCourseDetail = async (req, res) => {
@@ -405,7 +407,6 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    //  Fetch directly from QuestionModel
     const caseStudyQuestion = await model.QuestionModel.findOne({
       where: {
         courseId,
@@ -413,7 +414,7 @@ const getCaseStudyForSession = async (req, res) => {
         day,
         sessionNumber,
         isDeleted: false,
-        caseStudy: { [Op.ne]: null } // ensure case study is not null/empty
+        caseStudy: { [Op.and]: { [Op.ne]: null, [Op.ne]: "" } }
       }
     });
 
@@ -425,7 +426,6 @@ const getCaseStudyForSession = async (req, res) => {
       );
     }
 
-    // Response shaped exactly like your frontend expects
     return ReS(
       res,
       {
