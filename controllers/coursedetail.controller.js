@@ -405,35 +405,40 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{
-        model: model.QuestionModel,
-        where: { isDeleted: false },
-        required: false
-      }]
+    //  Fetch directly from QuestionModel
+    const caseStudyQuestion = await model.QuestionModel.findOne({
+      where: {
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        isDeleted: false,
+        caseStudy: { [Op.ne]: null } // ensure case study is not null/empty
+      }
     });
 
-    if (!sessionDetail) return ReE(res, "Session details not found", 404);
-
-    // ✅ Pick first question with caseStudy for this session
-    const caseStudyQuestion = (sessionDetail.QuestionModels || [])
-      .find(q => q.caseStudy && q.caseStudy.trim() !== "");
-
     if (!caseStudyQuestion) {
-      return ReS(res, { success: false, message: "No case study available for this session." }, 200);
+      return ReS(
+        res,
+        { success: false, message: "No case study available for this session." },
+        200
+      );
     }
 
-    return ReS(res, {
-      success: true,
-      data: {
-        caseStudy: {
-          questionId: caseStudyQuestion.id,
-          caseStudy: caseStudyQuestion.caseStudy
+    // Response shaped exactly like your frontend expects
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          caseStudy: {
+            questionId: caseStudyQuestion.id,
+            caseStudy: caseStudyQuestion.caseStudy
+          }
         }
-      }
-    }, 200);
-
+      },
+      200
+    );
   } catch (error) {
     console.error("Get Case Study Error:", error);
     return ReE(res, error.message, 500);
