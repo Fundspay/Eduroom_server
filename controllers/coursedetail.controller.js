@@ -31,12 +31,12 @@ const addOrUpdateCourseDetail = async (req, res) => {
       const updatedSessions = [];
 
       for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions, caseStudy } = session;
+        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
 
         if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Find or create the session row
+        // Find or create session row
         let currentSessionRow = await model.CourseDetail.findOne({
           where: { courseId, coursePreviewId, day, sessionNumber },
           transaction
@@ -55,8 +55,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
             youtubeLink: youtubeLink ?? null,
             duration,
             sessionDuration,
-            heading,
-            caseStudy: caseStudy ?? null // store case study directly here
+            heading
           }, { transaction });
         } else {
           await currentSessionRow.update({
@@ -65,12 +64,11 @@ const addOrUpdateCourseDetail = async (req, res) => {
             youtubeLink: youtubeLink ?? null,
             duration,
             sessionDuration,
-            heading,
-            caseStudy: caseStudy ?? currentSessionRow.caseStudy // update if provided
+            heading
           }, { transaction });
         }
 
-        // MCQs handling (unchanged)
+        // ✅ Save MCQs + Case Study in QuestionModel
         if (Array.isArray(questions)) {
           const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: currentSessionRow.id, sessionNumber },
@@ -91,7 +89,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionC: q.optionC,
                 optionD: q.optionD,
                 answer: q.answer,
-                keywords: q.keywords ?? null
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null   // ✅ keep caseStudy in QuestionModel
               }, { transaction });
               incomingIds.push(qId);
             } else {
@@ -108,7 +107,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionC: q.optionC,
                 optionD: q.optionD,
                 answer: q.answer,
-                keywords: q.keywords ?? null
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null   // ✅ save caseStudy here
               }, { transaction });
               incomingIds.push(newQ.id);
             }
@@ -129,8 +129,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           duration,
           sessionDuration,
           heading,
-          questions,
-          caseStudy: currentSessionRow.caseStudy // return it in response
+          questions
         });
       }
 
@@ -148,7 +147,6 @@ const addOrUpdateCourseDetail = async (req, res) => {
 };
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
-
 
 const deleteCourseDetail = async (req, res) => {
   const { courseDetailId } = req.body;
@@ -407,27 +405,31 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    //  Fetch session details directly
     const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false }
+      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
+      include: [{
+        model: model.QuestionModel,
+        where: { isDeleted: false },
+        required: false
+      }]
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-    if (!sessionDetail.caseStudy || sessionDetail.caseStudy.trim() === "") {
-      return ReS(res, {
-        success: false,
-        message: "No case study available for this session."
-      }, 200);
+    // ✅ Pick first question with caseStudy for this session
+    const caseStudyQuestion = (sessionDetail.QuestionModels || [])
+      .find(q => q.caseStudy && q.caseStudy.trim() !== "");
+
+    if (!caseStudyQuestion) {
+      return ReS(res, { success: false, message: "No case study available for this session." }, 200);
     }
 
-    //  Response structure as frontend expects
     return ReS(res, {
       success: true,
       data: {
         caseStudy: {
-          questionId: sessionDetail.id,  // or keep null if no real questionId
-          caseStudy: sessionDetail.caseStudy
+          questionId: caseStudyQuestion.id,
+          caseStudy: caseStudyQuestion.caseStudy
         }
       }
     }, 200);
@@ -439,7 +441,6 @@ const getCaseStudyForSession = async (req, res) => {
 };
 
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
-
 
 const submitCaseStudyAnswer = async (req, res) => {
   try {
