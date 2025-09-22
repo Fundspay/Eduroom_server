@@ -404,6 +404,51 @@ const evaluateSessionMCQ = async (req, res) => {
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
 
+// const getCaseStudyForSession = async (req, res) => {
+//   try {
+//     const { courseId, coursePreviewId, day, sessionNumber } = req.params;
+//     const { userId } = req.query;
+
+//     if (!userId) return ReE(res, "userId is required", 400);
+
+//     // Fetch the first question in this session that has a case study
+//     const caseStudyQuestion = await model.QuestionModel.findOne({
+//       where: {
+//         courseId,
+//         coursePreviewId,
+//         day,
+//         sessionNumber,
+//         isDeleted: false,
+//         caseStudy: { [Op.ne]: null }  // not null
+//       },
+//       order: [['questionNumber', 'ASC']]  // ensures first question with case study
+//     });
+
+//     if (!caseStudyQuestion) {
+//       return ReS(res, {
+//         success: false,
+//         message: "No case study available for this session."
+//       }, 200);
+//     }
+
+//     // Response exactly like frontend expects
+//     return ReS(res, {
+//       success: true,
+//       data: {
+//         caseStudy: {
+//           questionId: caseStudyQuestion.id,
+//           caseStudy: caseStudyQuestion.caseStudy
+//         }
+//       }
+//     }, 200);
+
+//   } catch (error) {
+//     console.error("Get Case Study Error:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
+
+// module.exports.getCaseStudyForSession = getCaseStudyForSession;
 const getCaseStudyForSession = async (req, res) => {
   try {
     const { courseId, coursePreviewId, day, sessionNumber } = req.params;
@@ -411,34 +456,32 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch the first question in this session that has a case study
-    const caseStudyQuestion = await model.QuestionModel.findOne({
-      where: {
+    const sessionDetail = await model.CourseDetail.findOne({
+      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
+      include: [{
+        model: model.QuestionModel,
+        where: { isDeleted: false },
+        required: false // keep false so sessions without questions still return
+      }]
+    });
+
+    if (!sessionDetail) return ReE(res, "Session details not found", 404);
+
+    // Ensure we look into all questions for this session row
+    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy && q.caseStudy.trim() !== '');
+    if (!caseStudyQuestion) {
+      return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
+    }
+
+    return ReS(res, {
+      success: true,
+      data: {
+        userId,
         courseId,
         coursePreviewId,
         day,
         sessionNumber,
-        isDeleted: false,
-        caseStudy: { [Op.ne]: null }  // not null
-      },
-      order: [['questionNumber', 'ASC']]  // ensures first question with case study
-    });
-
-    if (!caseStudyQuestion) {
-      return ReS(res, {
-        success: false,
-        message: "No case study available for this session."
-      }, 200);
-    }
-
-    // Response exactly like frontend expects
-    return ReS(res, {
-      success: true,
-      data: {
-        caseStudy: {
-          questionId: caseStudyQuestion.id,
-          caseStudy: caseStudyQuestion.caseStudy
-        }
+        caseStudy: { questionId: caseStudyQuestion.id, caseStudy: caseStudyQuestion.caseStudy }
       }
     }, 200);
 
