@@ -31,19 +31,18 @@ const addOrUpdateCourseDetail = async (req, res) => {
       const updatedSessions = [];
 
       for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
+        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions, caseStudy } = session;
 
         if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Find existing session row
+        // Find or create the session row
         let currentSessionRow = await model.CourseDetail.findOne({
           where: { courseId, coursePreviewId, day, sessionNumber },
           transaction
         });
 
         if (!currentSessionRow) {
-          // ✅ Create new row if it doesn't exist
           currentSessionRow = await model.CourseDetail.create({
             domainId,
             courseId,
@@ -56,23 +55,23 @@ const addOrUpdateCourseDetail = async (req, res) => {
             youtubeLink: youtubeLink ?? null,
             duration,
             sessionDuration,
-            heading
+            heading,
+            caseStudy: caseStudy ?? null // store case study directly here
           }, { transaction });
         } else {
-          // Update existing session row
           await currentSessionRow.update({
             title,
             description: description ?? null,
             youtubeLink: youtubeLink ?? null,
             duration,
             sessionDuration,
-            heading
+            heading,
+            caseStudy: caseStudy ?? currentSessionRow.caseStudy // update if provided
           }, { transaction });
         }
 
-        // MCQs: replace old questions for this session
+        // MCQs handling (unchanged)
         if (Array.isArray(questions)) {
-          // Fetch existing questions for this session
           const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: currentSessionRow.id, sessionNumber },
             transaction
@@ -80,13 +79,11 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
           const existingQuestionMap = {};
           existingQuestions.forEach(q => existingQuestionMap[q.id] = q);
-
           const incomingIds = [];
 
           for (const q of questions) {
             const qId = Number(q.id);
             if (qId && existingQuestionMap[qId]) {
-              // Update existing question
               await existingQuestionMap[qId].update({
                 question: q.question,
                 optionA: q.optionA,
@@ -94,12 +91,10 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionC: q.optionC,
                 optionD: q.optionD,
                 answer: q.answer,
-                keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null
+                keywords: q.keywords ?? null
               }, { transaction });
               incomingIds.push(qId);
             } else {
-              // Create new question
               const newQ = await model.QuestionModel.create({
                 courseDetailId: currentSessionRow.id,
                 domainId,
@@ -113,14 +108,12 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionC: q.optionC,
                 optionD: q.optionD,
                 answer: q.answer,
-                keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null
+                keywords: q.keywords ?? null
               }, { transaction });
               incomingIds.push(newQ.id);
             }
           }
 
-          // Delete old questions not present in payload
           const toDelete = existingQuestions.filter(q => !incomingIds.includes(q.id));
           if (toDelete.length > 0) {
             const deleteIds = toDelete.map(q => q.id);
@@ -136,7 +129,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
           duration,
           sessionDuration,
           heading,
-          questions
+          questions,
+          caseStudy: currentSessionRow.caseStudy // return it in response
         });
       }
 
@@ -154,7 +148,6 @@ const addOrUpdateCourseDetail = async (req, res) => {
 };
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
-
 
 
 const deleteCourseDetail = async (req, res) => {
@@ -416,18 +409,17 @@ const getCaseStudyForSession = async (req, res) => {
 
     const sessionDetail = await model.CourseDetail.findOne({
       where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{
-        model: model.QuestionModel,
-        where: { isDeleted: false },
-        required: false // keep false so sessions without questions still return
-      }]
+      include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-    // Ensure we look into all questions for this session row
-    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy && q.caseStudy.trim() !== '');
-    if (!caseStudyQuestion) {
+    // Find **any case study** in the session, regardless of question
+    const caseStudy = (sessionDetail.QuestionModels || [])
+      .map(q => q.caseStudy)
+      .find(cs => cs && cs.trim() !== '');
+
+    if (!caseStudy) {
       return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
     }
 
@@ -439,7 +431,7 @@ const getCaseStudyForSession = async (req, res) => {
         coursePreviewId,
         day,
         sessionNumber,
-        caseStudy: { questionId: caseStudyQuestion.id, caseStudy: caseStudyQuestion.caseStudy }
+        caseStudy
       }
     }, 200);
 
@@ -448,7 +440,6 @@ const getCaseStudyForSession = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
 
 const submitCaseStudyAnswer = async (req, res) => {
