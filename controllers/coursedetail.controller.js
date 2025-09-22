@@ -5,8 +5,6 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
 const { Op } = require("sequelize");
 
-
-
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
 
@@ -70,7 +68,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           }, { transaction });
         }
 
-        // ✅ Save MCQs + Case Study in QuestionModel
+        // Save MCQs + Case Study in QuestionModel with questionNumber
         if (Array.isArray(questions)) {
           const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: currentSessionRow.id, sessionNumber },
@@ -81,8 +79,10 @@ const addOrUpdateCourseDetail = async (req, res) => {
           existingQuestions.forEach(q => existingQuestionMap[q.id] = q);
           const incomingIds = [];
 
-          for (const q of questions) {
+          for (let index = 0; index < questions.length; index++) {
+            const q = questions[index];
             const qId = Number(q.id);
+
             if (qId && existingQuestionMap[qId]) {
               await existingQuestionMap[qId].update({
                 question: q.question,
@@ -92,7 +92,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionD: q.optionD,
                 answer: q.answer,
                 keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null   // ✅ keep caseStudy in QuestionModel
+                caseStudy: q.caseStudy ?? null,
+                questionNumber: index + 1  // explicit question number
               }, { transaction });
               incomingIds.push(qId);
             } else {
@@ -110,12 +111,14 @@ const addOrUpdateCourseDetail = async (req, res) => {
                 optionD: q.optionD,
                 answer: q.answer,
                 keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null   // ✅ save caseStudy here
+                caseStudy: q.caseStudy ?? null,
+                questionNumber: index + 1  // explicit question number
               }, { transaction });
               incomingIds.push(newQ.id);
             }
           }
 
+          // Delete old questions not in payload
           const toDelete = existingQuestions.filter(q => !incomingIds.includes(q.id));
           if (toDelete.length > 0) {
             const deleteIds = toDelete.map(q => q.id);
@@ -149,6 +152,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
 };
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
+
 
 const deleteCourseDetail = async (req, res) => {
   const { courseDetailId } = req.body;
@@ -407,6 +411,7 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
+    // Fetch the first question in this session that has a case study
     const caseStudyQuestion = await model.QuestionModel.findOne({
       where: {
         courseId,
@@ -414,31 +419,29 @@ const getCaseStudyForSession = async (req, res) => {
         day,
         sessionNumber,
         isDeleted: false,
-        caseStudy: { [Op.and]: { [Op.ne]: null, [Op.ne]: "" } }
-      }
+        caseStudy: { [Op.ne]: null }  // not null
+      },
+      order: [['questionNumber', 'ASC']]  // ensures first question with case study
     });
 
     if (!caseStudyQuestion) {
-      return ReS(
-        res,
-        { success: false, message: "No case study available for this session." },
-        200
-      );
+      return ReS(res, {
+        success: false,
+        message: "No case study available for this session."
+      }, 200);
     }
 
-    return ReS(
-      res,
-      {
-        success: true,
-        data: {
-          caseStudy: {
-            questionId: caseStudyQuestion.id,
-            caseStudy: caseStudyQuestion.caseStudy
-          }
+    // Response exactly like frontend expects
+    return ReS(res, {
+      success: true,
+      data: {
+        caseStudy: {
+          questionId: caseStudyQuestion.id,
+          caseStudy: caseStudyQuestion.caseStudy
         }
-      },
-      200
-    );
+      }
+    }, 200);
+
   } catch (error) {
     console.error("Get Case Study Error:", error);
     return ReE(res, error.message, 500);
@@ -446,6 +449,7 @@ const getCaseStudyForSession = async (req, res) => {
 };
 
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
+
 
 const submitCaseStudyAnswer = async (req, res) => {
   try {
