@@ -193,9 +193,9 @@ var addInternshipDetails = async function (req, res) {
     } = req.body;
 
     // Validate required fields (except internshipModeId)
-    if (!internshipProgram || !internshipDuration) {
-      return ReE(res, "Missing required internship details", 400);
-    }
+    // if (!internshipProgram || !internshipDuration) {
+    //   return ReE(res, "Missing required internship details", 400);
+    // }
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
