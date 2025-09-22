@@ -407,31 +407,28 @@ const getCaseStudyForSession = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
+    //  Fetch session details directly
     const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
+      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false }
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-    // Find **any case study** in the session, regardless of question
-    const caseStudy = (sessionDetail.QuestionModels || [])
-      .map(q => q.caseStudy)
-      .find(cs => cs && cs.trim() !== '');
-
-    if (!caseStudy) {
-      return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
+    if (!sessionDetail.caseStudy || sessionDetail.caseStudy.trim() === "") {
+      return ReS(res, {
+        success: false,
+        message: "No case study available for this session."
+      }, 200);
     }
 
+    //  Response structure as frontend expects
     return ReS(res, {
       success: true,
       data: {
-        userId,
-        courseId,
-        coursePreviewId,
-        day,
-        sessionNumber,
-        caseStudy
+        caseStudy: {
+          questionId: sessionDetail.id,  // or keep null if no real questionId
+          caseStudy: sessionDetail.caseStudy
+        }
       }
     }, 200);
 
@@ -440,7 +437,9 @@ const getCaseStudyForSession = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
+
 
 const submitCaseStudyAnswer = async (req, res) => {
   try {
