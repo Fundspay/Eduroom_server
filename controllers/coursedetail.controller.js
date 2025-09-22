@@ -21,7 +21,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
     if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
-    // One CourseDetail per coursePreviewId
+    // One CourseDetail per coursePreviewId (basic info)
     let courseDetail = await model.CourseDetail.findOne({
       where: { coursePreviewId, courseId },
       transaction
@@ -41,7 +41,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
     for (const dayObj of days) {
       const { day, sessions } = dayObj;
       if (!day) throw new Error("day is required for each day object");
-      if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
+      if (!Array.isArray(sessions) || sessions.length === 0)
+        throw new Error(`sessions are required for day ${day}`);
 
       const createdSessions = [];
 
@@ -51,14 +52,19 @@ const addOrUpdateCourseDetail = async (req, res) => {
         if (!sessionNumber) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Check for existing session in the same CourseDetail
+        // Check for existing session for this coursePreviewId + day + sessionNumber
         let existingSession = await model.CourseDetail.findOne({
           where: { coursePreviewId, courseId, day, sessionNumber },
           transaction
         });
 
         if (!existingSession) {
-          await courseDetail.update({
+          // ✅ Create a new session row if it doesn't exist
+          existingSession = await model.CourseDetail.create({
+            domainId,
+            courseId,
+            coursePreviewId,
+            userId: userId || null,
             day,
             sessionNumber,
             title,
@@ -69,6 +75,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
             heading: heading || null
           }, { transaction });
         } else {
+          // Update existing session if it already exists
           await existingSession.update({
             title,
             description: description || null,
@@ -82,13 +89,13 @@ const addOrUpdateCourseDetail = async (req, res) => {
         // MCQs: replace old questions for this session
         if (Array.isArray(questions)) {
           await model.QuestionModel.destroy({
-            where: { courseDetailId: courseDetail.id, sessionNumber },
+            where: { courseDetailId: existingSession.id, sessionNumber },
             transaction
           });
 
           if (questions.length > 0) {
             const questionRecords = questions.map(q => ({
-              courseDetailId: courseDetail.id,
+              courseDetailId: existingSession.id,
               domainId,
               courseId,
               coursePreviewId,
@@ -134,6 +141,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
 };
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
+
 
 const deleteCourseDetail = async (req, res) => {
   const { courseDetailId } = req.body;
