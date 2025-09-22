@@ -97,7 +97,7 @@ const fetchAllCourses = async (req, res) => {
     const { userId } = req.query;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user with assigned TeamManager
+    // 🔹 Fetch user with TeamManager
     const user = await model.User.findByPk(userId, {
       include: [
         {
@@ -110,40 +110,56 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // Fetch all courses
+    // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
-      include: [
-        { model: model.Domain, attributes: ["name"] },
-        {
-          model: model.CoursePreview,
-          attributes: [["id", "coursePreviewId"], "dayCount"],
-          where: { isDeleted: false },
-          required: false,
-        },
-      ],
+      include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
+    // 🔹 Fetch all CoursePreviews at once
+    const previews = await model.CoursePreview.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        ["id", "coursePreviewId"],
+        "courseId",
+        "domainId",
+        "title",
+        "heading",
+        "dayCount",
+      ],
+      raw: true,
+    });
+
+    // 🔹 Map courses with status and previews
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
-      // 1️⃣ Check TeamManager internshipStatus
-      if (user.teamManager && user.teamManager.internshipStatus) {
-        status = user.teamManager.internshipStatus;
-      } else {
-        const courseDates = user.courseDates || {};
-        const courseStatuses = user.courseStatuses || {};
+      const courseDates = user.courseDates || {};
+      const courseStatuses = user.courseStatuses || {};
+      const courseIdStr = String(course.id); // 🔹 Ensure string key access
 
-        // 2️⃣ Check if course has been started
-        if (courseDates[course.id] && courseDates[course.id].started) {
-          // 3️⃣ If started, check courseStatuses for updated status
-          status = courseStatuses[course.id] || "Started";
-        }
+      // ✅ Check if course has started
+      if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
+        status = courseStatuses[courseIdStr] || "Started";
+      } else {
+        status = "Not Started";
       }
+
+      // 🔹 Attach previews specific to this course
+      const coursePreviews = previews
+        .filter((p) => p.courseId === course.id)
+        .map((p) => ({
+          coursePreviewId: p.coursePreviewId,
+          dayCount: p.dayCount,
+          title: p.title,
+          heading: p.heading,
+        }));
 
       return {
         ...course.toJSON(),
+        courseId: course.id,
+        CoursePreviews: coursePreviews,
         status,
       };
     });
@@ -156,6 +172,8 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
+
 
 // ✅ Fetch single Course by ID
 var fetchSingleCourse = async (req, res) => {

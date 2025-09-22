@@ -10,6 +10,15 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion
 });
 
+const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+
+const normalizeDateToISO = (input) => {
+  if (!input) return null;
+  const d = new Date(input);
+  if (isNaN(d)) return null;
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD
+};
+
 const generateOfferLetter = async (userId) => {
   if (!userId) throw new Error("Missing userId");
 
@@ -21,208 +30,204 @@ const generateOfferLetter = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Get Start Date
-  const startDateRaw = user.preferredStartDate;
-  const startDate = startDateRaw
-    ? new Date(startDateRaw).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : "To Be Decided";
+  // 2. Determine the earliest course start date from courseDates
+  let startDate = null;
+  let courseName = null;
 
-  // 3. Find matching courseId from courseDates JSON
-  let courseName = "Intern"; // default
-  if (startDateRaw && user.courseDates) {
-    const entry = Object.entries(user.courseDates).find(
-      ([courseId, date]) =>
-        new Date(date).toISOString().split("T")[0] === startDateRaw
-    );
+  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+    let earliestStart = null;
+    let courseIdForStart = null;
 
-    if (entry) {
-      const [courseId] = entry;
+    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+      if (!courseObj.startDate) continue;
+      const courseStartISO = normalizeDateToISO(courseObj.startDate);
+      if (!courseStartISO) continue;
 
-      // 4. Fetch Course Name
-      const course = await model.Course.findOne({
-        where: { id: courseId },
-      });
-      if (course) {
+      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+        earliestStart = courseStartISO;
+        courseIdForStart = cid;
+      }
+    }
+
+    startDate = earliestStart;
+
+    if (courseIdForStart) {
+      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+      if (course && course.name) {
         courseName = course.name;
       }
     }
   }
 
-  const workLocation =  "Work from Home";
+  // 3. Fallbacks
+  startDate = startDate
+    ? new Date(startDate).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    })
+    : "To Be Decided";
+
+  const position = courseName || "Intern";
+  const role = courseName || "Intern";
+  const workLocation = "Work from Home";
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
-    year: "numeric",
+    year: "numeric"
   });
-  // 2. Build HTML Template
-  const html = `
-  <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; margin: 60px; font-size: 13px; line-height: 1.6; position: relative; }
 
-        /* Top green bar (empty, same as footer) */
-        .topbar {
-          background:#009688;
-          padding:15px 30px;
-          width: 100%;
-          margin-bottom: 20px;
+  // 5) HTML content (your CSS untouched, only background path fixed)
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Offer Letter</title>
+
+    <!-- Embed TeX Gyre Bonum directly via @font-face -->
+    <style>
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Times New Roman', serif;
+            background: #f5f5f5;
         }
 
-        /* Header */
-        .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:40px; }
-        .logo { width:150px; }
-        .date { font-size:13px; }
+        .letter-container {
+            width: 800px;
+            margin: 20px auto;
+            padding: 80px 100px;
+            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background-size: cover;
+            min-height: 1100px;
+            box-sizing: border-box;
+            position: relative;
+        }
 
-        /* Title */
-        .title { text-align:center; font-weight:bold; font-size:15px; margin:30px 0 20px 0; text-decoration: underline; }
+        .date,
+        .title,
+        .content {
+            font-family: 'Times New Roman', serif;
+        }
 
-        /* Paragraphs */
-        p { margin: 8px 0; text-align: justify; }
+        .date {
+            text-align: left;
+            margin-top: 100px;
+            margin-bottom: 87px;
+            margin-left: -65px;
+            font-size: 16px;
+        }
+
+        .title {
+            text-align: center;
+            font-weight: bold;
+            margin-left: -65px;
+            font-size: 20px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .content {
+            font-size: 15.5px;
+            margin-left: -65px;
+            line-height: 1.6;
+            text-align: justify;
+        }
 
         .signature {
-  margin-top: 30px;
-  margin-bottom: 60px;  /* keeps block above footer */
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.signature-left { text-align: left; }
-.signature-left img { width:120px; display:block; }
-.signature-left span { display:block; margin-top:5px; }
-
-.stamp {
-  width: 100px;   /* reduced from 120px */
-  opacity: 0.9;
-}
-        /* Watermark */
-        .watermark {
-          position: fixed;
-          top: 280px;
-          left: 50%;
-          transform: translateX(-50%);
-          opacity: 0.06;
-          width: 400px;
-          z-index: -1;
+            margin-top: 60px;
+            font-size: 16px;
         }
 
-        /* Footer strip */
+        .signature img {
+            height: 60px;
+            display: block;
+            margin-top: 10px;
+        }
+
         .footer {
-          background:#009688;
-          color:white;
-          padding:15px 30px;
-          font-size:11px;
-          line-height:1.5;
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          display:flex;
-          justify-content:space-between;
+            position: absolute;
+            bottom: 30px;
+            left: 100px;
+            right: 100px;
+            text-align: center;
+            font-size: 14px;
+            color: #333;
         }
-      </style>
-    </head>
-    <body>
-      <!-- Top green bar -->
-      <div class="topbar"></div>
+    </style>
+</head>
 
-      <!-- watermark -->
-      <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-watermark.png" class="watermark"/>
+<body>
+    <div class="letter-container">
+        <div class="date">Date: <b>${today}</b></div>
 
-      <!-- header -->
-      <div class="header">
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/eduroom-logo.jpg" class="logo"/>
-        <div class="date">Date: ${today}</div>
-      </div>
+        <div class="content">
+            Dear <b>${candidateName}</b>,<br><br>
 
-      <!-- Title -->
-      <div class="title">OFFER LETTER FOR INTERNSHIP</div>
+            Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at
+            Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this
+            role.
+            <br><br>
+            <b>Starting Date:</b> ${startDate}<br>
+            <b>Position:</b> ${position}<br>
+            <b>Work Location:</b> ${workLocation}<br>
+            <b>Benefits:</b> Certification of Internship and LOA (performance-based).<br><br>
 
-      <p>Dear ${candidateName},</p>
-      <p>
-        Congratulations! We are pleased to confirm that you have been selected
-        for the role of <b>${courseName}</b> at Eduroom. We believe that your skills,
-        experience, and qualifications make you an excellent fit for this role.
-      </p>
-
-      <p><b>Starting Date:</b> ${startDate}</p>
-      <p><b>Position:</b>  ${courseName}</p>
-      <p><b>Work Location:</b> ${workLocation}</p>
-
-      <p>Benefits for the position include Certification of Internship and LOA (performance-based).</p>
-
-      <p>
-        We eagerly anticipate welcoming you to our team and embarking on this journey together.
-        Your talents and expertise will enrich our collaborative efforts as we work towards our
-        shared goals. We are excited about the opportunity to leverage your skills and contributions
-        to drive our company’s success.
-      </p>
-
-      <p>Thank you!<br/>Yours sincerely,<br/>Eduroom</p>
-
-      <!-- Signature + Stamp -->
-      <div class="signature">
-        <div class="signature-left">
-          <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png"/>
-          <span>Mrs. Pooja Shedge<br/>Branch Manager</span>
+            We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and
+            expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about
+            the opportunity to leverage your skills and contributions to drive our company's success.
         </div>
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp"/>
-      </div>
+    </div>
+</body>
 
-      <!-- Footer strip -->
-      <div class="footer">
-        <div>
-          FUNDSROOM · Reg: Fundsroom Infotech Pvt Ltd, Pune-411001<br/>
-          CIN: U62099PN2025PTC245778
-        </div>
-        <div style="text-align:right;">
-          Fundsroom HQ, 804 Nucleus Mall, Pune-411001<br/>
-          connect@eduroom.in · www.eduroom.in
-        </div>
-      </div>
-    </body>
-  </html>
-  `;
+</html>
 
-  // 3. Generate PDF from HTML
-  const browser = await puppeteer.launch({
-    headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
-  });
-  const page = await browser.newPage();
-  await page.setContent(html, { waitUntil: "networkidle0" });
+`;
+  // 5) Render PDF with Puppeteer
+  let pdfBuffer;
+  try {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+    const page = await browser.newPage();
 
-  const pdfBuffer = await page.pdf({
-    format: "A4",
-    printBackground: true,
-    margin: { top: "60px", bottom: "140px", left: "50px", right: "50px" }
-  });
+    await page.setContent(html, { waitUntil: "networkidle0" });
 
-  await browser.close();
+    // Wait until fonts are fully loaded
+    await page.evaluateHandle('document.fonts.ready');
+    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
 
-  // 4. Upload to S3
+    pdfBuffer = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+    });
+
+    await browser.close();
+  } catch (err) {
+    throw new Error("PDF generation failed: " + err.message);
+  }
+
+  // 6) Upload PDF to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf"
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 

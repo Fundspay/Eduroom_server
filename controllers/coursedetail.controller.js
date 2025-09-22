@@ -21,117 +21,127 @@ const addOrUpdateCourseDetail = async (req, res) => {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
     if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
 
-    // One CourseDetail per coursePreviewId (basic info)
-    let courseDetail = await model.CourseDetail.findOne({
-      where: { coursePreviewId, courseId },
-      transaction
-    });
-
-    if (!courseDetail) {
-      courseDetail = await model.CourseDetail.create({
-        domainId,
-        courseId,
-        coursePreviewId,
-        userId: userId || null
-      }, { transaction });
-    }
-
     const createdDays = [];
 
     for (const dayObj of days) {
       const { day, sessions } = dayObj;
-      if (!day) throw new Error("day is required for each day object");
-      if (!Array.isArray(sessions) || sessions.length === 0)
-        throw new Error(`sessions are required for day ${day}`);
+      if (day === undefined || day === null) throw new Error("day is required for each day object");
+      if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
 
-      const createdSessions = [];
+      // Find or create course detail for the day
+      let courseDetail = await model.CourseDetail.findOne({
+        where: { courseId, coursePreviewId, day },
+        transaction
+      });
+
+      if (!courseDetail) {
+        courseDetail = await model.CourseDetail.create({
+          domainId,
+          courseId,
+          coursePreviewId,
+          userId: userId ?? null,
+          day,
+          sessionNumber: sessions[0].sessionNumber ?? 1,
+          title: sessions[0].title ?? `Day ${day} Overview`,
+          description: sessions[0].description ?? null,
+        }, { transaction });
+      }
+
+      const updatedSessions = [];
 
       for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, questions, duration, sessionDuration, heading } = session;
+        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
 
-        if (!sessionNumber) throw new Error("sessionNumber is required for each session");
+        if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
-        // Check for existing session for this coursePreviewId + day + sessionNumber
-        let existingSession = await model.CourseDetail.findOne({
-          where: { coursePreviewId, courseId, day, sessionNumber },
-          transaction
-        });
-
-        if (!existingSession) {
-          // ✅ Create a new session row if it doesn't exist
-          existingSession = await model.CourseDetail.create({
-            domainId,
-            courseId,
-            coursePreviewId,
-            userId: userId || null,
-            day,
+        // Update main CourseDetail fields for first session
+        if (sessionNumber === 1) {
+          await courseDetail.update({
             sessionNumber,
             title,
-            description: description || null,
-            youtubeLink: youtubeLink || null,
-            duration: duration || null,
-            sessionDuration: sessionDuration || null,
-            heading: heading || null
-          }, { transaction });
-        } else {
-          // Update existing session if it already exists
-          await existingSession.update({
-            title,
-            description: description || null,
-            youtubeLink: youtubeLink || null,
-            duration: duration || null,
-            sessionDuration: sessionDuration || null,
-            heading: heading || null
+            description: description ?? null,
+            youtubeLink: youtubeLink ?? null,
+            duration: duration ?? null,
+            sessionDuration: sessionDuration ?? null,
+            heading: heading ?? null
           }, { transaction });
         }
 
-        // MCQs: replace old questions for this session
         if (Array.isArray(questions)) {
-          await model.QuestionModel.destroy({
-            where: { courseDetailId: existingSession.id, sessionNumber },
+          // Fetch existing questions for this session
+          const existingQuestions = await model.QuestionModel.findAll({
+            where: { courseDetailId: courseDetail.id, sessionNumber },
             transaction
           });
 
-          if (questions.length > 0) {
-            const questionRecords = questions.map(q => ({
-              courseDetailId: existingSession.id,
-              domainId,
-              courseId,
-              coursePreviewId,
-              day,
-              sessionNumber,
-              question: q.question,
-              optionA: q.optionA,
-              optionB: q.optionB,
-              optionC: q.optionC,
-              optionD: q.optionD,
-              answer: q.answer,
-              keywords: q.keywords || null,
-              caseStudy: q.caseStudy || null
-            }));
-            await model.QuestionModel.bulkCreate(questionRecords, { transaction });
+          const existingQuestionMap = {};
+          existingQuestions.forEach(q => existingQuestionMap[Number(q.id)] = q);
+
+          const incomingIds = [];
+
+          for (const q of questions) {
+            const qId = Number(q.id);
+            if (qId && existingQuestionMap[qId]) {
+              // Update existing question
+              await existingQuestionMap[qId].update({
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(qId);
+            } else {
+              // Create new question
+              const newQ = await model.QuestionModel.create({
+                courseDetailId: courseDetail.id,
+                domainId,
+                courseId,
+                coursePreviewId,
+                day,
+                sessionNumber,
+                question: q.question,
+                optionA: q.optionA,
+                optionB: q.optionB,
+                optionC: q.optionC,
+                optionD: q.optionD,
+                answer: q.answer,
+                keywords: q.keywords ?? null,
+                caseStudy: q.caseStudy ?? null
+              }, { transaction });
+              incomingIds.push(newQ.id);
+            }
+          }
+
+          // Delete old questions not present in payload
+          const toDelete = existingQuestions.filter(q => !incomingIds.includes(Number(q.id)));
+          if (toDelete.length > 0) {
+            const deleteIds = toDelete.map(q => q.id);
+            await model.QuestionModel.destroy({ where: { id: deleteIds }, transaction });
           }
         }
 
-        // Include all session details in response
-        createdSessions.push({
+        updatedSessions.push({
           sessionNumber,
           title,
-          description: description || null,
-          youtubeLink: youtubeLink || null,
-          duration: duration || null,
-          sessionDuration: sessionDuration || null,
-          heading: heading || null,
+          description: description ?? null,
+          youtubeLink: youtubeLink ?? null,
+          duration: duration ?? null,
+          sessionDuration: sessionDuration ?? null,
+          heading: heading ?? null,
           questions
         });
       }
 
-      createdDays.push({ day, sessions: createdSessions });
+      createdDays.push({ day, sessions: updatedSessions });
     }
 
     await transaction.commit();
-    return ReS(res, { success: true, courseDetailId: courseDetail.id, days: createdDays }, 201);
+    return ReS(res, { success: true, days: createdDays }, 201);
 
   } catch (error) {
     await transaction.rollback();
@@ -718,13 +728,16 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Prepare response with subscription info
+    // Correct subscription logic
+    const totalSubscriptions = user.TotalSubscriptions || 0; // total given
+    const deductedSubscriptions = user.subscriptiondeductedWallet || 0; // already used
+
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: user.subscriptionWallet || 0,                   // Total subscription
-      subscriptionWalletRemaining: user.subscriptiondeductedWallet || 0,       // Amount already deducted
-      subscriptionLeft: (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0), // Remaining usable subscription
+      subscriptionWalletTotal: totalSubscriptions, // keep same name
+      subscriptionWalletRemaining: deductedSubscriptions, // keep same name (used)
+      subscriptionLeft: Math.max(totalSubscriptions - deductedSubscriptions, 0), // no negatives
       courses: [],
     };
 
@@ -736,8 +749,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         where: { id: courseId, isDeleted: false },
         include: [
           { model: model.Domain, attributes: ["name"] },
-          { model: model.CoursePreview, attributes: ["id", "title", "heading"], where: { isDeleted: false }, required: false }
-        ]
+          {
+            model: model.CoursePreview,
+            attributes: ["id", "title", "heading"],
+            where: { isDeleted: false },
+            required: false,
+          },
+        ],
       });
       if (!course) continue;
 
@@ -775,7 +793,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           sessionNumber: session.sessionNumber,
           title: session.title,
           attempted,
-          status: attempted && correctMCQs === sessionMCQs && sessionMCQs > 0 ? "Completed" : "In Progress",
+          status:
+            attempted && correctMCQs === sessionMCQs && sessionMCQs > 0
+              ? "Completed"
+              : "In Progress",
           correctMCQs,
           totalMCQs: sessionMCQs,
           sessionDuration: session.sessionDuration || null,
@@ -802,7 +823,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
-      const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+      const overallStatus =
+        completedSessions === totalSessions ? "Completed" : "In Progress";
 
       response.courses.push({
         courseId,
@@ -829,52 +851,76 @@ const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
+    console.log("Received params:", { userId, courseId });
+
     // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
-    if (isNaN(userId) || isNaN(courseId))
+    if (isNaN(userId) || isNaN(courseId)) {
+      console.log("Invalid IDs provided");
       return ReE(res, "Invalid userId or courseId", 400);
+    }
 
     // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
+    if (!user) {
+      console.log(`User not found for ID: ${userId}`);
+      return ReE(res, "User not found", 404);
+    }
 
     // 2️⃣ Fetch course
     const course = await model.Course.findByPk(courseId);
-    if (!course) return ReE(res, "Course not found", 404);
-
-    const businessTarget = course.businessTarget || 0;
-
-    // 3️⃣ Fetch referral count from external API
-    let referralCount = 0;
-    if (user.referralCode) {
-      const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-      const apiResponse = await axios.get(apiUrl);
-      referralCount = Number(apiResponse.data?.referral_count) || 0;
+    if (!course) {
+      console.log(`Course not found for ID: ${courseId}`);
+      return ReE(res, "Course not found", 404);
     }
 
-    // 4️⃣ Calculate achieved units 
-    const achievedCount = referralCount;
+    // 3️⃣ Extract business target
+    const businessTarget = parseInt(course.businessTarget, 10) || 0;
+
+    // 4️⃣ Fetch achieved referral count
+    let achievedCount = 0;
+    if (user.referralCode) {
+      try {
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        const apiResponse = await axios.get(apiUrl);
+        achievedCount = apiResponse.data?.referral_count || 0;
+      } catch (apiError) {
+        console.warn("Referral API error:", apiError.message);
+        achievedCount = 0;
+      }
+    }
+
+    // 5️⃣ Calculate remaining
     const remaining = Math.max(businessTarget - achievedCount, 0);
 
-    // 5️⃣ Update user's subscriptionWallet with achieved count
-    await model.User.update(
-      { subscriptionWallet: achievedCount },
-      { where: { id: userId } }
-    );
+    // 6️⃣ Ensure safe numbers for BIGINT fields
+    const achievedCountNum = Number(achievedCount) || 0;
+    const remainingNum = Number(remaining) || 0;
 
-    // 6️⃣ Return response
+    // 7️⃣ Update User table
+    user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
+    user.subscriptionWallet = achievedCountNum;
+    user.subscriptionLeft = remainingNum;
+
+    await user.save({
+      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
+    });
+    console.log(`Updated user ${user.id} with business target info`);
+
+    // 8️⃣ Return response exactly as before
     return ReS(res, {
       success: true,
       data: {
-        userId,
+        userId: user.id,
         courseId,
         businessTarget,
-        achievedCount,
-        remaining,
-        subscriptionWallet: achievedCount
-      }
+        achievedCount: achievedCountNum,
+        remaining: remainingNum,
+        subscriptionWallet: achievedCountNum,
+        businessTargets: user.businessTargets,
+      },
     }, 200);
 
   } catch (error) {
@@ -958,6 +1004,7 @@ const getCourseStatus = async (req, res) => {
 
 module.exports.getCourseStatus = getCourseStatus;
 
+
 const setCourseStartEndDates = async (req, res) => {
   try {
     const { userId, courseId, startDate } = req.body;
@@ -982,27 +1029,43 @@ const setCourseStartEndDates = async (req, res) => {
     const end = new Date(start);
     end.setDate(start.getDate() + durationDays);
 
-    // Update user's courseDates JSON
-    const courseDates = user.courseDates || {};
+    // 🔹 Reload latest user data to avoid overwriting in concurrent updates
+    await user.reload();
+
+    // 🔹 Update user's courseDates JSON safely
+    const courseDates = { ...(user.courseDates || {}) };
     courseDates[courseId] = {
       startDate: start.toISOString().split("T")[0],
       endDate: end.toISOString().split("T")[0],
       started: true, // per-course started flag
     };
 
-    await user.update({ courseDates });
+    user.courseDates = courseDates;
+    await user.save(); // safer than user.update()
 
-    return ReS(res, {
-      success: true,
-      message: "Course start and end dates updated successfully",
-      data: {
-        courseId,
-        startDate: courseDates[courseId].startDate,
-        endDate: courseDates[courseId].endDate,
-        started: courseDates[courseId].started,
+    // 🔹 Trigger internal Offer Letter API (non-blocking)
+    try {
+      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}`);
+      console.log(`Offer letter triggered for user ${userId}`);
+    } catch (err) {
+      console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
+      // ⚠️ Don’t fail main request if offerletter fails
+    }
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Course start and end dates updated successfully",
+        data: {
+          courseId,
+          startDate: courseDates[courseId].startDate,
+          endDate: courseDates[courseId].endDate,
+          started: courseDates[courseId].started,
+        },
       },
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Set Course Start/End Dates Error:", error);
     return ReE(res, error.message, 500);
@@ -1010,4 +1073,3 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
-

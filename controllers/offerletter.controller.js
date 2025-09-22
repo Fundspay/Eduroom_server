@@ -93,14 +93,12 @@ const listAllUsers = async (req, res) => {
       attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
     });
 
-    // Fetch RaiseQuery status for all users
     const userIds = users.map(u => u.id);
     const raiseQueries = await RaiseQuery.findAll({
       where: { userId: userIds, isDeleted: false },
       attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
-    // Map query info by userId with queryCount
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
@@ -119,7 +117,6 @@ const listAllUsers = async (req, res) => {
     const response = [];
 
     for (const user of users) {
-      // Build course details
       const courseDetails = [];
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
@@ -143,13 +140,11 @@ const listAllUsers = async (req, res) => {
         }
       }
 
-      // Internship info
       const internshipIssued =
         user.InternshipCertificates && user.InternshipCertificates.length > 0
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
-      // Team Manager info
       const teamManager = user.teamManager
         ? {
             id: user.teamManager.id,
@@ -158,7 +153,6 @@ const listAllUsers = async (req, res) => {
           }
         : null;
 
-      // Offer Letter info
       const offerLetterSent =
         user.OfferLetters && user.OfferLetters.length > 0
           ? user.OfferLetters[0].issent
@@ -169,11 +163,10 @@ const listAllUsers = async (req, res) => {
           ? user.OfferLetters[0].fileUrl
           : null;
 
-      // Query info for this user
       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
-      // ✅ Create Status record including query info
-      const statusRecord = await Status.create({
+      // Build new status object
+      const newStatusData = {
         userId: user.id,
         userName: `${user.firstName} ${user.lastName}`,
         email: user.email,
@@ -190,26 +183,36 @@ const listAllUsers = async (req, res) => {
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
         queryCount: queryInfo.queryCount
-      });
+      };
+
+      // 🔹 Check existing record
+      const existingStatus = await Status.findOne({ where: { userId: user.id } });
+
+      let statusRecord;
+      if (!existingStatus) {
+        // Create if not found
+        statusRecord = await Status.create(newStatusData);
+      } else {
+        // Compare data
+        const oldData = existingStatus.toJSON();
+
+        // Remove sequelize metadata from comparison
+        delete oldData.id;
+        delete oldData.createdAt;
+        delete oldData.updatedAt;
+
+        const hasChanged = JSON.stringify(oldData) !== JSON.stringify(newStatusData);
+
+        if (hasChanged) {
+          await existingStatus.update(newStatusData);
+        }
+
+        statusRecord = existingStatus;
+      }
 
       response.push({
         statusId: statusRecord.id,
-        userId: user.id,
-        name: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        collegeName: user.collegeName,
-        subscriptionWallet: user.subscriptionWallet,
-        subscriptionLeft: user.subscriptionLeft,
-        courses: courseDetails,
-        internshipIssued,
-        internshipStatus: teamManager ? teamManager.internshipStatus : null,
-        offerLetterSent,
-        offerLetterFile,
-        teamManager: teamManager ? teamManager.name : null,
-        isQueryRaised: queryInfo.isQueryRaised,
-        queryStatus: queryInfo.queryStatus,
-        queryCount: queryInfo.queryCount
+        ...newStatusData
       });
     }
 
