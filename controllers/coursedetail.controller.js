@@ -416,12 +416,17 @@ const getCaseStudyForSession = async (req, res) => {
 
     const sessionDetail = await model.CourseDetail.findOne({
       where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
+      include: [{
+        model: model.QuestionModel,
+        where: { isDeleted: false },
+        required: false // keep false so sessions without questions still return
+      }]
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
-    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy);
+    // Ensure we look into all questions for this session row
+    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy && q.caseStudy.trim() !== '');
     if (!caseStudyQuestion) {
       return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
     }
