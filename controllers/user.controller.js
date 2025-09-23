@@ -28,24 +28,28 @@ const addPersonalInfo = async (req, res) => {
     const {
       firstName,
       lastName,
+      email,
+      phoneNumber,
+      password,
       fullName,
       dateOfBirth,
       gender,
-      phoneNumber,
       alternatePhoneNumber,
-      email,
       residentialAddress,
       emergencyContactName,
       emergencyContactNumber,
       city,
       state,
       pinCode,
-      password,
     } = req.body;
 
     // ✅ Required fields validation
     if (!firstName || !lastName || !email || !phoneNumber || !password) {
-      return ReE(res, "Required fields missing: firstName, lastName, email, phoneNumber, password", 400);
+      return ReE(
+        res,
+        "Required fields missing: firstName, lastName, email, phoneNumber, password",
+        400
+      );
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -53,15 +57,17 @@ const addPersonalInfo = async (req, res) => {
 
     // ✅ Check if email already exists
     const existingEmail = await model.User.findOne({
-      where: { email: normalizedEmail, isDeleted: false }
+      where: { email: normalizedEmail, isDeleted: false },
     });
-    if (existingEmail) return ReE(res, "User with this email already exists", 409);
+    if (existingEmail)
+      return ReE(res, "User with this email already exists", 409);
 
     // ✅ Check if phone number already exists
     const existingPhone = await model.User.findOne({
-      where: { phoneNumber: normalizedPhone, isDeleted: false }
+      where: { phoneNumber: normalizedPhone, isDeleted: false },
     });
-    if (existingPhone) return ReE(res, "User with this phone number already exists", 409);
+    if (existingPhone)
+      return ReE(res, "User with this phone number already exists", 409);
 
     // ✅ Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -69,19 +75,29 @@ const addPersonalInfo = async (req, res) => {
     const user = await model.User.create({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
-      fullName: fullName ? fullName.trim() : null,
-      dateOfBirth,
-      gender,
-      phoneNumber: normalizedPhone,
-      alternatePhoneNumber: alternatePhoneNumber ? alternatePhoneNumber.trim() : null,
       email: normalizedEmail,
-      residentialAddress: residentialAddress ? residentialAddress.trim() : null,
-      emergencyContactName: emergencyContactName ? emergencyContactName.trim() : null,
-      emergencyContactNumber: emergencyContactNumber ? emergencyContactNumber.trim() : null,
+      phoneNumber: normalizedPhone,
+      password: hashedPassword,
+
+      // Optional fields (nullable if not provided)
+      fullName: fullName ? fullName.trim() : null,
+      dateOfBirth: dateOfBirth || null,
+      gender: gender || null,
+      alternatePhoneNumber: alternatePhoneNumber
+        ? alternatePhoneNumber.trim()
+        : null,
+      residentialAddress: residentialAddress
+        ? residentialAddress.trim()
+        : null,
+      emergencyContactName: emergencyContactName
+        ? emergencyContactName.trim()
+        : null,
+      emergencyContactNumber: emergencyContactNumber
+        ? emergencyContactNumber.trim()
+        : null,
       city: city ? city.trim() : null,
       state: state ? state.trim() : null,
       pinCode: pinCode ? pinCode.trim() : null,
-      password: hashedPassword,
     });
 
     return ReS(res, { success: true, userId: user.id }, 201);
@@ -92,6 +108,7 @@ const addPersonalInfo = async (req, res) => {
 };
 
 module.exports.addPersonalInfo = addPersonalInfo;
+
 
 // Fetch users created within a date range (DD-MM-YYYY)
 const fetchUsersByDateRange = async (req, res) => {
@@ -193,9 +210,9 @@ var addInternshipDetails = async function (req, res) {
     } = req.body;
 
     // Validate required fields (except internshipModeId)
-    if (!internshipProgram || !internshipDuration) {
-      return ReE(res, "Missing required internship details", 400);
-    }
+    // if (!internshipProgram || !internshipDuration) {
+    //   return ReE(res, "Missing required internship details", 400);
+    // }
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
