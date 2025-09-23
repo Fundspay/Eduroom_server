@@ -193,7 +193,6 @@ module.exports.addEducationalDetails = addEducationalDetails;
 
 var addInternshipDetails = async function (req, res) {
   try {
-    // Use the correct route parameter name
     const { userId } = req.params;
     if (!userId || isNaN(userId)) {
       return ReE(res, "Valid user ID is required", 400);
@@ -202,29 +201,29 @@ var addInternshipDetails = async function (req, res) {
     const {
       internshipProgram,
       internshipDuration,
-      internshipModeId, // optional now
+      internshipModeId, // mandatory
       preferredStartDate,
       referralCode,
       referralLink,
       referralSource,
     } = req.body;
 
-    // Validate required fields (except internshipModeId)
-    // if (!internshipProgram || !internshipDuration) {
-    //   return ReE(res, "Missing required internship details", 400);
-    // }
+    //  Required validation: only internshipModeId
+    if (!internshipModeId) {
+      return ReE(res, "internshipModeId is required", 400);
+    }
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.update({
-      internshipProgram,
-      internshipDuration,
-      internshipModeId, // can be undefined/null
-      preferredStartDate,
-      referralCode,
-      referralLink,
-      referralSource,
+      internshipProgram: internshipProgram || null,
+      internshipDuration: internshipDuration || null,
+      internshipModeId, // required, no null fallback
+      preferredStartDate: preferredStartDate || null,
+      referralCode: referralCode || null,
+      referralLink: referralLink || null,
+      referralSource: referralSource || null,
     });
 
     return ReS(res, { success: true, message: "Internship details updated" }, 200);
@@ -235,6 +234,7 @@ var addInternshipDetails = async function (req, res) {
 };
 
 module.exports.addInternshipDetails = addInternshipDetails;
+
 // ✅ STEP 4: Add Verification Docs
 
 const addVerificationDocs = async (req, res) => {
