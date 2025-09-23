@@ -421,22 +421,27 @@ const getUserWalletDetails = async (req, res) => {
         where: { userId, courseId },
         attributes: ["deductedWallet"]
       });
+
       const deductedWallet = certificates.reduce(
-        (sum, c) => sum + (c.deductedWallet || 0),
+        (sum, c) => sum + (parseInt(c.deductedWallet || 0, 10)),
         0
       );
 
       courseDetails.push({
         courseId,
         courseName: course?.name || null,
-        businessTarget: course?.businessTarget || 0,
+        businessTarget: parseInt(course?.businessTarget || 0, 10),
         deductedWallet
       });
     }
 
-    const subscriptionWalletTotal = user.subscriptionWallet || 0;
-    const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
-    const subscriptionLeft = subscriptionWalletTotal - subscriptiondeductedWallet;
+    // Ensure values are numbers and never negative
+    const subscriptionWalletTotal = parseInt(user.subscriptionWallet || 0, 10);
+    const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+    const subscriptionLeft = Math.max(
+      0,
+      subscriptionWalletTotal - subscriptiondeductedWallet
+    );
 
     const response = {
       userId: user.id,
