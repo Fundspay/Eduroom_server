@@ -4,6 +4,7 @@ const sequelize = model.sequelize;
 const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
 const { Op } = require("sequelize");
+const dayjs = require("dayjs"); 
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
@@ -1076,10 +1077,9 @@ const setCourseStartEndDates = async (req, res) => {
     }
 
     // Calculate end date
-    const start = new Date(startDate);
+    const start = dayjs(startDate); // use dayjs
     const durationDays = parseInt(course.duration, 10); // assuming duration is in days
-    const end = new Date(start);
-    end.setDate(start.getDate() + durationDays);
+    const end = start.add(durationDays, "day");
 
     // 🔹 Reload latest user data to avoid overwriting in concurrent updates
     await user.reload();
@@ -1087,9 +1087,10 @@ const setCourseStartEndDates = async (req, res) => {
     // 🔹 Update user's courseDates JSON safely
     const courseDates = { ...(user.courseDates || {}) };
     courseDates[courseId] = {
-      startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
-      started: true, // per-course started flag
+      courseName: course.name, // include course name
+      startDate: start.format("YYYY-MM-DD"), // proper date format
+      endDate: end.format("YYYY-MM-DD"),
+      started: true,
     };
 
     user.courseDates = courseDates;
@@ -1097,11 +1098,16 @@ const setCourseStartEndDates = async (req, res) => {
 
     // 🔹 Trigger internal Offer Letter API (non-blocking)
     try {
-      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}`);
+      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}`, {
+        courseId,
+        courseName: course.name, // send course name
+        startDate: courseDates[courseId].startDate,
+        endDate: courseDates[courseId].endDate,
+      });
       console.log(`Offer letter triggered for user ${userId}`);
     } catch (err) {
       console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
-      // ⚠️ Don’t fail main request if offerletter fails
+      //  Don’t fail main request if offerletter fails
     }
 
     return ReS(
@@ -1111,6 +1117,7 @@ const setCourseStartEndDates = async (req, res) => {
         message: "Course start and end dates updated successfully",
         data: {
           courseId,
+          courseName: course.name, // include in response too
           startDate: courseDates[courseId].startDate,
           endDate: courseDates[courseId].endDate,
           started: courseDates[courseId].started,
