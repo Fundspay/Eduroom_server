@@ -948,7 +948,9 @@ const getBusinessTarget = async (req, res) => {
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-        achievedCount = apiResponse.data?.referral_count || 0;
+
+        // ✅ Fix: use the `count` field inside referral_count
+        achievedCount = apiResponse.data?.referral_count?.count || 0;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
         achievedCount = 0;
@@ -972,20 +974,23 @@ const getBusinessTarget = async (req, res) => {
     });
     console.log(`Updated user ${user.id} with business target info`);
 
-    // 8️⃣ Return response exactly as before
-    return ReS(res, {
-      success: true,
-      data: {
-        userId: user.id,
-        courseId,
-        businessTarget,
-        achievedCount: achievedCountNum,
-        remaining: remainingNum,
-        subscriptionWallet: achievedCountNum,
-        businessTargets: user.businessTargets,
+    // 8️⃣ Return response
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId: user.id,
+          courseId,
+          businessTarget,
+          achievedCount: achievedCountNum,
+          remaining: remainingNum,
+          subscriptionWallet: achievedCountNum,
+          businessTargets: user.businessTargets,
+        },
       },
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Get Business Target Error:", error);
     return ReE(res, error.message, 500);
