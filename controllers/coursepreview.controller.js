@@ -208,19 +208,21 @@ var updateCoursePreview = async (req, res) => {
 module.exports.updateCoursePreview = updateCoursePreview;
 
 
-// ✅ Soft delete CoursePreview
+// ✅ Hard delete CoursePreview
 var deleteCoursePreview = async (req, res) => {
     try {
         const preview = await model.CoursePreview.findByPk(req.params.id);
         if (!preview) return ReE(res, "CoursePreview not found", 404);
 
-        await preview.update({ isDeleted: true });
+        await preview.destroy(); // <-- hard delete
         return ReS(res, { message: "CoursePreview deleted successfully" }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.deleteCoursePreview = deleteCoursePreview;
+
 
 // ✅ Fetch all CoursePreviews by Course ID
 var fetchPreviewsByCourse = async (req, res) => {
