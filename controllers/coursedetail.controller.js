@@ -1132,3 +1132,49 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
+
+const getUserMCQScore = async (req, res) => {
+  try {
+    const { courseId, coursePreviewId, day, sessionNumber, userId } = req.params;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Fetch the session detail
+    const sessionDetail = await model.CourseDetail.findOne({
+      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
+    });
+
+    if (!sessionDetail) return ReE(res, "Session details not found", 404);
+
+    // Parse stored progress
+    let progress = {};
+    if (sessionDetail.userProgress) {
+      progress = typeof sessionDetail.userProgress === "string"
+        ? JSON.parse(sessionDetail.userProgress)
+        : sessionDetail.userProgress;
+    }
+
+    // Check if user has progress saved
+    const userProgress = progress[userId];
+    if (!userProgress) {
+      return ReE(res, "No score found for this user in this session", 404);
+    }
+
+    return ReS(res, {
+      success: true,
+      userId,
+      courseId,
+      coursePreviewId,
+      day,
+      sessionNumber,
+      score: userProgress
+    }, 200);
+
+  } catch (error) {
+    console.error("Get User MCQ Score Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getUserMCQScore = getUserMCQScore;
+
