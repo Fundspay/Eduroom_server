@@ -343,41 +343,54 @@ const evaluateSessionMCQ = async (req, res) => {
     const mcqs = sessionDetail.QuestionModels || [];
     if (mcqs.length === 0) return ReE(res, "No MCQs found for this session", 404);
 
-    let correctCount = 0;
-    const results = [];
+    // Normalize existing userProgress
+    let progress = {};
+    if (sessionDetail.userProgress) {
+      progress = typeof sessionDetail.userProgress === "string"
+        ? JSON.parse(sessionDetail.userProgress)
+        : sessionDetail.userProgress;
+    }
 
-    // Evaluate each answer
+    // Ensure user object exists
+    if (!progress[userId]) {
+      progress[userId] = {
+        correctMCQs: 0,
+        totalMCQs: mcqs.length,
+        eligibleForCaseStudy: false,
+        answers: {}
+      };
+    }
+
+    let correctCount = 0;
+
+    // Evaluate each answer and upsert
     for (let ans of answers) {
       const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
 
       const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
-      if (isCorrect) correctCount++;
 
-      results.push({
-        mcqId: mcq.id,
+      // Save/Update answer for this mcq
+      progress[userId].answers[mcq.id] = {
         question: mcq.question,
         selectedOption: ans.selectedOption,
         isCorrect,
         correctAnswer: mcq.answer,
         keywords: mcq.keywords || null,
         caseStudy: mcq.caseStudy || null
-      });
+      };
     }
 
+    // Recalculate score based on latest answers
+    const allAnswers = Object.values(progress[userId].answers);
+    correctCount = allAnswers.filter(a => a.isCorrect).length;
     const total = mcqs.length;
-    const score = `${correctCount}/${total}`;
 
-    // Normalize existing userProgress
-    let progress = {};
-    if (sessionDetail.userProgress) {
-      progress = typeof sessionDetail.userProgress === "string" ? JSON.parse(sessionDetail.userProgress) : sessionDetail.userProgress;
-    }
+    progress[userId].correctMCQs = correctCount;
+    progress[userId].totalMCQs = total;
+    progress[userId].eligibleForCaseStudy = correctCount === total;
 
-    // Set current user's progress
-    progress[userId] = { correctMCQs: correctCount, totalMCQs: total, eligibleForCaseStudy: correctCount === total };
-
-    // Update DB
+    // Save back to DB
     await model.CourseDetail.update(
       { userProgress: progress },
       { where: { id: sessionDetail.id } }
@@ -385,15 +398,13 @@ const evaluateSessionMCQ = async (req, res) => {
 
     return ReS(res, {
       success: true,
-      courseDetail: sessionDetail,
-      questions: mcqs,
       evaluation: {
         totalQuestions: total,
         correct: correctCount,
         wrong: total - correctCount,
-        score,
+        score: `${correctCount}/${total}`,
         eligibleForCaseStudy: correctCount === total,
-        results
+        answers: progress[userId].answers
       }
     }, 200);
 
@@ -404,6 +415,7 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
+
 
 // const getCaseStudyForSession = async (req, res) => {
 //   try {
@@ -1167,7 +1179,12 @@ const getUserMCQScore = async (req, res) => {
       coursePreviewId,
       day,
       sessionNumber,
-      score: userProgress
+      score: {
+        correctMCQs: userProgress.correctMCQs,
+        totalMCQs: userProgress.totalMCQs,
+        eligibleForCaseStudy: userProgress.eligibleForCaseStudy,
+        answers: userProgress.answers || {}   // include all saved answers
+      }
     }, 200);
 
   } catch (error) {
@@ -1177,4 +1194,5 @@ const getUserMCQScore = async (req, res) => {
 };
 
 module.exports.getUserMCQScore = getUserMCQScore;
+
 
