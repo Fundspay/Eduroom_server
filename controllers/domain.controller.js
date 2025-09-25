@@ -82,13 +82,15 @@ var deleteDomain = async (req, res) => {
         const domain = await model.Domain.findByPk(req.params.id);
         if (!domain) return ReE(res, "Domain not found", 404);
 
-        await domain.update({ isDeleted: true });
+        await domain.destroy(); // <-- permanently removes from DB
+
         return ReS(res, { message: "Domain deleted successfully" }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
 module.exports.deleteDomain = deleteDomain;
+
 
 // ✅ Fetch all Courses by Domain ID
 var fetchCoursesByDomain = async (req, res) => {
