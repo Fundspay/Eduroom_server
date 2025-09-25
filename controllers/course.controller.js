@@ -404,7 +404,8 @@ const getUserWalletDetails = async (req, res) => {
         "fullName",
         "subscriptionWallet",
         "subscriptiondeductedWallet",
-        "courseStatuses"
+        "courseStatuses",
+        "businessTargets"
       ]
     });
     if (!user) return ReE(res, "User not found", 404);
@@ -429,8 +430,12 @@ const getUserWalletDetails = async (req, res) => {
         0
       );
 
-      // ✅ Clamp businessTarget to 0 if negative
-      const rawTarget = parseInt(course?.businessTarget || 0, 10);
+      // ✅ Prefer user's businessTargets value; fallback to Course table
+      const userTarget = user.businessTargets?.[courseId];
+      const rawTarget = parseInt(
+        userTarget !== undefined ? userTarget : course?.businessTarget || 0,
+        10
+      );
       const businessTarget = rawTarget < 0 ? 0 : rawTarget;
 
       courseDetails.push({
