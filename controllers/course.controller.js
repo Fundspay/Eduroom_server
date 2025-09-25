@@ -193,19 +193,21 @@ var fetchSingleCourse = async (req, res) => {
 };
 module.exports.fetchSingleCourse = fetchSingleCourse;
 
-// ✅ Soft delete Course
+// ✅ Hard delete Course
 var deleteCourse = async (req, res) => {
     try {
         const course = await model.Course.findByPk(req.params.id);
         if (!course) return ReE(res, "Course not found", 404);
 
-        await course.update({ isDeleted: true });
+        await course.destroy(); // <-- hard delete
         return ReS(res, { message: "Course deleted successfully" }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.deleteCourse = deleteCourse;
+
 
 // ✅ Fetch all Courses by Domain ID
 var fetchCoursesByDomain = async (req, res) => {
