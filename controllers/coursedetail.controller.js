@@ -1205,7 +1205,7 @@ const getUserCaseStudyResult = async (req, res) => {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch the user's case study result along with the question
+    // Fetch the user's latest case study result along with the question
     const result = await model.CaseStudyResult.findOne({
       where: {
         userId,
@@ -1218,7 +1218,8 @@ const getUserCaseStudyResult = async (req, res) => {
       include: [{
         model: model.QuestionModel,
         attributes: ['question'],  // fetch only the question text
-      }]
+      }],
+      order: [['createdAt', 'DESC']] // fetch the latest submission
     });
 
     if (!result) return ReE(res, "No case study result found for this user", 404);
@@ -1246,6 +1247,7 @@ const getUserCaseStudyResult = async (req, res) => {
 };
 
 module.exports.getUserCaseStudyResult = getUserCaseStudyResult;
+
 
 
 
