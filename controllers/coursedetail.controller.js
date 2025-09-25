@@ -321,7 +321,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
 
 module.exports.fetchCourseDetailsByDayAndSession = fetchCourseDetailsByDayAndSession;
 
-// ✅ Evaluate MCQs for a specific course + course preview + day
+//  Evaluate MCQs for a specific course + course preview + day
 
 const evaluateSessionMCQ = async (req, res) => {
   try {
@@ -343,6 +343,31 @@ const evaluateSessionMCQ = async (req, res) => {
     const mcqs = sessionDetail.QuestionModels || [];
     if (mcqs.length === 0) return ReE(res, "No MCQs found for this session", 404);
 
+    let correctCount = 0;
+    const results = [];
+
+    // Evaluate each answer
+    for (let ans of answers) {
+      const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
+      if (!mcq) continue;
+
+      const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
+      if (isCorrect) correctCount++;
+
+      results.push({
+        mcqId: mcq.id,
+        question: mcq.question,
+        selectedOption: ans.selectedOption,
+        isCorrect,
+        correctAnswer: mcq.answer,
+        keywords: mcq.keywords || null,
+        caseStudy: mcq.caseStudy || null
+      });
+    }
+
+    const total = mcqs.length;
+    const score = `${correctCount}/${total}`;
+
     // Normalize existing userProgress
     let progress = {};
     if (sessionDetail.userProgress) {
@@ -351,46 +376,15 @@ const evaluateSessionMCQ = async (req, res) => {
         : sessionDetail.userProgress;
     }
 
-    // Ensure user object exists
-    if (!progress[userId]) {
-      progress[userId] = {
-        correctMCQs: 0,
-        totalMCQs: mcqs.length,
-        eligibleForCaseStudy: false,
-        answers: {}
-      };
-    }
+    // Save both score and selected answers
+    progress[userId] = {
+      correctMCQs: correctCount,
+      totalMCQs: total,
+      eligibleForCaseStudy: correctCount === total,
+      answers: results // store the evaluated answers too
+    };
 
-    let correctCount = 0;
-
-    // Evaluate each answer and upsert
-    for (let ans of answers) {
-      const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
-      if (!mcq) continue;
-
-      const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
-
-      // Save/Update answer for this mcq
-      progress[userId].answers[mcq.id] = {
-        question: mcq.question,
-        selectedOption: ans.selectedOption,
-        isCorrect,
-        correctAnswer: mcq.answer,
-        keywords: mcq.keywords || null,
-        caseStudy: mcq.caseStudy || null
-      };
-    }
-
-    // Recalculate score based on latest answers
-    const allAnswers = Object.values(progress[userId].answers);
-    correctCount = allAnswers.filter(a => a.isCorrect).length;
-    const total = mcqs.length;
-
-    progress[userId].correctMCQs = correctCount;
-    progress[userId].totalMCQs = total;
-    progress[userId].eligibleForCaseStudy = correctCount === total;
-
-    // Save back to DB
+    // Update DB
     await model.CourseDetail.update(
       { userProgress: progress },
       { where: { id: sessionDetail.id } }
@@ -398,13 +392,15 @@ const evaluateSessionMCQ = async (req, res) => {
 
     return ReS(res, {
       success: true,
+      courseDetail: sessionDetail,
+      questions: mcqs,
       evaluation: {
         totalQuestions: total,
         correct: correctCount,
         wrong: total - correctCount,
-        score: `${correctCount}/${total}`,
+        score,
         eligibleForCaseStudy: correctCount === total,
-        answers: progress[userId].answers
+        results
       }
     }, 200);
 
@@ -415,6 +411,7 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
+
 
 
 // const getCaseStudyForSession = async (req, res) => {
