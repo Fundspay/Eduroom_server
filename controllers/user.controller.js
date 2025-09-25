@@ -5,21 +5,19 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const crypto = require("crypto");
 const { Op } = require("sequelize");
-const jwt = require('jsonwebtoken');
-const admin = require('firebase-admin');
+const jwt = require("jsonwebtoken");
+const admin = require("firebase-admin");
 const CONFIG = require("../config/config.js");
-const axios = require('axios');
+const axios = require("axios");
 const moment = require("moment");
-
-
-
 
 if (!admin.apps.length) {
   admin.initializeApp({
-    credential: admin.credential.cert(require("../config/firebase-service-account.json"))
+    credential: admin.credential.cert(
+      require("../config/firebase-service-account.json")
+    ),
   });
 }
-
 
 // ✅  STEP 1: Create Student Personal Information
 
@@ -86,9 +84,7 @@ const addPersonalInfo = async (req, res) => {
       alternatePhoneNumber: alternatePhoneNumber
         ? alternatePhoneNumber.trim()
         : null,
-      residentialAddress: residentialAddress
-        ? residentialAddress.trim()
-        : null,
+      residentialAddress: residentialAddress ? residentialAddress.trim() : null,
       emergencyContactName: emergencyContactName
         ? emergencyContactName.trim()
         : null,
@@ -109,39 +105,46 @@ const addPersonalInfo = async (req, res) => {
 
 module.exports.addPersonalInfo = addPersonalInfo;
 
-
 // Fetch users created within a date range (DD-MM-YYYY)
 const fetchUsersByDateRange = async (req, res) => {
   try {
     const { from, to } = req.query;
 
-    if (!from || !to) return ReE(res, "Both 'from' and 'to' dates are required", 400);
+    if (!from || !to)
+      return ReE(res, "Both 'from' and 'to' dates are required", 400);
 
     // Parse dates using DD-MM-YYYY
     const fromDate = moment(from, "DD-MM-YYYY").startOf("day").toDate();
     const toDate = moment(to, "DD-MM-YYYY").endOf("day").toDate();
 
-    if (!fromDate || !toDate) return ReE(res, "Invalid date format. Use DD-MM-YYYY", 400);
+    if (!fromDate || !toDate)
+      return ReE(res, "Invalid date format. Use DD-MM-YYYY", 400);
 
     // Fetch users within range
     const users = await model.User.findAll({
       where: {
         isDeleted: false,
         createdAt: {
-          [Op.between]: [fromDate, toDate]
-        }
+          [Op.between]: [fromDate, toDate],
+        },
       },
       include: [
-        { model: model.Gender, attributes: { exclude: ["createdAt", "updatedAt"] } }
-      ]
+        {
+          model: model.Gender,
+          attributes: { exclude: ["createdAt", "updatedAt"] },
+        },
+      ],
     });
 
-    return ReS(res, {
-      success: true,
-      count: users.length,
-      users: users.map(u => u.get({ plain: true }))
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        count: users.length,
+        users: users.map((u) => u.get({ plain: true })),
+      },
+      200
+    );
   } catch (error) {
     console.error("Fetch Users By Date Range Error:", error);
     return ReE(res, error.message, 500);
@@ -149,8 +152,6 @@ const fetchUsersByDateRange = async (req, res) => {
 };
 
 module.exports.fetchUsersByDateRange = fetchUsersByDateRange;
-
-
 
 //  ✅ STEP 2: Add Educational Details
 
@@ -184,7 +185,11 @@ var addEducationalDetails = async function (req, res) {
       placementCoordinatorContact,
     });
 
-    return ReS(res, { success: true, message: "Educational details updated" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "Educational details updated" },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
@@ -226,7 +231,11 @@ var addInternshipDetails = async function (req, res) {
       referralSource: referralSource || null,
     });
 
-    return ReS(res, { success: true, message: "Internship details updated" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "Internship details updated" },
+      200
+    );
   } catch (error) {
     console.error("Error updating internship details:", error);
     return ReE(res, error.message || "Server error", 500);
@@ -250,12 +259,17 @@ const addVerificationDocs = async (req, res) => {
 
     // Ensure req.files exists
     if (!req.files || Object.keys(req.files).length === 0) {
-      return ReE(res, "No files uploaded. Make sure you are sending multipart/form-data with correct field names.", 400);
+      return ReE(
+        res,
+        "No files uploaded. Make sure you are sending multipart/form-data with correct field names.",
+        400
+      );
     }
 
     // Safely extract file URLs if present
     const studentIdCard = req.files?.studentIdCard?.[0]?.location || null;
-    const governmentIdProof = req.files?.governmentIdProof?.[0]?.location || null;
+    const governmentIdProof =
+      req.files?.governmentIdProof?.[0]?.location || null;
     const passportPhoto = req.files?.passportPhoto?.[0]?.location || null;
 
     // Check if at least one file is uploaded
@@ -275,13 +289,16 @@ const addVerificationDocs = async (req, res) => {
     // Reload user to get latest info
     await user.reload();
 
-    return ReS(res, {
-      success: true,
-      message: "Verification documents uploaded successfully",
-      data: updateData,
-      user
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Verification documents uploaded successfully",
+        data: updateData,
+        user,
+      },
+      200
+    );
   } catch (error) {
     console.error("Error uploading verification docs:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
@@ -295,14 +312,21 @@ module.exports.addVerificationDocs = addVerificationDocs;
 const addBankDetails = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { accountHolderName, bankName, branchAddress, ifscCode, accountNumber } = req.body;
+    const {
+      accountHolderName,
+      bankName,
+      branchAddress,
+      ifscCode,
+      accountNumber,
+    } = req.body;
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     // Build update object dynamically; allow null values
     const updateData = {};
-    if (accountHolderName !== undefined) updateData.accountHolderName = accountHolderName;
+    if (accountHolderName !== undefined)
+      updateData.accountHolderName = accountHolderName;
     if (bankName !== undefined) updateData.bankName = bankName;
     if (branchAddress !== undefined) updateData.branchAddress = branchAddress;
     if (ifscCode !== undefined) updateData.ifscCode = ifscCode;
@@ -328,12 +352,15 @@ const addBankDetails = async (req, res) => {
     await user.update(updateData);
     await user.reload();
 
-    return ReS(res, {
-      success: true,
-      message: "Bank details updated successfully",
-      user,
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Bank details updated successfully",
+        user,
+      },
+      200
+    );
   } catch (error) {
     console.error("addBankDetails error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
@@ -357,13 +384,16 @@ var addCommunicationPreferences = async function (req, res) {
       linkedInProfile,
     });
 
-    return ReS(res, { success: true, message: "Communication preferences updated" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "Communication preferences updated" },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 module.exports.addCommunicationPreferences = addCommunicationPreferences;
-
 
 // ✅  STEP 7: Add Declaration & Consent
 
@@ -437,28 +467,32 @@ var updatePersonalInfo = async function (req, res) {
       password,
     });
 
-    return ReS(res, { success: true, message: "User info updated successfully" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "User info updated successfully" },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 module.exports.updatePersonalInfo = updatePersonalInfo;
 
-
-
 // ✅ Fetch Single User
 var fetchSingleUser = async (req, res) => {
   try {
     const user = await model.User.findByPk(req.params.id, {
       include: [
-        { model: model.Gender, attributes: { exclude: ["createdAt", "updatedAt"] } }
-      ]
+        {
+          model: model.Gender,
+          attributes: { exclude: ["createdAt", "updatedAt"] },
+        },
+      ],
     });
 
     if (!user || user.isDeleted) return ReE(res, "User not found", 404);
 
     return ReS(res, { success: true, user: user.get({ plain: true }) }, 200);
-
   } catch (error) {
     return ReE(res, error.message, 500);
   }
@@ -482,7 +516,7 @@ const updateUser = async (req, res) => {
       state,
       city,
       referralCode,
-      referralLink
+      referralLink,
     } = req.body;
 
     // Validate gender if provided
@@ -502,8 +536,10 @@ const updateUser = async (req, res) => {
       course: course !== undefined ? course : user.course,
       state: state !== undefined ? state : user.state,
       city: city !== undefined ? city : user.city,
-      referralCode: referralCode !== undefined ? referralCode : user.referralCode,
-      referralLink: referralLink !== undefined ? referralLink : user.referralLink
+      referralCode:
+        referralCode !== undefined ? referralCode : user.referralCode,
+      referralLink:
+        referralLink !== undefined ? referralLink : user.referralLink,
     };
 
     // Update user
@@ -513,7 +549,6 @@ const updateUser = async (req, res) => {
     await user.reload();
 
     return ReS(res, { success: true, user }, 200);
-
   } catch (error) {
     console.error("updateUser error:", error);
     return ReE(res, error.message, 500);
@@ -529,8 +564,11 @@ var deleteUser = async (req, res) => {
     if (!user) return ReE(res, "User not found", 404);
 
     await user.update({ isDeleted: true });
-    return ReS(res, { success: true, message: "User deleted successfully" }, 200);
-
+    return ReS(
+      res,
+      { success: true, message: "User deleted successfully" },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
@@ -544,11 +582,15 @@ const loginWithEmailPassword = async (req, res) => {
 
     if (!email || !password) return ReE(res, "Missing email or password", 400);
 
-    let account = await model.User.findOne({ where: { email, isDeleted: false } });
+    let account = await model.User.findOne({
+      where: { email, isDeleted: false },
+    });
     let role = "user";
 
     if (!account) {
-      account = await model.TeamManager.findOne({ where: { email, isDeleted: false } });
+      account = await model.TeamManager.findOne({
+        where: { email, isDeleted: false },
+      });
       role = "manager";
     }
 
@@ -579,7 +621,7 @@ const loginWithEmailPassword = async (req, res) => {
         city: account.city,
         state: account.state,
         pinCode: account.pinCode,
-        internshipStatus: account.internshipStatus || null   // ✅ Added here
+        internshipStatus: account.internshipStatus || null, // ✅ Added here
       };
     } else {
       payload = {
@@ -589,22 +631,27 @@ const loginWithEmailPassword = async (req, res) => {
         mobileNumber: account.mobileNumber,
         department: account.department,
         position: account.position,
-        internshipStatus: account.internshipStatus || null   // ✅ Added here
+        internshipStatus: account.internshipStatus || null, // ✅ Added here
       };
     }
 
-    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
+    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
+      expiresIn: "365d",
+    });
 
-    return ReS(res, {
-      success: true,
-      account: {
-        ...payload,
-        isFirstLogin,
-        token,
-        role
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        account: {
+          ...payload,
+          isFirstLogin,
+          token,
+          role,
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Login Error:", error);
     return ReE(res, error.message, 500);
@@ -622,7 +669,9 @@ const logoutUser = async (req, res) => {
     let role = "user";
 
     if (!account) {
-      account = await model.TeamManager.findOne({ where: { managerId: id, isDeleted: false } });
+      account = await model.TeamManager.findOne({
+        where: { managerId: id, isDeleted: false },
+      });
       role = "manager";
     }
 
@@ -630,8 +679,11 @@ const logoutUser = async (req, res) => {
 
     await account.update({ lastLogoutAt: new Date() });
 
-    return ReS(res, { success: true, message: `${role} logged out successfully` }, 200);
-
+    return ReS(
+      res,
+      { success: true, message: `${role} logged out successfully` },
+      200
+    );
   } catch (error) {
     console.error("Logout Error:", error);
     return ReE(res, error.message, 500);
@@ -645,22 +697,34 @@ const requestPasswordReset = async (req, res) => {
     const { email } = req.body;
     if (!email) return ReE(res, "Email is required", 400);
 
-    let account = await model.User.findOne({ where: { email, isDeleted: false } });
+    let account = await model.User.findOne({
+      where: { email, isDeleted: false },
+    });
     let role = "user";
 
     if (!account) {
-      account = await model.TeamManager.findOne({ where: { email, isDeleted: false } });
+      account = await model.TeamManager.findOne({
+        where: { email, isDeleted: false },
+      });
       role = "manager";
     }
 
-    if (!account) return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
+    if (!account)
+      return ReS(
+        res,
+        { message: "If the email is registered, a reset link has been sent." },
+        200
+      );
 
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenExpiry = Date.now() + 3600000;
 
     await account.update({ resetToken, resetTokenExpiry });
 
-    const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
+    const queryParams = new URLSearchParams({
+      token: resetToken,
+      email,
+    }).toString();
     const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
 
     const htmlContent = `
@@ -673,11 +737,18 @@ const requestPasswordReset = async (req, res) => {
           <p>– The EduRoom Team</p>
         `;
 
-    const mailResult = await sendMail(email, "EduRoom - Password Reset Request", htmlContent);
+    const mailResult = await sendMail(
+      email,
+      "EduRoom - Password Reset Request",
+      htmlContent
+    );
     if (!mailResult.success) return ReE(res, "Failed to send reset email", 500);
 
-    return ReS(res, { message: "If the email is registered, a reset link has been sent." }, 200);
-
+    return ReS(
+      res,
+      { message: "If the email is registered, a reset link has been sent." },
+      200
+    );
   } catch (error) {
     console.error("Password reset error:", error);
     return ReE(res, error.message, 500);
@@ -689,7 +760,8 @@ module.exports.requestPasswordReset = requestPasswordReset;
 const resetPassword = async (req, res) => {
   try {
     const { email, token, newPassword } = req.body;
-    if (!email || !token || !newPassword) return ReE(res, "All fields are required", 400);
+    if (!email || !token || !newPassword)
+      return ReE(res, "All fields are required", 400);
 
     let account = await model.User.findOne({
       where: {
@@ -697,7 +769,7 @@ const resetPassword = async (req, res) => {
         resetToken: token,
         resetTokenExpiry: { [Op.gt]: Date.now() },
         isDeleted: false,
-      }
+      },
     });
     let role = "user";
 
@@ -708,7 +780,7 @@ const resetPassword = async (req, res) => {
           resetToken: token,
           resetTokenExpiry: { [Op.gt]: Date.now() },
           isDeleted: false,
-        }
+        },
       });
       role = "manager";
     }
@@ -716,10 +788,13 @@ const resetPassword = async (req, res) => {
     if (!account) return ReE(res, "Invalid or expired reset token", 400);
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    await account.update({ password: hashedPassword, resetToken: null, resetTokenExpiry: null });
+    await account.update({
+      password: hashedPassword,
+      resetToken: null,
+      resetTokenExpiry: null,
+    });
 
     return ReS(res, { message: "Password has been reset successfully" }, 200);
-
   } catch (error) {
     return ReE(res, error.message, 500);
   }
@@ -731,15 +806,20 @@ const loginWithGoogle = async (req, res) => {
   try {
     const firebaseUser = req.user;
 
-    let account = await model.User.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
+    let account = await model.User.findOne({
+      where: { email: firebaseUser.email, isDeleted: false },
+    });
     let role = "user";
 
     if (!account) {
-      account = await model.TeamManager.findOne({ where: { email: firebaseUser.email, isDeleted: false } });
+      account = await model.TeamManager.findOne({
+        where: { email: firebaseUser.email, isDeleted: false },
+      });
       role = "manager";
     }
 
-    if (!account) return ReE(res, "Account not found. Please register first.", 404);
+    if (!account)
+      return ReE(res, "Account not found. Please register first.", 404);
 
     let isFirstLogin = !account.hasLoggedIn;
     if (isFirstLogin) await account.update({ hasLoggedIn: true });
@@ -749,7 +829,10 @@ const loginWithGoogle = async (req, res) => {
       managerId: account.managerId || null,
       firstName: account.firstName || null,
       lastName: account.lastName || null,
-      fullName: account.fullName || account.name || `${account.firstName || ""} ${account.lastName || ""}`,
+      fullName:
+        account.fullName ||
+        account.name ||
+        `${account.firstName || ""} ${account.lastName || ""}`,
       dateOfBirth: account.dateOfBirth || null,
       gender: account.gender || null,
       phoneNumber: account.phoneNumber || account.mobileNumber || null,
@@ -761,13 +844,17 @@ const loginWithGoogle = async (req, res) => {
       city: account.city || null,
       state: account.state || null,
       pinCode: account.pinCode || null,
-      internshipStatus: account.internshipStatus || null   // ✅ Added here
+      internshipStatus: account.internshipStatus || null, // ✅ Added here
     };
 
-    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
+    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
+      expiresIn: "365d",
+    });
 
-    return ReS(res, { success: true, user: { ...payload, isFirstLogin, token, role } });
-
+    return ReS(res, {
+      success: true,
+      user: { ...payload, isFirstLogin, token, role },
+    });
   } catch (error) {
     console.error("Google login failed:", error);
     return ReE(res, "Login failed", 500);
@@ -812,22 +899,55 @@ const fetchSingleUserById = async (req, res) => {
 
     //  Calculate profile completion
     const fields = [
-      "firstName", "lastName", "fullName", "dateOfBirth", "gender",
-      "phoneNumber", "alternatePhoneNumber", "email", "residentialAddress",
-      "emergencyContactName", "emergencyContactNumber", "city", "state", "pinCode",
-      "collegeName", "collegeRollNumber", "course", "specialization", "currentYear",
-      "currentSemester", "collegeAddress", "placementCoordinatorName",
-      "placementCoordinatorContact", "internshipProgram", "internshipDuration",
-      "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
-      "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
-      "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
-      "preferredCommunicationId", "linkedInProfile", "studentDeclaration",
-      "consentAgreement", "internshipStatus"
+      "firstName",
+      "lastName",
+      "fullName",
+      "dateOfBirth",
+      "gender",
+      "phoneNumber",
+      "alternatePhoneNumber",
+      "email",
+      "residentialAddress",
+      "emergencyContactName",
+      "emergencyContactNumber",
+      "city",
+      "state",
+      "pinCode",
+      "collegeName",
+      "collegeRollNumber",
+      "course",
+      "specialization",
+      "currentYear",
+      "currentSemester",
+      "collegeAddress",
+      "placementCoordinatorName",
+      "placementCoordinatorContact",
+      "internshipProgram",
+      "internshipDuration",
+      "internshipModeId",
+      "preferredStartDate",
+      "referralCode",
+      "referralLink",
+      "referralSource",
+      "studentIdCard",
+      "governmentIdProof",
+      "passportPhoto",
+      "accountHolderName",
+      "bankName",
+      "branchAddress",
+      "ifscCode",
+      "accountNumber",
+      "preferredCommunicationId",
+      "linkedInProfile",
+      "studentDeclaration",
+      "consentAgreement",
+      "internshipStatus",
     ];
 
     let filled = 0;
     fields.forEach((f) => {
-      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
+      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false)
+        filled++;
     });
 
     const profileCompletion = Math.round((filled / fields.length) * 100);
@@ -837,14 +957,20 @@ const fetchSingleUserById = async (req, res) => {
       ? Object.keys(userData.businessTargets).length
       : 0;
 
-    // Call the referral API directly
+    //  Call the referral API directly with conditional +91 prefix
     let referralCode = userData.referralCode || null;
     let referralLink = userData.referralLink || null;
     try {
+      // Ensure phone number starts with +91
+      let phoneNumber = userData.phoneNumber;
+      if (!phoneNumber.startsWith("+91")) {
+        phoneNumber = `+91${phoneNumber}`;
+      }
+
       const referralRes = await axios.get(
         "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
         {
-          params: { phone_number: userData.phoneNumber },
+          params: { phone_number: phoneNumber },
         }
       );
 
@@ -891,25 +1017,59 @@ const fetchAllUsers = async (req, res) => {
     }
 
     const fields = [
-      "firstName", "lastName", "fullName", "dateOfBirth", "gender",
-      "phoneNumber", "alternatePhoneNumber", "email", "residentialAddress",
-      "emergencyContactName", "emergencyContactNumber", "city", "state", "pinCode",
-      "collegeName", "collegeRollNumber", "course", "specialization", "currentYear",
-      "currentSemester", "collegeAddress", "placementCoordinatorName",
-      "placementCoordinatorContact", "internshipProgram", "internshipDuration",
-      "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
-      "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
-      "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
-      "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement", "internshipStatus"
+      "firstName",
+      "lastName",
+      "fullName",
+      "dateOfBirth",
+      "gender",
+      "phoneNumber",
+      "alternatePhoneNumber",
+      "email",
+      "residentialAddress",
+      "emergencyContactName",
+      "emergencyContactNumber",
+      "city",
+      "state",
+      "pinCode",
+      "collegeName",
+      "collegeRollNumber",
+      "course",
+      "specialization",
+      "currentYear",
+      "currentSemester",
+      "collegeAddress",
+      "placementCoordinatorName",
+      "placementCoordinatorContact",
+      "internshipProgram",
+      "internshipDuration",
+      "internshipModeId",
+      "preferredStartDate",
+      "referralCode",
+      "referralLink",
+      "referralSource",
+      "studentIdCard",
+      "governmentIdProof",
+      "passportPhoto",
+      "accountHolderName",
+      "bankName",
+      "branchAddress",
+      "ifscCode",
+      "accountNumber",
+      "preferredCommunicationId",
+      "linkedInProfile",
+      "studentDeclaration",
+      "consentAgreement",
+      "internshipStatus",
     ];
 
-    const formattedUsers = users.map(user => {
+    const formattedUsers = users.map((user) => {
       const userData = user.get({ plain: true });
 
       // Profile completion
       let filled = 0;
-      fields.forEach(f => {
-        if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
+      fields.forEach((f) => {
+        if (userData[f] !== null && userData[f] !== "" && userData[f] !== false)
+          filled++;
       });
       const profileCompletion = Math.round((filled / fields.length) * 100);
 
@@ -922,16 +1082,19 @@ const fetchAllUsers = async (req, res) => {
       return {
         ...userData,
         ProfileCompletion: profileCompletion,
-        TotalSubscriptions: totalSubscriptions
+        TotalSubscriptions: totalSubscriptions,
       };
     });
 
-    return ReS(res, {
-      success: true,
-      totalUsers: formattedUsers.length,
-      data: formattedUsers
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        totalUsers: formattedUsers.length,
+        data: formattedUsers,
+      },
+      200
+    );
   } catch (error) {
     console.error("Fetch all users error:", error);
     return ReE(res, error.message, 500);
@@ -949,7 +1112,11 @@ const getReferralPaymentStatus = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
     if (!user.referralCode) {
-      return ReS(res, { success: true, message: "User has no referral code", data: null }, 200);
+      return ReS(
+        res,
+        { success: true, message: "User has no referral code", data: null },
+        200
+      );
     }
 
     // Call external Lambda
@@ -958,7 +1125,7 @@ const getReferralPaymentStatus = async (req, res) => {
     let modifiedData = { ...apiResponse.data };
 
     const regUsers = Array.isArray(modifiedData.registered_users)
-      ? modifiedData.registered_users.map(u => ({ ...u }))
+      ? modifiedData.registered_users.map((u) => ({ ...u }))
       : [];
 
     if (regUsers.length === 0) {
@@ -967,7 +1134,8 @@ const getReferralPaymentStatus = async (req, res) => {
     }
 
     // Helper: pick a sensible external id field from the registered user object
-    const pickExternalId = (u) => u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
+    const pickExternalId = (u) =>
+      u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
     // 1) Split numeric (likely local DB id) vs external (string) ids
     const numericIndexToLocalId = new Map();
@@ -990,15 +1158,28 @@ const getReferralPaymentStatus = async (req, res) => {
     const localIdByExternal = {};
 
     if (externalList.length > 0) {
-      const candidateUserCols = ['firebaseUid', 'externalId', 'authId', 'uuid', 'uid', 'userUid'];
+      const candidateUserCols = [
+        "firebaseUid",
+        "externalId",
+        "authId",
+        "uuid",
+        "uid",
+        "userUid",
+      ];
       const userAttrs = Object.keys(model.User.rawAttributes || {});
-      const availableUserCols = candidateUserCols.filter(c => userAttrs.includes(c));
+      const availableUserCols = candidateUserCols.filter((c) =>
+        userAttrs.includes(c)
+      );
 
       if (availableUserCols.length > 0) {
-        const userWhere = { [Op.or]: availableUserCols.map(col => ({ [col]: { [Op.in]: externalList } })) };
+        const userWhere = {
+          [Op.or]: availableUserCols.map((col) => ({
+            [col]: { [Op.in]: externalList },
+          })),
+        };
         const foundUsers = await model.User.findAll({
           where: userWhere,
-          attributes: ['id', ...availableUserCols],
+          attributes: ["id", ...availableUserCols],
           raw: true,
         });
 
@@ -1014,7 +1195,10 @@ const getReferralPaymentStatus = async (req, res) => {
     }
 
     // 3) Build candidate IDs for RaiseQuery search
-    const candidateLocalIds = new Set([...numericIndexToLocalId.values(), ...Object.values(localIdByExternal)]);
+    const candidateLocalIds = new Set([
+      ...numericIndexToLocalId.values(),
+      ...Object.values(localIdByExternal),
+    ]);
     const candidateExternalIds = externalList;
 
     let raiseQueries = [];
@@ -1023,15 +1207,29 @@ const getReferralPaymentStatus = async (req, res) => {
       const whereClause = { [Op.or]: [] };
 
       if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
-        whereClause[Op.or].push({ userId: { [Op.in]: [...candidateLocalIds] } });
+        whereClause[Op.or].push({
+          userId: { [Op.in]: [...candidateLocalIds] },
+        });
       }
-      if (rqAttrs.includes("fundsAuditUserId") && candidateExternalIds.length > 0) {
-        whereClause[Op.or].push({ fundsAuditUserId: { [Op.in]: candidateExternalIds } });
+      if (
+        rqAttrs.includes("fundsAuditUserId") &&
+        candidateExternalIds.length > 0
+      ) {
+        whereClause[Op.or].push({
+          fundsAuditUserId: { [Op.in]: candidateExternalIds },
+        });
       }
 
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
-        attributes: ["id", "queryStatus", "isQueryRaised", "createdAt", "userId", "fundsAuditUserId"],
+        attributes: [
+          "id",
+          "queryStatus",
+          "isQueryRaised",
+          "createdAt",
+          "userId",
+          "fundsAuditUserId",
+        ],
         order: [["createdAt", "DESC"]],
         raw: true,
       });
@@ -1041,20 +1239,29 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
 
-      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
+      const localId =
+        numericIndexToLocalId.get(idx) ||
+        localIdByExternal[String(pickExternalId(u))] ||
+        null;
       const extId = pickExternalId(u);
 
       let rq = null;
       if (localId != null) {
-        rq = raiseQueries.find(r => String(r.userId) === String(localId));
+        rq = raiseQueries.find((r) => String(r.userId) === String(localId));
       }
       if (!rq && extId) {
-        rq = raiseQueries.find(r => String(r.fundsAuditUserId) === String(extId));
+        rq = raiseQueries.find(
+          (r) => String(r.fundsAuditUserId) === String(extId)
+        );
       }
 
       // ✅ Normalize queryStatus: default to "Pending" if null, empty, or "No Query"
       cloned.queryStatus = rq
-        ? (!rq.queryStatus || rq.queryStatus.trim() === "" || rq.queryStatus === "No Query" ? "Pending" : rq.queryStatus)
+        ? !rq.queryStatus ||
+          rq.queryStatus.trim() === "" ||
+          rq.queryStatus === "No Query"
+          ? "Pending"
+          : rq.queryStatus
         : "Pending";
       cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
 
@@ -1082,20 +1289,22 @@ const getInternshipStatusByUser = async (req, res) => {
 
     // Check if manager exists
     const manager = await model.TeamManager.findOne({
-      where: { managerId: userId, isDeleted: false }
+      where: { managerId: userId, isDeleted: false },
     });
     if (!manager) return ReE(res, "Manager not found", 404);
 
     // ✅ Fetch interns using assignedTeamManager (not managerId)
     const interns = await model.User.findAll({
       where: { assignedTeamManager: userId, isDeleted: false },
-      attributes: ["id", "firstName", "lastName", "internshipStatus"]
+      attributes: ["id", "firstName", "lastName", "internshipStatus"],
     });
 
     // Count by status
-    let completed = 0, onHold = 0, inProgress = 0;
+    let completed = 0,
+      onHold = 0,
+      inProgress = 0;
 
-    interns.forEach(intern => {
+    interns.forEach((intern) => {
       const status = (intern.internshipStatus || "").trim().toLowerCase();
       switch (status) {
         case "completed":
@@ -1112,17 +1321,20 @@ const getInternshipStatusByUser = async (req, res) => {
       }
     });
 
-    return ReS(res, {
-      success: true,
-      managerId: userId,
-      data: {
-        totalInterns: interns.length,
-        completed,
-        onHold,
-        inProgress
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        managerId: userId,
+        data: {
+          totalInterns: interns.length,
+          completed,
+          onHold,
+          inProgress,
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Get Internship Status By User Error:", error);
     return ReE(res, error.message, 500);
