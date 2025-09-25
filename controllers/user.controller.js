@@ -790,9 +790,18 @@ const fetchSingleUserById = async (req, res) => {
         {
           model: model.TeamManager,
           as: "teamManager",
-          attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
-        }
-      ]
+          attributes: [
+            "id",
+            "managerId",
+            "name",
+            "email",
+            "mobileNumber",
+            "department",
+            "position",
+            "internshipStatus",
+          ],
+        },
+      ],
     });
 
     if (!user) {
@@ -812,11 +821,12 @@ const fetchSingleUserById = async (req, res) => {
       "internshipModeId", "preferredStartDate", "referralCode", "referralLink",
       "referralSource", "studentIdCard", "governmentIdProof", "passportPhoto",
       "accountHolderName", "bankName", "branchAddress", "ifscCode", "accountNumber",
-      "preferredCommunicationId", "linkedInProfile", "studentDeclaration", "consentAgreement", "internshipStatus"
+      "preferredCommunicationId", "linkedInProfile", "studentDeclaration",
+      "consentAgreement", "internshipStatus"
     ];
 
     let filled = 0;
-    fields.forEach(f => {
+    fields.forEach((f) => {
       if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
     });
 
@@ -827,22 +837,40 @@ const fetchSingleUserById = async (req, res) => {
       ? Object.keys(userData.businessTargets).length
       : 0;
 
+    // Call the referral API directly
+    let referralCode = userData.referralCode || null;
+    let referralLink = userData.referralLink || null;
+    try {
+      const referralRes = await axios.get(
+        "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
+        {
+          params: { phone_number: userData.phoneNumber },
+        }
+      );
+
+      if (referralRes.data) {
+        referralCode = referralRes.data.referral_code || referralCode;
+        referralLink = referralRes.data.referral_link || referralLink;
+      }
+    } catch (err) {
+      console.warn("Referral API failed:", err.message);
+    }
+
     //  Prepare filtered response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
       PhoneNumber: userData.phoneNumber,
       CollegeName: userData.collegeName,
-      ReferralCode: userData.referralCode,
-      ReferralLink: userData.referralLink,
+      ReferralCode: referralCode,
+      ReferralLink: referralLink,
       ProfileCompletion: profileCompletion,
       TotalSubscriptions: totalSubscriptions,
       InternshipStatus: userData.internshipStatus || null,
-      TeamManager: userData.teamManager || null
+      TeamManager: userData.teamManager || null,
     };
 
     return ReS(res, { success: true, data: filteredData }, 200);
-
   } catch (error) {
     console.error("Fetch user error:", error);
     return ReE(res, error.message, 500);
