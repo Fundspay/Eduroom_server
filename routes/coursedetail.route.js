@@ -66,5 +66,11 @@ router.get("/:userId", coursedetailController.getDailyStatusAllCoursesPerUser);
 // GET user MCQ score for a specific session
 router.get("/mcq/score/:courseId/:coursePreviewId/:day/:sessionNumber/:userId",coursedetailController.getUserMCQScore);
 
+router.get(
+  "/casestudy/result/:courseId/:coursePreviewId/:day/:sessionNumber/:questionId/:userId",
+  coursedetailController.getUserCaseStudyResult
+);
+
+
 
 module.exports = router;
