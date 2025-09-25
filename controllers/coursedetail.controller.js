@@ -538,8 +538,8 @@ const submitCaseStudyAnswer = async (req, res) => {
     const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
     const passed = matchPercentage >= 35;
 
-    // Save result
-    await model.CaseStudyResult.create({
+    // ✅ Upsert result (insert if not exists, update if exists)
+    await model.CaseStudyResult.upsert({
       userId,
       courseId,
       coursePreviewId,
@@ -573,6 +573,7 @@ const submitCaseStudyAnswer = async (req, res) => {
 };
 
 module.exports.submitCaseStudyAnswer = submitCaseStudyAnswer;
+
 
 // ✅ Session-wise status for a user
 const getSessionStatusPerUser = async (req, res) => {
@@ -1191,5 +1192,55 @@ const getUserMCQScore = async (req, res) => {
 };
 
 module.exports.getUserMCQScore = getUserMCQScore;
+
+
+const getUserCaseStudyResult = async (req, res) => {
+  try {
+    const { courseId, coursePreviewId, day, sessionNumber, questionId, userId } = req.params;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Fetch the user's case study result along with the question
+    const result = await model.CaseStudyResult.findOne({
+      where: {
+        userId,
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        questionId
+      },
+      include: [{
+        model: model.QuestionModel,
+        attributes: ['question'],  // fetch only the question text
+      }]
+    });
+
+    if (!result) return ReE(res, "No case study result found for this user", 404);
+
+    return ReS(res, {
+      success: true,
+      data: {
+        userId: result.userId,
+        courseId: result.courseId,
+        coursePreviewId: result.coursePreviewId,
+        day: result.day,
+        sessionNumber: result.sessionNumber,
+        questionId: result.questionId,
+        question: result.QuestionModel?.question || null,
+        answer: result.answer,
+        matchPercentage: result.matchPercentage,
+        passed: result.passed
+      }
+    }, 200);
+
+  } catch (error) {
+    console.error("Get User Case Study Result Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getUserCaseStudyResult = getUserCaseStudyResult;
+
 
 
