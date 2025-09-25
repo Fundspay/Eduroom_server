@@ -63,4 +63,8 @@ router.post("/course/start-end-dates", coursedetailController.setCourseStartEndD
 
 router.get("/:userId", coursedetailController.getDailyStatusAllCoursesPerUser);
 
+// GET user MCQ score for a specific session
+router.get("/mcq/score/:courseId/:coursePreviewId/:day/:sessionNumber/:userId",coursedetailController.getUserMCQScore);
+
+
 module.exports = router;
