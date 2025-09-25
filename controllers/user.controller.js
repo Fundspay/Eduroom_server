@@ -977,6 +977,12 @@ const fetchSingleUserById = async (req, res) => {
       if (referralRes.data) {
         referralCode = referralRes.data.referral_code || referralCode;
         referralLink = referralRes.data.referral_link || referralLink;
+
+        // ✅ Save referral code and link to DB
+        await user.update({
+          referralCode,
+          referralLink
+        });
       }
     } catch (err) {
       console.warn("Referral API failed:", err.message);
