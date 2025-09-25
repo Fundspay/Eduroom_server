@@ -536,7 +536,7 @@ const submitCaseStudyAnswer = async (req, res) => {
     });
 
     const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
-    const passed = matchPercentage >= 35;
+    const passed = matchPercentage >= 33;
 
     // ✅ Upsert result (insert if not exists, update if exists)
     await model.CaseStudyResult.upsert({
