@@ -429,10 +429,14 @@ const getUserWalletDetails = async (req, res) => {
         0
       );
 
+      // ✅ Clamp businessTarget to 0 if negative
+      const rawTarget = parseInt(course?.businessTarget || 0, 10);
+      const businessTarget = rawTarget < 0 ? 0 : rawTarget;
+
       courseDetails.push({
         courseId,
         courseName: course?.name || null,
-        businessTarget: parseInt(course?.businessTarget || 0, 10),
+        businessTarget,
         deductedWallet
       });
     }
