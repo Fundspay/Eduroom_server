@@ -26,6 +26,7 @@ var updateStatus = async function (req, res) {
 
         // 📝 Update all fields passed in req.body
         await status.update(req.body);
+        await status.reload();
 
         return ReS(res, status, 200);
     } catch (error) {
