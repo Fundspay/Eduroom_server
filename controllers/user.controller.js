@@ -1109,6 +1109,7 @@ const fetchAllUsers = async (req, res) => {
 
 module.exports.fetchAllUsers = fetchAllUsers;
 
+
 const getReferralPaymentStatus = async (req, res) => {
   try {
     let { userId } = req.params;
@@ -1139,11 +1140,10 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Helper: pick a sensible external id field from the registered user object
+    // Normalize registered users (queryStatus, etc.)
     const pickExternalId = (u) =>
       u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
-    // 1) Split numeric (likely local DB id) vs external (string) ids
     const numericIndexToLocalId = new Map();
     const externalValues = new Set();
 
@@ -1159,7 +1159,6 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     });
 
-    // 2) Resolve external ids to local User.id
     const externalList = [...externalValues];
     const localIdByExternal = {};
 
@@ -1179,9 +1178,7 @@ const getReferralPaymentStatus = async (req, res) => {
 
       if (availableUserCols.length > 0) {
         const userWhere = {
-          [Op.or]: availableUserCols.map((col) => ({
-            [col]: { [Op.in]: externalList },
-          })),
+          [Op.or]: availableUserCols.map((col) => ({ [col]: { [Op.in]: externalList } })),
         };
         const foundUsers = await model.User.findAll({
           where: userWhere,
@@ -1200,11 +1197,7 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     }
 
-    // 3) Build candidate IDs for RaiseQuery search
-    const candidateLocalIds = new Set([
-      ...numericIndexToLocalId.values(),
-      ...Object.values(localIdByExternal),
-    ]);
+    const candidateLocalIds = new Set([...numericIndexToLocalId.values(), ...Object.values(localIdByExternal)]);
     const candidateExternalIds = externalList;
 
     let raiseQueries = [];
@@ -1213,59 +1206,33 @@ const getReferralPaymentStatus = async (req, res) => {
       const whereClause = { [Op.or]: [] };
 
       if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
-        whereClause[Op.or].push({
-          userId: { [Op.in]: [...candidateLocalIds] },
-        });
+        whereClause[Op.or].push({ userId: { [Op.in]: [...candidateLocalIds] } });
       }
-      if (
-        rqAttrs.includes("fundsAuditUserId") &&
-        candidateExternalIds.length > 0
-      ) {
-        whereClause[Op.or].push({
-          fundsAuditUserId: { [Op.in]: candidateExternalIds },
-        });
+      if (rqAttrs.includes("fundsAuditUserId") && candidateExternalIds.length > 0) {
+        whereClause[Op.or].push({ fundsAuditUserId: { [Op.in]: candidateExternalIds } });
       }
 
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
-        attributes: [
-          "id",
-          "queryStatus",
-          "isQueryRaised",
-          "createdAt",
-          "userId",
-          "fundsAuditUserId",
-        ],
+        attributes: ["id", "queryStatus", "isQueryRaised", "createdAt", "userId", "fundsAuditUserId"],
         order: [["createdAt", "DESC"]],
         raw: true,
       });
     }
 
-    // 4) Attach RaiseQuery info to registered users and normalize queryStatus
+    // Attach RaiseQuery info and normalize queryStatus
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
 
-      const localId =
-        numericIndexToLocalId.get(idx) ||
-        localIdByExternal[String(pickExternalId(u))] ||
-        null;
+      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
       const extId = pickExternalId(u);
 
       let rq = null;
-      if (localId != null) {
-        rq = raiseQueries.find((r) => String(r.userId) === String(localId));
-      }
-      if (!rq && extId) {
-        rq = raiseQueries.find(
-          (r) => String(r.fundsAuditUserId) === String(extId)
-        );
-      }
+      if (localId != null) rq = raiseQueries.find((r) => String(r.userId) === String(localId));
+      if (!rq && extId) rq = raiseQueries.find((r) => String(r.fundsAuditUserId) === String(extId));
 
-      // ✅ Normalize queryStatus: default to "Pending" if null, empty, or "No Query"
       cloned.queryStatus = rq
-        ? !rq.queryStatus ||
-          rq.queryStatus.trim() === "" ||
-          rq.queryStatus === "No Query"
+        ? !rq.queryStatus || rq.queryStatus.trim() === "" || rq.queryStatus === "No Query"
           ? "Pending"
           : rq.queryStatus
         : "Pending";
@@ -1275,6 +1242,24 @@ const getReferralPaymentStatus = async (req, res) => {
     });
 
     modifiedData.registered_users = updatedRegisteredUsers;
+
+    // ✅ Save all registered users to FundsAudit
+    const rowsToInsert = updatedRegisteredUsers.map((u) => ({
+      userId: userId, // from req.params
+      registeredUserId: u.user_id,
+      firstName: u.first_name,
+      lastName: u.last_name,
+      phoneNumber: u.phone_number,
+      email: u.email,
+      dateOfPayment: u.date_of_payment ? new Date(u.date_of_payment) : null,
+      dateOfDownload: u.date_of_download ? new Date(u.date_of_download) : null,
+      hasPaid: u.has_paid,
+      isDownloaded: u.isDownloaded,
+      queryStatus: u.queryStatus,
+      isQueryRaised: u.isQueryRaised,
+    }));
+
+    await FundsAudit.bulkCreate(rowsToInsert);
 
     return ReS(res, { success: true, data: modifiedData }, 200);
   } catch (error) {
