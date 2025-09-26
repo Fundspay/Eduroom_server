@@ -25,10 +25,10 @@ const sendOfferLetter = async (req, res) => {
     const offerLetter = await generateOfferLetter(userId);
 
     // Build email content
-    const subject = "Your Internship Offer Letter - Fundsroom Investment Services";
+    const subject = "Your Internship Offer Letter - Fundsroom InfoTech Pvt Ltd";
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
-      <p>Congratulations! Please find attached your <b>Offer Letter</b> for the internship at <b>Fundsroom Investment Services</b>.</p>
+      <p>Congratulations! Please find attached your <b>Offer Letter</b> for the internship at <b>Fundsroom InfoTech Pvt Ltd</b>.</p>
       <p>You can also access it anytime using the following link:</p>
       <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
       <br/>

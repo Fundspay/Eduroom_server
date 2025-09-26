@@ -17,6 +17,7 @@ const offerletterRouter = require("./offerletter.route");
 const contactusRouter = require("./contactus.route");
 const internshipcertificateRouter = require("./internshipcertificate.route");
 const raisequeryRouter = require("./raisequery.route");
+const fundsauditRouter = require("./fundsaudit.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -39,5 +40,6 @@ router.use("/offerletter", offerletterRouter);
 router.use("/contactus", contactusRouter);
 router.use("/internshipcertificate", internshipcertificateRouter);
 router.use("/raisequery", raisequeryRouter);
+router.use("/fundsaudit", fundsauditRouter);
 
 module.exports = router;
