@@ -10,6 +10,7 @@ const admin = require("firebase-admin");
 const CONFIG = require("../config/config.js");
 const axios = require("axios");
 const moment = require("moment");
+const { FundsAudit } = require("../models");
 
 if (!admin.apps.length) {
   admin.initializeApp({
