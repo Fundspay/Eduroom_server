@@ -695,26 +695,41 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // Core session logic
-    sessions.forEach((session) => {
+    // --- Loop through sessions using for..of so we can await ---
+    for (const session of sessions) {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
 
-      // --- Handle MCQs ---
-      const sessionMCQs = progress?.totalMCQs || 0;
-      const correctMCQs = progress?.correctMCQs || 0;
+      let sessionCompletionPercentage = 0;
+      let correctMCQs = 0;
+      let sessionMCQs = 0;
+      let caseStudyPercentage = null;
 
-      // --- Handle Case Studies ---
-      const totalCaseStudies = progress?.totalCaseStudies || 0;
-      const completedCaseStudies = progress?.completedCaseStudies || 0;
+      // --- Case study check ---
+      if (session.hasCaseStudy) { // replace with actual flag if different
+        const latestCaseStudy = await model.CaseStudyResult.findOne({
+          where: {
+            userId,
+            courseId,
+            coursePreviewId,
+            day: session.day,
+            sessionNumber: session.sessionNumber,
+          },
+          order: [["createdAt", "DESC"]],
+        });
 
-      // --- Total Attempts (MCQs + Case Studies) ---
-      const totalItems = sessionMCQs + totalCaseStudies;
-      const completedItems = correctMCQs + completedCaseStudies;
-
-      const sessionCompletionPercentage = totalItems
-        ? ((completedItems / totalItems) * 100).toFixed(2)
-        : 0;
+        if (latestCaseStudy) {
+          caseStudyPercentage = latestCaseStudy.matchPercentage;
+          sessionCompletionPercentage = caseStudyPercentage;
+        }
+      } else {
+        // --- MCQ logic if no case study ---
+        sessionMCQs = progress?.totalMCQs || 0;
+        correctMCQs = progress?.correctMCQs || 0;
+        sessionCompletionPercentage = sessionMCQs
+          ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
+          : 0;
+      }
 
       if (!daysMap[session.day]) {
         daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
@@ -723,7 +738,7 @@ const getDailyStatusPerUser = async (req, res) => {
       daysMap[session.day].total++;
       totalSessions++;
 
-      // ✅ New completion criteria: ≥ 33%
+      // ✅ Completion check: ≥33%
       if (attempted && sessionCompletionPercentage >= 33) {
         daysMap[session.day].completed++;
         completedSessions++;
@@ -736,12 +751,11 @@ const getDailyStatusPerUser = async (req, res) => {
         status: attempted && sessionCompletionPercentage >= 33 ? "Completed" : "In Progress",
         correctMCQs,
         totalMCQs: sessionMCQs,
-        completedCaseStudies,
-        totalCaseStudies,
+        caseStudyPercentage,
         sessionDuration: session.sessionDuration || null,
         sessionCompletionPercentage: Number(sessionCompletionPercentage),
       });
-    });
+    }
 
     // --- Daily Status ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
@@ -801,7 +815,6 @@ const getDailyStatusPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
-
 
 // ✅ Get daily status and wallet info for all courses of a user
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
