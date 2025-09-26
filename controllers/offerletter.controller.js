@@ -63,6 +63,168 @@ const sendOfferLetter = async (req, res) => {
 
 module.exports = { sendOfferLetter };
 
+// const listAllUsers = async (req, res) => {
+//   try {
+//     // Fetch users with related models
+//     const users = await User.findAll({
+//       include: [
+//         {
+//           model: TeamManager,
+//           as: "teamManager",
+//           attributes: ["id", "name", "internshipStatus"]
+//         },
+//         {
+//           model: InternshipCertificate,
+//           attributes: ["id", "courseId", "certificateUrl", "isIssued", "issuedDate"]
+//         },
+//         {
+//           model: OfferLetter,
+//           attributes: ["id", "fileUrl", "issent", "startDate"]
+//         }
+//       ]
+//     });
+
+//     const courses = await Course.findAll({
+//       attributes: ["id", "name", "duration", "businessTarget", "domainId"],
+//       include: [{ model: Domain, attributes: ["id", "name"] }]
+//     });
+
+//     const allTeamManagers = await TeamManager.findAll({
+//       where: { isDeleted: false },
+//       attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+//     });
+
+//     const userIds = users.map(u => u.id);
+//     const raiseQueries = await RaiseQuery.findAll({
+//       where: { userId: userIds, isDeleted: false },
+//       attributes: ["userId", "isQueryRaised", "queryStatus"]
+//     });
+
+//     // Aggregate query info per user
+//     const queryInfoByUser = {};
+//     raiseQueries.forEach(q => {
+//       if (!queryInfoByUser[q.userId]) {
+//         queryInfoByUser[q.userId] = {
+//           isQueryRaised: q.isQueryRaised || false,
+//           queryStatus: q.queryStatus || null,
+//           queryCount: 1
+//         };
+//       } else {
+//         queryInfoByUser[q.userId].queryCount += 1;
+//         queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
+//         queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
+//       }
+//     });
+
+//     const response = [];
+
+//     for (const user of users) {
+//       // Prepare course details
+//       const courseDetails = [];
+//       if (user.courseStatuses && typeof user.courseStatuses === "object") {
+//         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
+//           const course = courses.find(c => c.id.toString() === courseId);
+//           courseDetails.push({
+//             courseId,
+//             courseName: course ? course.name : null,
+//             duration: course ? course.duration : null,
+//             businessTarget: course ? course.businessTarget : null,
+//             domainName: course && course.Domain ? course.Domain.name : null,
+//             status,
+//             startDate:
+//               user.courseDates && user.courseDates[courseId]
+//                 ? user.courseDates[courseId].startDate
+//                 : null,
+//             endDate:
+//               user.courseDates && user.courseDates[courseId]
+//                 ? user.courseDates[courseId].endDate
+//                 : null
+//           });
+//         }
+//       }
+
+//       const internshipIssued =
+//         user.InternshipCertificates && user.InternshipCertificates.length > 0
+//           ? user.InternshipCertificates.some(cert => cert.isIssued)
+//           : null;
+
+//       const teamManager = user.teamManager
+//         ? {
+//             id: user.teamManager.id,
+//             name: user.teamManager.name,
+//             internshipStatus: user.teamManager.internshipStatus
+//           }
+//         : null;
+
+//       const offerLetterSent =
+//         user.OfferLetters && user.OfferLetters.length > 0
+//           ? user.OfferLetters[0].issent
+//           : false;
+
+//       const offerLetterFile =
+//         user.OfferLetters && user.OfferLetters.length > 0
+//           ? user.OfferLetters[0].fileUrl
+//           : null;
+
+//       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
+
+//       const newStatusData = {
+//         userId: user.id,
+//         userName: `${user.firstName} ${user.lastName}`,
+//         email: user.email,
+//         phoneNumber: user.phoneNumber,
+//         collegeName: user.collegeName,
+//         subscriptionWallet: user.subscriptionWallet,
+//         subscriptionLeft: user.subscriptionLeft,
+//         courses: courseDetails,
+//         internshipIssued,
+//         offerLetterSent,
+//         offerLetterFile,
+//         queryStatus: queryInfo.queryStatus,
+//         isQueryRaised: queryInfo.isQueryRaised,
+//         queryCount: queryInfo.queryCount,
+//         internshipStatus: teamManager ? teamManager.internshipStatus : null,
+//         teamManager: teamManager ? teamManager.name : null
+//       };
+
+//       // 🔹 FIXED: Check if Status already exists for this user
+//       let statusRecord = await Status.findOne({ where: { userId: user.id } });
+
+//       if (statusRecord) {
+//         // Update existing record
+//         await statusRecord.update(newStatusData);
+//       } else {
+//         // Create new record
+//         statusRecord = await Status.create(newStatusData);
+
+//         // Save the newly created statusId to user
+//         await user.update({ statusId: statusRecord.id });
+//       }
+
+//       response.push({
+//         statusId: statusRecord.id,
+//         ...statusRecord.toJSON()
+//       });
+//     }
+
+//     return ReS(res, {
+//       success: true,
+//       data: response,
+//       teamManagers: {
+//         total: allTeamManagers.length,
+//         list: allTeamManagers
+//       }
+//     }, 200);
+
+//   } catch (err) {
+//     console.error("Error in listAllUsers:", err);
+//     return ReE(res, err.message, 500);
+//   }
+// };
+
+// module.exports.listAllUsers = listAllUsers;
+
+
 const listAllUsers = async (req, res) => {
   try {
     // Fetch users with related models
@@ -168,12 +330,8 @@ const listAllUsers = async (req, res) => {
 
       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
-      const newStatusData = {
-        userId: user.id,
-        userName: `${user.firstName} ${user.lastName}`,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
-        collegeName: user.collegeName,
+      // Only fields that should change on update
+      const fieldsToUpdate = {
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
@@ -182,22 +340,29 @@ const listAllUsers = async (req, res) => {
         offerLetterFile,
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
-        queryCount: queryInfo.queryCount,
-        internshipStatus: teamManager ? teamManager.internshipStatus : null,
-        teamManager: teamManager ? teamManager.name : null
+        queryCount: queryInfo.queryCount
       };
 
-      // 🔹 FIXED: Check if Status already exists for this user
+      // Check if a Status record already exists for this user
       let statusRecord = await Status.findOne({ where: { userId: user.id } });
 
       if (statusRecord) {
-        // Update existing record
-        await statusRecord.update(newStatusData);
+        // Update only the relevant fields
+        await statusRecord.update(fieldsToUpdate);
       } else {
-        // Create new record
-        statusRecord = await Status.create(newStatusData);
+        // Create new record including teamManager & internshipStatus
+        statusRecord = await Status.create({
+          userId: user.id,
+          userName: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          collegeName: user.collegeName,
+          ...fieldsToUpdate,
+          teamManager: teamManager ? teamManager.name : null,
+          internshipStatus: teamManager ? teamManager.internshipStatus : null
+        });
 
-        // Save the newly created statusId to user
+        // Save the new statusId to user
         await user.update({ statusId: statusRecord.id });
       }
 
@@ -223,3 +388,4 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
+
