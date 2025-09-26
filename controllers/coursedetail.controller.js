@@ -694,14 +694,25 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // Core session logic (unchanged)
+    // Core session logic
     sessions.forEach((session) => {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
+
+      // --- Handle MCQs ---
       const sessionMCQs = progress?.totalMCQs || 0;
       const correctMCQs = progress?.correctMCQs || 0;
-      const sessionCompletionPercentage = sessionMCQs
-        ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
+
+      // --- Handle Case Studies ---
+      const totalCaseStudies = progress?.totalCaseStudies || 0;
+      const completedCaseStudies = progress?.completedCaseStudies || 0;
+
+      // --- Total Attempts (MCQs + Case Studies) ---
+      const totalItems = sessionMCQs + totalCaseStudies;
+      const completedItems = correctMCQs + completedCaseStudies;
+
+      const sessionCompletionPercentage = totalItems
+        ? ((completedItems / totalItems) * 100).toFixed(2)
         : 0;
 
       if (!daysMap[session.day]) {
@@ -710,7 +721,9 @@ const getDailyStatusPerUser = async (req, res) => {
 
       daysMap[session.day].total++;
       totalSessions++;
-      if (attempted && correctMCQs === sessionMCQs) {
+
+      // ✅ New completion criteria: ≥ 33%
+      if (attempted && sessionCompletionPercentage >= 33) {
         daysMap[session.day].completed++;
         completedSessions++;
       }
@@ -719,14 +732,17 @@ const getDailyStatusPerUser = async (req, res) => {
         sessionNumber: session.sessionNumber,
         title: session.title,
         attempted,
-        status: attempted && correctMCQs === sessionMCQs ? "Completed" : "In Progress",
+        status: attempted && sessionCompletionPercentage >= 33 ? "Completed" : "In Progress",
         correctMCQs,
         totalMCQs: sessionMCQs,
+        completedCaseStudies,
+        totalCaseStudies,
         sessionDuration: session.sessionDuration || null,
         sessionCompletionPercentage: Number(sessionCompletionPercentage),
       });
     });
 
+    // --- Daily Status ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
       const d = daysMap[dayKey];
       const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
@@ -741,8 +757,11 @@ const getDailyStatusPerUser = async (req, res) => {
       };
     });
 
-    // Compute overall status
+    // --- Overall Status ---
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+    const overallCompletionRate = totalSessions
+      ? ((completedSessions / totalSessions) * 100).toFixed(2)
+      : 0;
 
     // ✅ Update courseStatuses in User table
     const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
@@ -753,26 +772,27 @@ const getDailyStatusPerUser = async (req, res) => {
 
     await user.update(
       { courseStatuses: existingStatuses },
-      { fields: ['courseStatuses'] } // ensures JSON is updated
+      { fields: ["courseStatuses"] }
     );
 
     await user.reload();
     console.log("After update:", JSON.stringify(user.courseStatuses));
 
-    const overallCompletionRate = ((completedSessions / totalSessions) * 100).toFixed(2);
-
-    return ReS(res, {
-      success: true,
-      summary: {
-        totalSessions,
-        completedSessions,
-        remainingSessions: totalSessions - completedSessions,
-        overallCompletionRate: Number(overallCompletionRate),
-        overallStatus,
+    return ReS(
+      res,
+      {
+        success: true,
+        summary: {
+          totalSessions,
+          completedSessions,
+          remainingSessions: totalSessions - completedSessions,
+          overallCompletionRate: Number(overallCompletionRate),
+          overallStatus,
+        },
+        dailyStatus,
       },
-      dailyStatus,
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Get Daily Status Error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
@@ -780,6 +800,7 @@ const getDailyStatusPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
+
 
 // ✅ Get daily status and wallet info for all courses of a user
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
