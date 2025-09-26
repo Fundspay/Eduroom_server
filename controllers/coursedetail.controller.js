@@ -1011,7 +1011,7 @@ const getBusinessTarget = async (req, res) => {
           courseId,
           businessTarget,
           achievedCount: achievedCountNum,
-          remaining: remainingNum,
+          remaining: achievedCountNum,
           subscriptionWallet: achievedCountNum,
           businessTargets: user.businessTargets,
         },
