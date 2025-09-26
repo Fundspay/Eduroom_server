@@ -35,6 +35,29 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
+    // 🔹 Get business target (prefer user.businessTargets first)
+    const userTarget = user.businessTargets?.[courseId];
+    const rawTarget = parseInt(
+      userTarget !== undefined ? userTarget : course?.businessTarget || 0,
+      10
+    );
+    const businessTarget = rawTarget < 0 ? 0 : rawTarget;
+
+    // 🔹 Deduct subscription
+    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
+    const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+
+    const newDeductedWallet = subscriptiondeductedWallet + businessTarget;
+    const newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
+
+    user.subscriptiondeductedWallet = newDeductedWallet;
+    user.subscriptionLeft = newSubscriptionLeft;
+
+    await user.save({
+      fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
+      transaction
+    });
+
     // 🔹 Generate certificate PDF + S3 link
     const certificateFile = await generateInternshipCertificate(userId, courseId);
 
@@ -52,19 +75,20 @@ const createAndSendInternshipCertificate = async (req, res) => {
       courseId,
       certificateUrl: certificateFile.fileUrl,
       isIssued: true,
-      issuedDate: new Date()
+      issuedDate: new Date(),
+      deductedWallet: businessTarget   // store how much was deducted for this course
     }, { transaction });
 
     // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
-  <p>Dear ${user.fullName || user.firstName},</p>
-  <p>Congratulations! Please find attached your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
-  <p>Access it here:</p>
-  <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
-  <br/>
-  <p>Best Regards,<br/>${course.name} Team</p>
-`;
+      <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Congratulations! Please find attached your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
+      <p>Access it here:</p>
+      <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
+      <br/>
+      <p>Best Regards,<br/>${course.name} Team</p>
+    `;
 
     const mailResult = await sendMail(user.email, subject, html);
     if (!mailResult.success) {
@@ -76,8 +100,14 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Internship Certificate created and sent successfully",
-      certificateUrl: certificate.certificateUrl
+      message: "Internship Certificate created, wallet updated, and email sent successfully",
+      certificateUrl: certificate.certificateUrl,
+      wallet: {
+        businessTarget,
+        subscriptionWallet,
+        subscriptiondeductedWallet: newDeductedWallet,
+        subscriptionLeft: newSubscriptionLeft
+      }
     });
 
   } catch (error) {
