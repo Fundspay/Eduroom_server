@@ -857,7 +857,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload(); // latest values
 
-    // Prepare response with subscription fields exactly as in DB
+    // Prepare response with subscription fields
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
@@ -973,12 +973,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const isBusinessTargetMet = user.subscriptionWallet >= (course.businessTarget || 0) &&
         user.subscriptiondeductedWallet >= (course.businessTarget || 0);
 
-      // Overall status considers both sessions and business logic
-      const overallStatus =
-        Number(overallCompletionRate) === 100 && isBusinessTargetMet
-          ? "Completed"
-          : "In Progress";
-
+      // Updated overallStatus logic
+      let overallStatus = "In Progress";
+      if (isBusinessTargetMet) {
+        overallStatus = "Completed"; // Business target alone completes course
+      } else if (Number(overallCompletionRate) === 100) {
+        overallStatus = "Completed"; // All sessions done
+      }
 
       // Update user's courseStatuses
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
