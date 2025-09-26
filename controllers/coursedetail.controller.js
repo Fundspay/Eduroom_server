@@ -817,10 +817,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Reload to get the latest values
-    await user.reload();
+    await user.reload(); // latest values
 
-    // Use subscription fields exactly as stored in the DB
+    // Prepare response with subscription fields exactly as in DB
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
@@ -830,7 +829,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       courses: [],
     };
 
-    // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
       const course = await model.Course.findOne({
@@ -847,7 +845,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
       if (!course) continue;
 
-      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -857,46 +854,68 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       let totalSessions = 0;
       let completedSessions = 0;
 
-      sessions.forEach((session) => {
-        const progress = session.userProgress?.[userId];
+      for (const session of sessions) {
+        const progress = session.userProgress?.[userId] || {};
         const attempted = !!progress;
-        const sessionMCQs = progress?.totalMCQs || 0;
-        const correctMCQs = progress?.correctMCQs || 0;
-        const sessionCompletionPercentage = sessionMCQs
-          ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
-          : 0;
 
-        if (!daysMap[session.day]) {
-          daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+        let sessionCompletionPercentage = 0;
+        let correctMCQs = 0;
+        let totalMCQs = 0;
+        let caseStudyPercentage = null;
+
+        // Fetch latest case study result
+        const latestCaseStudy = await model.CaseStudyResult.findOne({
+          where: {
+            userId,
+            courseId,
+            day: session.day,
+            sessionNumber: session.sessionNumber,
+          },
+          order: [["createdAt", "DESC"]],
+        });
+
+        if (latestCaseStudy) {
+          caseStudyPercentage = latestCaseStudy.matchPercentage;
+          sessionCompletionPercentage = caseStudyPercentage;
+        } else {
+          totalMCQs = progress.totalMCQs || 0;
+          correctMCQs = progress.correctMCQs || 0;
+          sessionCompletionPercentage = totalMCQs
+            ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
+            : 0;
         }
 
+        if (!daysMap[session.day]) daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
         daysMap[session.day].total++;
         totalSessions++;
-        if (attempted && correctMCQs === sessionMCQs && sessionMCQs > 0) {
-          daysMap[session.day].completed++;
+
+        if (attempted && sessionCompletionPercentage > 0) {
           completedSessions++;
+          daysMap[session.day].completed++;
         }
+
+        const status = latestCaseStudy
+          ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
+          : sessionCompletionPercentage >= 33
+            ? "Completed"
+            : "In Progress";
 
         daysMap[session.day].sessions.push({
           sessionNumber: session.sessionNumber,
           title: session.title,
           attempted,
-          status:
-            attempted && correctMCQs === sessionMCQs && sessionMCQs > 0
-              ? "Completed"
-              : "In Progress",
+          status,
           correctMCQs,
-          totalMCQs: sessionMCQs,
+          totalMCQs,
+          caseStudyPercentage,
           sessionDuration: session.sessionDuration || null,
           sessionCompletionPercentage: Number(sessionCompletionPercentage),
         });
-      });
+      }
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = d.total
-          ? ((d.completed / d.total) * 100).toFixed(2)
-          : 0;
+        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
         return {
           day: Number(dayKey),
           totalSessions: d.total,
@@ -911,8 +930,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
-      const overallStatus =
-        completedSessions === totalSessions ? "Completed" : "In Progress";
+      const overallStatus = Number(overallCompletionRate) === 100 ? "Completed" : "In Progress";
+
+      // Update user's courseStatuses
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+      existingStatuses[String(courseId)] = overallStatus;
+      await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
       response.courses.push({
         courseId,
@@ -934,7 +957,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
 
 
 const getBusinessTarget = async (req, res) => {
