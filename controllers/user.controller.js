@@ -420,61 +420,28 @@ module.exports.addConsent = addConsent;
 
 var updatePersonalInfo = async function (req, res) {
   try {
-    const {
-      userId,
-      firstName,
-      lastName,
-      fullName,
-      dateOfBirth,
-      gender,
-      phoneNumber,
-      alternatePhoneNumber,
-      email,
-      residentialAddress,
-      emergencyContactName,
-      emergencyContactNumber,
-      city,
-      state,
-      pinCode,
-    } = req.body;
+    const userId = req.params.id; // from URL
+    const updateFields = req.body; // all other fields
 
-    if (!userId) {
-      return ReE(res, "User ID is required", 400);
-    }
+    if (!userId) return ReE(res, "User ID is required", 400);
 
-    // Find user
     const user = await model.User.findByPk(userId);
-    if (!user) {
-      return ReE(res, "User not found", 404);
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
-    // Update fields
-    await user.update({
-      firstName,
-      lastName,
-      fullName,
-      dateOfBirth,
-      gender,
-      phoneNumber,
-      alternatePhoneNumber,
-      email,
-      residentialAddress,
-      emergencyContactName,
-      emergencyContactNumber,
-      city,
-      state,
-      pinCode,
-    });
-
-    return ReS(
-      res,
-      { success: true, message: "User info updated successfully" },
-      200
+    // Remove undefined fields to avoid validation errors
+    Object.keys(updateFields).forEach(
+      key => updateFields[key] === undefined && delete updateFields[key]
     );
+
+    await user.update(updateFields);
+
+    return ReS(res, { success: true, message: "User info updated successfully" }, 200);
   } catch (error) {
+    console.error("Update Personal Info Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.updatePersonalInfo = updatePersonalInfo;
 
 // ✅ Fetch Single User
