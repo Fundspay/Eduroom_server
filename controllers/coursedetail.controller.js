@@ -156,28 +156,47 @@ module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
 
 
 const deleteCourseDetail = async (req, res) => {
-  const { courseDetailId } = req.params;
-  
+  const { courseDetailId, courseId, day, sessionNumber } = req.params;
 
-  if (!courseDetailId) return ReE(res, "courseDetailId is required", 400);
+  if (!courseDetailId && (!courseId || !day || !sessionNumber)) {
+    return ReE(res, "Either courseDetailId OR (courseId, day, sessionNumber) is required", 400);
+  }
 
   const transaction = await sequelize.transaction();
   try {
-    // Fetch the CourseDetail
-    const courseDetail = await model.CourseDetail.findByPk(courseDetailId, { transaction });
-    if (!courseDetail) return ReE(res, "CourseDetail not found", 404);
+    let courseDetail;
 
-    // Delete all associated questions
+    if (courseDetailId) {
+      // Delete by primary key
+      courseDetail = await model.CourseDetail.findByPk(courseDetailId, { transaction });
+    } else {
+      // Delete by courseId + day + sessionNumber
+      courseDetail = await model.CourseDetail.findOne({
+        where: { courseId, day, sessionNumber },
+        transaction
+      });
+    }
+
+    if (!courseDetail) {
+      await transaction.rollback();
+      return ReE(res, "CourseDetail not found", 404);
+    }
+
+    // Delete associated questions
     await model.QuestionModel.destroy({
-      where: { courseDetailId },
+      where: { courseDetailId: courseDetail.id },
       transaction
     });
 
-    // Delete the CourseDetail itself (hard delete)
+    // Hard delete CourseDetail
     await courseDetail.destroy({ transaction });
 
     await transaction.commit();
-    return ReS(res, { success: true, message: "CourseDetail and associated questions deleted successfully" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "CourseDetail and associated questions deleted successfully" },
+      200
+    );
   } catch (error) {
     await transaction.rollback();
     console.error("Delete CourseDetail Error:", error);
@@ -186,6 +205,7 @@ const deleteCourseDetail = async (req, res) => {
 };
 
 module.exports.deleteCourseDetail = deleteCourseDetail;
+
 
 
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
