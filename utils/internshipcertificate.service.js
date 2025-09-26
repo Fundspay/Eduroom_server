@@ -134,13 +134,12 @@ const generateInternshipCertificate = async (userId, courseId) => {
          <div class="date">Date: <b>${today}</b></div>
 
          <div class="content">
-            To <b>${candidateName}</b>,<br><br>
-We are pleased to confirm that ${candidateName} has successfully undertaken ${pronouns.possessive} role as a <b>${role}</b> and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
+            <b>To Whom so ever it may concern</b>,<br><br>
+We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern  and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
 
 During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
 
-${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported our marketing efforts and contributed immensely to business development.<br><br>
-
+${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported to overall business and organisational development. We wish ${pronouns.object} all the best in ${pronouns.possessive} future endeavours.<br><br>
         </div>
      </div>
  </body>
