@@ -8,7 +8,7 @@ var listAll = async function (req, res) {
         const statuses = await model.Status.findAll({
             where: { isDeleted: false }
         });
-        const allTeamManagers = await TeamManager.findAll({
+        const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
