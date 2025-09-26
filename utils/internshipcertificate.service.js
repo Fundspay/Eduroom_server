@@ -41,6 +41,8 @@ const generateInternshipCertificate = async (userId, courseId) => {
   let startDate = "To Be Decided";
   let endDate = "To Be Decided";
   let courseName = "Intern";
+  let domainSkills = [];
+  let interpersonalSkills = [];
 
   if (user.courseDates && user.courseDates[courseId]) {
     const courseObj = user.courseDates[courseId];
@@ -48,7 +50,11 @@ const generateInternshipCertificate = async (userId, courseId) => {
     endDate = courseObj.endDate ? normalizeDateToISO(courseObj.endDate) : endDate;
 
     const course = await model.Course.findOne({ where: { id: Number(courseId) } });
-    if (course && course.name) courseName = course.name;
+    if (course) {
+      if (course.name) courseName = course.name;
+      domainSkills = course.domainSkills ? course.domainSkills.split(",").map(s => s.trim()) : [];
+      interpersonalSkills = course.interpersonalSkills ? course.interpersonalSkills.split(",").map(s => s.trim()) : [];
+    }
 
     // Format dates for certificate
     startDate = new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -59,15 +65,14 @@ const generateInternshipCertificate = async (userId, courseId) => {
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // 5) HTML content (your CSS untouched, only background path fixed)
-  // 5) HTML content (updated text)
   const html = `
  <!DOCTYPE html>
  <html lang="en">
- 
+
  <head>
      <meta charset="UTF-8">
      <title>Internship Completion Certificate</title>
- 
+
      <style>
          body {
              margin: 0;
@@ -75,7 +80,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
              font-family: 'Times New Roman', serif;
              background: #f5f5f5;
          }
- 
+
          .letter-container {
              width: 800px;
              margin: 20px auto;
@@ -86,12 +91,12 @@ const generateInternshipCertificate = async (userId, courseId) => {
              box-sizing: border-box;
              position: relative;
          }
- 
+
          .date,
          .content {
              font-family: 'Times New Roman', serif;
          }
- 
+
          .date {
              text-align: left;
              margin-top: 100px;
@@ -99,19 +104,19 @@ const generateInternshipCertificate = async (userId, courseId) => {
              margin-left: -65px;
              font-size: 16px;
          }
- 
+
          .content {
              font-size: 15.5px;
              margin-left: -65px;
              line-height: 1.6;
              text-align: justify;
          }
- 
+
          .signature {
              margin-top: 60px;
              font-size: 16px;
          }
- 
+
          .footer {
              position: absolute;
              bottom: 30px;
@@ -123,23 +128,23 @@ const generateInternshipCertificate = async (userId, courseId) => {
          }
      </style>
  </head>
- 
+
  <body>
      <div class="letter-container">
          <div class="date">Date: <b>${today}</b></div>
- 
+
          <div class="content">
             To <b>${candidateName}</b>,<br><br>
 We are pleased to confirm that ${candidateName} has successfully undertaken ${pronouns.possessive} role as a <b>${role}</b> and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
 
-During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like obedience, leadership, and strong communication skills. ${pronouns.subject} demonstrated exceptional skills in market research, data analysis, and the interpretation of marketing metrics.<br><br>
+During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
 
 ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported our marketing efforts and contributed immensely to business development.<br><br>
 
         </div>
      </div>
  </body>
- 
+
  </html>
  `;
 
