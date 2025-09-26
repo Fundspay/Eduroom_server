@@ -156,17 +156,24 @@ module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
 
 
 const deleteCourseDetail = async (req, res) => {
-  const { id } = req.params;   // route param is :id
-  const courseDetailId = id;
+  const { courseDetailId } = req.params;
+  
 
   if (!courseDetailId) return ReE(res, "courseDetailId is required", 400);
 
   const transaction = await sequelize.transaction();
   try {
+    // Fetch the CourseDetail
     const courseDetail = await model.CourseDetail.findByPk(courseDetailId, { transaction });
     if (!courseDetail) return ReE(res, "CourseDetail not found", 404);
 
-    await model.QuestionModel.destroy({ where: { courseDetailId }, transaction });
+    // Delete all associated questions
+    await model.QuestionModel.destroy({
+      where: { courseDetailId },
+      transaction
+    });
+
+    // Delete the CourseDetail itself (hard delete)
     await courseDetail.destroy({ transaction });
 
     await transaction.commit();
