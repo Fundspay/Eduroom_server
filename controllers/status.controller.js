@@ -24,11 +24,8 @@ var updateStatus = async function (req, res) {
         const status = await model.Status.findByPk(id);
         if (!status) return ReE(res, "Status not found", 404);
 
-        if (!req.body.teamManager) {
-            return ReE(res, "teamManager field is required", 400);
-        }
-
-        await status.update({ teamManager: req.body.teamManager });
+        // 📝 Update all fields passed in req.body
+        await status.update(req.body);
 
         return ReS(res, status, 200);
     } catch (error) {
