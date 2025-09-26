@@ -677,11 +677,11 @@ const getDailyStatusPerUser = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!courseId) return ReE(res, "courseId is required", 400);
 
+    // Fetch user
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    console.log("User fetched:", userId);
-
+    // Fetch all sessions for the course & preview
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
       order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -693,18 +693,18 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // --- Use for..of to await case study fetch ---
+    // Loop through sessions using for..of for async/await
     for (const session of sessions) {
-      const progress = session.userProgress?.[userId];
+      const progress = session.userProgress?.[userId] || {};
       const attempted = !!progress;
 
       let sessionCompletionPercentage = 0;
       let correctMCQs = 0;
-      let sessionMCQs = 0;
+      let totalMCQs = 0;
       let caseStudyPercentage = null;
 
-      // --- Case Study Handling ---
-      if (session.hasCaseStudy) { // replace with your flag
+      // --- Case study sessions ---
+      if (session.hasCaseStudy) { // replace with your actual field
         const latestCaseStudy = await model.CaseStudyResult.findOne({
           where: {
             userId,
@@ -718,14 +718,14 @@ const getDailyStatusPerUser = async (req, res) => {
 
         if (latestCaseStudy) {
           caseStudyPercentage = latestCaseStudy.matchPercentage;
-          sessionCompletionPercentage = caseStudyPercentage; // use real percentage
+          sessionCompletionPercentage = caseStudyPercentage;
         }
       } else {
-        // MCQs logic
-        sessionMCQs = progress?.totalMCQs || 0;
-        correctMCQs = progress?.correctMCQs || 0;
-        sessionCompletionPercentage = sessionMCQs
-          ? ((correctMCQs / sessionMCQs) * 100).toFixed(2)
+        // --- MCQ sessions ---
+        totalMCQs = progress.totalMCQs || 0;
+        correctMCQs = progress.correctMCQs || 0;
+        sessionCompletionPercentage = totalMCQs
+          ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
           : 0;
       }
 
@@ -737,14 +737,12 @@ const getDailyStatusPerUser = async (req, res) => {
       totalSessions++;
 
       // Count completed sessions
-      // For MCQs, you can decide if ≥33% counts as completed
-      // For case studies, we take the actual percentage as completion
-      if (attempted && (!session.hasCaseStudy ? sessionCompletionPercentage >= 33 : sessionCompletionPercentage > 0)) {
+      // For case studies, any percentage > 0 counts as attempted
+      if (attempted && sessionCompletionPercentage > 0) {
         completedSessions++;
         daysMap[session.day].completed++;
       }
 
-      // --- Push session info ---
       daysMap[session.day].sessions.push({
         sessionNumber: session.sessionNumber,
         title: session.title,
@@ -755,14 +753,14 @@ const getDailyStatusPerUser = async (req, res) => {
             ? "Completed"
             : "In Progress",
         correctMCQs,
-        totalMCQs: sessionMCQs,
+        totalMCQs,
         caseStudyPercentage,
         sessionDuration: session.sessionDuration || null,
         sessionCompletionPercentage: Number(sessionCompletionPercentage),
       });
     }
 
-    // --- Daily Status ---
+    // --- Daily status ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
       const d = daysMap[dayKey];
       const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
@@ -777,16 +775,15 @@ const getDailyStatusPerUser = async (req, res) => {
       };
     });
 
-    // --- Overall Status ---
+    // --- Overall status ---
     const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
     const overallCompletionRate = totalSessions
       ? ((completedSessions / totalSessions) * 100).toFixed(2)
       : 0;
 
-    // Update user courseStatuses
+    // Update user's courseStatuses
     const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
     existingStatuses[String(courseId)] = overallStatus;
-
     await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
     await user.reload();
 
