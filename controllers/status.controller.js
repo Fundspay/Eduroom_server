@@ -8,7 +8,11 @@ var listAll = async function (req, res) {
         const statuses = await model.Status.findAll({
             where: { isDeleted: false }
         });
-        return ReS(res, { success: true, data: statuses }, 200);
+        const allTeamManagers = await TeamManager.findAll({
+            where: { isDeleted: false },
+            attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+        });
+        return ReS(res, { success: true, data: statuses, teamManagers: allTeamManagers }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
