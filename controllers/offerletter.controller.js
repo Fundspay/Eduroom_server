@@ -8,7 +8,6 @@ const { ReE, ReS } = require("../utils/util.service.js");
 
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
-
   try {
     const { userId } = req.params;
     if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
@@ -21,18 +20,49 @@ const sendOfferLetter = async (req, res) => {
       return res.status(400).json({ success: false, message: "User has no email" });
     }
 
-    // Generate Offer Letter (PDF uploaded to S3 + DB saved)
+    // Fetch Offer Letter info (domain, duration, startDate should be stored in offer letter or user profile)
     const offerLetter = await generateOfferLetter(userId);
 
+    // Example placeholders — adjust based on your DB schema
+    const domainName = offerLetter.domain || "Domain Not Specified";
+    const duration = offerLetter.duration || "Duration Not Specified";
+    const startDate = offerLetter.startDate || "Start Date Not Specified";
+
     // Build email content
-    const subject = "Your Internship Offer Letter - Fundsroom InfoTech Pvt Ltd";
+    const subject = "Your Internship Offer Letter - Eduroom";
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
-      <p>Congratulations! Please find attached your <b>Offer Letter</b> for the internship at <b>Fundsroom InfoTech Pvt Ltd</b>.</p>
-      <p>You can also access it anytime using the following link:</p>
-      <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
+      <p>Greetings from Eduroom!</p>
+      <p>
+        We are pleased to inform you that you have been selected for the <b>Live Project</b> 
+        in the domain of <b>${domainName}</b> with <b>Eduroom</b> – India’s leading online internship platform.
+      </p>
+
+      <p>This internship is designed to provide you with practical industry exposure through:</p>
+      <ul>
+        <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
+        <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
+      </ul>
+
+      <p><b>Live Project Details:</b></p>
+      <ul>
+        <li><b>Domain:</b> ${domainName}</li>
+        <li><b>Mode:</b> Online (Virtual)</li>
+        <li><b>Duration:</b> ${duration}</li>
+        <li><b>Start Date:</b> ${startDate}</li>
+      </ul>
+
+      <p>
+        We welcome you onboard and look forward to your enthusiastic participation. 
+        This is a valuable opportunity to build your portfolio, enhance your skills, 
+        and gain career-oriented exposure.
+      </p>
+
+      <p>Please find your official <b>Offer Letter</b> attached with this email.</p>
+      <p>For any queries, feel free to reach us at <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a></p>
+
       <br/>
-      <p>Best Regards,<br/>Fundsroom HR Team</p>
+      <p>Best Regards,<br/>Eduroom HR Team</p>
     `;
 
     // Send Email
@@ -41,6 +71,7 @@ const sendOfferLetter = async (req, res) => {
     if (!mailResult.success) {
       return res.status(500).json({ success: false, message: "Failed to send email", error: mailResult.error });
     }
+
     await model.OfferLetter.update(
       {
         issent: true,
@@ -62,6 +93,7 @@ const sendOfferLetter = async (req, res) => {
 };
 
 module.exports = { sendOfferLetter };
+
 
 const listAllUsers = async (req, res) => {
   try {
