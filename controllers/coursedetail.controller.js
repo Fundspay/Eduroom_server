@@ -984,17 +984,17 @@ const getBusinessTarget = async (req, res) => {
       }
     }
 
-    // 5️⃣ Calculate remaining
-    const remaining = Math.max(businessTarget - achievedCount, 0);
+    // // 5️⃣ Calculate remaining
+    // const remaining = Math.max(businessTarget - achievedCount, 0);
 
     // 6️⃣ Ensure safe numbers for BIGINT fields
     const achievedCountNum = Number(achievedCount) || 0;
-    const remainingNum = Number(remaining) || 0;
+    // const remainingNum = Number(remaining) || 0;
 
     // 7️⃣ Update User table
     user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
     user.subscriptionWallet = achievedCountNum;
-    user.subscriptionLeft = remainingNum;
+    user.subscriptionLeft = achievedCountNum;
 
     await user.save({
       fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
