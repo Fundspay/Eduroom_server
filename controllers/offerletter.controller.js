@@ -97,6 +97,7 @@ module.exports = { sendOfferLetter };
 
 const listAllUsers = async (req, res) => {
   try {
+    // Fetch users with related models
     const users = await User.findAll({
       include: [
         {
@@ -149,6 +150,7 @@ const listAllUsers = async (req, res) => {
     const response = [];
 
     for (const user of users) {
+      // Build courses array
       const courseDetails = [];
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
@@ -197,7 +199,6 @@ const listAllUsers = async (req, res) => {
 
       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
-      // Build new status object
       const newStatusData = {
         userId: user.id,
         userName: `${user.firstName} ${user.lastName}`,
@@ -217,26 +218,28 @@ const listAllUsers = async (req, res) => {
         queryCount: queryInfo.queryCount
       };
 
-      // 🔹 Check existing record
-      const existingStatus = await Status.findOne({ where: { userId: user.id } });
+      // 🔹 Use statusId for check instead of userId
+      const statusRecordId = user.statusId; // <-- ensure this is coming from user or request
+      const existingStatus = await Status.findByPk(statusRecordId);
 
       let statusRecord;
       if (!existingStatus) {
-        // Create if not found
+        // Create new if not exists
         statusRecord = await Status.create(newStatusData);
       } else {
-        // Compare data
-        const oldData = existingStatus.toJSON();
+        // Update all except teamManager & internshipStatus
+        const { teamManager, internshipStatus, ...updateData } = newStatusData;
 
-        // Remove sequelize metadata from comparison
+        const oldData = existingStatus.toJSON();
         delete oldData.id;
         delete oldData.createdAt;
         delete oldData.updatedAt;
+        delete oldData.teamManager;
+        delete oldData.internshipStatus;
 
-        const hasChanged = JSON.stringify(oldData) !== JSON.stringify(newStatusData);
-
+        const hasChanged = JSON.stringify(oldData) !== JSON.stringify(updateData);
         if (hasChanged) {
-          await existingStatus.update(newStatusData);
+          await existingStatus.update(updateData);
         }
 
         statusRecord = existingStatus;
