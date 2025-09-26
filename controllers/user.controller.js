@@ -846,7 +846,7 @@ module.exports.loginWithGoogle = loginWithGoogle;
 //  Fetch Single User Info by ID with profile completion and filtered fields
 const fetchSingleUserById = async (req, res) => {
   try {
-    const { id } = req.params; // get ID from URL
+    const { id } = req.params;
     if (!id) return ReE(res, "Missing user ID", 400);
 
     const user = await model.User.findOne({
@@ -873,79 +873,59 @@ const fetchSingleUserById = async (req, res) => {
 
     const userData = user.get({ plain: true });
 
-    // 1️⃣ Fetch Status record for this user
+    // Fetch Status record
     const statusRecord = await model.Status.findOne({
       where: { userId: user.id },
     });
 
-    // 2️⃣ Determine which TeamManager name to return safely
+    // Determine final team manager
     let finalTeamManager = null;
+
     if (statusRecord && statusRecord.teamManager) {
-      finalTeamManager = statusRecord.teamManager;
-    } else if (userData.teamManager && userData.teamManager.name) {
-      finalTeamManager = userData.teamManager.name;
+      // Status team manager exists → fetch email & phone from TeamManager table
+      const tmFromStatus = await model.TeamManager.findOne({
+        where: { name: statusRecord.teamManager },
+      });
+      if (tmFromStatus) {
+        finalTeamManager = {
+          name: tmFromStatus.name,
+          email: tmFromStatus.email,
+          phoneNumber: tmFromStatus.mobileNumber,
+        };
+      } else {
+        finalTeamManager = { name: statusRecord.teamManager, email: null, phoneNumber: null };
+      }
+    } else if (userData.teamManager) {
+      // Fallback to user's current team manager
+      finalTeamManager = {
+        name: userData.teamManager.name,
+        email: userData.teamManager.email,
+        phoneNumber: userData.teamManager.mobileNumber,
+      };
     }
 
-    // 3️⃣ Calculate profile completion
+    // Calculate profile completion
     const fields = [
-      "firstName",
-      "lastName",
-      "fullName",
-      "dateOfBirth",
-      "gender",
-      "phoneNumber",
-      "alternatePhoneNumber",
-      "email",
-      "residentialAddress",
-      "emergencyContactName",
-      "emergencyContactNumber",
-      "city",
-      "state",
-      "pinCode",
-      "collegeName",
-      "collegeRollNumber",
-      "course",
-      "specialization",
-      "currentYear",
-      "currentSemester",
-      "collegeAddress",
-      "placementCoordinatorName",
-      "placementCoordinatorContact",
-      "internshipProgram",
-      "internshipDuration",
-      "internshipModeId",
-      "preferredStartDate",
-      "referralCode",
-      "referralLink",
-      "referralSource",
-      "studentIdCard",
-      "governmentIdProof",
-      "passportPhoto",
-      "accountHolderName",
-      "bankName",
-      "branchAddress",
-      "ifscCode",
-      "accountNumber",
-      "preferredCommunicationId",
-      "linkedInProfile",
-      "studentDeclaration",
-      "consentAgreement",
-      "internshipStatus",
+      "firstName","lastName","fullName","dateOfBirth","gender","phoneNumber","alternatePhoneNumber",
+      "email","residentialAddress","emergencyContactName","emergencyContactNumber","city","state",
+      "pinCode","collegeName","collegeRollNumber","course","specialization","currentYear","currentSemester",
+      "collegeAddress","placementCoordinatorName","placementCoordinatorContact","internshipProgram",
+      "internshipDuration","internshipModeId","preferredStartDate","referralCode","referralLink",
+      "referralSource","studentIdCard","governmentIdProof","passportPhoto","accountHolderName","bankName",
+      "branchAddress","ifscCode","accountNumber","preferredCommunicationId","linkedInProfile",
+      "studentDeclaration","consentAgreement","internshipStatus"
     ];
 
     let filled = 0;
     fields.forEach((f) => {
-      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false)
-        filled++;
+      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
     });
     const profileCompletion = Math.round((filled / fields.length) * 100);
 
-    // 4️⃣ Calculate total subscriptions
-    const totalSubscriptions = userData.businessTargets
-      ? Object.keys(userData.businessTargets).length
-      : 0;
+    // Total subscriptions
+    const totalSubscriptions = userData.businessTargets ? Object.keys(userData.businessTargets).length : 0;
 
-    // 5️⃣ Referral API logic
+    // Referral API logic
     let referralCode = userData.referralCode || null;
     let referralLink = userData.referralLink || null;
     try {
@@ -967,7 +947,7 @@ const fetchSingleUserById = async (req, res) => {
       console.warn("Referral API failed:", err.message);
     }
 
-    // 6️⃣ Prepare filtered response
+    // Prepare response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
@@ -989,7 +969,6 @@ const fetchSingleUserById = async (req, res) => {
 };
 
 module.exports.fetchSingleUserById = fetchSingleUserById;
-
 
 //  Fetch All Users with full data + profile completion + subscriptions
 const fetchAllUsers = async (req, res) => {
