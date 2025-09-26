@@ -817,19 +817,16 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Reload to get the latest values (if user was updated elsewhere)
+    // Reload to get the latest values
     await user.reload();
 
-    // Correct subscription logic (use exact field names)
-    const totalSubscriptions = user.subscriptionWallet || 0;
-    const deductedSubscriptions = user.subscriptiondeductedWallet || 0;
-
+    // Use subscription fields exactly as stored in the DB
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: totalSubscriptions,
-      subscriptionWalletRemaining: deductedSubscriptions, // already used
-      subscriptionLeft: Math.max(totalSubscriptions - deductedSubscriptions, 0),
+      subscriptionWallet: user.subscriptionWallet,
+      subscriptiondeductedWallet: user.subscriptiondeductedWallet,
+      subscriptionLeft: user.subscriptionLeft,
       courses: [],
     };
 
@@ -850,6 +847,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
       if (!course) continue;
 
+      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -937,7 +935,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-// business target
+
+
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
