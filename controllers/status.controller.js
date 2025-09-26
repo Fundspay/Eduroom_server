@@ -5,14 +5,26 @@ const { ReE, ReS } = require("../utils/util.service.js");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
+        // Fetch active statuses
         const statuses = await model.Status.findAll({
             where: { isDeleted: false }
         });
+
+        // Fetch active team managers
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
-        return ReS(res, { success: true, data: statuses, teamManagers: allTeamManagers }, 200);
+
+        // Return response with counts
+        return ReS(res, {
+            success: true,
+            data: statuses,
+            teamManagers: {
+                total: allTeamManagers.length,
+                list: allTeamManagers
+            }
+        }, 200);
     } catch (error) {
         return ReE(res, error.message, 500);
     }
