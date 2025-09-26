@@ -4,7 +4,7 @@ const sequelize = model.sequelize;
 const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
 const { Op } = require("sequelize");
-const dayjs = require("dayjs"); 
+const dayjs = require("dayjs");
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
@@ -968,7 +968,17 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
-      const overallStatus = Number(overallCompletionRate) === 100 ? "Completed" : "In Progress";
+
+      // Check if business target is met
+      const isBusinessTargetMet = user.subscriptionWallet >= (course.businessTarget || 0) &&
+        user.subscriptiondeductedWallet >= (course.businessTarget || 0);
+
+      // Overall status considers both sessions and business logic
+      const overallStatus =
+        Number(overallCompletionRate) === 100 && isBusinessTargetMet
+          ? "Completed"
+          : "In Progress";
+
 
       // Update user's courseStatuses
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
