@@ -848,9 +848,7 @@ const fetchSingleUserById = async (req, res) => {
   try {
     const { id } = req.params; // get ID from URL
 
-    if (!id) {
-      return ReE(res, "Missing user ID", 400);
-    }
+    if (!id) return ReE(res, "Missing user ID", 400);
 
     const user = await model.User.findOne({
       where: { id, isDeleted: false },
@@ -872,13 +870,31 @@ const fetchSingleUserById = async (req, res) => {
       ],
     });
 
-    if (!user) {
-      return ReE(res, "User not found", 404);
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
     const userData = user.get({ plain: true });
 
-    //  Calculate profile completion
+    // 1️⃣ Fetch Status record for this user
+    const statusRecord = await model.Status.findOne({
+      where: { userId: user.id },
+    });
+
+    // 2️⃣ Determine which TeamManager name to return
+    let finalTeamManager = userData.teamManager
+      ? userData.teamManager.name
+      : null;
+
+    if (
+      statusRecord &&
+      statusRecord.teamManager &&
+      finalTeamManager &&
+      statusRecord.teamManager !== finalTeamManager
+    ) {
+      // Status table team manager is different, return that instead
+      finalTeamManager = statusRecord.teamManager;
+    }
+
+    // 3️⃣ Calculate profile completion
     const fields = [
       "firstName",
       "lastName",
@@ -933,43 +949,34 @@ const fetchSingleUserById = async (req, res) => {
 
     const profileCompletion = Math.round((filled / fields.length) * 100);
 
-    //  Calculate total subscriptions
+    // 4️⃣ Calculate total subscriptions
     const totalSubscriptions = userData.businessTargets
       ? Object.keys(userData.businessTargets).length
       : 0;
 
-    //  Call the referral API directly with conditional +91 prefix
+    // 5️⃣ Referral API logic
     let referralCode = userData.referralCode || null;
     let referralLink = userData.referralLink || null;
     try {
-      // Ensure phone number starts with +91
       let phoneNumber = userData.phoneNumber;
-      if (!phoneNumber.startsWith("+91")) {
-        phoneNumber = `+91${phoneNumber}`;
-      }
+      if (!phoneNumber.startsWith("+91")) phoneNumber = `+91${phoneNumber}`;
 
       const referralRes = await axios.get(
         "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
-        {
-          params: { phone_number: phoneNumber },
-        }
+        { params: { phone_number: phoneNumber } }
       );
 
       if (referralRes.data) {
         referralCode = referralRes.data.referral_code || referralCode;
         referralLink = referralRes.data.referral_link || referralLink;
 
-        // ✅ Save referral code and link to DB
-        await user.update({
-          referralCode,
-          referralLink
-        });
+        await user.update({ referralCode, referralLink });
       }
     } catch (err) {
       console.warn("Referral API failed:", err.message);
     }
 
-    //  Prepare filtered response
+    // 6️⃣ Prepare response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
@@ -980,7 +987,7 @@ const fetchSingleUserById = async (req, res) => {
       ProfileCompletion: profileCompletion,
       TotalSubscriptions: totalSubscriptions,
       InternshipStatus: userData.internshipStatus || null,
-      TeamManager: userData.teamManager || null,
+      TeamManager: finalTeamManager,
     };
 
     return ReS(res, { success: true, data: filteredData }, 200);
@@ -991,6 +998,7 @@ const fetchSingleUserById = async (req, res) => {
 };
 
 module.exports.fetchSingleUserById = fetchSingleUserById;
+
 
 //  Fetch All Users with full data + profile completion + subscriptions
 const fetchAllUsers = async (req, res) => {
