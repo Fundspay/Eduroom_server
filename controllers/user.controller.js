@@ -847,7 +847,6 @@ module.exports.loginWithGoogle = loginWithGoogle;
 const fetchSingleUserById = async (req, res) => {
   try {
     const { id } = req.params; // get ID from URL
-
     if (!id) return ReE(res, "Missing user ID", 400);
 
     const user = await model.User.findOne({
@@ -879,19 +878,12 @@ const fetchSingleUserById = async (req, res) => {
       where: { userId: user.id },
     });
 
-    // 2️⃣ Determine which TeamManager name to return
-    let finalTeamManager = userData.teamManager
-      ? userData.teamManager.name
-      : null;
-
-    if (
-      statusRecord &&
-      statusRecord.teamManager &&
-      finalTeamManager &&
-      statusRecord.teamManager !== finalTeamManager
-    ) {
-      // Status table team manager is different, return that instead
+    // 2️⃣ Determine which TeamManager name to return safely
+    let finalTeamManager = null;
+    if (statusRecord && statusRecord.teamManager) {
       finalTeamManager = statusRecord.teamManager;
+    } else if (userData.teamManager && userData.teamManager.name) {
+      finalTeamManager = userData.teamManager.name;
     }
 
     // 3️⃣ Calculate profile completion
@@ -946,7 +938,6 @@ const fetchSingleUserById = async (req, res) => {
       if (userData[f] !== null && userData[f] !== "" && userData[f] !== false)
         filled++;
     });
-
     const profileCompletion = Math.round((filled / fields.length) * 100);
 
     // 4️⃣ Calculate total subscriptions
@@ -976,7 +967,7 @@ const fetchSingleUserById = async (req, res) => {
       console.warn("Referral API failed:", err.message);
     }
 
-    // 6️⃣ Prepare response
+    // 6️⃣ Prepare filtered response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
