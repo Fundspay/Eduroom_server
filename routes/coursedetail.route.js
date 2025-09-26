@@ -71,6 +71,8 @@ router.get(
   coursedetailController.getUserCaseStudyResult
 );
 
+router.get("/business-target/:userId", coursedetailController.getBusinessUserTarget);
+
 
 
 module.exports = router;
