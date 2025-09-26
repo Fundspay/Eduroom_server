@@ -156,7 +156,8 @@ module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
 
 
 const deleteCourseDetail = async (req, res) => {
-  const { courseDetailId } = req.body;
+  const { courseDetailId } = req.params;
+  
 
   if (!courseDetailId) return ReE(res, "courseDetailId is required", 400);
 
