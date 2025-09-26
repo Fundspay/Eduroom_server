@@ -677,13 +677,11 @@ const getDailyStatusPerUser = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!courseId) return ReE(res, "courseId is required", 400);
 
-    // Fetch user instance
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     console.log("User fetched:", userId);
 
-    // Fetch all sessions for this course & preview
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
       order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -695,7 +693,7 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // --- Loop through sessions using for..of so we can await ---
+    // --- Use for..of to await case study fetch ---
     for (const session of sessions) {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
@@ -705,8 +703,8 @@ const getDailyStatusPerUser = async (req, res) => {
       let sessionMCQs = 0;
       let caseStudyPercentage = null;
 
-      // --- Case study check ---
-      if (session.hasCaseStudy) { // replace with actual flag if different
+      // --- Case Study Handling ---
+      if (session.hasCaseStudy) { // replace with your flag
         const latestCaseStudy = await model.CaseStudyResult.findOne({
           where: {
             userId,
@@ -720,10 +718,10 @@ const getDailyStatusPerUser = async (req, res) => {
 
         if (latestCaseStudy) {
           caseStudyPercentage = latestCaseStudy.matchPercentage;
-          sessionCompletionPercentage = caseStudyPercentage;
+          sessionCompletionPercentage = caseStudyPercentage; // use real percentage
         }
       } else {
-        // --- MCQ logic if no case study ---
+        // MCQs logic
         sessionMCQs = progress?.totalMCQs || 0;
         correctMCQs = progress?.correctMCQs || 0;
         sessionCompletionPercentage = sessionMCQs
@@ -738,17 +736,24 @@ const getDailyStatusPerUser = async (req, res) => {
       daysMap[session.day].total++;
       totalSessions++;
 
-      // ✅ Completion check: ≥33%
-      if (attempted && sessionCompletionPercentage >= 33) {
-        daysMap[session.day].completed++;
+      // Count completed sessions
+      // For MCQs, you can decide if ≥33% counts as completed
+      // For case studies, we take the actual percentage as completion
+      if (attempted && (!session.hasCaseStudy ? sessionCompletionPercentage >= 33 : sessionCompletionPercentage > 0)) {
         completedSessions++;
+        daysMap[session.day].completed++;
       }
 
+      // --- Push session info ---
       daysMap[session.day].sessions.push({
         sessionNumber: session.sessionNumber,
         title: session.title,
         attempted,
-        status: attempted && sessionCompletionPercentage >= 33 ? "Completed" : "In Progress",
+        status: session.hasCaseStudy
+          ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
+          : sessionCompletionPercentage >= 33
+            ? "Completed"
+            : "In Progress",
         correctMCQs,
         totalMCQs: sessionMCQs,
         caseStudyPercentage,
@@ -778,36 +783,25 @@ const getDailyStatusPerUser = async (req, res) => {
       ? ((completedSessions / totalSessions) * 100).toFixed(2)
       : 0;
 
-    // ✅ Update courseStatuses in User table
+    // Update user courseStatuses
     const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
-    const key = String(courseId);
-    existingStatuses[key] = overallStatus;
+    existingStatuses[String(courseId)] = overallStatus;
 
-    console.log("Before update:", JSON.stringify(existingStatuses));
-
-    await user.update(
-      { courseStatuses: existingStatuses },
-      { fields: ["courseStatuses"] }
-    );
-
+    await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
     await user.reload();
-    console.log("After update:", JSON.stringify(user.courseStatuses));
 
-    return ReS(
-      res,
-      {
-        success: true,
-        summary: {
-          totalSessions,
-          completedSessions,
-          remainingSessions: totalSessions - completedSessions,
-          overallCompletionRate: Number(overallCompletionRate),
-          overallStatus,
-        },
-        dailyStatus,
+    return ReS(res, {
+      success: true,
+      summary: {
+        totalSessions,
+        completedSessions,
+        remainingSessions: totalSessions - completedSessions,
+        overallCompletionRate: Number(overallCompletionRate),
+        overallStatus,
       },
-      200
-    );
+      dailyStatus,
+    }, 200);
+
   } catch (error) {
     console.error("Get Daily Status Error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
