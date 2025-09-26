@@ -18,6 +18,7 @@ const contactusRouter = require("./contactus.route");
 const internshipcertificateRouter = require("./internshipcertificate.route");
 const raisequeryRouter = require("./raisequery.route");
 const fundsauditRouter = require("./fundsaudit.route");
+const statusRouter = require("./status.route");
 
 // Health Check Route
 router.get("/health", (req, res) => {
@@ -41,5 +42,6 @@ router.use("/contactus", contactusRouter);
 router.use("/internshipcertificate", internshipcertificateRouter);
 router.use("/raisequery", raisequeryRouter);
 router.use("/fundsaudit", fundsauditRouter);
+router.use("/status", statusRouter);
 
 module.exports = router;
