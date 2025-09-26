@@ -436,7 +436,6 @@ var updatePersonalInfo = async function (req, res) {
       city,
       state,
       pinCode,
-      password,
     } = req.body;
 
     if (!userId) {
@@ -465,7 +464,6 @@ var updatePersonalInfo = async function (req, res) {
       city,
       state,
       pinCode,
-      password,
     });
 
     return ReS(
