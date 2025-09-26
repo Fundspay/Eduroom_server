@@ -7,7 +7,7 @@ router.post("/course-detail", coursedetailController.addOrUpdateCourseDetail);
 
 // delete
 
-router.delete("/delete/:id", coursedetailController.deleteCourseDetail);
+router.delete("/delete/:courseDetailId", coursedetailController.deleteCourseDetail);
 
 //  Fetch all sessions by coursePreviewId (with MCQs)
 router.get("/course-preview/:coursePreviewId/details", coursedetailController.fetchCourseDetailsByPreview);
