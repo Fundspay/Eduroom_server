@@ -814,26 +814,28 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
 
     // Fetch user instance
-    const user = await model.User.findByPk(userId);
+    let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Correct subscription logic
-    const totalSubscriptions = user.TotalSubscriptions || 0; // total given
-    const deductedSubscriptions = user.subscriptiondeductedWallet || 0; // already used
+    // Reload to get the latest values (if user was updated elsewhere)
+    await user.reload();
+
+    // Correct subscription logic (use exact field names)
+    const totalSubscriptions = user.subscriptionWallet || 0;
+    const deductedSubscriptions = user.subscriptiondeductedWallet || 0;
 
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWalletTotal: totalSubscriptions, // keep same name
-      subscriptionWalletRemaining: deductedSubscriptions, // keep same name (used)
-      subscriptionLeft: Math.max(totalSubscriptions - deductedSubscriptions, 0), // no negatives
+      subscriptionWalletTotal: totalSubscriptions,
+      subscriptionWalletRemaining: deductedSubscriptions, // already used
+      subscriptionLeft: Math.max(totalSubscriptions - deductedSubscriptions, 0),
       courses: [],
     };
 
     // Loop through all courses in user's courseStatuses
     const courseIds = Object.keys(user.courseStatuses || {});
     for (const courseId of courseIds) {
-      // Fetch course details
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
         include: [
@@ -848,7 +850,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
       if (!course) continue;
 
-      // Fetch all sessions for this course
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
@@ -936,6 +937,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
+// business target
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
