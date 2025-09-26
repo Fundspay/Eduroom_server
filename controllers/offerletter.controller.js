@@ -100,6 +100,7 @@ const listAllUsers = async (req, res) => {
       attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
+    // Aggregate query info per user
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
@@ -118,6 +119,7 @@ const listAllUsers = async (req, res) => {
     const response = [];
 
     for (const user of users) {
+      // Prepare course details
       const courseDetails = [];
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
@@ -180,33 +182,23 @@ const listAllUsers = async (req, res) => {
         offerLetterFile,
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
-        queryCount: queryInfo.queryCount
+        queryCount: queryInfo.queryCount,
+        internshipStatus: teamManager ? teamManager.internshipStatus : null,
+        teamManager: teamManager ? teamManager.name : null
       };
 
-      // 🔹 Check existing Status by statusId
-      let statusRecord;
-      if (user.statusId) {
-        // Update existing row if statusId exists
-        const existingStatus = await Status.findByPk(user.statusId);
-        if (existingStatus) {
-          // Only update fields except teamManager & internshipStatus
-          await existingStatus.update(newStatusData);
-          statusRecord = existingStatus;
-        } else {
-          // If statusId does not exist, create new
-          statusRecord = await Status.create({
-            ...newStatusData,
-            internshipStatus: teamManager ? teamManager.internshipStatus : null,
-            teamManager: teamManager ? teamManager.name : null
-          });
-        }
+      // 🔹 FIXED: Check if Status already exists for this user
+      let statusRecord = await Status.findOne({ where: { userId: user.id } });
+
+      if (statusRecord) {
+        // Update existing record
+        await statusRecord.update(newStatusData);
       } else {
-        // No statusId present, create new
-        statusRecord = await Status.create({
-          ...newStatusData,
-          internshipStatus: teamManager ? teamManager.internshipStatus : null,
-          teamManager: teamManager ? teamManager.name : null
-        });
+        // Create new record
+        statusRecord = await Status.create(newStatusData);
+
+        // Save the newly created statusId to user
+        await user.update({ statusId: statusRecord.id });
       }
 
       response.push({
