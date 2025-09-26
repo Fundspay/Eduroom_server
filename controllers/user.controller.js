@@ -42,7 +42,7 @@ const addPersonalInfo = async (req, res) => {
       pinCode,
     } = req.body;
 
-    // ✅ Required fields validation
+    // Required fields validation
     if (!firstName || !lastName || !email || !phoneNumber || !password) {
       return ReE(
         res,
@@ -54,31 +54,30 @@ const addPersonalInfo = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = phoneNumber.trim();
 
-    // ✅ Check if email already exists
+    // Check if email already exists
     const existingEmail = await model.User.findOne({
       where: { email: normalizedEmail, isDeleted: false },
     });
     if (existingEmail)
       return ReE(res, "User with this email already exists", 409);
 
-    // ✅ Check if phone number already exists
+    // Check if phone number already exists
     const existingPhone = await model.User.findOne({
       where: { phoneNumber: normalizedPhone, isDeleted: false },
     });
     if (existingPhone)
       return ReE(res, "User with this phone number already exists", 409);
 
-    // ✅ Hash the password
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create user
     const user = await model.User.create({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: normalizedEmail,
       phoneNumber: normalizedPhone,
       password: hashedPassword,
-
-      // Optional fields (nullable if not provided)
       fullName: fullName ? fullName.trim() : null,
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
@@ -96,6 +95,22 @@ const addPersonalInfo = async (req, res) => {
       state: state ? state.trim() : null,
       pinCode: pinCode ? pinCode.trim() : null,
     });
+
+    // ✅ Send welcome email after registration
+    const emailSubject = "Welcome to EduRoom!";
+    const emailBody = `
+      <h2>Hello ${firstName} ${lastName},</h2>
+      <p>Welcome to EduRoom! Your registration was successful.</p>
+      <p>We are excited to have you on board.</p>
+      <p>Best Regards,<br>EduRoom Team</p>
+    `;
+
+    const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
+
+    if (!mailResult.success) {
+      console.error("Failed to send welcome email:", mailResult.error);
+      // Optional: you can still return success for registration even if email fails
+    }
 
     return ReS(res, { success: true, userId: user.id }, 201);
   } catch (error) {
