@@ -19,8 +19,9 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const  generateInternshipCertificate = async (userId) => {
+const generateInternshipCertificate = async (userId, courseId) => {
   if (!userId) throw new Error("Missing userId");
+  if (!courseId) throw new Error("Missing courseId");
 
   // 1. Load user
   const user = await model.User.findOne({
@@ -30,60 +31,32 @@ const  generateInternshipCertificate = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Set gender-specific pronouns
-
+  // 2. Set pronouns
   const genderVal = String(user.gender);
-  let pronouns;
-  if (genderVal === "1") {
-    pronouns = { subject: "He", object: "him", possessive: "his" };
-  } else if (genderVal === "2") {
-    pronouns = { subject: "She", object: "her", possessive: "her" };
-  } else {
-    pronouns = { subject: "They", object: "them", possessive: "their" }; // fallback
+  let pronouns = { subject: "They", object: "them", possessive: "their" };
+  if (genderVal === "1") pronouns = { subject: "He", object: "him", possessive: "his" };
+  if (genderVal === "2") pronouns = { subject: "She", object: "her", possessive: "her" };
+
+  // 3. Fetch course-specific start and end dates
+  let startDate = "To Be Decided";
+  let endDate = "To Be Decided";
+  let courseName = "Intern";
+
+  if (user.courseDates && user.courseDates[courseId]) {
+    const courseObj = user.courseDates[courseId];
+    startDate = courseObj.startDate ? normalizeDateToISO(courseObj.startDate) : startDate;
+    endDate = courseObj.endDate ? normalizeDateToISO(courseObj.endDate) : endDate;
+
+    const course = await model.Course.findOne({ where: { id: Number(courseId) } });
+    if (course && course.name) courseName = course.name;
+
+    // Format dates for certificate
+    startDate = new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    endDate = new Date(endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   }
 
-  // 3. Determine earliest course start date and end date
-  let startDate = null;
-  let endDate = null;
-  let courseName = null;
-
-  if (user.courseDates && Object.keys(user.courseDates).length > 0) {
-    let earliestStart = null;
-    let courseIdForStart = null;
-
-    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
-      if (!courseObj.startDate) continue;
-      const courseStartISO = normalizeDateToISO(courseObj.startDate);
-      if (!courseStartISO) continue;
-
-      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
-        earliestStart = courseStartISO;
-        courseIdForStart = cid;
-        if (courseObj.endDate) endDate = normalizeDateToISO(courseObj.endDate);
-      }
-    }
-
-    startDate = earliestStart;
-
-    if (courseIdForStart) {
-      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
-      if (course && course.name) courseName = course.name;
-    }
-  }
-
-  // 4. Fallbacks
-  startDate = startDate
-    ? new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
-    : "To Be Decided";
-
-  endDate = endDate
-    ? new Date(endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
-    : "To Be Decided";
-
-  const role = courseName || "Intern";
-
+  const role = courseName;
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-
 
   // 5) HTML content (your CSS untouched, only background path fixed)
   // 5) HTML content (updated text)
