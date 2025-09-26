@@ -628,10 +628,21 @@ const getOverallCourseStatus = async (req, res) => {
 
     if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
 
+    // ✅ Deduplicate sessions (keep only unique day+sessionNumber)
+    const uniqueSessions = [];
+    const seen = new Set();
+    for (const s of sessions) {
+      const key = `${s.day}-${s.sessionNumber}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueSessions.push(s);
+      }
+    }
+
     let completedSessions = 0;
     const daysMap = {};
 
-    sessions.forEach(session => {
+    uniqueSessions.forEach(session => {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
       if (attempted) completedSessions++;
@@ -654,9 +665,9 @@ const getOverallCourseStatus = async (req, res) => {
 
     const overallStatus = {
       totalDays: Object.keys(daysMap).length,
-      totalSessions: sessions.length,
+      totalSessions: uniqueSessions.length, // ✅ only unique sessions count
       completedSessions,
-      completionRate: ((completedSessions / sessions.length) * 100).toFixed(2) + "%",
+      completionRate: ((completedSessions / uniqueSessions.length) * 100).toFixed(2) + "%",
       days: daysMap
     };
 
@@ -669,6 +680,7 @@ const getOverallCourseStatus = async (req, res) => {
 };
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
+
 
 // ✅ Daily status per user
 const getDailyStatusPerUser = async (req, res) => {
@@ -746,18 +758,24 @@ const getDailyStatusPerUser = async (req, res) => {
           ? "Completed"
           : "In Progress";
 
-      // Add session info
-      daysMap[session.day].sessions.push({
-        sessionNumber: session.sessionNumber,
-        title: session.title,
-        attempted,
-        status,
-        correctMCQs,
-        totalMCQs,
-        caseStudyPercentage,
-        sessionDuration: session.sessionDuration || null,
-        sessionCompletionPercentage: Number(sessionCompletionPercentage),
-      });
+      // ✅ Prevent duplicate sessions
+      const alreadyExists = daysMap[session.day].sessions.some(
+        (s) => s.sessionNumber === session.sessionNumber
+      );
+
+      if (!alreadyExists) {
+        daysMap[session.day].sessions.push({
+          sessionNumber: session.sessionNumber,
+          title: session.title,
+          attempted,
+          status,
+          correctMCQs,
+          totalMCQs,
+          caseStudyPercentage,
+          sessionDuration: session.sessionDuration || null,
+          sessionCompletionPercentage: Number(sessionCompletionPercentage),
+        });
+      }
     }
 
     // --- Build dailyStatus array ---
