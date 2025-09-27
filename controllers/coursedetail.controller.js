@@ -728,7 +728,7 @@ const getDailyStatusPerUser = async (req, res) => {
     // Loop through sessions
     for (const session of sessions) {
       const progress = session.userProgress?.[userId] || {};
-      const attempted = !!progress;
+      const attempted = !!progress || false;
 
       let sessionCompletionPercentage = 0;
       let correctMCQs = 0;
@@ -748,11 +748,11 @@ const getDailyStatusPerUser = async (req, res) => {
       });
 
       if (latestCaseStudy) {
-        // Use the real matchPercentage from case study
+        // Use only case study if available
         caseStudyPercentage = latestCaseStudy.matchPercentage;
         sessionCompletionPercentage = caseStudyPercentage;
       } else {
-        // Fallback to MCQs
+        // Fallback to MCQs if no case study
         totalMCQs = progress.totalMCQs || 0;
         correctMCQs = progress.correctMCQs || 0;
         sessionCompletionPercentage = totalMCQs
@@ -771,13 +771,10 @@ const getDailyStatusPerUser = async (req, res) => {
         daysMap[session.day].completed++;
       }
 
-      // Determine status
-      // Determine status using the same 33% logic for all sessions
+      // Determine status using >=33% logic
       const status = sessionCompletionPercentage >= 33 ? "Completed" : "In Progress";
 
-
-
-      // ✅ Prevent duplicate sessions
+      // Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
         (s) => s.sessionNumber === session.sessionNumber
       );
