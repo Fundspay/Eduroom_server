@@ -700,7 +700,7 @@ const requestPasswordReset = async (req, res) => {
       token: resetToken,
       email,
     }).toString();
-    const resetUrl = `https://eduroom.in/reset-password?${queryParams}`;
+    const resetUrl = `https://eduroom.in/reset-password.html?${queryParams}`;
 
     const htmlContent = `
           <h3>Hello ${account.name || account.firstName},</h3>
