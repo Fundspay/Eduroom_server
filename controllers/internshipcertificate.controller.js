@@ -24,11 +24,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 🔹 Check FundsAudit: all registered users must have hasPaid === true
-    const fundsRecords = await model.FundsAudit.findAll({
-      where: { userId }
-    });
-
+    // 🔹 Check FundsAudit
+    const fundsRecords = await model.FundsAudit.findAll({ where: { userId } });
     if (fundsRecords.length > 0) {
       const allPaid = fundsRecords.every(record => record.hasPaid === true);
       if (!allPaid) {
@@ -55,11 +52,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const rawTarget = parseInt(userTarget !== undefined ? userTarget : course?.businessTarget || 0, 10);
     const businessTarget = rawTarget < 0 ? 0 : rawTarget;
 
-    // 🔹 Deduct subscription
-    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
-    const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    const newDeductedWallet = subscriptiondeductedWallet + businessTarget;
-    const newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
+    // 🔹 Wallet Logic (explicit & clean)
+    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // Total subscribed
+    const alreadyDeducted = parseInt(user.subscriptiondeductedWallet || 0, 10); // Already deducted
+    const newDeductedWallet = alreadyDeducted + businessTarget; // Total deducted after this certificate
+    const newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet); // Remaining
 
     user.subscriptiondeductedWallet = newDeductedWallet;
     user.subscriptionLeft = newSubscriptionLeft;
@@ -109,9 +106,9 @@ const createAndSendInternshipCertificate = async (req, res) => {
       message: "Internship Certificate created, wallet updated, and email sent successfully",
       certificateUrl: certificate.certificateUrl,
       wallet: {
+        totalSubscribed: subscriptionWallet,
         businessTarget,
-        subscriptionWallet,
-        subscriptiondeductedWallet: newDeductedWallet,
+        totalDeducted: newDeductedWallet,
         subscriptionLeft: newSubscriptionLeft
       }
     });
