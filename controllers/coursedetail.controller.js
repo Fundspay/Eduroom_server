@@ -2,11 +2,10 @@
 const model = require("../models/index");
 const sequelize = model.sequelize;
 const { ReE, ReS } = require("../utils/util.service.js");
-const axios = require('axios');
+const axios = require("axios");
 const { Op } = require("sequelize");
 const dayjs = require("dayjs");
 model.InternshipStatus = require("../models/status.model.js"); // or the correct path
-
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
@@ -14,7 +13,8 @@ const addOrUpdateCourseDetail = async (req, res) => {
   if (!domainId) return ReE(res, "domainId is required", 400);
   if (!courseId) return ReE(res, "courseId is required", 400);
   if (!coursePreviewId) return ReE(res, "coursePreviewId is required", 400);
-  if (!Array.isArray(days) || days.length === 0) return ReE(res, "days are required", 400);
+  if (!Array.isArray(days) || days.length === 0)
+    return ReE(res, "days are required", 400);
 
   const transaction = await sequelize.transaction();
   try {
@@ -22,64 +22,83 @@ const addOrUpdateCourseDetail = async (req, res) => {
     if (!course || course.isDeleted) throw new Error("Course not found");
 
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
-    if (!coursePreview || coursePreview.isDeleted) throw new Error("Course Preview not found");
+    if (!coursePreview || coursePreview.isDeleted)
+      throw new Error("Course Preview not found");
 
     const createdDays = [];
 
     for (const dayObj of days) {
       const { day, sessions } = dayObj;
-      if (day === undefined || day === null) throw new Error("day is required for each day object");
-      if (!Array.isArray(sessions) || sessions.length === 0) throw new Error(`sessions are required for day ${day}`);
+      if (day === undefined || day === null)
+        throw new Error("day is required for each day object");
+      if (!Array.isArray(sessions) || sessions.length === 0)
+        throw new Error(`sessions are required for day ${day}`);
 
       const updatedSessions = [];
 
       for (const session of sessions) {
-        const { sessionNumber, title, description, youtubeLink, duration, sessionDuration, heading, questions } = session;
+        const {
+          sessionNumber,
+          title,
+          description,
+          youtubeLink,
+          duration,
+          sessionDuration,
+          heading,
+          questions,
+        } = session;
 
-        if (sessionNumber === undefined || sessionNumber === null) throw new Error("sessionNumber is required for each session");
+        if (sessionNumber === undefined || sessionNumber === null)
+          throw new Error("sessionNumber is required for each session");
         if (!title) throw new Error("title is required for each session");
 
         // Find or create session row
         let currentSessionRow = await model.CourseDetail.findOne({
           where: { courseId, coursePreviewId, day, sessionNumber },
-          transaction
+          transaction,
         });
 
         if (!currentSessionRow) {
-          currentSessionRow = await model.CourseDetail.create({
-            domainId,
-            courseId,
-            coursePreviewId,
-            userId: userId ?? null,
-            day,
-            sessionNumber,
-            title,
-            description: description ?? null,
-            youtubeLink: youtubeLink ?? null,
-            duration,
-            sessionDuration,
-            heading
-          }, { transaction });
+          currentSessionRow = await model.CourseDetail.create(
+            {
+              domainId,
+              courseId,
+              coursePreviewId,
+              userId: userId ?? null,
+              day,
+              sessionNumber,
+              title,
+              description: description ?? null,
+              youtubeLink: youtubeLink ?? null,
+              duration,
+              sessionDuration,
+              heading,
+            },
+            { transaction }
+          );
         } else {
-          await currentSessionRow.update({
-            title,
-            description: description ?? null,
-            youtubeLink: youtubeLink ?? null,
-            duration,
-            sessionDuration,
-            heading
-          }, { transaction });
+          await currentSessionRow.update(
+            {
+              title,
+              description: description ?? null,
+              youtubeLink: youtubeLink ?? null,
+              duration,
+              sessionDuration,
+              heading,
+            },
+            { transaction }
+          );
         }
 
         // Save MCQs + Case Study in QuestionModel with questionNumber
         if (Array.isArray(questions)) {
           const existingQuestions = await model.QuestionModel.findAll({
             where: { courseDetailId: currentSessionRow.id, sessionNumber },
-            transaction
+            transaction,
           });
 
           const existingQuestionMap = {};
-          existingQuestions.forEach(q => existingQuestionMap[q.id] = q);
+          existingQuestions.forEach((q) => (existingQuestionMap[q.id] = q));
           const incomingIds = [];
 
           for (let index = 0; index < questions.length; index++) {
@@ -87,45 +106,56 @@ const addOrUpdateCourseDetail = async (req, res) => {
             const qId = Number(q.id);
 
             if (qId && existingQuestionMap[qId]) {
-              await existingQuestionMap[qId].update({
-                question: q.question,
-                optionA: q.optionA,
-                optionB: q.optionB,
-                optionC: q.optionC,
-                optionD: q.optionD,
-                answer: q.answer,
-                keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null,
-                questionNumber: index + 1  // explicit question number
-              }, { transaction });
+              await existingQuestionMap[qId].update(
+                {
+                  question: q.question,
+                  optionA: q.optionA,
+                  optionB: q.optionB,
+                  optionC: q.optionC,
+                  optionD: q.optionD,
+                  answer: q.answer,
+                  keywords: q.keywords ?? null,
+                  caseStudy: q.caseStudy ?? null,
+                  questionNumber: index + 1, // explicit question number
+                },
+                { transaction }
+              );
               incomingIds.push(qId);
             } else {
-              const newQ = await model.QuestionModel.create({
-                courseDetailId: currentSessionRow.id,
-                domainId,
-                courseId,
-                coursePreviewId,
-                day,
-                sessionNumber,
-                question: q.question,
-                optionA: q.optionA,
-                optionB: q.optionB,
-                optionC: q.optionC,
-                optionD: q.optionD,
-                answer: q.answer,
-                keywords: q.keywords ?? null,
-                caseStudy: q.caseStudy ?? null,
-                questionNumber: index + 1  // explicit question number
-              }, { transaction });
+              const newQ = await model.QuestionModel.create(
+                {
+                  courseDetailId: currentSessionRow.id,
+                  domainId,
+                  courseId,
+                  coursePreviewId,
+                  day,
+                  sessionNumber,
+                  question: q.question,
+                  optionA: q.optionA,
+                  optionB: q.optionB,
+                  optionC: q.optionC,
+                  optionD: q.optionD,
+                  answer: q.answer,
+                  keywords: q.keywords ?? null,
+                  caseStudy: q.caseStudy ?? null,
+                  questionNumber: index + 1, // explicit question number
+                },
+                { transaction }
+              );
               incomingIds.push(newQ.id);
             }
           }
 
           // Delete old questions not in payload
-          const toDelete = existingQuestions.filter(q => !incomingIds.includes(q.id));
+          const toDelete = existingQuestions.filter(
+            (q) => !incomingIds.includes(q.id)
+          );
           if (toDelete.length > 0) {
-            const deleteIds = toDelete.map(q => q.id);
-            await model.QuestionModel.destroy({ where: { id: deleteIds }, transaction });
+            const deleteIds = toDelete.map((q) => q.id);
+            await model.QuestionModel.destroy({
+              where: { id: deleteIds },
+              transaction,
+            });
           }
         }
 
@@ -137,7 +167,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           duration,
           sessionDuration,
           heading,
-          questions
+          questions,
         });
       }
 
@@ -146,7 +176,6 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
     await transaction.commit();
     return ReS(res, { success: true, days: createdDays }, 201);
-
   } catch (error) {
     await transaction.rollback();
     console.error("Add/Update Course Details Error:", error);
@@ -156,12 +185,15 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
 module.exports.addOrUpdateCourseDetail = addOrUpdateCourseDetail;
 
-
 const deleteCourseDetail = async (req, res) => {
   const { courseDetailId, courseId, day, sessionNumber } = req.params;
 
   if (!courseDetailId && (!courseId || !day || !sessionNumber)) {
-    return ReE(res, "Either courseDetailId OR (courseId, day, sessionNumber) is required", 400);
+    return ReE(
+      res,
+      "Either courseDetailId OR (courseId, day, sessionNumber) is required",
+      400
+    );
   }
 
   const transaction = await sequelize.transaction();
@@ -170,12 +202,14 @@ const deleteCourseDetail = async (req, res) => {
 
     if (courseDetailId) {
       // Delete by primary key
-      courseDetail = await model.CourseDetail.findByPk(courseDetailId, { transaction });
+      courseDetail = await model.CourseDetail.findByPk(courseDetailId, {
+        transaction,
+      });
     } else {
       // Delete by courseId + day + sessionNumber
       courseDetail = await model.CourseDetail.findOne({
         where: { courseId, day, sessionNumber },
-        transaction
+        transaction,
       });
     }
 
@@ -187,7 +221,7 @@ const deleteCourseDetail = async (req, res) => {
     // Delete associated questions
     await model.QuestionModel.destroy({
       where: { courseDetailId: courseDetail.id },
-      transaction
+      transaction,
     });
 
     // Hard delete CourseDetail
@@ -196,7 +230,10 @@ const deleteCourseDetail = async (req, res) => {
     await transaction.commit();
     return ReS(
       res,
-      { success: true, message: "CourseDetail and associated questions deleted successfully" },
+      {
+        success: true,
+        message: "CourseDetail and associated questions deleted successfully",
+      },
       200
     );
   } catch (error) {
@@ -208,8 +245,6 @@ const deleteCourseDetail = async (req, res) => {
 
 module.exports.deleteCourseDetail = deleteCourseDetail;
 
-
-
 // ✅ Fetch all CourseDetails by coursePreviewId (with MCQs)
 var fetchCourseDetailsByPreview = async (req, res) => {
   const { coursePreviewId } = req.params;
@@ -217,11 +252,15 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 
   try {
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
-    if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
+    if (!coursePreview || coursePreview.isDeleted)
+      return ReE(res, "Course Preview not found", 404);
 
     const courseDetails = await model.CourseDetail.findAll({
       where: { coursePreviewId, isDeleted: false },
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
       attributes: [
         "id",
         "day",
@@ -233,7 +272,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
         "duration",
         "sessionDuration",
         "createdAt",
-        "updatedAt"
+        "updatedAt",
       ],
       include: [
         {
@@ -250,18 +289,18 @@ var fetchCourseDetailsByPreview = async (req, res) => {
             "answer",
             "keywords",
             "caseStudy",
-            "sessionNumber"
-          ]
+            "sessionNumber",
+          ],
         },
         {
           model: model.Course,
-          attributes: ["id", "name"] // Include course name
+          attributes: ["id", "name"], // Include course name
         },
         {
           model: model.Domain,
-          attributes: ["id", "name"] // Include domain name
-        }
-      ]
+          attributes: ["id", "name"], // Include domain name
+        },
+      ],
     });
 
     return ReS(res, { success: true, data: courseDetails }, 200);
@@ -284,12 +323,16 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
   try {
     // Get the course preview first
     const coursePreview = await model.CoursePreview.findByPk(coursePreviewId);
-    if (!coursePreview || coursePreview.isDeleted) return ReE(res, "Course Preview not found", 404);
+    if (!coursePreview || coursePreview.isDeleted)
+      return ReE(res, "Course Preview not found", 404);
 
     // Fetch all course details like existing API
     const courseDetails = await model.CourseDetail.findAll({
       where: { coursePreviewId, isDeleted: false },
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
       attributes: [
         "id",
         "day",
@@ -301,7 +344,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
         "duration",
         "sessionDuration",
         "createdAt",
-        "updatedAt"
+        "updatedAt",
       ],
       include: [
         {
@@ -318,22 +361,24 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
             "answer",
             "keywords",
             "caseStudy",
-            "sessionNumber"
-          ]
+            "sessionNumber",
+          ],
         },
         {
           model: model.Course,
-          attributes: ["id", "name"]
+          attributes: ["id", "name"],
         },
         {
           model: model.Domain,
-          attributes: ["id", "name"]
-        }
-      ]
+          attributes: ["id", "name"],
+        },
+      ],
     });
 
     // Filter by day and sessionNumber
-    const filteredDetails = courseDetails.filter(cd => cd.day == day && cd.sessionNumber == sessionNumber);
+    const filteredDetails = courseDetails.filter(
+      (cd) => cd.day == day && cd.sessionNumber == sessionNumber
+    );
 
     return ReS(res, { success: true, data: filteredDetails }, 200);
   } catch (error) {
@@ -342,7 +387,8 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
   }
 };
 
-module.exports.fetchCourseDetailsByDayAndSession = fetchCourseDetailsByDayAndSession;
+module.exports.fetchCourseDetailsByDayAndSession =
+  fetchCourseDetailsByDayAndSession;
 
 //  Evaluate MCQs for a specific course + course preview + day
 
@@ -357,24 +403,39 @@ const evaluateSessionMCQ = async (req, res) => {
 
     // Fetch session details with MCQs
     const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{ model: model.QuestionModel, where: { isDeleted: false }, required: false }]
+      where: {
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        isDeleted: false,
+      },
+      include: [
+        {
+          model: model.QuestionModel,
+          where: { isDeleted: false },
+          required: false,
+        },
+      ],
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
     const mcqs = sessionDetail.QuestionModels || [];
-    if (mcqs.length === 0) return ReE(res, "No MCQs found for this session", 404);
+    if (mcqs.length === 0)
+      return ReE(res, "No MCQs found for this session", 404);
 
     let correctCount = 0;
     const results = [];
 
     // Evaluate each answer
     for (let ans of answers) {
-      const mcq = mcqs.find(m => String(m.id) === String(ans.mcqId));
+      const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
 
-      const isCorrect = String(mcq.answer).toUpperCase() === String(ans.selectedOption).toUpperCase();
+      const isCorrect =
+        String(mcq.answer).toUpperCase() ===
+        String(ans.selectedOption).toUpperCase();
       if (isCorrect) correctCount++;
 
       results.push({
@@ -384,7 +445,7 @@ const evaluateSessionMCQ = async (req, res) => {
         isCorrect,
         correctAnswer: mcq.answer,
         keywords: mcq.keywords || null,
-        caseStudy: mcq.caseStudy || null
+        caseStudy: mcq.caseStudy || null,
       });
     }
 
@@ -394,9 +455,10 @@ const evaluateSessionMCQ = async (req, res) => {
     // Normalize existing userProgress
     let progress = {};
     if (sessionDetail.userProgress) {
-      progress = typeof sessionDetail.userProgress === "string"
-        ? JSON.parse(sessionDetail.userProgress)
-        : sessionDetail.userProgress;
+      progress =
+        typeof sessionDetail.userProgress === "string"
+          ? JSON.parse(sessionDetail.userProgress)
+          : sessionDetail.userProgress;
     }
 
     // Save both score and selected answers
@@ -404,7 +466,7 @@ const evaluateSessionMCQ = async (req, res) => {
       correctMCQs: correctCount,
       totalMCQs: total,
       eligibleForCaseStudy: correctCount === total,
-      answers: results // store the evaluated answers too
+      answers: results, // store the evaluated answers too
     };
 
     // Update DB
@@ -413,20 +475,23 @@ const evaluateSessionMCQ = async (req, res) => {
       { where: { id: sessionDetail.id } }
     );
 
-    return ReS(res, {
-      success: true,
-      courseDetail: sessionDetail,
-      questions: mcqs,
-      evaluation: {
-        totalQuestions: total,
-        correct: correctCount,
-        wrong: total - correctCount,
-        score,
-        eligibleForCaseStudy: correctCount === total,
-        results
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        courseDetail: sessionDetail,
+        questions: mcqs,
+        evaluation: {
+          totalQuestions: total,
+          correct: correctCount,
+          wrong: total - correctCount,
+          score,
+          eligibleForCaseStudy: correctCount === total,
+          results,
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Evaluate Session MCQ Error:", error);
     return ReE(res, error.message, 500);
@@ -434,8 +499,6 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
-
-
 
 // const getCaseStudyForSession = async (req, res) => {
 //   try {
@@ -490,34 +553,57 @@ const getCaseStudyForSession = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
 
     const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
-      include: [{
-        model: model.QuestionModel,
-        where: { isDeleted: false },
-        required: false // keep false so sessions without questions still return
-      }]
+      where: {
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        isDeleted: false,
+      },
+      include: [
+        {
+          model: model.QuestionModel,
+          where: { isDeleted: false },
+          required: false, // keep false so sessions without questions still return
+        },
+      ],
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
 
     // Ensure we look into all questions for this session row
-    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(q => q.caseStudy && q.caseStudy.trim() !== '');
+    const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(
+      (q) => q.caseStudy && q.caseStudy.trim() !== ""
+    );
     if (!caseStudyQuestion) {
-      return ReS(res, { success: false, message: "No Case Study available for this session." }, 200);
+      return ReS(
+        res,
+        {
+          success: false,
+          message: "No Case Study available for this session.",
+        },
+        200
+      );
     }
 
-    return ReS(res, {
-      success: true,
-      data: {
-        userId,
-        courseId,
-        coursePreviewId,
-        day,
-        sessionNumber,
-        caseStudy: { questionId: caseStudyQuestion.id, caseStudy: caseStudyQuestion.caseStudy }
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId,
+          courseId,
+          coursePreviewId,
+          day,
+          sessionNumber,
+          caseStudy: {
+            questionId: caseStudyQuestion.id,
+            caseStudy: caseStudyQuestion.caseStudy,
+          },
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Get Case Study Error:", error);
     return ReE(res, error.message, 500);
@@ -526,13 +612,14 @@ const getCaseStudyForSession = async (req, res) => {
 
 module.exports.getCaseStudyForSession = getCaseStudyForSession;
 
-
 const submitCaseStudyAnswer = async (req, res) => {
   try {
-    const { courseId, coursePreviewId, day, sessionNumber, questionId } = req.params;
+    const { courseId, coursePreviewId, day, sessionNumber, questionId } =
+      req.params;
     const { userId, answer } = req.body;
 
-    if (!userId || !answer) return ReE(res, "userId and answer are required", 400);
+    if (!userId || !answer)
+      return ReE(res, "userId and answer are required", 400);
 
     // Fetch case study question
     const question = await model.QuestionModel.findOne({
@@ -543,8 +630,8 @@ const submitCaseStudyAnswer = async (req, res) => {
         day,
         sessionNumber,
         isDeleted: false,
-        caseStudy: { [model.Sequelize.Op.ne]: null }
-      }
+        caseStudy: { [model.Sequelize.Op.ne]: null },
+      },
     });
 
     if (!question) return ReE(res, "Case Study not found", 404);
@@ -554,7 +641,7 @@ const submitCaseStudyAnswer = async (req, res) => {
     const userAnswerLower = answer.toLowerCase();
     let matchedCount = 0;
 
-    keywords.forEach(kw => {
+    keywords.forEach((kw) => {
       if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
     });
 
@@ -571,24 +658,29 @@ const submitCaseStudyAnswer = async (req, res) => {
       questionId,
       answer,
       matchPercentage,
-      passed
+      passed,
     });
 
-    return ReS(res, {
-      success: true,
-      data: {
-        userId,
-        courseId,
-        coursePreviewId,
-        day,
-        sessionNumber,
-        questionId,
-        matchPercentage,
-        passed,
-        message: passed ? "You have passed this Case Study" : "You did not pass. Try again."
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId,
+          courseId,
+          coursePreviewId,
+          day,
+          sessionNumber,
+          questionId,
+          matchPercentage,
+          passed,
+          message: passed
+            ? "You have passed this Case Study"
+            : "You did not pass. Try again.",
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Submit Case Study Answer Error:", error);
     return ReE(res, error.message, 500);
@@ -596,7 +688,6 @@ const submitCaseStudyAnswer = async (req, res) => {
 };
 
 module.exports.submitCaseStudyAnswer = submitCaseStudyAnswer;
-
 
 // ✅ Session-wise status for a user
 const getSessionStatusPerUser = async (req, res) => {
@@ -606,12 +697,16 @@ const getSessionStatusPerUser = async (req, res) => {
 
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]]
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
     });
 
-    if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
+    if (!sessions.length)
+      return ReE(res, "No sessions found for this course", 404);
 
-    const sessionStatus = sessions.map(session => {
+    const sessionStatus = sessions.map((session) => {
       const progress = session.userProgress?.[userId];
       return {
         day: session.day,
@@ -619,16 +714,19 @@ const getSessionStatusPerUser = async (req, res) => {
         title: session.title,
         attempted: !!progress,
         correctMCQs: progress?.correctMCQs || 0,
-        totalMCQs: progress?.totalMCQs || 0
+        totalMCQs: progress?.totalMCQs || 0,
       };
     });
 
-    return ReS(res, {
-      success: true,
-      totalSessions: sessions.length,
-      sessionStatus
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        totalSessions: sessions.length,
+        sessionStatus,
+      },
+      200
+    );
   } catch (error) {
     console.error("Get Session Status Error:", error);
     return ReE(res, error.message, 500);
@@ -645,10 +743,14 @@ const getOverallCourseStatus = async (req, res) => {
 
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]]
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
     });
 
-    if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
+    if (!sessions.length)
+      return ReE(res, "No sessions found for this course", 404);
 
     // ✅ Deduplicate sessions (keep only unique day+sessionNumber)
     const uniqueSessions = [];
@@ -664,7 +766,7 @@ const getOverallCourseStatus = async (req, res) => {
     let completedSessions = 0;
     const daysMap = {};
 
-    uniqueSessions.forEach(session => {
+    uniqueSessions.forEach((session) => {
       const progress = session.userProgress?.[userId];
       const attempted = !!progress;
       if (attempted) completedSessions++;
@@ -681,7 +783,7 @@ const getOverallCourseStatus = async (req, res) => {
         title: session.title,
         attempted,
         correctMCQs: progress?.correctMCQs || 0,
-        totalMCQs: progress?.totalMCQs || 0
+        totalMCQs: progress?.totalMCQs || 0,
       });
     });
 
@@ -689,12 +791,12 @@ const getOverallCourseStatus = async (req, res) => {
       totalDays: Object.keys(daysMap).length,
       totalSessions: uniqueSessions.length, // ✅ only unique sessions count
       completedSessions,
-      completionRate: ((completedSessions / uniqueSessions.length) * 100).toFixed(2) + "%",
-      days: daysMap
+      completionRate:
+        ((completedSessions / uniqueSessions.length) * 100).toFixed(2) + "%",
+      days: daysMap,
     };
 
     return ReS(res, { success: true, overallStatus }, 200);
-
   } catch (error) {
     console.error("Get Overall Course Status Error:", error);
     return ReE(res, error.message, 500);
@@ -702,7 +804,6 @@ const getOverallCourseStatus = async (req, res) => {
 };
 
 module.exports.getOverallCourseStatus = getOverallCourseStatus;
-
 
 // ✅ Daily status per user
 const getDailyStatusPerUser = async (req, res) => {
@@ -718,10 +819,14 @@ const getDailyStatusPerUser = async (req, res) => {
     // Fetch all sessions for the course & preview
     const sessions = await model.CourseDetail.findAll({
       where: { courseId, coursePreviewId, isDeleted: false },
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
     });
 
-    if (!sessions.length) return ReE(res, "No sessions found for this course", 404);
+    if (!sessions.length)
+      return ReE(res, "No sessions found for this course", 404);
 
     const daysMap = {};
     let totalSessions = 0;
@@ -763,7 +868,8 @@ const getDailyStatusPerUser = async (req, res) => {
       }
 
       // Initialize day in map
-      if (!daysMap[session.day]) daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+      if (!daysMap[session.day])
+        daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
       daysMap[session.day].total++;
       totalSessions++;
 
@@ -777,8 +883,8 @@ const getDailyStatusPerUser = async (req, res) => {
       const status = latestCaseStudy
         ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
         : sessionCompletionPercentage >= 33
-          ? "Completed"
-          : "In Progress";
+        ? "Completed"
+        : "In Progress";
 
       // ✅ Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
@@ -803,7 +909,9 @@ const getDailyStatusPerUser = async (req, res) => {
     // --- Build dailyStatus array ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
       const d = daysMap[dayKey];
-      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(
+        2
+      );
       return {
         day: Number(dayKey),
         totalSessions: d.total,
@@ -816,29 +924,38 @@ const getDailyStatusPerUser = async (req, res) => {
     });
 
     // --- Overall status ---
-    const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+    const overallStatus =
+      completedSessions === totalSessions ? "Completed" : "In Progress";
     const overallCompletionRate = totalSessions
       ? ((completedSessions / totalSessions) * 100).toFixed(2)
       : 0;
 
     // Update user's courseStatuses
-    const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+    const existingStatuses = user.courseStatuses
+      ? { ...user.courseStatuses }
+      : {};
     existingStatuses[String(courseId)] = overallStatus;
-    await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
+    await user.update(
+      { courseStatuses: existingStatuses },
+      { fields: ["courseStatuses"] }
+    );
     await user.reload();
 
-    return ReS(res, {
-      success: true,
-      summary: {
-        totalSessions,
-        completedSessions,
-        remainingSessions: totalSessions - completedSessions,
-        overallCompletionRate: Number(overallCompletionRate),
-        overallStatus,
+    return ReS(
+      res,
+      {
+        success: true,
+        summary: {
+          totalSessions,
+          completedSessions,
+          remainingSessions: totalSessions - completedSessions,
+          overallCompletionRate: Number(overallCompletionRate),
+          overallStatus,
+        },
+        dailyStatus,
       },
-      dailyStatus,
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Get Daily Status Error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
@@ -887,7 +1004,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
-        order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+        order: [
+          ["day", "ASC"],
+          ["sessionNumber", "ASC"],
+        ],
       });
 
       const daysMap = {};
@@ -925,7 +1045,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
             : 0;
         }
 
-        if (!daysMap[session.day]) daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+        if (!daysMap[session.day])
+          daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
         daysMap[session.day].total++;
         totalSessions++;
 
@@ -937,8 +1058,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         const status = latestCaseStudy
           ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
           : sessionCompletionPercentage >= 33
-            ? "Completed"
-            : "In Progress";
+          ? "Completed"
+          : "In Progress";
 
         daysMap[session.day].sessions.push({
           sessionNumber: session.sessionNumber,
@@ -955,7 +1076,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(
+          2
+        );
         return {
           day: Number(dayKey),
           totalSessions: d.total,
@@ -997,7 +1120,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
             const progress = session.userProgress?.[userId] || {};
             if (progress.totalMCQs && progress.correctMCQs !== undefined) {
               sessionCompletionPercentage =
-                ((progress.correctMCQs / progress.totalMCQs) * 100) || 0;
+                (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
             }
           }
 
@@ -1016,14 +1139,28 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         where: { userId, isDeleted: false },
       });
 
-      if (statusRecord && ["On Hold", "Terminated"].includes(statusRecord.internshipStatus)) {
-        overallStatus = statusRecord.internshipStatus;
+      if (statusRecord && statusRecord.internshipStatus) {
+        const normalized = statusRecord.internshipStatus
+          .trim()
+          .toLowerCase()
+          .replace(/[-_]/g, " ");
+
+        if (["terminated"].includes(normalized)) {
+          overallStatus = "Terminated";
+        } else if (["on hold", "hold", "onhold"].includes(normalized)) {
+          overallStatus = "On Hold";
+        }
       }
 
       // Update user's courseStatuses
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+      const existingStatuses = user.courseStatuses
+        ? { ...user.courseStatuses }
+        : {};
       existingStatuses[String(courseId)] = overallStatus;
-      await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
+      await user.update(
+        { courseStatuses: existingStatuses },
+        { fields: ["courseStatuses"] }
+      );
 
       response.courses.push({
         courseId,
@@ -1044,9 +1181,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
   }
 };
 
-module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
-
+module.exports.getDailyStatusAllCoursesPerUser =
+  getDailyStatusAllCoursesPerUser;
 
 const getBusinessTarget = async (req, res) => {
   try {
@@ -1103,7 +1239,10 @@ const getBusinessTarget = async (req, res) => {
     const subscriptionWallet = achievedCountNum; // total achieved
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-    user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
+    user.businessTargets = {
+      ...user.businessTargets,
+      [courseId]: businessTarget,
+    };
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
 
@@ -1138,7 +1277,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
 
 const getBusinessUserTarget = async (req, res) => {
   try {
@@ -1234,10 +1372,13 @@ const getCourseStatus = async (req, res) => {
         {
           model: model.QuestionModel,
           where: { isDeleted: false },
-          required: false
-        }
+          required: false,
+        },
       ],
-      order: [["day", "ASC"], ["sessionNumber", "ASC"]]
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
     });
 
     if (!sessions || sessions.length === 0) {
@@ -1249,15 +1390,16 @@ const getCourseStatus = async (req, res) => {
     let completedSessions = 0;
 
     // 2. Build structured response
-    const status = sessions.map(session => {
+    const status = sessions.map((session) => {
       const progress = session.userProgress || {};
       const userProg = progress[userId] || {
         correctMCQs: 0,
-        totalMCQs: session.QuestionModels.length
+        totalMCQs: session.QuestionModels.length,
       };
 
       // ✅ Session is completed if all MCQs attempted (correct or not)
-      const isCompleted = userProg.correctMCQs === userProg.totalMCQs && userProg.totalMCQs > 0;
+      const isCompleted =
+        userProg.correctMCQs === userProg.totalMCQs && userProg.totalMCQs > 0;
       if (isCompleted) completedSessions++;
 
       return {
@@ -1267,23 +1409,28 @@ const getCourseStatus = async (req, res) => {
         description: session.description,
         youtubeLink: session.youtubeLink,
         mcqProgress: userProg,
-        status: isCompleted ? "Completed" : "In Progress"
+        status: isCompleted ? "Completed" : "In Progress",
       };
     });
 
     const remainingSessions = totalSessions - completedSessions;
-    const overallStatus = completedSessions === totalSessions ? "Completed" : "In Progress";
+    const overallStatus =
+      completedSessions === totalSessions ? "Completed" : "In Progress";
 
-    return ReS(res, {
-      success: true,
-      summary: {
-        totalSessions,
-        completedSessions,
-        remainingSessions,
-        overallStatus
+    return ReS(
+      res,
+      {
+        success: true,
+        summary: {
+          totalSessions,
+          completedSessions,
+          remainingSessions,
+          overallStatus,
+        },
+        courseStatus: status,
       },
-      courseStatus: status
-    }, 200);
+      200
+    );
   } catch (err) {
     console.error("Get Course Status Error:", err);
     return ReE(res, err.message, 500);
@@ -1291,7 +1438,6 @@ const getCourseStatus = async (req, res) => {
 };
 
 module.exports.getCourseStatus = getCourseStatus;
-
 
 const setCourseStartEndDates = async (req, res) => {
   try {
@@ -1341,7 +1487,10 @@ const setCourseStartEndDates = async (req, res) => {
       });
       console.log(`Offer letter triggered for user ${userId}`);
     } catch (err) {
-      console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
+      console.error(
+        `Failed to trigger offer letter for user ${userId}:`,
+        err.message
+      );
       //  Don’t fail main request if offerletter fails
     }
 
@@ -1370,13 +1519,20 @@ module.exports.setCourseStartEndDates = setCourseStartEndDates;
 
 const getUserMCQScore = async (req, res) => {
   try {
-    const { courseId, coursePreviewId, day, sessionNumber, userId } = req.params;
+    const { courseId, coursePreviewId, day, sessionNumber, userId } =
+      req.params;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
     // Fetch the session detail
     const sessionDetail = await model.CourseDetail.findOne({
-      where: { courseId, coursePreviewId, day, sessionNumber, isDeleted: false },
+      where: {
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        isDeleted: false,
+      },
     });
 
     if (!sessionDetail) return ReE(res, "Session details not found", 404);
@@ -1384,9 +1540,10 @@ const getUserMCQScore = async (req, res) => {
     // Parse stored progress
     let progress = {};
     if (sessionDetail.userProgress) {
-      progress = typeof sessionDetail.userProgress === "string"
-        ? JSON.parse(sessionDetail.userProgress)
-        : sessionDetail.userProgress;
+      progress =
+        typeof sessionDetail.userProgress === "string"
+          ? JSON.parse(sessionDetail.userProgress)
+          : sessionDetail.userProgress;
     }
 
     // Check if user has progress saved
@@ -1395,21 +1552,24 @@ const getUserMCQScore = async (req, res) => {
       return ReE(res, "No score found for this user in this session", 404);
     }
 
-    return ReS(res, {
-      success: true,
-      userId,
-      courseId,
-      coursePreviewId,
-      day,
-      sessionNumber,
-      score: {
-        correctMCQs: userProgress.correctMCQs,
-        totalMCQs: userProgress.totalMCQs,
-        eligibleForCaseStudy: userProgress.eligibleForCaseStudy,
-        answers: userProgress.answers || {}   // include all saved answers
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        userId,
+        courseId,
+        coursePreviewId,
+        day,
+        sessionNumber,
+        score: {
+          correctMCQs: userProgress.correctMCQs,
+          totalMCQs: userProgress.totalMCQs,
+          eligibleForCaseStudy: userProgress.eligibleForCaseStudy,
+          answers: userProgress.answers || {}, // include all saved answers
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Get User MCQ Score Error:", error);
     return ReE(res, error.message, 500);
@@ -1418,10 +1578,16 @@ const getUserMCQScore = async (req, res) => {
 
 module.exports.getUserMCQScore = getUserMCQScore;
 
-
 const getUserCaseStudyResult = async (req, res) => {
   try {
-    const { courseId, coursePreviewId, day, sessionNumber, questionId, userId } = req.params;
+    const {
+      courseId,
+      coursePreviewId,
+      day,
+      sessionNumber,
+      questionId,
+      userId,
+    } = req.params;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
@@ -1433,33 +1599,39 @@ const getUserCaseStudyResult = async (req, res) => {
         coursePreviewId,
         day,
         sessionNumber,
-        questionId
+        questionId,
       },
-      include: [{
-        model: model.QuestionModel,
-        attributes: ['question'],  // fetch only the question text
-      }],
-      order: [['createdAt', 'DESC']] // fetch the latest submission
+      include: [
+        {
+          model: model.QuestionModel,
+          attributes: ["question"], // fetch only the question text
+        },
+      ],
+      order: [["createdAt", "DESC"]], // fetch the latest submission
     });
 
-    if (!result) return ReE(res, "No case study result found for this user", 404);
+    if (!result)
+      return ReE(res, "No case study result found for this user", 404);
 
-    return ReS(res, {
-      success: true,
-      data: {
-        userId: result.userId,
-        courseId: result.courseId,
-        coursePreviewId: result.coursePreviewId,
-        day: result.day,
-        sessionNumber: result.sessionNumber,
-        questionId: result.questionId,
-        question: result.QuestionModel?.question || null,
-        answer: result.answer,
-        matchPercentage: result.matchPercentage,
-        passed: result.passed
-      }
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId: result.userId,
+          courseId: result.courseId,
+          coursePreviewId: result.coursePreviewId,
+          day: result.day,
+          sessionNumber: result.sessionNumber,
+          questionId: result.questionId,
+          question: result.QuestionModel?.question || null,
+          answer: result.answer,
+          matchPercentage: result.matchPercentage,
+          passed: result.passed,
+        },
+      },
+      200
+    );
   } catch (error) {
     console.error("Get User Case Study Result Error:", error);
     return ReE(res, error.message, 500);
@@ -1467,7 +1639,3 @@ const getUserCaseStudyResult = async (req, res) => {
 };
 
 module.exports.getUserCaseStudyResult = getUserCaseStudyResult;
-
-
-
-
