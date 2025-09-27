@@ -871,13 +871,6 @@ const fetchSingleUserById = async (req, res) => {
             "internshipStatus",
           ],
         },
-        {
-          // If College is a separate table
-          model: model.College,
-          as: "college",
-          attributes: ["id", "name"],
-          required: false, // don’t force join
-        },
       ],
     });
 
@@ -892,7 +885,9 @@ const fetchSingleUserById = async (req, res) => {
 
     // Determine final team manager
     let finalTeamManager = null;
+
     if (statusRecord && statusRecord.teamManager) {
+      // Status team manager exists → fetch email & phone from TeamManager table
       const tmFromStatus = await model.TeamManager.findOne({
         where: { name: statusRecord.teamManager },
       });
@@ -906,6 +901,7 @@ const fetchSingleUserById = async (req, res) => {
         finalTeamManager = { name: statusRecord.teamManager, email: null, phoneNumber: null };
       }
     } else if (userData.teamManager) {
+      // Fallback to user's current team manager
       finalTeamManager = {
         name: userData.teamManager.name,
         email: userData.teamManager.email,
@@ -939,35 +935,29 @@ const fetchSingleUserById = async (req, res) => {
     let referralLink = userData.referralLink || null;
     try {
       let phoneNumber = userData.phoneNumber;
-      if (phoneNumber && !phoneNumber.startsWith("+91")) phoneNumber = `+91${phoneNumber}`;
+      if (!phoneNumber.startsWith("+91")) phoneNumber = `+91${phoneNumber}`;
 
-      if (phoneNumber) {
-        const referralRes = await axios.get(
-          "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
-          { params: { phone_number: phoneNumber } }
-        );
+      const referralRes = await axios.get(
+        "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
+        { params: { phone_number: phoneNumber } }
+      );
 
-        if (referralRes.data) {
-          referralCode = referralRes.data.referral_code || referralCode;
-          referralLink = referralRes.data.referral_link || referralLink;
+      if (referralRes.data) {
+        referralCode = referralRes.data.referral_code || referralCode;
+        referralLink = referralRes.data.referral_link || referralLink;
 
-          await user.update({ referralCode, referralLink });
-        }
+        await user.update({ referralCode, referralLink });
       }
     } catch (err) {
       console.warn("Referral API failed:", err.message);
     }
-
-    // ✅ Resolve college name (from User table or College table)
-    const collegeName =
-      userData.collegeName || (userData.college ? userData.college.name : null);
 
     // Prepare response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
       PhoneNumber: userData.phoneNumber,
-      CollegeName: collegeName,
+      CollegeName: userData.collegeName,
       ReferralCode: referralCode,
       ReferralLink: referralLink,
       ProfileCompletion: profileCompletion,
@@ -984,7 +974,6 @@ const fetchSingleUserById = async (req, res) => {
 };
 
 module.exports.fetchSingleUserById = fetchSingleUserById;
-
 
 //  Fetch All Users with full data + profile completion + subscriptions
 const fetchAllUsers = async (req, res) => {
