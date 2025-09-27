@@ -974,17 +974,34 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         user.subscriptionWallet >= (course.businessTarget || 0) &&
         user.subscriptiondeductedWallet >= (course.businessTarget || 0);
 
-      // ✅ New: Check if all sessions >= 33%
-      const allSessionsAboveThreshold = sessions.every((session) => {
-        const progress = session.userProgress?.[userId] || {};
-        let sessionCompletionPercentage = 0;
+      // ✅ New: Check if all sessions >= 33% (including case study)
+      const allSessionsAboveThreshold = await Promise.all(
+        sessions.map(async (session) => {
+          let sessionCompletionPercentage = 0;
 
-        if (progress.totalMCQs && progress.correctMCQs !== undefined) {
-          sessionCompletionPercentage = ((progress.correctMCQs / progress.totalMCQs) * 100) || 0;
-        }
+          const latestCaseStudy = await model.CaseStudyResult.findOne({
+            where: {
+              userId,
+              courseId,
+              day: session.day,
+              sessionNumber: session.sessionNumber,
+            },
+            order: [["createdAt", "DESC"]],
+          });
 
-        return sessionCompletionPercentage >= 33;
-      });
+          if (latestCaseStudy) {
+            sessionCompletionPercentage = latestCaseStudy.matchPercentage;
+          } else {
+            const progress = session.userProgress?.[userId] || {};
+            if (progress.totalMCQs && progress.correctMCQs !== undefined) {
+              sessionCompletionPercentage =
+                ((progress.correctMCQs / progress.totalMCQs) * 100) || 0;
+            }
+          }
+
+          return sessionCompletionPercentage >= 33;
+        })
+      ).then((results) => results.every(Boolean));
 
       // ✅ Final overallStatus logic
       let overallStatus = "In Progress";
