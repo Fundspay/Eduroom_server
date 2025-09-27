@@ -471,47 +471,40 @@ const updateUser = async (req, res) => {
     const user = await model.User.findByPk(req.params.id);
     if (!user || user.isDeleted) return ReE(res, "User not found", 404);
 
-    const {
-      firstName,
-      lastName,
-      phoneNumber,
-      gender,
-      email,
-      collegeName,
-      course,
-      state,
-      city,
-      referralCode,
-      referralLink,
-    } = req.body;
+    const allowedFields = [
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "gender",
+      "email",
+      "collegeName",
+      "course",
+      "state",
+      "city",
+      "referralCode",
+      "referralLink",
+    ];
 
-    // Validate gender if provided
-    if (gender !== undefined && gender !== null) {
-      const genderExists = await model.Gender.findByPk(gender);
+    const updatedFields = {};
+
+    for (const field of allowedFields) {
+      if (req.body.hasOwnProperty(field)) {
+        updatedFields[field] = req.body[field];
+      }
+    }
+
+    // Validate gender only if it's actually sent
+    if (updatedFields.gender !== undefined && updatedFields.gender !== null && updatedFields.gender !== "") {
+      const genderExists = await model.Gender.findByPk(updatedFields.gender);
       if (!genderExists) return ReE(res, "Invalid gender", 400);
     }
 
-    // Build updated fields
-    const updatedFields = {
-      firstName: firstName !== undefined ? firstName : user.firstName,
-      lastName: lastName !== undefined ? lastName : user.lastName,
-      phoneNumber: phoneNumber !== undefined ? phoneNumber : user.phoneNumber,
-      gender: gender !== undefined ? gender : user.gender,
-      email: email !== undefined ? email : user.email,
-      collegeName: collegeName !== undefined ? collegeName : user.collegeName,
-      course: course !== undefined ? course : user.course,
-      state: state !== undefined ? state : user.state,
-      city: city !== undefined ? city : user.city,
-      referralCode:
-        referralCode !== undefined ? referralCode : user.referralCode,
-      referralLink:
-        referralLink !== undefined ? referralLink : user.referralLink,
-    };
+    // If no fields provided, return
+    if (Object.keys(updatedFields).length === 0) {
+      return ReE(res, "No fields to update", 400);
+    }
 
-    // Update user
     await user.update(updatedFields);
-
-    // Reload to get latest values
     await user.reload();
 
     return ReS(res, { success: true, user }, 200);
@@ -522,6 +515,7 @@ const updateUser = async (req, res) => {
 };
 
 module.exports.updateUser = updateUser;
+
 
 // ✅ Soft Delete User
 var deleteUser = async (req, res) => {
