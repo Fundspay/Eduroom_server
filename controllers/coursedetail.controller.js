@@ -1011,6 +1011,15 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus = "Completed";
       }
 
+      // ✅ Check Status model for internshipStatus override
+      const statusRecord = await model.Status.findOne({
+        where: { userId, isDeleted: false },
+      });
+
+      if (statusRecord && ["On Hold", "Terminated"].includes(statusRecord.internshipStatus)) {
+        overallStatus = statusRecord.internshipStatus;
+      }
+
       // Update user's courseStatuses
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
@@ -1036,6 +1045,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 
 const getBusinessTarget = async (req, res) => {
