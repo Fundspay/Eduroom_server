@@ -1102,7 +1102,10 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Normalize registered users (queryStatus, etc.)
+    // Helper to normalize IDs as trimmed strings
+    const normalizeId = (id) => (id == null ? null : String(id).trim());
+
+    // Pick external ID from user object
     const pickExternalId = (u) =>
       u.user_id ?? u.id ?? u.uid ?? u.userId ?? u.externalId ?? null;
 
@@ -1113,7 +1116,7 @@ const getReferralPaymentStatus = async (req, res) => {
       const ext = pickExternalId(u);
       if (!ext) return;
 
-      const sExt = String(ext);
+      const sExt = String(ext).trim();
       if (/^\d+$/.test(sExt)) {
         numericIndexToLocalId.set(idx, parseInt(sExt, 10));
       } else {
@@ -1140,7 +1143,9 @@ const getReferralPaymentStatus = async (req, res) => {
 
       if (availableUserCols.length > 0) {
         const userWhere = {
-          [Op.or]: availableUserCols.map((col) => ({ [col]: { [Op.in]: externalList } })),
+          [Op.or]: availableUserCols.map((col) => ({
+            [col]: { [Op.in]: externalList },
+          })),
         };
         const foundUsers = await model.User.findAll({
           where: userWhere,
@@ -1151,15 +1156,18 @@ const getReferralPaymentStatus = async (req, res) => {
         for (const fu of foundUsers) {
           for (const col of availableUserCols) {
             const val = fu[col];
-            if (val && externalValues.has(String(val))) {
-              localIdByExternal[String(val)] = fu.id;
+            if (val && externalValues.has(String(val).trim())) {
+              localIdByExternal[String(val).trim()] = fu.id;
             }
           }
         }
       }
     }
 
-    const candidateLocalIds = new Set([...numericIndexToLocalId.values(), ...Object.values(localIdByExternal)]);
+    const candidateLocalIds = new Set([
+      ...numericIndexToLocalId.values(),
+      ...Object.values(localIdByExternal),
+    ]);
     const candidateExternalIds = externalList;
 
     let raiseQueries = [];
@@ -1186,12 +1194,14 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
 
-      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[String(pickExternalId(u))] || null;
-      const extId = pickExternalId(u);
+      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[normalizeId(pickExternalId(u))] || null;
+      const extId = normalizeId(pickExternalId(u));
 
       let rq = null;
-      if (localId != null) rq = raiseQueries.find((r) => String(r.userId) === String(localId));
-      if (!rq && extId) rq = raiseQueries.find((r) => String(r.fundsAuditUserId) === String(extId));
+      if (localId != null)
+        rq = raiseQueries.find((r) => normalizeId(r.userId) === normalizeId(localId));
+      if (!rq && extId)
+        rq = raiseQueries.find((r) => normalizeId(r.fundsAuditUserId) === extId);
 
       cloned.queryStatus = rq
         ? !rq.queryStatus || rq.queryStatus.trim() === "" || rq.queryStatus === "No Query"
@@ -1231,6 +1241,7 @@ const getReferralPaymentStatus = async (req, res) => {
 };
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
+
 
 // ✅ Get internship status summary per managerId (userId of manager)
 const getInternshipStatusByUser = async (req, res) => {
