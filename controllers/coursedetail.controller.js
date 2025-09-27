@@ -772,11 +772,9 @@ const getDailyStatusPerUser = async (req, res) => {
       }
 
       // Determine status
-      const status = latestCaseStudy
-        ? "Completed"   // any case study with a result counts as Completed
-        : sessionCompletionPercentage >= 33
-          ? "Completed"
-          : "In Progress";
+      // Determine status using the same 33% logic for all sessions
+      const status = sessionCompletionPercentage >= 33 ? "Completed" : "In Progress";
+
 
 
       // ✅ Prevent duplicate sessions
