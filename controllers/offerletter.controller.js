@@ -291,14 +291,12 @@ const listAllUsers = async (req, res) => {
     });
 
     const userIds = users.map(u => u.id);
-
-    // Fetch RaiseQuery including the actual queryCount column
     const raiseQueries = await RaiseQuery.findAll({
       where: { userId: userIds, isDeleted: false },
       attributes: ["userId", "isQueryRaised", "queryStatus", "queryCount"]
     });
 
-    // Aggregate query info per user
+    // Aggregate query info per user (sum queryCount for multiple rows)
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
@@ -308,10 +306,9 @@ const listAllUsers = async (req, res) => {
           queryCount: q.queryCount || 0
         };
       } else {
-        // Sum queryCount if multiple rows exist for same user
         queryInfoByUser[q.userId].queryCount += q.queryCount || 0;
-        queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
         queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
+        queryInfoByUser[q.userId].queryStatus = queryInfoByUser[q.userId].queryStatus || q.queryStatus;
       }
     });
 
@@ -330,15 +327,22 @@ const listAllUsers = async (req, res) => {
             businessTarget: course ? course.businessTarget : null,
             domainName: course && course.Domain ? course.Domain.name : null,
             status,
-            startDate: user.courseDates && user.courseDates[courseId] ? user.courseDates[courseId].startDate : null,
-            endDate: user.courseDates && user.courseDates[courseId] ? user.courseDates[courseId].endDate : null
+            startDate:
+              user.courseDates && user.courseDates[courseId]
+                ? user.courseDates[courseId].startDate
+                : null,
+            endDate:
+              user.courseDates && user.courseDates[courseId]
+                ? user.courseDates[courseId].endDate
+                : null
           });
         }
       }
 
-      const internshipIssued = user.InternshipCertificates && user.InternshipCertificates.length > 0
-        ? user.InternshipCertificates.some(cert => cert.isIssued)
-        : null;
+      const internshipIssued =
+        user.InternshipCertificates && user.InternshipCertificates.length > 0
+          ? user.InternshipCertificates.some(cert => cert.isIssued)
+          : null;
 
       const teamManager = user.teamManager
         ? {
@@ -348,33 +352,57 @@ const listAllUsers = async (req, res) => {
           }
         : null;
 
-      const offerLetterSent = user.OfferLetters && user.OfferLetters.length > 0
-        ? user.OfferLetters[0].issent
-        : false;
+      const offerLetterSent =
+        user.OfferLetters && user.OfferLetters.length > 0
+          ? user.OfferLetters[0].issent
+          : false;
 
-      const offerLetterFile = user.OfferLetters && user.OfferLetters.length > 0
-        ? user.OfferLetters[0].fileUrl
-        : null;
+      const offerLetterFile =
+        user.OfferLetters && user.OfferLetters.length > 0
+          ? user.OfferLetters[0].fileUrl
+          : null;
 
       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
-      response.push({
-        userId: user.id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        phoneNumber: user.phoneNumber,
+      // Only fields that should change on update
+      const fieldsToUpdate = {
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
         courses: courseDetails,
         internshipIssued,
         offerLetterSent,
         offerLetterFile,
-        teamManager: teamManager ? teamManager.name : null,
-        internshipStatus: teamManager ? teamManager.internshipStatus : null,
-        isQueryRaised: queryInfo.isQueryRaised,
         queryStatus: queryInfo.queryStatus,
-        queryCount: queryInfo.queryCount // actual value from RaiseQuery table
+        isQueryRaised: queryInfo.isQueryRaised,
+        queryCount: queryInfo.queryCount
+      };
+
+      // Check if a Status record already exists for this user
+      let statusRecord = await Status.findOne({ where: { userId: user.id } });
+
+      if (statusRecord) {
+        // Update only the relevant fields
+        await statusRecord.update(fieldsToUpdate);
+      } else {
+        // Create new record including teamManager & internshipStatus
+        statusRecord = await Status.create({
+          userId: user.id,
+          userName: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          collegeName: user.collegeName,
+          ...fieldsToUpdate,
+          teamManager: teamManager ? teamManager.name : null,
+          internshipStatus: teamManager ? teamManager.internshipStatus : null
+        });
+
+        // Save the new statusId to user
+        await user.update({ statusId: statusRecord.id });
+      }
+
+      response.push({
+        statusId: statusRecord.id,
+        ...statusRecord.toJSON()
       });
     }
 
