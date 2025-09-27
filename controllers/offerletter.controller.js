@@ -293,20 +293,20 @@ const listAllUsers = async (req, res) => {
     const userIds = users.map(u => u.id);
     const raiseQueries = await RaiseQuery.findAll({
       where: { userId: userIds, isDeleted: false },
-      attributes: ["userId", "isQueryRaised", "queryStatus", "queryCount"]
+      attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
-    // Aggregate query info per user (sum queryCount for multiple rows)
+    // Aggregate query info per user (count number of raised queries)
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
         queryInfoByUser[q.userId] = {
           isQueryRaised: q.isQueryRaised || false,
           queryStatus: q.queryStatus || null,
-          queryCount: q.queryCount || 0
+          queryCount: q.isQueryRaised ? 1 : 0
         };
       } else {
-        queryInfoByUser[q.userId].queryCount += q.queryCount || 0;
+        if (q.isQueryRaised) queryInfoByUser[q.userId].queryCount += 1;
         queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
         queryInfoByUser[q.userId].queryStatus = queryInfoByUser[q.userId].queryStatus || q.queryStatus;
       }
