@@ -1075,7 +1075,7 @@ const getBusinessTarget = async (req, res) => {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
 
-        // ✅ Fix: use the `count` field inside referral_count
+        // ✅ use the `count` field inside referral_count
         achievedCount = apiResponse.data?.referral_count?.count || 0;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
@@ -1083,24 +1083,25 @@ const getBusinessTarget = async (req, res) => {
       }
     }
 
-    // // 5️⃣ Calculate remaining
-    // const remaining = Math.max(businessTarget - achievedCount, 0);
-
-    // 6️⃣ Ensure safe numbers for BIGINT fields
+    // 5️⃣ Safe numbers
     const achievedCountNum = Number(achievedCount) || 0;
-    // const remainingNum = Number(remaining) || 0;
+    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
 
-    // 7️⃣ Update User table
+    // 6️⃣ Update wallet values
+    const subscriptionWallet = achievedCountNum; // total achieved
+    const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+
     user.businessTargets = { ...user.businessTargets, [courseId]: businessTarget };
-    user.subscriptionWallet = achievedCountNum;
-    user.subscriptionLeft = achievedCountNum;
+    user.subscriptionWallet = subscriptionWallet;
+    user.subscriptionLeft = subscriptionLeft;
 
     await user.save({
       fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
     });
+
     console.log(`Updated user ${user.id} with business target info`);
 
-    // 8️⃣ Return response
+    // 7️⃣ Return response
     return ReS(
       res,
       {
@@ -1109,9 +1110,10 @@ const getBusinessTarget = async (req, res) => {
           userId: user.id,
           courseId,
           businessTarget,
-          achievedCount: achievedCountNum,
-          remaining: achievedCountNum,
-          subscriptionWallet: achievedCountNum,
+          achievedCount: subscriptionWallet,
+          totalDeducted: alreadyDeducted,
+          subscriptionWallet,
+          subscriptionLeft,
           businessTargets: user.businessTargets,
         },
       },
@@ -1124,6 +1126,7 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
+
 
 const getBusinessUserTarget = async (req, res) => {
   try {
@@ -1164,10 +1167,14 @@ const getBusinessUserTarget = async (req, res) => {
     }
 
     const achievedCountNum = Number(achievedCount) || 0;
+    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
 
-    // 4️⃣ Update User table
-    user.subscriptionWallet = achievedCountNum;
-    user.subscriptionLeft = achievedCountNum;
+    // 4️⃣ Update wallet values properly
+    const subscriptionWallet = achievedCountNum; // total achieved
+    const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+
+    user.subscriptionWallet = subscriptionWallet;
+    user.subscriptionLeft = subscriptionLeft;
 
     await user.save({
       fields: ["subscriptionWallet", "subscriptionLeft"],
@@ -1183,22 +1190,22 @@ const getBusinessUserTarget = async (req, res) => {
         data: {
           userId: user.id,
           businessTarget,
-          achievedCount: achievedCountNum,
-          remaining: achievedCountNum,
-          subscriptionWallet: achievedCountNum,
+          achievedCount: subscriptionWallet,
+          totalDeducted: alreadyDeducted,
+          subscriptionWallet,
+          subscriptionLeft,
           businessTargets: user.businessTargets,
         },
       },
       200
     );
   } catch (error) {
-    console.error("Get Business Target Error:", error);
+    console.error("Get Business User Target Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
-
 
 const getCourseStatus = async (req, res) => {
   try {
