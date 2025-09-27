@@ -2,7 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,RaiseQuery,Status } = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
@@ -296,19 +296,19 @@ const listAllUsers = async (req, res) => {
       attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
-    // Aggregate query info per user
+    // Aggregate query info per user (count number of raised queries)
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
         queryInfoByUser[q.userId] = {
           isQueryRaised: q.isQueryRaised || false,
           queryStatus: q.queryStatus || null,
-          queryCount: 1
+          queryCount: q.isQueryRaised ? 1 : 0
         };
       } else {
-        queryInfoByUser[q.userId].queryCount += 1;
-        queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
+        if (q.isQueryRaised) queryInfoByUser[q.userId].queryCount += 1;
         queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
+        queryInfoByUser[q.userId].queryStatus = queryInfoByUser[q.userId].queryStatus || q.queryStatus;
       }
     });
 
@@ -346,10 +346,10 @@ const listAllUsers = async (req, res) => {
 
       const teamManager = user.teamManager
         ? {
-            id: user.teamManager.id,
-            name: user.teamManager.name,
-            internshipStatus: user.teamManager.internshipStatus
-          }
+          id: user.teamManager.id,
+          name: user.teamManager.name,
+          internshipStatus: user.teamManager.internshipStatus
+        }
         : null;
 
       const offerLetterSent =
@@ -398,11 +398,14 @@ const listAllUsers = async (req, res) => {
 
         // Save the new statusId to user
         await user.update({ statusId: statusRecord.id });
+
       }
+      const statusData = statusRecord.toJSON();
+      statusData.querycount = queryInfo.queryCount;
 
       response.push({
         statusId: statusRecord.id,
-        ...statusRecord.toJSON()
+        ...statusData
       });
     }
 
@@ -421,5 +424,4 @@ const listAllUsers = async (req, res) => {
   }
 };
 
-module.exports.listAllUsers = listAllUsers;
-
+module.exports.listAllUsers = listAllUsers; 

@@ -725,17 +725,15 @@ const getDailyStatusPerUser = async (req, res) => {
     let totalSessions = 0;
     let completedSessions = 0;
 
-    // Loop through sessions
     for (const session of sessions) {
       const progress = session.userProgress?.[userId] || {};
-      const attempted = !!progress;
-
+      let attempted = false;
       let sessionCompletionPercentage = 0;
+      let caseStudyPercentage = null;
       let correctMCQs = 0;
       let totalMCQs = 0;
-      let caseStudyPercentage = null;
 
-      // --- Fetch latest case study result for this session ---
+      // --- Fetch latest case study ---
       const latestCaseStudy = await model.CaseStudyResult.findOne({
         where: {
           userId,
@@ -748,16 +746,18 @@ const getDailyStatusPerUser = async (req, res) => {
       });
 
       if (latestCaseStudy) {
-        // Use the real matchPercentage from case study
+        // Case study exists → only consider case study
         caseStudyPercentage = latestCaseStudy.matchPercentage;
         sessionCompletionPercentage = caseStudyPercentage;
-      } else {
-        // Fallback to MCQs
+        attempted = true; // Counted as attempted only if case study exists
+      } else if (progress) {
+        // No case study → fallback to MCQs
         totalMCQs = progress.totalMCQs || 0;
         correctMCQs = progress.correctMCQs || 0;
         sessionCompletionPercentage = totalMCQs
           ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
           : 0;
+        attempted = totalMCQs > 0;
       }
 
       // Initialize day in map
@@ -772,13 +772,9 @@ const getDailyStatusPerUser = async (req, res) => {
       }
 
       // Determine status
-      const status = latestCaseStudy
-        ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
-        : sessionCompletionPercentage >= 33
-          ? "Completed"
-          : "In Progress";
+      const status = sessionCompletionPercentage >= 33 ? "Completed" : "In Progress";
 
-      // ✅ Prevent duplicate sessions
+      // Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
         (s) => s.sessionNumber === session.sessionNumber
       );
@@ -825,18 +821,21 @@ const getDailyStatusPerUser = async (req, res) => {
     await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
     await user.reload();
 
-    return ReS(res, {
-      success: true,
-      summary: {
-        totalSessions,
-        completedSessions,
-        remainingSessions: totalSessions - completedSessions,
-        overallCompletionRate: Number(overallCompletionRate),
-        overallStatus,
+    return ReS(
+      res,
+      {
+        success: true,
+        summary: {
+          totalSessions,
+          completedSessions,
+          remainingSessions: totalSessions - completedSessions,
+          overallCompletionRate: Number(overallCompletionRate),
+          overallStatus,
+        },
+        dailyStatus,
       },
-      dailyStatus,
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Get Daily Status Error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
