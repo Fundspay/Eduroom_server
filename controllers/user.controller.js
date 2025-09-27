@@ -672,63 +672,50 @@ const requestPasswordReset = async (req, res) => {
     const { email } = req.body;
     if (!email) return ReE(res, "Email is required", 400);
 
-    let account = await model.User.findOne({
+    // Check if the email exists in User table
+    const user = await model.User.findOne({
       where: { email, isDeleted: false },
     });
-    let role = "user";
 
-    if (!account) {
-      account = await model.TeamManager.findOne({
-        where: { email, isDeleted: false },
-      });
-      role = "manager";
+    // If not found, respond with not registered message
+    if (!user) {
+      return ReE(res, "Email is not registered with EduRoom", 404);
     }
 
-    if (!account)
-      return ReS(
-        res,
-        { message: "If the email is registered, a reset link has been sent." },
-        200
-      );
-
+    // Generate reset token and expiry
     const resetToken = crypto.randomBytes(32).toString("hex");
     const resetTokenExpiry = Date.now() + 3600000;
 
-    await account.update({ resetToken, resetTokenExpiry });
+    await user.update({ resetToken, resetTokenExpiry });
 
-    const queryParams = new URLSearchParams({
-      token: resetToken,
-      email,
-    }).toString();
+    const queryParams = new URLSearchParams({ token: resetToken, email }).toString();
     const resetUrl = `https://eduroom.in/reset-password.html?${queryParams}`;
 
     const htmlContent = `
-          <h3>Hello ${account.name || account.firstName},</h3>
-          <p>You requested a password reset for your EduRoom account.</p>
-          <p>Click the link below to reset your password (valid for 1 hour):</p>
-          <p><a href="${resetUrl}" target="_blank" style="color:#007bff; text-decoration:underline;">Reset Password</a></p>
-          <br>
-          <p>If you didn’t request this, you can safely ignore this email.</p>
-          <p>– The EduRoom Team</p>
-        `;
+      <h3>Hello ${user.name || user.firstName},</h3>
+      <p>You requested a password reset for your EduRoom account.</p>
+      <p>Click the link below to reset your password (valid for 1 hour):</p>
+      <p><a href="${resetUrl}" target="_blank" style="color:#007bff; text-decoration:underline;">Reset Password</a></p>
+      <br>
+      <p>If you didn’t request this, you can safely ignore this email.</p>
+      <p>– The EduRoom Team</p>
+    `;
 
     const mailResult = await sendMail(
       email,
       "EduRoom - Password Reset Request",
       htmlContent
     );
+
     if (!mailResult.success) return ReE(res, "Failed to send reset email", 500);
 
-    return ReS(
-      res,
-      { message: "If the email is registered, a reset link has been sent." },
-      200
-    );
+    return ReS(res, { message: "Reset link sent to your email." }, 200);
   } catch (error) {
     console.error("Password reset error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.requestPasswordReset = requestPasswordReset;
 
 // ===================== RESET PASSWORD =====================
