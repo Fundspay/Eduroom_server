@@ -773,10 +773,11 @@ const getDailyStatusPerUser = async (req, res) => {
 
       // Determine status
       const status = latestCaseStudy
-        ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
+        ? "Completed"   // any case study with a result counts as Completed
         : sessionCompletionPercentage >= 33
           ? "Completed"
           : "In Progress";
+
 
       // ✅ Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
