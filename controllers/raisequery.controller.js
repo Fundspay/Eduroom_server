@@ -89,7 +89,7 @@ var fetchAllRaiseQueries = async (req, res) => {
             where: { isDeleted: false },
             include: [
                 { model: model.User, attributes: ["id", "firstName", "lastName", "email"] },
-                { model: model.User, as: "auditUser", attributes: ["id", "firstName", "lastName", "email"] }
+      
             ]
         });
 
