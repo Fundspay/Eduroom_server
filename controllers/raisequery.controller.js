@@ -4,49 +4,45 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { Op } = require("sequelize");
 
 // ✅ Add a new Raise Query
-var addRaiseQuery = async (req, res) => {
-    const {
-        userId,
-        fundsAuditUserId,
-        queryStatus,
+const addQuery = async (req, res) => {
+  try {
+    const { userId, first_name, last_name, email, phone_number } = req.body;
+
+    // Ensure user exists
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Increment queryCount if row exists, else create new
+    const [raiseQuery, created] = await model.RaiseQuery.findOrCreate({
+      where: { userId },
+      defaults: {
         first_name,
         last_name,
+        email,
         phone_number,
-        email
-    } = req.body;
+        isQueryRaised: true,
+        queryCount: 0, // start from 0, will increment below
+        queryStatus: "Active",
+      },
+    });
 
-    if (!userId || !fundsAuditUserId) 
-        return ReE(res, "userId and fundsAuditUserId are required", 400);
+    // Increment the count
+    await raiseQuery.increment("queryCount");
+    await raiseQuery.reload();
 
-    try {
-        // Fetch user info for defaults
-        const user = await model.User.findByPk(userId, {
-            attributes: ["firstName", "lastName", "phoneNumber"]
-        });
-        if (!user) return ReE(res, "User not found", 404);
-
-        // Default queryStatus to "Pending" if not provided
-        const finalQueryStatus = queryStatus || "Pending";
-
-        const raiseQuery = await model.RaiseQuery.create({
-            userId,
-            fundsAuditUserId,
-            first_name: first_name || user.firstName,
-            last_name: last_name || user.lastName,
-            phone_number: phone_number || user.phoneNumber,
-            email: email || null,
-            isQueryRaised: true,         // always true
-            queryStatus: finalQueryStatus // default to "Pending"
-        });
-
-        return ReS(res, { success: true, query: raiseQuery }, 201);
-    } catch (error) {
-        return ReE(res, error.message, 500);
+    // Ensure isQueryRaised is true
+    if (!raiseQuery.isQueryRaised) {
+      raiseQuery.isQueryRaised = true;
+      await raiseQuery.save();
     }
+
+    return ReS(res, { success: true, raiseQuery }, 200);
+  } catch (error) {
+    console.error("Add Query Error:", error);
+    return ReE(res, error.message || "Internal Server Error", 500);
+  }
 };
-
-module.exports.addRaiseQuery = addRaiseQuery;
-
+module.exports.addQuery = addQuery;
 // ✅ Update the latest Raise Query by userId
 var updateRaiseQueryByUser = async (req, res) => {
     const { userId } = req.params;
