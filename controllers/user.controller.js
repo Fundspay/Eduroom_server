@@ -42,7 +42,7 @@ const addPersonalInfo = async (req, res) => {
       pinCode,
     } = req.body;
 
-    // ✅ Required fields validation
+    // Required fields validation
     if (!firstName || !lastName || !email || !phoneNumber || !password) {
       return ReE(
         res,
@@ -54,31 +54,30 @@ const addPersonalInfo = async (req, res) => {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedPhone = phoneNumber.trim();
 
-    // ✅ Check if email already exists
+    // Check if email already exists
     const existingEmail = await model.User.findOne({
       where: { email: normalizedEmail, isDeleted: false },
     });
     if (existingEmail)
       return ReE(res, "User with this email already exists", 409);
 
-    // ✅ Check if phone number already exists
+    // Check if phone number already exists
     const existingPhone = await model.User.findOne({
       where: { phoneNumber: normalizedPhone, isDeleted: false },
     });
     if (existingPhone)
       return ReE(res, "User with this phone number already exists", 409);
 
-    // ✅ Hash the password
+    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Create user
     const user = await model.User.create({
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       email: normalizedEmail,
       phoneNumber: normalizedPhone,
       password: hashedPassword,
-
-      // Optional fields (nullable if not provided)
       fullName: fullName ? fullName.trim() : null,
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
@@ -96,6 +95,22 @@ const addPersonalInfo = async (req, res) => {
       state: state ? state.trim() : null,
       pinCode: pinCode ? pinCode.trim() : null,
     });
+
+    // ✅ Send welcome email after registration
+    const emailSubject = "Welcome to EduRoom!";
+    const emailBody = `
+      <h2>Hello ${firstName} ${lastName},</h2>
+      <p>Welcome to EduRoom! Your registration was successful.</p>
+      <p>We are excited to have you on board.</p>
+      <p>Best Regards,<br>EduRoom Team</p>
+    `;
+
+    const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
+
+    if (!mailResult.success) {
+      console.error("Failed to send welcome email:", mailResult.error);
+      // Optional: you can still return success for registration even if email fails
+    }
 
     return ReS(res, { success: true, userId: user.id }, 201);
   } catch (error) {
@@ -825,11 +840,8 @@ module.exports.loginWithGoogle = loginWithGoogle;
 //  Fetch Single User Info by ID with profile completion and filtered fields
 const fetchSingleUserById = async (req, res) => {
   try {
-    const { id } = req.params; // get ID from URL
-
-    if (!id) {
-      return ReE(res, "Missing user ID", 400);
-    }
+    const { id } = req.params;
+    if (!id) return ReE(res, "Missing user ID", 400);
 
     const user = await model.User.findOne({
       where: { id, isDeleted: false },
@@ -851,104 +863,85 @@ const fetchSingleUserById = async (req, res) => {
       ],
     });
 
-    if (!user) {
-      return ReE(res, "User not found", 404);
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
     const userData = user.get({ plain: true });
 
-    //  Calculate profile completion
+    // Fetch Status record
+    const statusRecord = await model.Status.findOne({
+      where: { userId: user.id },
+    });
+
+    // Determine final team manager
+    let finalTeamManager = null;
+
+    if (statusRecord && statusRecord.teamManager) {
+      // Status team manager exists → fetch email & phone from TeamManager table
+      const tmFromStatus = await model.TeamManager.findOne({
+        where: { name: statusRecord.teamManager },
+      });
+      if (tmFromStatus) {
+        finalTeamManager = {
+          name: tmFromStatus.name,
+          email: tmFromStatus.email,
+          phoneNumber: tmFromStatus.mobileNumber,
+        };
+      } else {
+        finalTeamManager = { name: statusRecord.teamManager, email: null, phoneNumber: null };
+      }
+    } else if (userData.teamManager) {
+      // Fallback to user's current team manager
+      finalTeamManager = {
+        name: userData.teamManager.name,
+        email: userData.teamManager.email,
+        phoneNumber: userData.teamManager.mobileNumber,
+      };
+    }
+
+    // Calculate profile completion
     const fields = [
-      "firstName",
-      "lastName",
-      "fullName",
-      "dateOfBirth",
-      "gender",
-      "phoneNumber",
-      "alternatePhoneNumber",
-      "email",
-      "residentialAddress",
-      "emergencyContactName",
-      "emergencyContactNumber",
-      "city",
-      "state",
-      "pinCode",
-      "collegeName",
-      "collegeRollNumber",
-      "course",
-      "specialization",
-      "currentYear",
-      "currentSemester",
-      "collegeAddress",
-      "placementCoordinatorName",
-      "placementCoordinatorContact",
-      "internshipProgram",
-      "internshipDuration",
-      "internshipModeId",
-      "preferredStartDate",
-      "referralCode",
-      "referralLink",
-      "referralSource",
-      "studentIdCard",
-      "governmentIdProof",
-      "passportPhoto",
-      "accountHolderName",
-      "bankName",
-      "branchAddress",
-      "ifscCode",
-      "accountNumber",
-      "preferredCommunicationId",
-      "linkedInProfile",
-      "studentDeclaration",
-      "consentAgreement",
-      "internshipStatus",
+      "firstName","lastName","fullName","dateOfBirth","gender","phoneNumber","alternatePhoneNumber",
+      "email","residentialAddress","emergencyContactName","emergencyContactNumber","city","state",
+      "pinCode","collegeName","collegeRollNumber","course","specialization","currentYear","currentSemester",
+      "collegeAddress","placementCoordinatorName","placementCoordinatorContact","internshipProgram",
+      "internshipDuration","internshipModeId","preferredStartDate","referralCode","referralLink",
+      "referralSource","studentIdCard","governmentIdProof","passportPhoto","accountHolderName","bankName",
+      "branchAddress","ifscCode","accountNumber","preferredCommunicationId","linkedInProfile",
+      "studentDeclaration","consentAgreement","internshipStatus"
     ];
 
     let filled = 0;
     fields.forEach((f) => {
-      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false)
-        filled++;
+      if (userData[f] !== null && userData[f] !== "" && userData[f] !== false) filled++;
     });
-
     const profileCompletion = Math.round((filled / fields.length) * 100);
 
-    //  Calculate total subscriptions
-    const totalSubscriptions = userData.businessTargets
-      ? Object.keys(userData.businessTargets).length
-      : 0;
+    // Total subscriptions
+    const totalSubscriptions = userData.businessTargets ? Object.keys(userData.businessTargets).length : 0;
 
-    //  Call the referral API directly with conditional +91 prefix
+    // Referral API logic
     let referralCode = userData.referralCode || null;
     let referralLink = userData.referralLink || null;
     try {
-      // Ensure phone number starts with +91
       let phoneNumber = userData.phoneNumber;
-      if (!phoneNumber.startsWith("+91")) {
-        phoneNumber = `+91${phoneNumber}`;
-      }
+      if (!phoneNumber.startsWith("+91")) phoneNumber = `+91${phoneNumber}`;
 
       const referralRes = await axios.get(
         "https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralByPhone",
-        {
-          params: { phone_number: phoneNumber },
-        }
+        { params: { phone_number: phoneNumber } }
       );
 
       if (referralRes.data) {
         referralCode = referralRes.data.referral_code || referralCode;
         referralLink = referralRes.data.referral_link || referralLink;
 
-        // ✅ Save referral code and link to DB
-        await user.update({
-          referralCode,
-          referralLink
-        });
+        await user.update({ referralCode, referralLink });
       }
     } catch (err) {
       console.warn("Referral API failed:", err.message);
     }
 
-    //  Prepare filtered response
+    // Prepare response
     const filteredData = {
       Name: userData.fullName || `${userData.firstName} ${userData.lastName}`,
       Email: userData.email,
@@ -959,7 +952,7 @@ const fetchSingleUserById = async (req, res) => {
       ProfileCompletion: profileCompletion,
       TotalSubscriptions: totalSubscriptions,
       InternshipStatus: userData.internshipStatus || null,
-      TeamManager: userData.teamManager || null,
+      TeamManager: finalTeamManager,
     };
 
     return ReS(res, { success: true, data: filteredData }, 200);
