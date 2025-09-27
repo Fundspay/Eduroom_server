@@ -291,23 +291,24 @@ const listAllUsers = async (req, res) => {
     });
 
     const userIds = users.map(u => u.id);
+
+    // Fetch all RaiseQuery rows for these users
     const raiseQueries = await RaiseQuery.findAll({
       where: { userId: userIds, isDeleted: false },
-      attributes: ["userId", "isQueryRaised", "queryStatus", "queryCount"]
+      attributes: ["userId", "isQueryRaised", "queryStatus"]
     });
 
-    // Aggregate query info per user
+    // Aggregate query info per user dynamically by counting rows
     const queryInfoByUser = {};
     raiseQueries.forEach(q => {
       if (!queryInfoByUser[q.userId]) {
         queryInfoByUser[q.userId] = {
           isQueryRaised: q.isQueryRaised || false,
           queryStatus: q.queryStatus || null,
-          queryCount: q.queryCount || 0     // ✅ take actual value from DB
+          queryCount: 1      // count this row as 1 query
         };
       } else {
-        // Sum counts if multiple rows exist
-        queryInfoByUser[q.userId].queryCount += q.queryCount || 0;
+        queryInfoByUser[q.userId].queryCount += 1;
         queryInfoByUser[q.userId].queryStatus = q.queryStatus || queryInfoByUser[q.userId].queryStatus;
         queryInfoByUser[q.userId].isQueryRaised = queryInfoByUser[q.userId].isQueryRaised || q.isQueryRaised;
       }
