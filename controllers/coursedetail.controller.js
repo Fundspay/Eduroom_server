@@ -974,7 +974,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         user.subscriptionWallet >= (course.businessTarget || 0) &&
         user.subscriptiondeductedWallet >= (course.businessTarget || 0);
 
-      // ✅ New: Check if all sessions >= 33% (including case study)
+      // ✅ Check if all sessions >= 33% (including case study)
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
@@ -1009,6 +1009,15 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus = "Completed";
       }
 
+      // ✅ Check internship status and override if needed
+      const internshipRecord = await model.InternshipStatus.findOne({
+        where: { userId, courseId, isDeleted: false },
+      });
+
+      if (internshipRecord && ["On Hold", "Terminated"].includes(internshipRecord.status)) {
+        overallStatus = internshipRecord.status;
+      }
+
       // Update user's courseStatuses
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
@@ -1034,7 +1043,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
 
 const getBusinessTarget = async (req, res) => {
   try {
