@@ -2,7 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,RaiseQuery,Status } = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
@@ -346,10 +346,10 @@ const listAllUsers = async (req, res) => {
 
       const teamManager = user.teamManager
         ? {
-            id: user.teamManager.id,
-            name: user.teamManager.name,
-            internshipStatus: user.teamManager.internshipStatus
-          }
+          id: user.teamManager.id,
+          name: user.teamManager.name,
+          internshipStatus: user.teamManager.internshipStatus
+        }
         : null;
 
       const offerLetterSent =
@@ -398,11 +398,14 @@ const listAllUsers = async (req, res) => {
 
         // Save the new statusId to user
         await user.update({ statusId: statusRecord.id });
+
       }
+      const statusData = statusRecord.toJSON();
+      statusData.querycount = queryInfo.queryCount;
 
       response.push({
         statusId: statusRecord.id,
-        ...statusRecord.toJSON()
+        ...statusData
       });
     }
 
