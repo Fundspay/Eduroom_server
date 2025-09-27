@@ -5,6 +5,8 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require('axios');
 const { Op } = require("sequelize");
 const dayjs = require("dayjs");
+model.InternshipStatus = require("../models/status.model.js"); // or the correct path
+
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
@@ -974,7 +976,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         user.subscriptionWallet >= (course.businessTarget || 0) &&
         user.subscriptiondeductedWallet >= (course.businessTarget || 0);
 
-      // ✅ Check if all sessions >= 33% (including case study)
+      // ✅ New: Check if all sessions >= 33% (including case study)
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
@@ -1009,15 +1011,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus = "Completed";
       }
 
-      // ✅ New: Check internshipStatus and override if "On Hold" or "Terminated"
-      const internshipRecord = await model.InternshipStatus.findOne({
-        where: { userId, courseId, isDeleted: false },
-      });
-
-      if (internshipRecord && ["On Hold", "Terminated"].includes(internshipRecord.internshipStatus)) {
-        overallStatus = internshipRecord.internshipStatus;
-      }
-
       // Update user's courseStatuses
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
@@ -1043,7 +1036,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
 
 
 const getBusinessTarget = async (req, res) => {
