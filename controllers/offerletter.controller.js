@@ -6,9 +6,7 @@ const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,R
 const { ReE, ReS } = require("../utils/util.service.js");
 
 
-// Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
-
   try {
     const { userId } = req.params;
     if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
@@ -16,72 +14,68 @@ const sendOfferLetter = async (req, res) => {
     // Fetch user
     const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-    if (!user.email) {
-      return res.status(400).json({ success: false, message: "User has no email" });
-    }
+    if (!user.email) return res.status(400).json({ success: false, message: "User has no email" });
 
     // Generate Offer Letter (PDF uploaded to S3 + DB saved)
     const offerLetter = await generateOfferLetter(userId);
 
+    const courseName = offerLetter.courseName || "Your Domain";
+    const startDate = offerLetter.startDate || "Find In the Offer Letter";
+
     // Build email content
     const subject = "Your Internship Offer Letter - Fundsroom InfoTech Pvt Ltd";
     const html = `
-  <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Dear ${user.fullName || user.firstName},</p>
 
-  <p>Greetings from <b>Eduroom!</b></p>
+      <p>Greetings from <b>Eduroom!</b></p>
 
-  <p>
-    We are pleased to inform you that you have been selected for the 
-    <b>Live Project</b> in the domain of <b>${courseName || "Your Domain"}</b> 
-    with Eduroom – India’s leading online internship platform.
-  </p>
+      <p>
+        We are pleased to inform you that you have been selected for the 
+        <b>Live Project</b> in the domain of <b>${courseName}</b> 
+        with Eduroom – India’s leading online internship platform.
+      </p>
 
-  <p>
-    This internship is designed to provide you with practical industry exposure through:
-  </p>
-  <ul>
-    <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
-    <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
-  </ul>
+      <p>
+        This internship is designed to provide you with practical industry exposure through:
+      </p>
+      <ul>
+        <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
+        <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
+      </ul>
 
-  <h3>Live Project Details:</h3>
-  <p><b>Domain:</b> ${courseName || "Find In the Offere Letter"}</p>
-  <p><b>Mode:</b> Online (Virtual)</p>
-  <p><b>Duration:</b>[e.g., 10 Days / 30 Days / 45 Days]</p>
-  <p><b>Start Date:</b> ${startDate || "Find In the Offere Letter"}</p>
+      <h3>Live Project Details:</h3>
+      <p><b>Domain:</b> ${courseName}</p>
+      <p><b>Mode:</b> Online (Virtual)</p>
+      <p><b>Duration:</b> [e.g., 10 Days / 30 Days / 45 Days]</p>
+      <p><b>Start Date:</b> ${startDate}</p>
 
-  <p>
-    We welcome you onboard and look forward to your enthusiastic participation. 
-    This is a valuable opportunity to build your portfolio, enhance your skills, 
-    and gain career-oriented exposure.
-  </p>
+      <p>
+        We welcome you onboard and look forward to your enthusiastic participation. 
+        This is a valuable opportunity to build your portfolio, enhance your skills, 
+        and gain career-oriented exposure.
+      </p>
 
-  <p>
-    Please find your official <b>Offer Letter</b> attached with this email.
-  </p>
+      <p>
+        Please find your official <b>Offer Letter</b> attached with this email.
+      </p>
 
-  <p>
-    For any queries, feel free to reach us at 
-    <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
-  </p>
+      <p>
+        For any queries, feel free to reach us at 
+        <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
+      </p>
 
-  <br/>
-  <p>Best Regards,<br/>Eduroom HR Team</p>
-`;
-
+      <br/>
+      <p>Best Regards,<br/>Eduroom HR Team</p>
+    `;
 
     // Send Email
     const mailResult = await sendMail(user.email, subject, html);
-
     if (!mailResult.success) {
       return res.status(500).json({ success: false, message: "Failed to send email", error: mailResult.error });
     }
+
     await model.OfferLetter.update(
-      {
-        issent: true,
-        updatedAt: new Date()
-      },
+      { issent: true, updatedAt: new Date() },
       { where: { id: offerLetter.id } }
     );
 
@@ -92,7 +86,7 @@ const sendOfferLetter = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(" sendOfferLetter error:", error);
+    console.error("sendOfferLetter error:", error);
     return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
