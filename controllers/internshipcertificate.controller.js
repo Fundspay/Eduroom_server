@@ -52,11 +52,28 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const rawTarget = parseInt(userTarget !== undefined ? userTarget : course?.businessTarget || 0, 10);
     const businessTarget = rawTarget < 0 ? 0 : rawTarget;
 
-    // 🔹 Wallet Logic (explicit & clean)
+    // 🔹 Wallet Logic (check sufficiency first)
     const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // Total subscribed
     const alreadyDeducted = parseInt(user.subscriptiondeductedWallet || 0, 10); // Already deducted
-    const newDeductedWallet = alreadyDeducted + businessTarget; // Total deducted after this certificate
-    const newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet); // Remaining
+    const currentLeft = Math.max(0, subscriptionWallet - alreadyDeducted);
+
+    if (currentLeft < businessTarget) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient subscription wallet, business target not met",
+        wallet: {
+          totalSubscribed: subscriptionWallet,
+          businessTarget,
+          totalDeducted: alreadyDeducted,
+          subscriptionLeft: currentLeft
+        }
+      });
+    }
+
+    // ✅ Deduct only if sufficient
+    const newDeductedWallet = alreadyDeducted + businessTarget;
+    const newSubscriptionLeft = subscriptionWallet - newDeductedWallet;
 
     user.subscriptiondeductedWallet = newDeductedWallet;
     user.subscriptionLeft = newSubscriptionLeft;
