@@ -970,15 +970,26 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         : 0;
 
       // Check if business target is met
-      const isBusinessTargetMet = user.subscriptionWallet >= (course.businessTarget || 0) &&
+      const isBusinessTargetMet =
+        user.subscriptionWallet >= (course.businessTarget || 0) &&
         user.subscriptiondeductedWallet >= (course.businessTarget || 0);
 
-      // Updated overallStatus logic
+      // ✅ New: Check if all sessions >= 33%
+      const allSessionsAboveThreshold = sessions.every((session) => {
+        const progress = session.userProgress?.[userId] || {};
+        let sessionCompletionPercentage = 0;
+
+        if (progress.totalMCQs && progress.correctMCQs !== undefined) {
+          sessionCompletionPercentage = ((progress.correctMCQs / progress.totalMCQs) * 100) || 0;
+        }
+
+        return sessionCompletionPercentage >= 33;
+      });
+
+      // ✅ Final overallStatus logic
       let overallStatus = "In Progress";
-      if (isBusinessTargetMet) {
-        overallStatus = "Completed"; // Business target alone completes course
-      } else if (Number(overallCompletionRate) === 100) {
-        overallStatus = "Completed"; // All sessions done
+      if (isBusinessTargetMet && allSessionsAboveThreshold) {
+        overallStatus = "Completed";
       }
 
       // Update user's courseStatuses
