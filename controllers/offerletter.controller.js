@@ -56,7 +56,8 @@ const sendOfferLetter = async (req, res) => {
   </p>
 
   <p>
-    Please find your official <b>Offer Letter</b> attached with this email.
+    Please find your official <b>Offer Letter</b> Here:
+    <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
   </p>
 
   <p>
@@ -67,8 +68,6 @@ const sendOfferLetter = async (req, res) => {
   <br/>
   <p>Best Regards,<br/>Eduroom HR Team</p>
 `;
-
-
 
     // Send Email
     const mailResult = await sendMail(user.email, subject, html);
