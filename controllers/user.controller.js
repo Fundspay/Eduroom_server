@@ -99,13 +99,35 @@ const addPersonalInfo = async (req, res) => {
     // ✅ Send welcome email after registration
     const emailSubject = "Welcome to EduRoom!";
     const emailBody = `
-      <h2>Hello ${firstName} ${lastName},</h2>
-      <p>Welcome to EduRoom! Your registration was successful.</p>
-      <p>We are excited to have you on board.</p>
-      <p>Best Regards,<br>EduRoom Team</p>
-    `;
+  <p>Dear ${firstName} ${lastName},</p>
 
-    const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
+  <p>Thank you for registering with <strong>Eduroom – India’s hands-on internship platform!</strong> 🎉</p>
+
+  <p>
+    You are now one step closer to gaining real-world exposure through structured learning, 
+    case studies, live projects, and business tasks.
+  </p>
+
+  <h3>What’s Next?</h3>
+  <ul>
+    <li>✅ You’ll receive your internship domain details & schedule shortly</li>
+    <li>✅ Get access to learning sessions, quizzes & assignments</li>
+    <li>✅ Work on live tasks and build your portfolio</li>
+    <li>✅ Earn your Internship Certificate (and unlock extended internship + placement opportunities)</li>
+  </ul>
+
+  <p>
+    We’re excited to have you onboard and can’t wait to see you grow with Eduroom! 🌟
+  </p>
+
+  <p>
+    For queries, feel free to reach us at 
+    <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
+  </p>
+`;
+
+const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
+
 
     if (!mailResult.success) {
       console.error("Failed to send welcome email:", mailResult.error);
