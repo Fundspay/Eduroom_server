@@ -40,6 +40,7 @@ const addPersonalInfo = async (req, res) => {
       city,
       state,
       pinCode,
+      collegeName
     } = req.body;
 
     // Required fields validation
@@ -94,6 +95,7 @@ const addPersonalInfo = async (req, res) => {
       city: city ? city.trim() : null,
       state: state ? state.trim() : null,
       pinCode: pinCode ? pinCode.trim() : null,
+      collegeName: collegeName ? collegeName.trim() : null
     });
 
     // ✅ Send welcome email after registration
