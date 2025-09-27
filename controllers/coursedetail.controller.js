@@ -1013,8 +1013,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         where: { userId, courseId, isDeleted: false },
       });
 
-      if (internshipRecord && ["On Hold", "Terminated"].includes(internshipRecord.status)) {
-        overallStatus = internshipRecord.status;
+      if (internshipRecord && ["On Hold", "Terminated"].includes(internshipRecord.internshipStatus)) {
+        overallStatus = internshipRecord.internshipStatus;
       }
 
       // Update user's courseStatuses
@@ -1042,6 +1042,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
