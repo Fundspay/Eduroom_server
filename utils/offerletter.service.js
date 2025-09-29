@@ -19,7 +19,7 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
 };
 
-const generateOfferLetter = async (userId) => {
+const generateOfferLetter = async (userId, courseId = null) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1. Load user
@@ -30,35 +30,42 @@ const generateOfferLetter = async (userId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Determine the earliest course start date from courseDates
+  // 2. Determine course details
   let startDate = null;
   let courseName = null;
 
   if (user.courseDates && Object.keys(user.courseDates).length > 0) {
-    let earliestStart = null;
-    let courseIdForStart = null;
+    let targetCourseId = null;
 
-    for (const [cid, courseObj] of Object.entries(user.courseDates)) {
-      if (!courseObj.startDate) continue;
-      const courseStartISO = normalizeDateToISO(courseObj.startDate);
-      if (!courseStartISO) continue;
-
-      if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
-        earliestStart = courseStartISO;
-        courseIdForStart = cid;
+    if (courseId) {
+      // If courseId explicitly passed, use that
+      if (user.courseDates[courseId] && user.courseDates[courseId].startDate) {
+        targetCourseId = courseId;
+      }
+    } else {
+      // Otherwise pick earliest start
+      let earliestStart = null;
+      for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+        if (!courseObj.startDate) continue;
+        const courseStartISO = normalizeDateToISO(courseObj.startDate);
+        if (!courseStartISO) continue;
+        if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+          earliestStart = courseStartISO;
+          targetCourseId = cid;
+        }
       }
     }
 
-    startDate = earliestStart;
+    if (targetCourseId) {
+      const courseObj = user.courseDates[targetCourseId];
+      startDate = normalizeDateToISO(courseObj.startDate);
 
-    if (courseIdForStart) {
-      const course = await model.Course.findOne({ where: { id: Number(courseIdForStart) } });
+      const course = await model.Course.findOne({ where: { id: Number(targetCourseId) } });
       if (course && course.name) {
         courseName = course.name;
       }
     }
   }
-
   // 3. Fallbacks
   startDate = startDate
     ? new Date(startDate).toLocaleDateString("en-GB", {
