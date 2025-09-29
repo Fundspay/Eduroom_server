@@ -911,6 +911,7 @@ const getDailyStatusPerUser = async (req, res) => {
           caseStudyPercentage,
           sessionDuration: session.sessionDuration || null,
           sessionCompletionPercentage: Number(sessionCompletionPercentage),
+          minBusinessTarget: session.minBusinessTarget || null,
         });
       }
     }
