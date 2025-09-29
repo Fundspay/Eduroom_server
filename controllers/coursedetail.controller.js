@@ -39,6 +39,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
       for (const session of sessions) {
         const {
           sessionNumber,
+         minBusinessTarget,
           title,
           description,
           youtubeLink,
@@ -67,6 +68,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               userId: userId ?? null,
               day,
               sessionNumber,
+              minBusinessTarget,
               title,
               description: description ?? null,
               youtubeLink: youtubeLink ?? null,
@@ -84,6 +86,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               youtubeLink: youtubeLink ?? null,
               duration,
               sessionDuration,
+              minBusinessTarget,
               heading,
             },
             { transaction }
@@ -130,6 +133,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                   coursePreviewId,
                   day,
                   sessionNumber,
+                  minBusinessTarget,
                   question: q.question,
                   optionA: q.optionA,
                   optionB: q.optionB,
@@ -166,6 +170,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           youtubeLink: youtubeLink ?? null,
           duration,
           sessionDuration,
+          minBusinessTarget,
           heading,
           questions,
         });
@@ -265,6 +270,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
         "id",
         "day",
         "sessionNumber",
+        "minBusinessTarget",
         "title",
         "heading",
         "description",
@@ -290,6 +296,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
             "keywords",
             "caseStudy",
             "sessionNumber",
+            "minBusinessTarget",
           ],
         },
         {
@@ -343,6 +350,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
         "youtubeLink",
         "duration",
         "sessionDuration",
+        "minBusinessTarget",
         "createdAt",
         "updatedAt",
       ],
@@ -362,6 +370,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
             "keywords",
             "caseStudy",
             "sessionNumber",
+            "minBusinessTarget",
           ],
         },
         {
