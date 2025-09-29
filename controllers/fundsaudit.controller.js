@@ -1,7 +1,8 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { FundsAudit, User, Status } = require("../models");
+const { FundsAudit, User, Status,Sequelize } = require("../models");
+const { Op } = Sequelize;
 
 // ✅ Add a new FundsAudit record
 var addFundsAudit = async function (req, res) {
@@ -179,6 +180,118 @@ const listAllFundsAudit = async (req, res) => {
     }
 
     // ✅ Send paginated response
+    return res.status(200).json({
+      success: true,
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / limit),
+      currentPage: page,
+      limit,
+      data: response
+    });
+  } catch (err) {
+    console.error("Error in listAllFundsAudit:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+module.exports.listAllFundsAudit = listAllFundsAudit;
+
+
+const listAllFundsAuditByUser = async (req, res) => {
+  try {
+    const { teamManagerName } = req.query;
+
+    // ✅ Pagination params
+    const limit = parseInt(req.query.limit) || 100;
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
+
+    let userIds = null;
+
+    if (teamManagerName) {
+      // Partial, case-insensitive match
+      const statuses = await Status.findAll({
+        where: {
+          teamManager: { [Op.iLike]: `%${teamManagerName}%` }
+        },
+        attributes: ["userId"]
+      });
+
+      userIds = statuses.map(s => s.userId);
+
+      if (!userIds.length) {
+        return res.status(200).json({
+          success: true,
+          totalRecords: 0,
+          totalPages: 0,
+          currentPage: page,
+          limit,
+          data: []
+        });
+      }
+    }
+
+    // Fetch FundsAudit with optional filter
+    const { count: totalRecords, rows: fundsAudits } = await FundsAudit.findAndCountAll({
+      where: userIds ? { userId: userIds } : {},
+      limit,
+      offset,
+      order: [["createdAt", "DESC"]]
+    });
+
+    const response = [];
+
+    for (const audit of fundsAudits) {
+      const user = await User.findOne({
+        where: { id: audit.userId },
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "phoneNumber",
+          "email",
+          "collegeName",
+          "businessTargets",
+          "subscriptionWallet",
+          "createdAt",
+        ],
+      });
+
+      const status = await Status.findOne({
+        where: { userId: audit.userId },
+        attributes: ["teamManager"],
+      });
+
+      response.push({
+        id: audit.id,
+        userId: audit.userId,
+        registeredUserId: audit.registeredUserId,
+        dateOfPayment: audit.dateOfPayment,
+        dateOfDownload: audit.dateOfDownload,
+        hasPaid: audit.hasPaid,
+        isDownloaded: audit.isDownloaded,
+        queryStatus: audit.queryStatus,
+        isQueryRaised: audit.isQueryRaised,
+        createdAt: audit.createdAt,
+
+        userInfo: user
+          ? {
+              name: `${user.firstName} ${user.lastName}`,
+              phoneNumber: user.phoneNumber,
+              email: user.email,
+              collegeName: user.collegeName,
+              businessTargets: user.businessTargets,
+              subscriptionWallet: user.subscriptionWallet,
+              registeredAt: user.createdAt,
+            }
+          : null,
+        teamManager: status ? status.teamManager : null,
+      });
+    }
+
     return res.status(200).json({
       success: true,
       totalRecords,
