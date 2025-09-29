@@ -844,7 +844,7 @@ const getDailyStatusPerUser = async (req, res) => {
     // Loop through sessions
     for (const session of sessions) {
       const progress = session.userProgress?.[userId] || {};
-      const attempted = !!progress;
+      const attempted = !!progress || true; // consider attempted if any progress
 
       let sessionCompletionPercentage = 0;
       let correctMCQs = 0;
@@ -864,15 +864,14 @@ const getDailyStatusPerUser = async (req, res) => {
       });
 
       if (latestCaseStudy) {
-        // Use the real matchPercentage from case study
-        caseStudyPercentage = latestCaseStudy.matchPercentage;
+        caseStudyPercentage = latestCaseStudy.matchPercentage || 0;
         sessionCompletionPercentage = caseStudyPercentage;
       } else {
         // Fallback to MCQs
         totalMCQs = progress.totalMCQs || 0;
         correctMCQs = progress.correctMCQs || 0;
         sessionCompletionPercentage = totalMCQs
-          ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
+          ? ((correctMCQs / totalMCQs) * 100)
           : 0;
       }
 
@@ -882,16 +881,17 @@ const getDailyStatusPerUser = async (req, res) => {
       daysMap[session.day].total++;
       totalSessions++;
 
-      // Count completed sessions
-      if (attempted && sessionCompletionPercentage > 0) {
+      // Count completed sessions based on threshold (>=20%)
+      const isCompleted = sessionCompletionPercentage >= 20 && attempted;
+      if (isCompleted) {
         completedSessions++;
         daysMap[session.day].completed++;
       }
 
-      // Determine status
-   const status = sessionCompletionPercentage >= 20 ? "Completed" : "In Progress";
+      // Determine status for this session
+      const status = isCompleted ? "Completed" : "In Progress";
 
-      // ✅ Prevent duplicate sessions
+      // Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
         (s) => s.sessionNumber === session.sessionNumber
       );
@@ -906,7 +906,7 @@ const getDailyStatusPerUser = async (req, res) => {
           totalMCQs,
           caseStudyPercentage,
           sessionDuration: session.sessionDuration || null,
-          sessionCompletionPercentage: Number(sessionCompletionPercentage),
+          sessionCompletionPercentage: Number(sessionCompletionPercentage.toFixed(2)),
           minBusinessTarget: session.minBusinessTarget || null,
         });
       }
@@ -915,9 +915,7 @@ const getDailyStatusPerUser = async (req, res) => {
     // --- Build dailyStatus array ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
       const d = daysMap[dayKey];
-      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(
-        2
-      );
+      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
       return {
         day: Number(dayKey),
         totalSessions: d.total,
