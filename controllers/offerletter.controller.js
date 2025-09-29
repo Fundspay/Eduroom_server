@@ -380,7 +380,7 @@ const listAllUsers = async (req, res) => {
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
         queryCount: queryInfo.queryCount,
-        createdAt: createdAtFormatted
+        registeredAt: createdAtFormatted
       };
 
       // Check if a Status record already exists for this user
