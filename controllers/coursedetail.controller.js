@@ -1479,7 +1479,7 @@ const setCourseStartEndDates = async (req, res) => {
 
     // 🔹 Trigger internal Offer Letter API (non-blocking)
     try {
-      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}`, {
+      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}/${courseId}`, {
         courseId,
         courseName: course.name, // send course name
         startDate: courseDates[courseId].startDate,
