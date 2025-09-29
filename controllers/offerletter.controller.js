@@ -9,77 +9,99 @@ const moment = require("moment");
 
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
-
   try {
-    const { userId } = req.params;
-    if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
+    const { userId, courseId } = req.params; // take both from params
+    if (!userId || !courseId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing userId or courseId",
+      });
+    }
 
     // Fetch user
-    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+    });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
     if (!user.email) {
-      return res.status(400).json({ success: false, message: "User has no email" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User has no email" });
+    }
+
+    // Fetch course
+    const course = await model.Course.findByPk(courseId);
+    if (!course) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Course not found" });
     }
 
     // Generate Offer Letter (PDF uploaded to S3 + DB saved)
-    const offerLetter = await generateOfferLetter(userId);
+    const offerLetter = await generateOfferLetter(userId, courseId); 
+    // 🔹 update generateOfferLetter to also accept courseId if needed
 
-    // Build email content
-    const subject = "Your Internship Offer Letter - Fundsroom InfoTech Pvt Ltd";
+    // Build email content (inject course name + duration if available)
+    const subject = `Your Internship Offer Letter - ${course.name} - Fundsroom InfoTech Pvt Ltd`;
     const html = `
-  <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Greetings from <b>Eduroom!</b></p>
 
-  <p>Greetings from <b>Eduroom!</b></p>
+      <p>
+        We are pleased to inform you that you have been selected for the
+        <b>Live Project Internship</b> in <b>${course.name}</b> with Eduroom – India’s leading online internship platform.
+      </p>
 
-  <p>
-    We are pleased to inform you that you have been selected for the 
-    <b>Live Project Internship</b> with Eduroom – India’s leading online internship platform.
-  </p>
+      <p>
+        This internship is designed to provide you with practical industry exposure through:
+      </p>
+      <ul>
+        <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
+        <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
+      </ul>
 
-  <p>
-    This internship is designed to provide you with practical industry exposure through:
-  </p>
-  <ul>
-    <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
-    <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
-  </ul>
+      <h3>Live Project Details:</h3>
+      <p><b>Mode:</b> Online (Virtual)</p>
+      <p><b>Duration:</b> ${course.duration || "[Not Set]"} Days</p>
+      <p><b>Start Date:</b> Find in the Offer Letter</p>
 
-  <h3>Live Project Details:</h3>
-  <p><b>Mode:</b> Online (Virtual)</p>
-  <p><b>Duration:</b> [10 Days / 30 Days / 45 Days]</p>
-  <p><b>Start Date:</b>Find In the Offer Letter</p>
+      <p>
+        We welcome you onboard and look forward to your enthusiastic participation.
+        This is a valuable opportunity to build your portfolio, enhance your skills,
+        and gain career-oriented exposure.
+      </p>
 
-  <p>
-    We welcome you onboard and look forward to your enthusiastic participation. 
-    This is a valuable opportunity to build your portfolio, enhance your skills, 
-    and gain career-oriented exposure.
-  </p>
+      <p>
+        Please find your official <b>Offer Letter</b> here:
+        <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
+      </p>
 
-  <p>
-    Please find your official <b>Offer Letter</b> Here:
-    <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
-  </p>
+      <p>
+        For any queries, feel free to reach us at
+        <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
+      </p>
 
-  <p>
-    For any queries, feel free to reach us at 
-    <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
-  </p>
-
-  <br/>
-  <p>Best Regards,<br/>Eduroom HR Team</p>
-`;
+      <br/>
+      <p>Best Regards,<br/>Eduroom HR Team</p>
+    `;
 
     // Send Email
     const mailResult = await sendMail(user.email, subject, html);
 
     if (!mailResult.success) {
-      return res.status(500).json({ success: false, message: "Failed to send email", error: mailResult.error });
+      return res
+        .status(500)
+        .json({ success: false, message: "Failed to send email", error: mailResult.error });
     }
+
+    // Update DB
     await model.OfferLetter.update(
       {
         issent: true,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       },
       { where: { id: offerLetter.id } }
     );
@@ -89,14 +111,14 @@ const sendOfferLetter = async (req, res) => {
       message: "Offer Letter sent successfully",
       fileUrl: offerLetter.fileUrl,
     });
-
   } catch (error) {
-    console.error(" sendOfferLetter error:", error);
+    console.error("sendOfferLetter error:", error);
     return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
 
 module.exports = { sendOfferLetter };
+
 
 // const listAllUsers = async (req, res) => {
 //   try {
