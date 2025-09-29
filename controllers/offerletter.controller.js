@@ -2,8 +2,9 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
-const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain ,RaiseQuery,Status } = require("../models/index.js");
+const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
+const moment = require("moment");
 
 
 // Controller: Send Offer Letter to User Email
@@ -346,10 +347,10 @@ const listAllUsers = async (req, res) => {
 
       const teamManager = user.teamManager
         ? {
-            id: user.teamManager.id,
-            name: user.teamManager.name,
-            internshipStatus: user.teamManager.internshipStatus
-          }
+          id: user.teamManager.id,
+          name: user.teamManager.name,
+          internshipStatus: user.teamManager.internshipStatus
+        }
         : null;
 
       const offerLetterSent =
@@ -364,6 +365,10 @@ const listAllUsers = async (req, res) => {
 
       const queryInfo = queryInfoByUser[user.id] || { isQueryRaised: false, queryStatus: null, queryCount: 0 };
 
+      const createdAtFormatted = user.createdAt
+        ? moment(user.createdAt).format("YYYY-MM-DD HH:mm:ss")
+        : null;
+
       // Only fields that should change on update
       const fieldsToUpdate = {
         subscriptionWallet: user.subscriptionWallet,
@@ -374,7 +379,8 @@ const listAllUsers = async (req, res) => {
         offerLetterFile,
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
-        queryCount: queryInfo.queryCount
+        queryCount: queryInfo.queryCount,
+        createdAt: createdAtFormatted
       };
 
       // Check if a Status record already exists for this user
