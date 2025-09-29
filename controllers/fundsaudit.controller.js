@@ -113,76 +113,78 @@ module.exports.deleteFundsAudit = deleteFundsAudit;
 
 const listAllFundsAudit = async (req, res) => {
   try {
-    // Get all funds audits
-    const fundsAudits = await FundsAudit.findAll({
+    // Pagination params
+    const limit = parseInt(req.query.limit) || 100;   // records per page
+    const page = parseInt(req.query.page) || 1;       // current page
+    const offset = (page - 1) * limit;
+
+    // Fetch FundsAudit with related User and Status in one query
+    const { count, rows } = await FundsAudit.findAndCountAll({
+      limit,
+      offset,
       order: [["createdAt", "DESC"]],
+      include: [
+        {
+          model: User,
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "collegeName",
+            "businessTargets",
+            "subscriptionWallet",
+            "createdAt"
+          ]
+        },
+        {
+          model: Status,
+          attributes: ["teamManager"]
+        }
+      ]
     });
 
-    const response = [];
+    // Transform rows to desired format
+    const data = rows.map(audit => ({
+      id: audit.id,
+      userId: audit.userId,
+      registeredUserId: audit.registeredUserId,
+      dateOfPayment: audit.dateOfPayment,
+      dateOfDownload: audit.dateOfDownload,
+      hasPaid: audit.hasPaid,
+      isDownloaded: audit.isDownloaded,
+      queryStatus: audit.queryStatus,
+      isQueryRaised: audit.isQueryRaised,
+      createdAt: audit.createdAt,
 
-    for (const audit of fundsAudits) {
-      // Get user info
-      const user = await User.findOne({
-        where: { id: audit.userId },
-        attributes: [
-          "id",
-          "firstName",
-          "lastName",
-          "phoneNumber",
-          "email",
-          "collegeName",
-          "businessTargets",
-          "subscriptionWallet",
-          "createdAt",
-        ],
-      });
+      userInfo: audit.User
+        ? {
+            name: `${audit.User.firstName} ${audit.User.lastName}`,
+            phoneNumber: audit.User.phoneNumber,
+            email: audit.User.email,
+            collegeName: audit.User.collegeName,
+            businessTargets: audit.User.businessTargets,
+            subscriptionWallet: audit.User.subscriptionWallet,
+            registeredAt: audit.User.createdAt
+          }
+        : null,
+      teamManager: audit.Status ? audit.Status.teamManager : null
+    }));
 
-      // Get team manager info from Status
-      const status = await Status.findOne({
-        where: { userId: audit.userId },
-        attributes: ["teamManager"],
-      });
-
-      response.push({
-        id: audit.id,
-        userId: audit.userId,
-        registeredUserId: audit.registeredUserId,
-        dateOfPayment: audit.dateOfPayment,
-        dateOfDownload: audit.dateOfDownload,
-        hasPaid: audit.hasPaid,
-        isDownloaded: audit.isDownloaded,
-        queryStatus: audit.queryStatus,
-        isQueryRaised: audit.isQueryRaised,
-        createdAt: audit.createdAt,
-
-        // 🔹 Extra joined info
-        userInfo: user
-          ? {
-              name: `${user.firstName} ${user.lastName}`,
-              phoneNumber: user.phoneNumber,
-              email: user.email,
-              collegeName: user.collegeName,
-              businessTargets: user.businessTargets,
-              subscriptionWallet: user.subscriptionWallet,
-              registeredAt: user.createdAt, // from User table
-            }
-          : null,
-        teamManager: status ? status.teamManager : null,
-      });
-    }
-
-    return res.status(200).json({
+    // Response with pagination info
+    res.json({
       success: true,
-      data: response,
+      totalRecords: count,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      limit,
+      data
     });
   } catch (err) {
     console.error("Error in listAllFundsAudit:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
 module.exports.listAllFundsAudit = listAllFundsAudit;
-
