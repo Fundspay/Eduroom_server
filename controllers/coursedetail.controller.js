@@ -882,7 +882,7 @@ const getDailyStatusPerUser = async (req, res) => {
       // Determine status
       const status = latestCaseStudy
         ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
-        : sessionCompletionPercentage >= 33
+        : sessionCompletionPercentage >= 20
         ? "Completed"
         : "In Progress";
 
