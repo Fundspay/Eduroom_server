@@ -1,6 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
+const { FundsAudit, User, Status } = require("../models");
 
 // ✅ Add a new FundsAudit record
 var addFundsAudit = async function (req, res) {
@@ -109,3 +110,79 @@ var deleteFundsAudit = async function (req, res) {
     }
 };
 module.exports.deleteFundsAudit = deleteFundsAudit;
+
+const listAllFundsAudit = async (req, res) => {
+  try {
+    // Get all funds audits
+    const fundsAudits = await FundsAudit.findAll({
+      order: [["createdAt", "DESC"]],
+    });
+
+    const response = [];
+
+    for (const audit of fundsAudits) {
+      // Get user info
+      const user = await User.findOne({
+        where: { id: audit.userId },
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "phoneNumber",
+          "email",
+          "collegeName",
+          "businessTargets",
+          "subscriptionWallet",
+          "createdAt",
+        ],
+      });
+
+      // Get team manager info from Status
+      const status = await Status.findOne({
+        where: { userId: audit.userId },
+        attributes: ["teamManager"],
+      });
+
+      response.push({
+        id: audit.id,
+        userId: audit.userId,
+        registeredUserId: audit.registeredUserId,
+        dateOfPayment: audit.dateOfPayment,
+        dateOfDownload: audit.dateOfDownload,
+        hasPaid: audit.hasPaid,
+        isDownloaded: audit.isDownloaded,
+        queryStatus: audit.queryStatus,
+        isQueryRaised: audit.isQueryRaised,
+        createdAt: audit.createdAt,
+
+        // 🔹 Extra joined info
+        userInfo: user
+          ? {
+              name: `${user.firstName} ${user.lastName}`,
+              phoneNumber: user.phoneNumber,
+              email: user.email,
+              collegeName: user.collegeName,
+              businessTargets: user.businessTargets,
+              subscriptionWallet: user.subscriptionWallet,
+              registeredAt: user.createdAt, // from User table
+            }
+          : null,
+        teamManager: status ? status.teamManager : null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: response,
+    });
+  } catch (err) {
+    console.error("Error in listAllFundsAudit:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+module.exports.listAllFundsAudit = listAllFundsAudit;
+
