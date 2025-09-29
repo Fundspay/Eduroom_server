@@ -9,7 +9,8 @@ module.exports = (sequelize, Sequelize) => {
             coursePreviewId: { type: Sequelize.BIGINT, allowNull: false },
             courseDetailId: { type: Sequelize.BIGINT, allowNull: false }, // FK to CourseDetail
             day: { type: Sequelize.INTEGER, allowNull: false }, // Day number for reference
-            sessionNumber: { type: Sequelize.INTEGER, allowNull: false }, // 👈 New: Session per day
+            sessionNumber: { type: Sequelize.INTEGER, allowNull: false },
+            minBusinessTarget: { type: Sequelize.INTEGER, allowNull: true }, // 👈 New: Minimum Business Target
             question: { type: Sequelize.TEXT, allowNull: false },
             optionA: { type: Sequelize.TEXT, allowNull: false },
             optionB: { type: Sequelize.TEXT, allowNull: false },
