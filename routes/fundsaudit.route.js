@@ -7,7 +7,7 @@ router.post("/add", fundsauditController.addFundsAudit);
 router.get("/all", fundsauditController.fetchAllFundsAudit);          
 router.get("/list/:id", fundsauditController.fetchSingleFundsAudit);  
 router.put("/update/:id", fundsauditController.updateFundsAudit);    
-router.delete("/delete/:id", fundsauditController.deleteFundsAudit);  // Delete record by ID
+router.delete("/delete/:id", fundsauditController.deleteFundsAudit);  
 router.get("/list", fundsauditController.listAllFundsAudit);          // List all records with pagination
 router.get ("/byname", fundsauditController.listAllFundsAuditByUser); // List all records by user ID
 router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); // List all records by college ID
