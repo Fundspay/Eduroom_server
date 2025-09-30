@@ -521,6 +521,11 @@ const listAllUsers = async (req, res) => {
 
     for (const user of users) {
       const courseDetails = [];
+
+      // per-user counters
+      let userTotalCourses = 0;
+      let userCompletedCourses = 0;
+
       if (user.courseStatuses && typeof user.courseStatuses === "object") {
         for (const [courseId, status] of Object.entries(user.courseStatuses)) {
           const course = courses.find(c => c.id.toString() === courseId);
@@ -532,21 +537,25 @@ const listAllUsers = async (req, res) => {
             businessTarget: course ? course.businessTarget : null,
             domainName: course && course.Domain ? course.Domain.name : null,
             status,
-            startDate:
-              user.courseDates && user.courseDates[courseId]
-                ? user.courseDates[courseId].startDate
-                : null,
-            endDate:
-              user.courseDates && user.courseDates[courseId]
-                ? user.courseDates[courseId].endDate
-                : null
+            startDate: user.courseDates?.[courseId]?.startDate || null,
+            endDate: user.courseDates?.[courseId]?.endDate || null
           });
 
-          // Update overall course counters
+          // update per-user counters
+          userTotalCourses++;
+          if (status === "completed") userCompletedCourses++;
+
+          // update global counters
           totalCourses++;
           if (status === "completed") completedCourses++;
         }
       }
+
+      // per-user course completion percent
+      const userCourseCompletionPercent =
+        userTotalCourses > 0
+          ? ((userCompletedCourses / userTotalCourses) * 100).toFixed(2)
+          : "0.00";
 
       const internshipIssued =
         user.InternshipCertificates && user.InternshipCertificates.length > 0
@@ -592,7 +601,8 @@ const listAllUsers = async (req, res) => {
         queryStatus: queryInfo.queryStatus,
         isQueryRaised: queryInfo.isQueryRaised,
         queryCount: queryInfo.queryCount,
-        registeredAt: createdAtFormatted
+        registeredAt: createdAtFormatted,
+        courseCompletionPercent: userCourseCompletionPercent // ✅ per-user percentage
       };
 
       let statusRecord = await Status.findOne({ where: { userId: user.id } });
