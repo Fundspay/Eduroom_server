@@ -309,4 +309,4 @@ const listAllFundsAuditByUser = async (req, res) => {
   }
 };
 
-module.exports.listAllFundsAudit = listAllFundsAudit;
+module.exports.listAllFundsAuditByUser = listAllFundsAuditByUser;
