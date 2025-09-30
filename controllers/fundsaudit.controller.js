@@ -310,3 +310,161 @@ const listAllFundsAuditByUser = async (req, res) => {
 };
 
 module.exports.listAllFundsAuditByUser = listAllFundsAuditByUser;
+
+const listAllFundsAuditByCollege = async (req, res) => {
+  try {
+    const { teamManagerName } = req.query;
+
+    // ✅ Pagination params
+    const limit = parseInt(req.query.limit) || 100;
+    const page = parseInt(req.query.page) || 1;
+    const offset = (page - 1) * limit;
+
+    let userIds = null;
+    let extraInfo = {};
+
+    if (teamManagerName) {
+      // Partial, case-insensitive match
+      const statuses = await Status.findAll({
+        where: {
+          teamManager: { [Op.iLike]: `%${teamManagerName}%` }
+        },
+        attributes: ["userId"],
+      });
+
+      userIds = statuses.map(s => s.userId);
+
+      if (!userIds.length) {
+        return res.status(200).json({
+          success: true,
+          totalRecords: 0,
+          totalPages: 0,
+          currentPage: page,
+          limit,
+          data: [],
+          colleges: { total: 0, details: [] },
+          interns: { total: 0, details: [] }
+        });
+      }
+
+      // ✅ Get interns (users under this manager)
+      const interns = await User.findAll({
+        where: { id: userIds },
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "email",
+          "phoneNumber",
+          "collegeName",
+          "createdAt"
+        ],
+      });
+
+      // ✅ Group colleges (unique by name)
+      const collegeMap = new Map();
+      interns.forEach(u => {
+        if (u.collegeName) {
+          collegeMap.set(u.collegeName, {
+            collegeName: u.collegeName,
+            students: (collegeMap.get(u.collegeName)?.students || 0) + 1
+          });
+        }
+      });
+
+      extraInfo = {
+        colleges: {
+          total: collegeMap.size,
+          details: Array.from(collegeMap.values())
+        },
+        interns: {
+          total: interns.length,
+          details: interns.map(u => ({
+            id: u.id,
+            name: `${u.firstName} ${u.lastName}`,
+            email: u.email,
+            phoneNumber: u.phoneNumber,
+            collegeName: u.collegeName,
+            registeredAt: u.createdAt,
+          }))
+        }
+      };
+    }
+
+    // Fetch FundsAudit with optional filter
+    const { count: totalRecords, rows: fundsAudits } = await FundsAudit.findAndCountAll({
+      where: userIds ? { userId: userIds } : {},
+      limit,
+      offset,
+      order: [["createdAt", "DESC"]],
+    });
+
+    const response = [];
+
+    for (const audit of fundsAudits) {
+      const user = await User.findOne({
+        where: { id: audit.userId },
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "phoneNumber",
+          "email",
+          "collegeName",
+          "businessTargets",
+          "subscriptionWallet",
+          "createdAt",
+        ],
+      });
+
+      const status = await Status.findOne({
+        where: { userId: audit.userId },
+        attributes: ["teamManager"],
+      });
+
+      response.push({
+        id: audit.id,
+        userId: audit.userId,
+        registeredUserId: audit.registeredUserId,
+        dateOfPayment: audit.dateOfPayment,
+        dateOfDownload: audit.dateOfDownload,
+        hasPaid: audit.hasPaid,
+        isDownloaded: audit.isDownloaded,
+        queryStatus: audit.queryStatus,
+        isQueryRaised: audit.isQueryRaised,
+        createdAt: audit.createdAt,
+
+        userInfo: user
+          ? {
+              name: `${user.firstName} ${user.lastName}`,
+              phoneNumber: user.phoneNumber,
+              email: user.email,
+              collegeName: user.collegeName,
+              businessTargets: user.businessTargets,
+              subscriptionWallet: user.subscriptionWallet,
+              registeredAt: user.createdAt,
+            }
+          : null,
+        teamManager: status ? status.teamManager : null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      totalRecords,
+      totalPages: Math.ceil(totalRecords / limit),
+      currentPage: page,
+      limit,
+      data: response,
+      ...extraInfo, // ✅ add colleges + interns info if managerName is given
+    });
+  } catch (err) {
+    console.error("Error in listAllFundsAudit:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
