@@ -10,7 +10,8 @@ router.put("/update/:id", fundsauditController.updateFundsAudit);     // Update 
 router.delete("/delete/:id", fundsauditController.deleteFundsAudit);  // Delete record by ID
 router.get("/list", fundsauditController.listAllFundsAudit);          // List all records with pagination
 router.get ("/byname", fundsauditController.listAllFundsAuditByUser); // List all records by user ID
+router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); // List all records by college ID
 
-  
+
 
 module.exports = router;
