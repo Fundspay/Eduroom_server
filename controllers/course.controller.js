@@ -161,6 +161,7 @@ const fetchAllCourses = async (req, res) => {
         courseId: course.id,
         CoursePreviews: coursePreviews,
         status,
+        userCreatedAt: user.createdAt, // 🔹 Add user createdAt here
       };
     });
 
@@ -172,6 +173,7 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
+
 
 
 
