@@ -10,7 +10,7 @@ router.put("/update/:id", fundsauditController.updateFundsAudit);
 router.delete("/delete/:id", fundsauditController.deleteFundsAudit);  
 router.get("/list", fundsauditController.listAllFundsAudit);
 router.get ("/byname", fundsauditController.listAllFundsAuditByUser); 
-router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); // List all records by college ID
+router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); 
 
 
 
