@@ -1180,13 +1180,25 @@ const getReferralPaymentStatus = async (req, res) => {
       if (rqAttrs.includes("userId") && candidateLocalIds.size > 0) {
         whereClause[Op.or].push({ userId: { [Op.in]: [...candidateLocalIds] } });
       }
-      if (rqAttrs.includes("fundsAuditUserId") && candidateExternalIds.length > 0) {
-        whereClause[Op.or].push({ fundsAuditUserId: { [Op.in]: candidateExternalIds } });
+      if (
+        rqAttrs.includes("fundsAuditUserId") &&
+        candidateExternalIds.length > 0
+      ) {
+        whereClause[Op.or].push({
+          fundsAuditUserId: { [Op.in]: candidateExternalIds },
+        });
       }
 
       raiseQueries = await model.RaiseQuery.findAll({
         where: whereClause,
-        attributes: ["id", "queryStatus", "isQueryRaised", "createdAt", "userId", "fundsAuditUserId"],
+        attributes: [
+          "id",
+          "queryStatus",
+          "isQueryRaised",
+          "createdAt",
+          "userId",
+          "fundsAuditUserId",
+        ],
         order: [["createdAt", "DESC"]],
         raw: true,
       });
@@ -1196,20 +1208,28 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map((u, idx) => {
       const cloned = { ...u, isDownloaded: true };
 
-      const localId = numericIndexToLocalId.get(idx) || localIdByExternal[normalizeId(pickExternalId(u))] || null;
+      const localId =
+        numericIndexToLocalId.get(idx) ||
+        localIdByExternal[normalizeId(pickExternalId(u))] ||
+        null;
       const extId = normalizeId(pickExternalId(u));
 
       let rq = null;
       if (localId != null)
-        rq = raiseQueries.find((r) => normalizeId(r.userId) === normalizeId(localId));
+        rq = raiseQueries.find(
+          (r) => normalizeId(r.userId) === normalizeId(localId)
+        );
       if (!rq && extId)
-        rq = raiseQueries.find((r) => normalizeId(r.fundsAuditUserId) === extId);
+        rq = raiseQueries.find(
+          (r) => normalizeId(r.fundsAuditUserId) === extId
+        );
 
-      cloned.queryStatus = rq
-        ? !rq.queryStatus || rq.queryStatus.trim() === "" || rq.queryStatus === "No Query"
-          ? "Pending"
-          : rq.queryStatus
-        : "Pending";
+      // ✅ updated: return "" instead of forcing "Pending" or "No Query"
+      cloned.queryStatus =
+        rq && rq.queryStatus && rq.queryStatus.trim() !== ""
+          ? rq.queryStatus
+          : "";
+
       cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
 
       return cloned;
