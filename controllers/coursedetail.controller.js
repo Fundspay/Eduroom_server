@@ -1128,7 +1128,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
             }
           }
 
-          return sessionCompletionPercentage >= 33;
+          return sessionCompletionPercentage >= 20;
         })
       ).then((results) => results.every(Boolean));
 
@@ -1272,6 +1272,8 @@ const getBusinessTarget = async (req, res) => {
           subscriptionWallet,
           subscriptionLeft,
           businessTargets: user.businessTargets,
+          startDate: user.courseDates?.[courseId]?.startDate || null,
+          endDate: user.courseDates?.[courseId]?.endDate || null,
         },
       },
       200
