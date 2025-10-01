@@ -1175,6 +1175,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
+         startDate: user.courseDates?.[courseId]?.startDate || null,
+         endDate: user.courseDates?.[courseId]?.endDate || null,
       });
     }
 
