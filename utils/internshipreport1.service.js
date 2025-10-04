@@ -60,7 +60,7 @@ const generateInternshipReport = async (userId) => {
       box-sizing: border-box;
     }
     .title {
-      font-size: 40px;
+      font-size: 60px;
       font-weight: 700;
       text-transform: uppercase;
       margin-bottom: 10px;
@@ -71,7 +71,7 @@ const generateInternshipReport = async (userId) => {
       margin-top: 40px;
     }
     .name {
-      font-size: 28px;
+      font-size: 40px;
       color: red;
       font-weight: bold;
       margin-top: 10px;
