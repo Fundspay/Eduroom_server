@@ -762,51 +762,77 @@ const generateSingleSessionReport = async (req, res) => {
     if (!courseId) return ReE(res, "courseId is required", 400);
     if (!sessionNumber) return ReE(res, "sessionNumber is required", 400);
 
-    // Convert params to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
     sessionNumber = parseInt(sessionNumber, 10);
 
-    // 1️⃣ Load user
+    // 🧩 Load user
     const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
     if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Load course with domain
+    // 🧩 Load course
     const course = await model.Course.findOne({
       where: { id: courseId, isDeleted: false },
       include: [{ model: model.Domain, attributes: ["name"], required: false }]
     });
     if (!course) return ReE(res, "Course not found", 404);
 
-    // 3️⃣ Load session details
+    // 🧩 Load session
     const session = await model.CourseDetail.findOne({
       where: { courseId, sessionNumber, isDeleted: false }
     });
     if (!session) return ReE(res, "Session not found", 404);
 
-    // 4️⃣ Prepare MCQs
-    let mcqs = [];
+    // 🧩 Extract session data from courseStatuses
+    let sessionDataFromUser = {};
     try {
-      const progressMap = session.userProgress || {};
-      const progress = progressMap[String(userId)] || progressMap[userId] || {};
-      mcqs = (progress.questions ?? []).map(q => ({
-        question: q.question || q.q || "",
-        options: q.options || q.choices || q.opts || [],
-        correctAnswer: q.correctAnswer || q.correct || q.answer || ""
-      }));
+      const courseStatuses = user.courseStatuses || {};
+      const courseStatus = courseStatuses[String(courseId)] || {};
+      sessionDataFromUser = courseStatus[String(sessionNumber)] || {};
     } catch (err) {
-      mcqs = [];
+      console.error("Failed to extract session data from user.courseStatuses:", err);
+      sessionDataFromUser = {};
     }
 
-    // 5️⃣ Fetch latest case study result
-    const latestCaseStudy = await model.CaseStudyResult.findOne({
-      where: { userId, courseId, day: session.day, sessionNumber },
-      order: [["createdAt", "DESC"]]
-    });
+    // ✅ Extract MCQs
+    const mcqs = Array.isArray(sessionDataFromUser.mcqs)
+      ? sessionDataFromUser.mcqs.map((q, idx) => ({
+          question: q.question || `Question ${idx + 1}`,
+          options: q.options || [],
+          correctAnswer: q.correctAnswer || q.correct || q.answer || "",
+        }))
+      : [];
 
-    const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
+    // ✅ Extract Case Study (if any)
+    let caseStudyResult = null;
+    if (sessionDataFromUser.caseStudy) {
+      const cs = sessionDataFromUser.caseStudy;
+      caseStudyResult = {
+        matchPercentage: cs.matchPercentage || cs.matchedPercent || cs.score || 0,
+        summary: cs.summary || cs.notes || "",
+      };
+    } else {
+      // fallback from DB if not found in user model
+      const latestCaseStudy = await model.CaseStudyResult.findOne({
+        where: {
+          userId,
+          courseId,
+          [Op.or]: [{ sessionNumber }, { day: session.day }],
+        },
+        order: [["createdAt", "DESC"]],
+      });
+      if (latestCaseStudy) {
+        caseStudyResult = {
+          matchPercentage: latestCaseStudy.matchPercentage,
+          summary: latestCaseStudy.summary || latestCaseStudy.notes || "",
+        };
+      }
+    }
 
-    // 6️⃣ Prepare session data for PDF
+    // 🧩 Extract course start/end dates
+    const { startDate = null, endDate = null } = user.courseDates?.[String(courseId)] || {};
+
+    // 🧾 Prepare data for PDF
     const sessionData = {
       userId: user.id,
       userName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
@@ -820,15 +846,10 @@ const generateSingleSessionReport = async (req, res) => {
       startDate,
       endDate,
       mcqs,
-      caseStudyResult: latestCaseStudy
-        ? { 
-            matchPercentage: latestCaseStudy.matchPercentage, 
-            summary: latestCaseStudy.summary || latestCaseStudy.notes || "" 
-          }
-        : null
+      caseStudyResult,
     };
 
-    // 7️⃣ Generate PDF and upload to S3
+    // 🪄 Generate PDF
     const generated = await generateSessionReport(sessionData);
 
     return ReS(res, { success: true, data: generated }, 200);
