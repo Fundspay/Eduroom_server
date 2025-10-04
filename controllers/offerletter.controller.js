@@ -1,6 +1,6 @@
 "use strict";
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
-const { generateInternshipReport } = require("../utils/internshipreport1.service.js");
+const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
 const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
@@ -145,7 +145,7 @@ const sendInternshipReport = async (req, res) => {
     }
 
     // Generate Internship Report (PDF uploaded to S3 + DB saved)
-    const report = await generateInternshipReport(userId);
+    const report = await generateInternshipDetailsReport(userId);
     // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
 
     // Build email content
