@@ -119,6 +119,101 @@ const sendOfferLetter = async (req, res) => {
 
 module.exports = { sendOfferLetter };
 
+const sendInternshipReport = async (req, res) => {
+  try {
+    const { userId } = req.params; // only userId from params
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing userId",
+      });
+    }
+
+    // Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+    });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (!user.email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "User has no email" });
+    }
+
+    // Generate Internship Report (PDF uploaded to S3 + DB saved)
+    const report = await generateInternshipReport(userId);
+    // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
+
+    // Build email content
+    const subject = `Your Internship Report - Fundsroom InfoTech Pvt Ltd`;
+    const html = `
+      <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Greetings from <b>Eduroom!</b></p>
+
+      <p>
+        We are pleased to share your <b>Internship Completion Report</b>.
+        This report highlights your performance, learning outcomes, and the
+        value you’ve gained during the internship program with Eduroom.
+      </p>
+
+      <p>
+        Please find your official <b>Internship Report</b> here:
+        <p><a href="${report.fileUrl}" target="_blank">${report.fileUrl}</a></p>
+      </p>
+
+      <p>
+        We hope this experience has helped you enhance your skills and
+        contribute meaningfully to your career path.
+      </p>
+
+      <p>
+        For any queries, feel free to reach us at
+        <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
+      </p>
+
+      <br/>
+      <p>Best Regards,<br/>Eduroom HR Team</p>
+    `;
+
+    // Send Email
+    const mailResult = await sendMail(user.email, subject, html);
+
+    if (!mailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send email",
+        error: mailResult.error,
+      });
+    }
+
+    // Update DB
+    await model.InternshipReport.update(
+      {
+        issent: true,
+        updatedAt: new Date(),
+      },
+      { where: { id: report.id } }
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Internship Report sent successfully",
+      fileUrl: report.fileUrl,
+    });
+  } catch (error) {
+    console.error("sendInternshipReport error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Server error", error });
+  }
+};
+
+module.exports = { sendInternshipReport };
+
+
 
 // const listAllUsers = async (req, res) => {
 //   try {
