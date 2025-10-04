@@ -21,6 +21,7 @@ try {
   const bgData = fs.readFileSync(bgPath);
   BASE64_BG = `data:image/png;base64,${bgData.toString("base64")}`;
 } catch (err) {
+  console.warn("Could not load background image, proceeding without it");
   BASE64_BG = "";
 }
 
@@ -67,7 +68,16 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       @page { size: A4; margin: 20mm 15mm; }
       html, body { margin:0; padding:0; font-family: "Times New Roman", serif; color: #222; }
       body { background: #fff; }
-      .page { position: relative; padding: 12mm; background-image: url("${bgUrl}"); background-size: cover; }
+      .page {
+        position: relative;
+        padding: 12mm;
+        background-image: url("${bgUrl}");
+        background-repeat: no-repeat;
+        background-position: center top;
+        background-size: cover;
+        min-height: 100%;
+        box-sizing: border-box;
+      }
       .main-title { font-size: 20px; font-weight: 700; margin: 8px 0 12px 0; }
       .meta { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
       .meta b { font-weight: 700; }
@@ -119,20 +129,35 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   </html>
   `;
 
-  // Launch Puppeteer
-  const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
-  const page = await browser.newPage();
-  page.setDefaultNavigationTimeout(60000);
-  page.setDefaultTimeout(60000);
+  // PDF generation with retry
+  const generatePdfBuffer = async () => {
+    const maxRetries = 2;
+    let attempt = 0;
 
-  await page.setContent(html, { waitUntil: "domcontentloaded" });
-  await page.evaluateHandle("document.fonts.ready");
-  await new Promise(r=>setTimeout(r,500));
+    while(attempt <= maxRetries){
+      try {
+        const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
+        const page = await browser.newPage();
+        page.setDefaultNavigationTimeout(60000);
+        page.setDefaultTimeout(60000);
 
-  const pdfBuffer = await page.pdf({ format:"A4", printBackground:true, margin:{top:"15mm", bottom:"20mm", left:"12mm", right:"12mm"} });
+        await page.setContent(html, { waitUntil:"networkidle0" });
+        await page.evaluateHandle("document.fonts.ready");
+        await new Promise(r=>setTimeout(r,500));
 
-  await page.close();
-  await browser.close();
+        const pdfBuffer = await page.pdf({ format:"A4", printBackground:true, margin:{top:"15mm", bottom:"20mm", left:"12mm", right:"12mm"} });
+
+        await page.close();
+        await browser.close();
+        return pdfBuffer;
+      } catch(err){
+        attempt++;
+        if(attempt>maxRetries) throw new Error("PDF generation failed: " + err.message);
+      }
+    }
+  };
+
+  const pdfBuffer = await generatePdfBuffer();
 
   // Upload to S3
   const safeCourseId = courseId? String(courseId) : "generic";
