@@ -7,6 +7,7 @@ const model = require("../models/index.js");
 const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment");
+const { Op } = require("sequelize");
 
 
 // Controller: Send Offer Letter to User Email
