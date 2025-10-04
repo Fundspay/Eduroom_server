@@ -292,8 +292,8 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     Bucket: CONFIG.awsBucket || "fundsweb",
     Key: s3Key,
     Body: pdfBuffer,
-    ContentType: "application/pdf",
-    ACL: "public-read",
+    ContentType: "application/pdf"
+    
   }).promise();
 
   return {
