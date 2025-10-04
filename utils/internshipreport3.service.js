@@ -178,21 +178,18 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   const s3KeyPrefix = options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
   const s3Key = `${s3KeyPrefix}/${fileName}`;
 
-  await s3.putObject({
-    Bucket: CONFIG.awsBucket || "fundsweb",
-    Key: s3Key,
-    Body: pdfBuffer,
-    ContentType: "application/pdf",
-    ACL: "public-read",
-  }).promise();
-
-  const fileUrl = `https://${CONFIG.awsBucket || "fundsweb"}.s3.${CONFIG.awsRegion}.amazonaws.com/${s3Key}`;
+  await s3
+    .putObject({
+      Bucket: "fundsweb",
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: "application/pdf",
+    })
+    .promise();
 
   return {
     fileName,
-    fileUrl,
-    s3Key,
-    bufferLength: pdfBuffer.length,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 
