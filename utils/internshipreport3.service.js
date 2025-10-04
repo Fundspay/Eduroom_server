@@ -10,18 +10,27 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion,
 });
 
-const ASSET_BASE = CONFIG.assetBase || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+const ASSET_BASE =
+  CONFIG.assetBase ||
+  "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
 const escapeHtml = (str) => {
   if (!str) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 };
 
 const formatDateReadable = (input) => {
   if (!input) return "";
   const d = new Date(input);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
@@ -42,8 +51,14 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   } = sessionData;
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
-  const title = `${courseName || ""} Internship Report – Session ${sessionNumber}`;
-  const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+  const title = `${courseName || ""} Internship Report – Session ${
+    sessionNumber
+  }`;
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 
   const html = `
 <!DOCTYPE html>
@@ -57,6 +72,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     padding: 0;
     font-family: 'Times New Roman', serif;
   }
+
   .page {
     width: 100%;
     min-height: 100vh;
@@ -64,33 +80,82 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     background-size: cover;
     display: flex;
     flex-direction: column;
-    padding: 80px 40px 60px 40px; /* top/right/bottom/left */
+    padding: 180px 40px 60px 40px; /* increased top padding */
     box-sizing: border-box;
     color: #000;
+    position: relative;
   }
+
+  /* semi-transparent overlay for readability */
+  .page::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255,255,255,0.85);
+    z-index: 0;
+  }
+
+  .page > * {
+    position: relative;
+    z-index: 1;
+  }
+
   .main-title {
     font-size: 32px;
     font-weight: bold;
     text-align: center;
     margin-bottom: 20px;
   }
+
   .meta {
     font-size: 16px;
     line-height: 1.5;
     margin-bottom: 20px;
   }
-  .meta b { font-weight: bold; }
+
+  .meta b {
+    font-weight: bold;
+  }
+
   .section-title {
     font-size: 18px;
     font-weight: bold;
     margin: 16px 0 8px 0;
   }
-  .question { margin-bottom: 12px; }
-  .options { margin-left: 20px; margin-top: 6px; }
-  .option { margin-bottom: 4px; }
-  .correct { color: green; font-weight: 600; }
-  .answer-block { margin-top: 6px; font-style: normal; }
-  .case-study { margin-top: 12px; padding: 8px; border-left: 3px solid #ddd; background: rgba(255,255,255,0.8); }
+
+  .question {
+    margin-bottom: 12px;
+  }
+
+  .options {
+    margin-left: 20px;
+    margin-top: 6px;
+  }
+
+  .option {
+    margin-bottom: 4px;
+  }
+
+  .correct {
+    color: green;
+    font-weight: 600;
+  }
+
+  .answer-block {
+    margin-top: 6px;
+    font-style: normal;
+  }
+
+  .case-study {
+    margin-top: 12px;
+    padding: 8px;
+    border-left: 3px solid #ddd;
+    background: rgba(255,255,255,0.8);
+  }
+
   .footer {
     position: absolute;
     bottom: 40px;
@@ -105,36 +170,69 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   <div class="page">
     <div class="main-title">${escapeHtml(title)}</div>
     <div class="meta">
-      <div><b>Intern Name:</b> ${escapeHtml(userName||"")}</div>
-      <div><b>Domain:</b> ${escapeHtml(domainName||"")}</div>
-      <div><b>Course:</b> ${escapeHtml(courseName||"")}</div>
-      <div><b>Session:</b> Session ${escapeHtml(String(sessionNumber||""))} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
-      <div><b>Video Duration:</b> ${escapeHtml(sessionDuration||"")}</div>
-      <div><b>Start Date:</b> ${escapeHtml(formatDateReadable(startDate))} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
+      <div><b>Intern Name:</b> ${escapeHtml(userName || "")}</div>
+      <div><b>Domain:</b> ${escapeHtml(domainName || "")}</div>
+      <div><b>Course:</b> ${escapeHtml(courseName || "")}</div>
+      <div><b>Session:</b> Session ${escapeHtml(
+        String(sessionNumber || "")
+      )} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
+      <div><b>Video Duration:</b> ${escapeHtml(sessionDuration || "")}</div>
+      <div><b>Start Date:</b> ${escapeHtml(
+        formatDateReadable(startDate)
+      )} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
     </div>
 
-    <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(String(sessionNumber||""))}</div>
-    ${mcqs.length
-      ? mcqs.map((q, idx) => {
-          const opts = Array.isArray(q.options) ? q.options : [];
-          const correct = q.correctAnswer || "";
-          return `<div class="question">
-            <div><b>Question ${idx+1}:</b> ${escapeHtml(q.question || `Question ${idx+1}`)}</div>
+    <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(
+      String(sessionNumber || "")
+    )}</div>
+    ${
+      mcqs.length
+        ? mcqs
+            .map((q, idx) => {
+              const opts = Array.isArray(q.options) ? q.options : [];
+              const correct = q.correctAnswer || "";
+              return `<div class="question">
+            <div><b>Question ${idx + 1}:</b> ${escapeHtml(
+                q.question || `Question ${idx + 1}`
+              )}</div>
             <div class="options">
-              ${opts.map((opt,j)=>`<div class="option">${j+1}. ${escapeHtml(opt)}${opt==correct? ' <span class="correct">(Correct)</span>': ''}</div>`).join('')}
+              ${opts
+                .map(
+                  (opt, j) =>
+                    `<div class="option">${j + 1}. ${escapeHtml(opt)}${
+                      opt == correct
+                        ? ' <span class="correct">(Correct)</span>'
+                        : ""
+                    }</div>`
+                )
+                .join("")}
             </div>
-            <div class="answer-block"><b>Answer:</b> ${escapeHtml(correct)}</div>
+            <div class="answer-block"><b>Answer:</b> ${escapeHtml(
+              correct
+            )}</div>
           </div>`;
-        }).join('')
-      : `<div><i>No MCQ data available.</i></div>`}
+            })
+            .join("")
+        : `<div><i>No MCQ data available.</i></div>`
+    }
 
-    ${caseStudyResult
-      ? `<div class="case-study">
+    ${
+      caseStudyResult
+        ? `<div class="case-study">
            <div class="section-title">2. Case Study</div>
-           <div><b>Match Percentage:</b> ${escapeHtml(String(caseStudyResult.matchPercentage||""))}%</div>
-           ${caseStudyResult.summary ? `<div><b>Summary:</b> ${escapeHtml(caseStudyResult.summary)}</div>` : ""}
+           <div><b>Match Percentage:</b> ${escapeHtml(
+             String(caseStudyResult.matchPercentage || "")
+           )}%</div>
+           ${
+             caseStudyResult.summary
+               ? `<div><b>Summary:</b> ${escapeHtml(
+                   caseStudyResult.summary
+                 )}</div>`
+               : ""
+           }
          </div>`
-      : ""}
+        : ""
+    }
 
     <div class="footer">Generated on ${today}</div>
   </div>
@@ -143,11 +241,14 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
 `;
 
   // Puppeteer PDF generation
-  const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
   await page.evaluateHandle("document.fonts.ready");
-  await new Promise(r => setTimeout(r, 500));
+  await new Promise((r) => setTimeout(r, 500));
 
   const pdfBuffer = await page.pdf({
     format: "A4",
@@ -161,17 +262,24 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   // Upload to S3
   const safeCourseId = courseId ? String(courseId) : "generic";
   const fileName = `session-${day || "d"}-s${sessionNumber || "0"}.pdf`;
-  const s3KeyPrefix = options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
+  const s3KeyPrefix =
+    options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
   const s3Key = `${s3KeyPrefix}/${fileName}`;
 
-  await s3.putObject({
-    Bucket: "fundsweb",
-    Key: s3Key,
-    Body: pdfBuffer,
-    ContentType: "application/pdf"
-  }).promise();
+  await s3
+    .putObject({
+      Bucket: "fundsweb",
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: "application/pdf",
+    })
+    .promise();
 
-  return { fileName, fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`, s3Key };
+  return {
+    fileName,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+    s3Key,
+  };
 };
 
 module.exports = { generateSessionReport };
