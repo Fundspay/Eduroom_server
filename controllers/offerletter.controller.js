@@ -767,24 +767,24 @@ const generateSingleSessionReport = async (req, res) => {
     courseId = parseInt(courseId, 10);
     sessionNumber = parseInt(sessionNumber, 10);
 
-    // Load user
+    // 1️⃣ Load user
     const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
     if (!user) return ReE(res, "User not found", 404);
 
-    // Load course
+    // 2️⃣ Load course with domain
     const course = await model.Course.findOne({
       where: { id: courseId, isDeleted: false },
       include: [{ model: model.Domain, attributes: ["name"], required: false }]
     });
     if (!course) return ReE(res, "Course not found", 404);
 
-    // Load session
+    // 3️⃣ Load session details
     const session = await model.CourseDetail.findOne({
       where: { courseId, sessionNumber, isDeleted: false }
     });
     if (!session) return ReE(res, "Session not found", 404);
 
-    // MCQs
+    // 4️⃣ Prepare MCQs
     let mcqs = [];
     try {
       const progressMap = session.userProgress || {};
@@ -798,7 +798,7 @@ const generateSingleSessionReport = async (req, res) => {
       mcqs = [];
     }
 
-    // Latest case study
+    // 5️⃣ Fetch latest case study result
     const latestCaseStudy = await model.CaseStudyResult.findOne({
       where: { userId, courseId, day: session.day, sessionNumber },
       order: [["createdAt", "DESC"]]
@@ -806,7 +806,7 @@ const generateSingleSessionReport = async (req, res) => {
 
     const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
 
-    // Prepare session data for PDF
+    // 6️⃣ Prepare session data for PDF
     const sessionData = {
       userId: user.id,
       userName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
@@ -821,12 +821,15 @@ const generateSingleSessionReport = async (req, res) => {
       endDate,
       mcqs,
       caseStudyResult: latestCaseStudy
-        ? { matchPercentage: latestCaseStudy.matchPercentage, summary: latestCaseStudy.summary || latestCaseStudy.notes || "" }
+        ? { 
+            matchPercentage: latestCaseStudy.matchPercentage, 
+            summary: latestCaseStudy.summary || latestCaseStudy.notes || "" 
+          }
         : null
     };
 
-    // Generate PDF and upload to S3
-    const generated = await generateSessionReport(sessionData);
+    // 7️⃣ Generate PDF and upload to S3
+    const generated = await generateSessionReport(sessionData, { bgUrl: `${ASSET_BASE}/internshipbg.png` });
 
     return ReS(res, { success: true, data: generated }, 200);
 
