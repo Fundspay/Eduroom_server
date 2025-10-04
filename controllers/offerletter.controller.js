@@ -752,3 +752,118 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
+
+
+const generateCourseSessionReports = async (req, res) => {
+  try {
+    const { userId, courseId } = req.params;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!courseId) return ReE(res, "courseId is required", 400);
+
+    // Load user
+    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
+    if (!user) return ReE(res, "User not found", 404);
+
+    await user.reload();
+
+    // Load course
+    const course = await model.Course.findOne({
+      where: { id: courseId, isDeleted: false },
+      include: [{ model: model.Domain, attributes: ["name"], required: false }],
+    });
+    if (!course) return ReE(res, "Course not found", 404);
+
+    // Fetch sessions
+    const sessions = await model.CourseDetail.findAll({
+      where: { courseId, isDeleted: false },
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
+      ],
+    });
+
+    const response = {
+      userId: user.id,
+      fullName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+      courseId: course.id,
+      courseName: course.name,
+      results: [],
+    };
+
+    for (const session of sessions) {
+      const day = session.day;
+      const sessionNumber = session.sessionNumber;
+      const sessionTitle = session.title || "";
+      const sessionDuration = session.sessionDuration || "";
+      const startDate = user.courseDates?.[courseId]?.startDate || null;
+      const endDate = user.courseDates?.[courseId]?.endDate || null;
+
+      // MCQs
+      let mcqs = [];
+      try {
+        const progressMap = session.userProgress || {};
+        const progress = progressMap[String(userId)] || progressMap[userId] || {};
+        if (Array.isArray(progress.questions) && progress.questions.length > 0) {
+          mcqs = progress.questions.map((q) => ({
+            question: q.question || q.q || "",
+            options: q.options || q.choices || q.opts || [],
+            correctAnswer: q.correctAnswer || q.correct || q.answer || "",
+          }));
+        }
+      } catch (err) {
+        mcqs = [];
+      }
+
+      // Latest case study
+      const latestCaseStudy = await model.CaseStudyResult.findOne({
+        where: { userId, courseId, day, sessionNumber },
+        order: [["createdAt", "DESC"]],
+      });
+
+      const sessionData = {
+        userId: user.id,
+        userName: response.fullName,
+        domainName: course.Domain?.name || "",
+        courseId: course.id,
+        courseName: course.name,
+        day,
+        sessionNumber,
+        sessionTitle,
+        sessionDuration,
+        startDate,
+        endDate,
+        mcqs,
+        caseStudyResult: latestCaseStudy
+          ? { matchPercentage: latestCaseStudy.matchPercentage, summary: latestCaseStudy.summary || latestCaseStudy.notes || "" }
+          : null,
+      };
+
+      try {
+        const genOptions = {
+          bgUrl: `${process.env.REPORT_BG_URL || `${process.env.ASSET_BASE || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets"}/internshipbg.png`}`,
+          bucketPrefix: `internshipReports/${user.id}/course-${course.id}`,
+        };
+
+        const generated = await generateSessionReport(sessionData, genOptions);
+
+        response.results.push({
+          day,
+          sessionNumber,
+          fileName: generated.fileName,
+          fileUrl: generated.fileUrl,
+          s3Key: generated.s3Key,
+        });
+      } catch (gErr) {
+        response.results.push({ day, sessionNumber, error: gErr.message });
+      }
+    }
+
+    return ReS(res, { success: true, data: response }, 200);
+  } catch (error) {
+    console.error("generateCourseSessionReports error:", error);
+    return ReE(res, error.message || "Internal Server Error", 500);
+  }
+};
+
+module.exports.generateCourseSessionReports = generateCourseSessionReports;
