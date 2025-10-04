@@ -283,22 +283,23 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // Upload to S3
+ // 5️⃣ Upload to S3
   const timestamp = Date.now();
-  const fileName = `internship-details-${userId}-${timestamp}.pdf`;
+  const fileName = `internship-report-${timestamp}.pdf`;
   const s3Key = `internshipReports/${userId}/${fileName}`;
 
-  await s3.putObject({
-    Bucket: CONFIG.awsBucket || "fundsweb",
-    Key: s3Key,
-    Body: pdfBuffer,
-    ContentType: "application/pdf",
-    ACL: "public-read",
-  }).promise();
+   await s3
+    .putObject({
+      Bucket: "fundsweb",
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: "application/pdf",
+    })
+    .promise();
 
-  return {
+ return {
     fileName,
-    fileUrl: `https://${CONFIG.awsBucket || "fundsweb"}.s3.${CONFIG.awsRegion}.amazonaws.com/${s3Key}`,
+    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 
