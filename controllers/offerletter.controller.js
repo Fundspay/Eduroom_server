@@ -829,7 +829,7 @@ const generateSingleSessionReport = async (req, res) => {
     };
 
     // 7️⃣ Generate PDF and upload to S3
-    const generated = await generateSessionReport(sessionData, { bgUrl: `${ASSET_BASE}/internshipbg.png` });
+    const generated = await generateSessionReport(sessionData);
 
     return ReS(res, { success: true, data: generated }, 200);
 
