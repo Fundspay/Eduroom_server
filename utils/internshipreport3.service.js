@@ -80,27 +80,18 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     background-size: cover;
     display: flex;
     flex-direction: column;
-    padding: 180px 40px 60px 40px; /* increased top padding */
     box-sizing: border-box;
     color: #000;
     position: relative;
   }
 
-  /* semi-transparent overlay for readability */
-  .page::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+  /* main content area with white translucent background */
+  .content {
     background: rgba(255,255,255,0.85);
-    z-index: 0;
-  }
-
-  .page > * {
-    position: relative;
-    z-index: 1;
+    margin: 180px 40px 80px 40px; /* space for top header + bottom logo */
+    padding: 40px;
+    border-radius: 8px;
+    box-sizing: border-box;
   }
 
   .main-title {
@@ -116,9 +107,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     margin-bottom: 20px;
   }
 
-  .meta b {
-    font-weight: bold;
-  }
+  .meta b { font-weight: bold; }
 
   .section-title {
     font-size: 18px;
@@ -126,28 +115,11 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     margin: 16px 0 8px 0;
   }
 
-  .question {
-    margin-bottom: 12px;
-  }
-
-  .options {
-    margin-left: 20px;
-    margin-top: 6px;
-  }
-
-  .option {
-    margin-bottom: 4px;
-  }
-
-  .correct {
-    color: green;
-    font-weight: 600;
-  }
-
-  .answer-block {
-    margin-top: 6px;
-    font-style: normal;
-  }
+  .question { margin-bottom: 12px; }
+  .options { margin-left: 20px; margin-top: 6px; }
+  .option { margin-bottom: 4px; }
+  .correct { color: green; font-weight: 600; }
+  .answer-block { margin-top: 6px; font-style: normal; }
 
   .case-study {
     margin-top: 12px;
@@ -158,7 +130,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
 
   .footer {
     position: absolute;
-    bottom: 40px;
+    bottom: 30px;
     width: 100%;
     text-align: center;
     font-size: 14px;
@@ -168,71 +140,73 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
 </head>
 <body>
   <div class="page">
-    <div class="main-title">${escapeHtml(title)}</div>
-    <div class="meta">
-      <div><b>Intern Name:</b> ${escapeHtml(userName || "")}</div>
-      <div><b>Domain:</b> ${escapeHtml(domainName || "")}</div>
-      <div><b>Course:</b> ${escapeHtml(courseName || "")}</div>
-      <div><b>Session:</b> Session ${escapeHtml(
+    <div class="content">
+      <div class="main-title">${escapeHtml(title)}</div>
+      <div class="meta">
+        <div><b>Intern Name:</b> ${escapeHtml(userName || "")}</div>
+        <div><b>Domain:</b> ${escapeHtml(domainName || "")}</div>
+        <div><b>Course:</b> ${escapeHtml(courseName || "")}</div>
+        <div><b>Session:</b> Session ${escapeHtml(
+          String(sessionNumber || "")
+        )} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
+        <div><b>Video Duration:</b> ${escapeHtml(sessionDuration || "")}</div>
+        <div><b>Start Date:</b> ${escapeHtml(
+          formatDateReadable(startDate)
+        )} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
+      </div>
+
+      <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(
         String(sessionNumber || "")
-      )} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
-      <div><b>Video Duration:</b> ${escapeHtml(sessionDuration || "")}</div>
-      <div><b>Start Date:</b> ${escapeHtml(
-        formatDateReadable(startDate)
-      )} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
+      )}</div>
+      ${
+        mcqs.length
+          ? mcqs
+              .map((q, idx) => {
+                const opts = Array.isArray(q.options) ? q.options : [];
+                const correct = q.correctAnswer || "";
+                return `<div class="question">
+                  <div><b>Question ${idx + 1}:</b> ${escapeHtml(
+                  q.question || `Question ${idx + 1}`
+                )}</div>
+                  <div class="options">
+                    ${opts
+                      .map(
+                        (opt, j) =>
+                          `<div class="option">${j + 1}. ${escapeHtml(opt)}${
+                            opt == correct
+                              ? ' <span class="correct">(Correct)</span>'
+                              : ""
+                          }</div>`
+                      )
+                      .join("")}
+                  </div>
+                  <div class="answer-block"><b>Answer:</b> ${escapeHtml(
+                    correct
+                  )}</div>
+                </div>`;
+              })
+              .join("")
+          : `<div><i>No MCQ data available.</i></div>`
+      }
+
+      ${
+        caseStudyResult
+          ? `<div class="case-study">
+               <div class="section-title">2. Case Study</div>
+               <div><b>Match Percentage:</b> ${escapeHtml(
+                 String(caseStudyResult.matchPercentage || "")
+               )}%</div>
+               ${
+                 caseStudyResult.summary
+                   ? `<div><b>Summary:</b> ${escapeHtml(
+                       caseStudyResult.summary
+                     )}</div>`
+                   : ""
+               }
+             </div>`
+          : ""
+      }
     </div>
-
-    <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(
-      String(sessionNumber || "")
-    )}</div>
-    ${
-      mcqs.length
-        ? mcqs
-            .map((q, idx) => {
-              const opts = Array.isArray(q.options) ? q.options : [];
-              const correct = q.correctAnswer || "";
-              return `<div class="question">
-            <div><b>Question ${idx + 1}:</b> ${escapeHtml(
-                q.question || `Question ${idx + 1}`
-              )}</div>
-            <div class="options">
-              ${opts
-                .map(
-                  (opt, j) =>
-                    `<div class="option">${j + 1}. ${escapeHtml(opt)}${
-                      opt == correct
-                        ? ' <span class="correct">(Correct)</span>'
-                        : ""
-                    }</div>`
-                )
-                .join("")}
-            </div>
-            <div class="answer-block"><b>Answer:</b> ${escapeHtml(
-              correct
-            )}</div>
-          </div>`;
-            })
-            .join("")
-        : `<div><i>No MCQ data available.</i></div>`
-    }
-
-    ${
-      caseStudyResult
-        ? `<div class="case-study">
-           <div class="section-title">2. Case Study</div>
-           <div><b>Match Percentage:</b> ${escapeHtml(
-             String(caseStudyResult.matchPercentage || "")
-           )}%</div>
-           ${
-             caseStudyResult.summary
-               ? `<div><b>Summary:</b> ${escapeHtml(
-                   caseStudyResult.summary
-                 )}</div>`
-               : ""
-           }
-         </div>`
-        : ""
-    }
 
     <div class="footer">Generated on ${today}</div>
   </div>
