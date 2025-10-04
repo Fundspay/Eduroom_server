@@ -8,6 +8,6 @@ const offerletterController = require("../controllers/offerletter.controller");
 router.post("/send/:userId/:courseId", offerletterController.sendOfferLetter);
 router.post("/send/:userId", offerletterController.sendInternshipReport);
 router.get("/users/all", offerletterController.listAllUsers);
-router.post("/report/:userId/:courseId", offerletterController.generateCourseSessionReports);
+router.post("/report/:userId/:courseId/:sessionNumber", offerletterController.generateSingleSessionReport);
 
 module.exports = router;

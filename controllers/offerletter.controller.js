@@ -754,121 +754,86 @@ const listAllUsers = async (req, res) => {
 
 module.exports.listAllUsers = listAllUsers;
 
-
-const generateCourseSessionReports = async (req, res) => {
+const generateSingleSessionReport = async (req, res) => {
   try {
-    const { userId, courseId } = req.params;
+    let { userId, courseId, sessionNumber } = req.params;
 
     if (!userId) return ReE(res, "userId is required", 400);
     if (!courseId) return ReE(res, "courseId is required", 400);
+    if (!sessionNumber) return ReE(res, "sessionNumber is required", 400);
+
+    // Convert params to integers
+    userId = parseInt(userId, 10);
+    courseId = parseInt(courseId, 10);
+    sessionNumber = parseInt(sessionNumber, 10);
 
     // Load user
     const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
     if (!user) return ReE(res, "User not found", 404);
-    await user.reload();
 
     // Load course
     const course = await model.Course.findOne({
       where: { id: courseId, isDeleted: false },
-      include: [{ model: model.Domain, attributes: ["name"], required: false }],
+      include: [{ model: model.Domain, attributes: ["name"], required: false }]
     });
     if (!course) return ReE(res, "Course not found", 404);
 
-    // Fetch sessions
-    const sessions = await model.CourseDetail.findAll({
-      where: { courseId, isDeleted: false },
-      order: [
-        ["day", "ASC"],
-        ["sessionNumber", "ASC"],
-      ],
+    // Load session
+    const session = await model.CourseDetail.findOne({
+      where: { courseId, sessionNumber, isDeleted: false }
     });
+    if (!session) return ReE(res, "Session not found", 404);
 
-    // Fetch all case studies for the user and course at once
-    const caseStudies = await model.CaseStudyResult.findAll({
-      where: { userId, courseId },
-      order: [["createdAt", "DESC"]],
-    });
-
-    const caseStudyMap = {};
-    for (const cs of caseStudies) {
-      const key = `${cs.day}-${cs.sessionNumber}`;
-      if (!caseStudyMap[key]) caseStudyMap[key] = cs; // Keep latest only
+    // MCQs
+    let mcqs = [];
+    try {
+      const progressMap = session.userProgress || {};
+      const progress = progressMap[String(userId)] || progressMap[userId] || {};
+      mcqs = (progress.questions ?? []).map(q => ({
+        question: q.question || q.q || "",
+        options: q.options || q.choices || q.opts || [],
+        correctAnswer: q.correctAnswer || q.correct || q.answer || ""
+      }));
+    } catch (err) {
+      mcqs = [];
     }
 
-    const getFullName = (user) => user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim();
-    const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
-
-    const response = {
-      userId: user.id,
-      fullName: getFullName(user),
-      courseId: course.id,
-      courseName: course.name,
-      results: [],
-    };
-
-    // Generate reports in parallel
-    const reportPromises = sessions.map(async (session) => {
-      const day = session.day;
-      const sessionNumber = session.sessionNumber;
-      const sessionTitle = session.title || "";
-      const sessionDuration = session.sessionDuration || "";
-
-      // MCQs
-      let mcqs = [];
-      try {
-        const progressMap = session.userProgress || {};
-        const progress = progressMap[String(userId)] || progressMap[userId] || {};
-        mcqs = (progress.questions ?? []).map(q => ({
-          question: q.question || q.q || "",
-          options: q.options || q.choices || q.opts || [],
-          correctAnswer: q.correctAnswer || q.correct || q.answer || "",
-        }));
-      } catch (err) {
-        mcqs = [];
-      }
-
-      const latestCaseStudy = caseStudyMap[`${day}-${sessionNumber}`] || null;
-
-      const sessionData = {
-        userId: user.id,
-        userName: response.fullName,
-        domainName: course.Domain?.name || "",
-        courseId: course.id,
-        courseName: course.name,
-        day,
-        sessionNumber,
-        sessionTitle,
-        sessionDuration,
-        startDate,
-        endDate,
-        mcqs,
-        caseStudyResult: latestCaseStudy
-          ? { matchPercentage: latestCaseStudy.matchPercentage, summary: latestCaseStudy.summary || latestCaseStudy.notes || "" }
-          : null,
-      };
-
-      try {
-        const generated = await generateSessionReport(sessionData); // removed genOptions
-
-        return {
-          day,
-          sessionNumber,
-          fileName: generated.fileName,
-          fileUrl: generated.fileUrl,
-          s3Key: generated.s3Key,
-        };
-      } catch (gErr) {
-        return { day, sessionNumber, error: gErr.message };
-      }
+    // Latest case study
+    const latestCaseStudy = await model.CaseStudyResult.findOne({
+      where: { userId, courseId, day: session.day, sessionNumber },
+      order: [["createdAt", "DESC"]]
     });
 
-    response.results = await Promise.all(reportPromises);
+    const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
 
-    return ReS(res, { success: true, data: response }, 200);
+    // Prepare session data for PDF
+    const sessionData = {
+      userId: user.id,
+      userName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+      domainName: course.Domain?.name || "",
+      courseId: course.id,
+      courseName: course.name,
+      day: session.day,
+      sessionNumber,
+      sessionTitle: session.title || "",
+      sessionDuration: session.sessionDuration || "",
+      startDate,
+      endDate,
+      mcqs,
+      caseStudyResult: latestCaseStudy
+        ? { matchPercentage: latestCaseStudy.matchPercentage, summary: latestCaseStudy.summary || latestCaseStudy.notes || "" }
+        : null
+    };
+
+    // Generate PDF and upload to S3
+    const generated = await generateSessionReport(sessionData);
+
+    return ReS(res, { success: true, data: generated }, 200);
+
   } catch (error) {
-    console.error("generateCourseSessionReports error:", error);
+    console.error("generateSingleSessionReport error:", error);
     return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
 
-module.exports.generateCourseSessionReports = generateCourseSessionReports;
+module.exports.generateSingleSessionReport = generateSingleSessionReport;
