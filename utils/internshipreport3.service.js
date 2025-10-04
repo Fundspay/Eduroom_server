@@ -33,8 +33,11 @@ const formatDateReadable = (input) => {
 
 /**
  * Generate single session report PDF and upload to S3
+ * @param {Object} sessionData - Session details
+ * @param {Object} options - Options like bucketPrefix
+ * @param {puppeteer.Browser} browserInstance - Optional Puppeteer browser instance for reuse
  */
-const generateSessionReport = async (sessionData = {}, options = {}) => {
+const generateSessionReport = async (sessionData = {}, options = {}, browserInstance = null) => {
   const {
     userId,
     userName,
@@ -52,10 +55,8 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   } = sessionData;
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
-
   const title = `${courseName || ""} Internship Report – Session ${sessionNumber}`;
 
-  // Build HTML without logo or support email
   const html = `
   <!doctype html>
   <html>
@@ -115,7 +116,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       <div>
         <h3 class="section-title">1. MCQ Quiz – Session ${escapeHtml(String(sessionNumber || ""))}</h3>
 
-        ${mcqs && mcqs.length
+        ${mcqs.length
           ? mcqs.map((q, idx) => {
               const qText = escapeHtml(q.question || `Question ${idx + 1}`);
               const opts = Array.isArray(q.options) ? q.options : [];
@@ -151,26 +152,40 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   </html>
   `;
 
-  // Render PDF via Puppeteer
-  let pdfBuffer;
-  try {
-    const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
-    const page = await browser.newPage();
+  // Retry wrapper for PDF generation
+  const generatePdfBuffer = async (htmlContent) => {
+    const maxRetries = 2;
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+      try {
+        const browser = browserInstance || await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
+        const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
-    await page.evaluateHandle("document.fonts.ready");
-    await new Promise((r) => setTimeout(r, 250));
+        page.setDefaultNavigationTimeout(60000);
+        page.setDefaultTimeout(60000);
 
-    pdfBuffer = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      margin: { top: "15mm", bottom: "20mm", left: "12mm", right: "12mm" },
-    });
+        await page.setContent(htmlContent, { waitUntil: "networkidle2" });
+        await page.evaluateHandle("document.fonts.ready");
+        await new Promise(r => setTimeout(r, 500));
 
-    await browser.close();
-  } catch (err) {
-    throw new Error("PDF generation failed: " + err.message);
-  }
+        const pdfBuffer = await page.pdf({
+          format: "A4",
+          printBackground: true,
+          margin: { top: "15mm", bottom: "20mm", left: "12mm", right: "12mm" },
+        });
+
+        await page.close();
+        if (!browserInstance) await browser.close();
+
+        return pdfBuffer;
+      } catch (err) {
+        attempt++;
+        if (attempt > maxRetries) throw new Error("PDF generation failed: " + err.message);
+      }
+    }
+  };
+
+  const pdfBuffer = await generatePdfBuffer(html);
 
   // S3 upload
   const safeCourseId = courseId ? String(courseId) : "generic";
@@ -178,18 +193,17 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   const s3KeyPrefix = options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
   const s3Key = `${s3KeyPrefix}/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
     fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+    s3Key,
   };
 };
 
