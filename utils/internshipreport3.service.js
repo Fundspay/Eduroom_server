@@ -60,16 +60,12 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   .page {
     width: 100%;
     min-height: 100vh;
-    position: relative;
-    box-sizing: border-box;
-  }
-  .header {
-    height: 150px; /* adjust to your header image height */
     background: url("${bgUrl}") no-repeat center top;
-    background-size: contain;
-  }
-  .content {
-    padding: 20px 40px;
+    background-size: cover;
+    display: flex;
+    flex-direction: column;
+    padding: 80px 40px 60px 40px; /* top/right/bottom/left */
+    box-sizing: border-box;
     color: #000;
   }
   .main-title {
@@ -107,41 +103,39 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
 </head>
 <body>
   <div class="page">
-    <div class="header"></div>
-    <div class="content">
-      <div class="main-title">${escapeHtml(title)}</div>
-      <div class="meta">
-        <div><b>Intern Name:</b> ${escapeHtml(userName||"")}</div>
-        <div><b>Domain:</b> ${escapeHtml(domainName||"")}</div>
-        <div><b>Course:</b> ${escapeHtml(courseName||"")}</div>
-        <div><b>Session:</b> Session ${escapeHtml(String(sessionNumber||""))} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
-        <div><b>Video Duration:</b> ${escapeHtml(sessionDuration||"")}</div>
-        <div><b>Start Date:</b> ${escapeHtml(formatDateReadable(startDate))} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
-      </div>
-
-      <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(String(sessionNumber||""))}</div>
-      ${mcqs.length
-        ? mcqs.map((q, idx) => {
-            const opts = Array.isArray(q.options) ? q.options : [];
-            const correct = q.correctAnswer || "";
-            return `<div class="question">
-              <div><b>Question ${idx+1}:</b> ${escapeHtml(q.question || `Question ${idx+1}`)}</div>
-              <div class="options">
-                ${opts.map((opt,j)=>`<div class="option">${j+1}. ${escapeHtml(opt)}${opt==correct? ' <span class="correct">(Correct)</span>': ''}</div>`).join('')}
-              </div>
-              <div class="answer-block"><b>Answer:</b> ${escapeHtml(correct)}</div>
-            </div>`;
-          }).join('')
-        : `<div><i>No MCQ data available.</i></div>`}
-
-      ${caseStudyResult
-        ? `<div class="case-study">
-             <div class="section-title">2. Case Study</div>
-             <div><b>Match Percentage:</b> ${escapeHtml(String(caseStudyResult.matchPercentage||""))}%</div>
-             ${caseStudyResult.summary ? `<div><b>Summary:</b> ${escapeHtml(caseStudyResult.summary)}</div>` : ""}
-           </div>`
-        : ""}
+    <div class="main-title">${escapeHtml(title)}</div>
+    <div class="meta">
+      <div><b>Intern Name:</b> ${escapeHtml(userName||"")}</div>
+      <div><b>Domain:</b> ${escapeHtml(domainName||"")}</div>
+      <div><b>Course:</b> ${escapeHtml(courseName||"")}</div>
+      <div><b>Session:</b> Session ${escapeHtml(String(sessionNumber||""))} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
+      <div><b>Video Duration:</b> ${escapeHtml(sessionDuration||"")}</div>
+      <div><b>Start Date:</b> ${escapeHtml(formatDateReadable(startDate))} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
     </div>
+
+    <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(String(sessionNumber||""))}</div>
+    ${mcqs.length
+      ? mcqs.map((q, idx) => {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          const correct = q.correctAnswer || "";
+          return `<div class="question">
+            <div><b>Question ${idx+1}:</b> ${escapeHtml(q.question || `Question ${idx+1}`)}</div>
+            <div class="options">
+              ${opts.map((opt,j)=>`<div class="option">${j+1}. ${escapeHtml(opt)}${opt==correct? ' <span class="correct">(Correct)</span>': ''}</div>`).join('')}
+            </div>
+            <div class="answer-block"><b>Answer:</b> ${escapeHtml(correct)}</div>
+          </div>`;
+        }).join('')
+      : `<div><i>No MCQ data available.</i></div>`}
+
+    ${caseStudyResult
+      ? `<div class="case-study">
+           <div class="section-title">2. Case Study</div>
+           <div><b>Match Percentage:</b> ${escapeHtml(String(caseStudyResult.matchPercentage||""))}%</div>
+           ${caseStudyResult.summary ? `<div><b>Summary:</b> ${escapeHtml(caseStudyResult.summary)}</div>` : ""}
+         </div>`
+      : ""}
+
     <div class="footer">Generated on ${today}</div>
   </div>
 </body>
