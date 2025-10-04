@@ -211,7 +211,7 @@ const sendInternshipReport = async (req, res) => {
   }
 };
 
-module.exports = { sendInternshipReport };
+module.exports. sendInternshipReport = sendInternshipReport;
 
 
 
