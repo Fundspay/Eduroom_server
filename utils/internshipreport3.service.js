@@ -51,7 +51,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     caseStudyResult = null,
   } = sessionData;
 
-  const bgUrl = options.bgUrl || `${ASSET_BASE}/report-bg.png`;
+  const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
 
   const title = `${courseName || ""} Internship Report – Session ${sessionNumber}`;
 
