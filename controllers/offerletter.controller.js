@@ -1,6 +1,6 @@
 "use strict";
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
-const { generateInternshipReport } = require("../utils/internshipreport.service.js");
+const { generateInternshipReport } = require("../utils/internshipreport1.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
 const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
