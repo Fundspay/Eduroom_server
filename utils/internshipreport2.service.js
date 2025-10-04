@@ -123,139 +123,143 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
 
   // Build HTML (table designed to paginate across pages)
   const html = `
-  <!doctype html>
+ <!doctype html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>My Internship Details - ${fullName}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: 30px 30px 60px 30px; /* extra bottom margin for footer */
-    }
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      font-family: "Times New Roman", serif;
-      background: #fff;
-    }
+<meta charset="utf-8" />
+<title>My Internship Details - ${fullName}</title>
+<style>
+@page {
+size: A4;
+margin: 30px 30px 60px 30px; /* extra bottom margin for footer */
+@bottom-center {
+content: element(footer);
+}
+}
+html, body {
+height: 100%;
+margin: 0;
+padding: 0;
+font-family: "Times New Roman", serif;
+background: #fff;
+}
 
-    .sheet {
-      position: relative;
-      min-height: 100%;
-      box-sizing: border-box;
-      padding: 20px;
-      background-image: url("${bgUrl}");
-      background-repeat: no-repeat;
-      background-position: center top;
-      background-size: cover;
-    }
+.sheet {
+position: relative;
+min-height: 100%;
+box-sizing: border-box;
+padding: 20px;
+background-image: url("${bgUrl}");
+background-repeat: no-repeat;
+background-position: center top;
+background-size: cover;
+padding-bottom: 50px; /* Add padding to prevent overlap with running footer */
+}
 
-    .header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 0;
-    }
+.header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 10px 0;
+}
 
-    .title {
-      text-align: center;
-      font-size: 22px;
-      font-weight: 700;
-      margin: 10px 0 20px 0;
-      letter-spacing: 0.5px;
-    }
+.title {
+text-align: center;
+font-size: 22px;
+font-weight: 700;
+margin: 10px 0 20px 0;
+letter-spacing: 0.5px;
+}
 
-    /* Table styling */
-    .details-table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-      margin: 0 auto;
-      background: rgba(255,255,255,0.85);
-    }
-    .details-table th,
-    .details-table td {
-      border: 1px solid #000;
-      padding: 6px 8px;
-      vertical-align: top;
-      word-wrap: break-word;
-    }
+/* Table styling */
+.details-table {
+width: 100%;
+border-collapse: collapse;
+table-layout: fixed;
+margin: 0 auto;
+background: rgba(255,255,255,0.85);
+}
+.details-table th,
+.details-table td {
+border: 1px solid #000;
+padding: 6px 8px;
+vertical-align: top;
+word-wrap: break-word;
+}
 
-    .details-table thead th {
-      background: #fff;
-      font-weight: bold;
-      text-align: center;
-    }
+.details-table thead th {
+background: #fff;
+font-weight: bold;
+text-align: center;
+}
 
-    .field {
-      width: 35%;
-      font-weight: 700;
-    }
-    .value {
-      width: 65%;
-      color: #b00000;
-    }
+.field {
+width: 35%;
+font-weight: 700;
+}
+.value {
+width: 65%;
+color: #b00000;
+}
 
-    /* Page break rules */
-    .details-table { page-break-inside: auto; }
-    .details-table tr { page-break-inside: avoid; page-break-after: auto; }
-    .details-table td { page-break-inside: avoid; }
-    .page-break { page-break-after: always; }
+/* Page break rules */
+.details-table { page-break-inside: auto; }
+.details-table tr { page-break-inside: avoid; page-break-after: auto; }
+.details-table td { page-break-inside: avoid; }
+.page-break { page-break-after: always; }
 
-    /* Footer fix */
-    .footer {
-      position: fixed; /* instead of absolute */
-      bottom: 10px;
-      left: 0;
-      right: 0;
-      text-align: center;
-      font-size: 12px;
-      color: #333;
-    }
+/* Footer fix for print */
+.footer {
+display: block;
+position: running(footer);
+text-align: center;
+font-size: 12px;
+color: #333;
+}
 
-    /* Print specific: repeat header/footer on each page */
-    @media print {
-      thead { display: table-header-group; }
-      tfoot { display: table-footer-group; }
-    }
-  </style>
+/* Print specific: repeat header/footer on each page */
+@media print {
+thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
+}
+</style>
 </head>
 <body>
-  <div class="sheet">
-    <div class="header">
-      <div style="width: 150px;">
-        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
-      </div>
-      <div style="flex:1"></div>
-      <div style="width:150px; text-align:right; font-size:12px;">
-        ${generatedOn}
-      </div>
-    </div>
+<div class="sheet">
+<div class="header">
+<div style="width: 150px;">
+<img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
+</div>
+<div style="flex:1"></div>
+<div style="width:150px; text-align:right; font-size:12px;">
+${generatedOn}
+</div>
+</div>
 
-    <div class="title">MY INTERNSHIP DETAILS</div>
+<div class="title">MY INTERNSHIP DETAILS</div>
 
-    <table class="details-table">
-      <thead>
-        <tr>
-          <th class="field">Field</th>
-          <th class="value">Value (Auto-Fetched)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${visibleRows.map(([label, val]) => {
-          const safeVal = String(val || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return `<tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>`;
-        }).join("\n")}
-      </tbody>
-    </table>
+<table class="details-table">
+<thead>
+<tr>
+<th class="field">Field</th>
+<th class="value">Value (Auto-Fetched)</th>
+</tr>
+</thead>
+<tbody>
+${visibleRows.map(([label, val]) => {
+const safeVal = String(val || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+return `<tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>`;
+}).join("\n")}
+</tbody>
+</table>
 
-    <!-- Footer will now appear on every page without overlap -->
-    <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-  </div>
+</div>
+
+<!-- Footer positioned as running element for every page without overlap -->
+<div class="footer">Generated by FundsWeb · ${generatedOn}</div>
 </body>
 </html>
+
   `;
 
   // Render PDF with Puppeteer
