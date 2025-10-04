@@ -765,7 +765,6 @@ const generateCourseSessionReports = async (req, res) => {
     // Load user
     const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
     if (!user) return ReE(res, "User not found", 404);
-
     await user.reload();
 
     // Load course
@@ -784,43 +783,51 @@ const generateCourseSessionReports = async (req, res) => {
       ],
     });
 
+    // Fetch all case studies for the user and course at once
+    const caseStudies = await model.CaseStudyResult.findAll({
+      where: { userId, courseId },
+      order: [["createdAt", "DESC"]],
+    });
+
+    const caseStudyMap = {};
+    for (const cs of caseStudies) {
+      const key = `${cs.day}-${cs.sessionNumber}`;
+      if (!caseStudyMap[key]) caseStudyMap[key] = cs; // Keep latest only
+    }
+
+    const getFullName = (user) => user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim();
+    const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
+
     const response = {
       userId: user.id,
-      fullName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+      fullName: getFullName(user),
       courseId: course.id,
       courseName: course.name,
       results: [],
     };
 
-    for (const session of sessions) {
+    // Generate reports in parallel
+    const reportPromises = sessions.map(async (session) => {
       const day = session.day;
       const sessionNumber = session.sessionNumber;
       const sessionTitle = session.title || "";
       const sessionDuration = session.sessionDuration || "";
-      const startDate = user.courseDates?.[courseId]?.startDate || null;
-      const endDate = user.courseDates?.[courseId]?.endDate || null;
 
       // MCQs
       let mcqs = [];
       try {
         const progressMap = session.userProgress || {};
         const progress = progressMap[String(userId)] || progressMap[userId] || {};
-        if (Array.isArray(progress.questions) && progress.questions.length > 0) {
-          mcqs = progress.questions.map((q) => ({
-            question: q.question || q.q || "",
-            options: q.options || q.choices || q.opts || [],
-            correctAnswer: q.correctAnswer || q.correct || q.answer || "",
-          }));
-        }
+        mcqs = (progress.questions ?? []).map(q => ({
+          question: q.question || q.q || "",
+          options: q.options || q.choices || q.opts || [],
+          correctAnswer: q.correctAnswer || q.correct || q.answer || "",
+        }));
       } catch (err) {
         mcqs = [];
       }
 
-      // Latest case study
-      const latestCaseStudy = await model.CaseStudyResult.findOne({
-        where: { userId, courseId, day, sessionNumber },
-        order: [["createdAt", "DESC"]],
-      });
+      const latestCaseStudy = caseStudyMap[`${day}-${sessionNumber}`] || null;
 
       const sessionData = {
         userId: user.id,
@@ -841,24 +848,21 @@ const generateCourseSessionReports = async (req, res) => {
       };
 
       try {
-        const genOptions = {
-          bgUrl: `${process.env.REPORT_BG_URL || `${process.env.ASSET_BASE || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets"}/internshipbg.png`}`,
-          bucketPrefix: `internshipReports/${user.id}/course-${course.id}`,
-        };
+        const generated = await generateSessionReport(sessionData); // removed genOptions
 
-        const generated = await generateSessionReport(sessionData, genOptions);
-
-        response.results.push({
+        return {
           day,
           sessionNumber,
           fileName: generated.fileName,
           fileUrl: generated.fileUrl,
           s3Key: generated.s3Key,
-        });
+        };
       } catch (gErr) {
-        response.results.push({ day, sessionNumber, error: gErr.message });
+        return { day, sessionNumber, error: gErr.message };
       }
-    }
+    });
+
+    response.results = await Promise.all(reportPromises);
 
     return ReS(res, { success: true, data: response }, 200);
   } catch (error) {
