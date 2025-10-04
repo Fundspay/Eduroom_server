@@ -57,14 +57,19 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       .page {
         position: relative;
         padding: 12mm;
-        background-image: url("${bgUrl}");
-        background-repeat: no-repeat;
-        background-position: center top;
-        background-size: cover;
         min-height: 100%;
         box-sizing: border-box;
       }
-      .main-title { font-size: 20px; font-weight: 700; margin: 8px 0 12px 0; }
+      /* Header background image */
+      .header {
+        height: 80px; /* adjust based on your image */
+        background-image: url("${bgUrl}");
+        background-repeat: no-repeat;
+        background-position: top left;
+        background-size: contain;
+        margin-bottom: 20px;
+      }
+      .main-title { font-size: 20px; font-weight: 700; margin: 0 0 12px 0; }
       .meta { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
       .meta b { font-weight: 700; }
       hr { border:none; border-top:1px solid #cfcfcf; margin:12px 0; }
@@ -80,6 +85,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   </head>
   <body>
     <div class="page">
+      <div class="header"></div> <!-- header image -->
       <div class="main-title">${escapeHtml(title)}</div>
       <div class="meta">
         <div><b>Intern Name:</b> ${escapeHtml(userName||"")}</div>
@@ -115,13 +121,12 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   </html>
   `;
 
-  // Launch Puppeteer
   const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
   const page = await browser.newPage();
   page.setDefaultNavigationTimeout(60000);
   page.setDefaultTimeout(60000);
 
-  await page.setContent(html, { waitUntil: "networkidle0" }); // ensures network images load
+  await page.setContent(html, { waitUntil: "networkidle0" });
   await page.evaluateHandle("document.fonts.ready");
   await new Promise(r=>setTimeout(r,500));
 
@@ -130,7 +135,6 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await page.close();
   await browser.close();
 
-  // Upload to S3
   const safeCourseId = courseId? String(courseId) : "generic";
   const fileName = `session-${day||"d"}-s${sessionNumber||"0"}.pdf`;
   const s3KeyPrefix = options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
