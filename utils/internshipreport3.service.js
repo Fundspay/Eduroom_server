@@ -3,8 +3,6 @@
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
-const fs = require("fs");
-const path = require("path");
 
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
@@ -13,17 +11,6 @@ const s3 = new AWS.S3({
 });
 
 const ASSET_BASE = CONFIG.assetBase || "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
-
-// Load background image as Base64
-let BASE64_BG = "";
-try {
-  const bgPath = path.join(__dirname, "../assets/internshipbg.png");
-  const bgData = fs.readFileSync(bgPath);
-  BASE64_BG = `data:image/png;base64,${bgData.toString("base64")}`;
-} catch (err) {
-  console.warn("Could not load background image, proceeding without it");
-  BASE64_BG = "";
-}
 
 const escapeHtml = (str) => {
   if (str === null || typeof str === "undefined") return "";
@@ -54,10 +41,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     caseStudyResult = null,
   } = sessionData;
 
-  const bgUrl = BASE64_BG || options.bgUrl || "";
+  const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const title = `${courseName || ""} Internship Report – Session ${sessionNumber}`;
 
-  // Build HTML
   const html = `
   <!doctype html>
   <html>
@@ -115,7 +101,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
               ${opts.map((opt,j)=>`<div class="option">${j+1}. ${escapeHtml(opt)}${opt==correct? ' <span class="correct">(Correct)</span>': ''}</div>`).join("")}
             </div>
             <div class="answer-block"><b>Answer:</b> ${escapeHtml(correct)}</div>
-          </div>`
+          </div>`;
         }).join("") : `<div><i>No MCQ data available.</i></div>`}
       </div>
       ${caseStudyResult? `<div class="case-study">
@@ -129,35 +115,20 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   </html>
   `;
 
-  // PDF generation with retry
-  const generatePdfBuffer = async () => {
-    const maxRetries = 2;
-    let attempt = 0;
+  // Launch Puppeteer
+  const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
+  const page = await browser.newPage();
+  page.setDefaultNavigationTimeout(60000);
+  page.setDefaultTimeout(60000);
 
-    while(attempt <= maxRetries){
-      try {
-        const browser = await puppeteer.launch({ headless:true, args:["--no-sandbox","--disable-setuid-sandbox"] });
-        const page = await browser.newPage();
-        page.setDefaultNavigationTimeout(60000);
-        page.setDefaultTimeout(60000);
+  await page.setContent(html, { waitUntil: "networkidle0" }); // ensures network images load
+  await page.evaluateHandle("document.fonts.ready");
+  await new Promise(r=>setTimeout(r,500));
 
-        await page.setContent(html, { waitUntil:"networkidle0" });
-        await page.evaluateHandle("document.fonts.ready");
-        await new Promise(r=>setTimeout(r,500));
+  const pdfBuffer = await page.pdf({ format:"A4", printBackground:true, margin:{top:"15mm", bottom:"20mm", left:"12mm", right:"12mm"} });
 
-        const pdfBuffer = await page.pdf({ format:"A4", printBackground:true, margin:{top:"15mm", bottom:"20mm", left:"12mm", right:"12mm"} });
-
-        await page.close();
-        await browser.close();
-        return pdfBuffer;
-      } catch(err){
-        attempt++;
-        if(attempt>maxRetries) throw new Error("PDF generation failed: " + err.message);
-      }
-    }
-  };
-
-  const pdfBuffer = await generatePdfBuffer();
+  await page.close();
+  await browser.close();
 
   // Upload to S3
   const safeCourseId = courseId? String(courseId) : "generic";
