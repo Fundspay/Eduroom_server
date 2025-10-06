@@ -86,25 +86,25 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     ["Specialization", display(user.specialization)],
     ["Current Year", display(user.currentYear)],
     ["Current Semester", display(user.currentSemester)],
-    ["College Address", display(user.collegeAddress)],
-    ["Placement Coordinator Name", display(user.placementCoordinatorName)],
-    ["Placement Coordinator Contact", display(user.placementCoordinatorContact)],
-    ["Manager Name", display(user.managerName)],
-    ["Manager Email", display(user.managerEmail)],
+    // ["College Address", display(user.collegeAddress)],
+    // ["Placement Coordinator Name", display(user.placementCoordinatorName)],
+    // ["Placement Coordinator Contact", display(user.placementCoordinatorContact)],
+    // ["Manager Name", display(user.managerName)],
+    // ["Manager Email", display(user.managerEmail)],
     // Internship related
-    ["Internship Program", display(user.internshipProgram)],
-    ["Internship Duration", display(user.internshipDuration)],
-    ["Internship Mode", internshipMode],
-    ["Preferred Start Date", user.preferredStartDate ? new Date(user.preferredStartDate).toLocaleDateString("en-GB") : ""],
-    ["Referral Code", display(user.referralCode)],
-    ["Referral Source", display(user.referralSource)],
-    ["LinkedIn Profile", display(user.linkedInProfile)],
-    ["Account Holder Name", display(user.accountHolderName)],
-    ["Bank Name", display(user.bankName)],
-    ["IFSC Code", display(user.ifscCode)],
-    ["Account Number", display(user.accountNumber)],
-    ["Assigned Team Manager", teamManagerName],
-    ["Preferred Communication", communicationMode],
+    // ["Internship Program", display(user.internshipProgram)],
+    // ["Internship Duration", display(user.internshipDuration)],
+    // ["Internship Mode", internshipMode],
+    // ["Preferred Start Date", user.preferredStartDate ? new Date(user.preferredStartDate).toLocaleDateString("en-GB") : ""],
+    // ["Referral Code", display(user.referralCode)],
+    // ["Referral Source", display(user.referralSource)],
+    // ["LinkedIn Profile", display(user.linkedInProfile)],
+    // ["Account Holder Name", display(user.accountHolderName)],
+    // ["Bank Name", display(user.bankName)],
+    // ["IFSC Code", display(user.ifscCode)],
+    // ["Account Number", display(user.accountNumber)],
+    // ["Assigned Team Manager", teamManagerName],
+    // ["Preferred Communication", communicationMode],
   ];
 
   // Remove empty rows if you prefer (keeps consistent layout if you want all rows visible, commented out)
@@ -219,15 +219,13 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
 <body>
   <div class="sheet">
     <div class="header">
-      <div style="width: 150px;">
-        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
-      </div>
+      
       <div style="flex:1"></div>
-      <div style="width:150px; text-align:right; font-size:12px;">
+      <div style="width:150px; text-align:right; font-size:12px; margin-top: 2%;">
         ${generatedOn}
       </div>
     </div>
-    <div class="title">MY INTERNSHIP DETAILS</div>
+    <div class="title" style="margin-top: 5%;">MY INTERNSHIP DETAILS</div>
     <table class="details-table">
       <thead>
         <tr>
@@ -251,7 +249,6 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   </div>
 </body>
 </html>
-
   `;
 
   // Render PDF with Puppeteer
