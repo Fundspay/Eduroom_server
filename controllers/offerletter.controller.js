@@ -759,51 +759,67 @@ const generateSingleSessionReport = async (req, res) => {
   try {
     const { userId, courseId, sessionNumber } = req.params;
 
-    const user = await db.users.findByPk(userId);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    // 🧩 Validate params
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!courseId) return ReE(res, "courseId is required", 400);
+    if (!sessionNumber) return ReE(res, "sessionNumber is required", 400);
 
-    const course = await db.Course.findByPk(courseId, {
-      include: [{ model: db.Domain, attributes: ["name"] }],
+    // Convert to numbers
+    const userID = parseInt(userId, 10);
+    const courseID = parseInt(courseId, 10);
+    const sessionNum = parseInt(sessionNumber, 10);
+
+    // 🧩 Fetch user
+    const user = await model.User.findOne({
+      where: { id: userID, isDeleted: false },
     });
-    if (!course) {
-      return res.status(404).json({ error: "Course not found" });
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
-    // Extract course info
-    const { startDate = null, endDate = null } = user.courseDates?.[courseId] || {};
+    // 🧩 Fetch course
+    const course = await model.Course.findOne({
+      where: { id: courseID, isDeleted: false },
+      include: [{ model: model.Domain, attributes: ["name"], required: false }],
+    });
+    if (!course) return ReE(res, "Course not found", 404);
+
+    // ✅ Extract course dates and status from user JSON
+    const { startDate = null, endDate = null } =
+      user.courseDates?.[courseID] || {};
     const courseStatuses = user.courseStatuses || {};
-    const courseStatus = courseStatuses[String(courseId)] || "Not Started";
+    const courseStatus = courseStatuses[String(courseID)] || "Not Started";
 
-    // 🔹 No per-session data yet (Option 2)
-    const sessionDataFromUser = {};
+    // ✅ No MCQs or Case Study in Option 2
     const mcqs = [];
     const caseStudyResult = {
-      caseStudyQuestion: "No case study data available",
-      userAnswer: "N/A",
+      summary: "No case study data available.",
+      matchPercentage: 0,
     };
 
-    // Prepare data for PDF
-    const data = {
-      userName: user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
-      courseName: course.name,
+    // 🧾 Prepare data for PDF
+    const sessionData = {
+      userId: user.id,
+      userName:
+        user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
       domainName: course.Domain?.name || "N/A",
-      sessionNumber,
-      mcqs,
-      caseStudyResult,
+      courseId: course.id,
+      courseName: course.name,
+      sessionNumber: sessionNum,
+      sessionTitle: `Session ${sessionNum}`,
+      sessionDuration: "",
       startDate,
       endDate,
-      status: courseStatus,
+      mcqs,
+      caseStudyResult,
+      courseStatus,
     };
 
-    // Generate PDF
-    const pdfPath = await generateSessionReport(data);
+    // 🪄 Generate PDF
+    const generated = await generateSessionReport(sessionData);
 
-    return res.download(pdfPath, `Session_Report_User${userId}_Course${courseId}.pdf`);
+    return ReS(res, { success: true, data: generated }, 200);
   } catch (error) {
     console.error("❌ Error generating single session report:", error);
-    return res.status(500).json({ error: "Failed to generate report" });
+    return ReE(res, error.message || "Internal Server Error", 500);
   }
 };
 module.exports.generateSingleSessionReport = generateSingleSessionReport;
