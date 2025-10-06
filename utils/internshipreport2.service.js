@@ -219,15 +219,13 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
 <body>
   <div class="sheet">
     <div class="header">
-      <div style="width: 150px;">
-        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
-      </div>
+      
       <div style="flex:1"></div>
-      <div style="width:150px; text-align:right; font-size:12px;">
+      <div style="width:150px; text-align:right; font-size:12px; margin-top: -2%;">
         ${generatedOn}
       </div>
     </div>
-    <div class="title">MY INTERNSHIP DETAILS</div>
+    <div class="title" style="margin-top: -2%;">MY INTERNSHIP DETAILS</div>
     <table class="details-table">
       <thead>
         <tr>
