@@ -109,7 +109,7 @@ const internshipDetailsRows = [
 
   // Remove empty rows if you prefer (keeps consistent layout if you want all rows visible, commented out)
   // const visibleRows = rows.filter(([label, val]) => val && String(val).trim() !== "");
-  const visibleRows = rows; // keep all rows (like your screenshot includes empty fields sometimes)
+  // const visibleRows = rows; // keep all rows (like your screenshot includes empty fields sometimes)
 
   // background image — default to internships background; allow override through options.bgUrl
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
