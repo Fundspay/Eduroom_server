@@ -67,49 +67,49 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   const teamManagerName = user.teamManager && user.teamManager.name ? user.teamManager.name : "";
 
   // Build rows in the exact order you want to present them
-  const rows = [
-    ["Intern Name", fullName],
-    ["Date of Birth", dobDisplay],
-    ["Gender", genderName],
-    ["Email ID", display(user.email)],
-    ["Mobile Number", display(user.phoneNumber)],
-    ["Alternate Mobile Number", display(user.alternatePhoneNumber)],
-    ["Residential Address", display(user.residentialAddress)],
-    ["Emergency Contact Name", display(user.emergencyContactName)],
-    ["Emergency Contact Number", display(user.emergencyContactNumber)],
-    ["State", display(user.state)],
-    ["City", display(user.city)],
-    ["Pin Code", display(user.pinCode)],
-    ["College Name", display(user.collegeName)],
-    ["College Roll Number", display(user.collegeRollNumber)],
-    ["Course", display(user.course)],
-    ["Specialization", display(user.specialization)],
-    ["Current Year", display(user.currentYear)],
-    ["Current Semester", display(user.currentSemester)],
-    ["College Address", display(user.collegeAddress)],
-    ["Placement Coordinator Name", display(user.placementCoordinatorName)],
-    // ["Placement Coordinator Contact", display(user.placementCoordinatorContact)],
-    // ["Manager Name", display(user.managerName)],
-    // ["Manager Email", display(user.managerEmail)],
-    // Internship related
-    // ["Internship Program", display(user.internshipProgram)],
-    // ["Internship Duration", display(user.internshipDuration)],
-    // ["Internship Mode", internshipMode],
-    // ["Preferred Start Date", user.preferredStartDate ? new Date(user.preferredStartDate).toLocaleDateString("en-GB") : ""],
-    // ["Referral Code", display(user.referralCode)],
-    // ["Referral Source", display(user.referralSource)],
-    // ["LinkedIn Profile", display(user.linkedInProfile)],
-    // ["Account Holder Name", display(user.accountHolderName)],
-    // ["Bank Name", display(user.bankName)],
-    // ["IFSC Code", display(user.ifscCode)],
-    // ["Account Number", display(user.accountNumber)],
-    // ["Assigned Team Manager", teamManagerName],
-    // ["Preferred Communication", communicationMode],
-  ];
+  const personalDetailsRows = [
+  ["Intern Name", fullName],
+  ["Date of Birth", dobDisplay],
+  ["Gender", genderName],
+  ["Email ID", display(user.email)],
+  ["Mobile Number", display(user.phoneNumber)],
+  ["Alternate Mobile Number", display(user.alternatePhoneNumber)],
+  ["Residential Address", display(user.residentialAddress)],
+  ["Emergency Contact Name", display(user.emergencyContactName)],
+  ["Emergency Contact Number", display(user.emergencyContactNumber)],
+  ["State", display(user.state)],
+  ["City", display(user.city)],
+  ["Pin Code", display(user.pinCode)],
+  ["College Name", display(user.collegeName)],
+  ["College Roll Number", display(user.collegeRollNumber)],
+  ["Course", display(user.course)],
+  ["Specialization", display(user.specialization)],
+  ["Current Year", display(user.currentYear)],
+  ["Current Semester", display(user.currentSemester)],
+  ["College Address", display(user.collegeAddress)],
+  ["Placement Coordinator Name", display(user.placementCoordinatorName)],
+  ["Placement Coordinator Contact", display(user.placementCoordinatorContact)],
+];
+
+const internshipDetailsRows = [
+  ["Internship Program", display(user.internshipProgram)],
+  ["Internship Duration", display(user.internshipDuration)],
+  ["Internship Mode", internshipMode],
+  ["Preferred Start Date", user.preferredStartDate ? new Date(user.preferredStartDate).toLocaleDateString("en-GB") : ""],
+  ["Referral Code", display(user.referralCode)],
+  ["Referral Source", display(user.referralSource)],
+  ["LinkedIn Profile", display(user.linkedInProfile)],
+  ["Account Holder Name", display(user.accountHolderName)],
+  ["Bank Name", display(user.bankName)],
+  ["IFSC Code", display(user.ifscCode)],
+  ["Account Number", display(user.accountNumber)],
+  ["Assigned Team Manager", teamManagerName],
+  ["Preferred Communication", communicationMode],
+];
 
   // Remove empty rows if you prefer (keeps consistent layout if you want all rows visible, commented out)
   // const visibleRows = rows.filter(([label, val]) => val && String(val).trim() !== "");
-  const visibleRows = rows; // keep all rows (like your screenshot includes empty fields sometimes)
+  // const visibleRows = rows; // keep all rows (like your screenshot includes empty fields sometimes)
 
   // background image — default to internships background; allow override through options.bgUrl
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
@@ -121,9 +121,28 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     year: "numeric",
   });
 
-  // Build HTML (table designed to paginate across pages)
-  const html = `
-  <!doctype html>
+  const renderTable = (rows) => `
+  <table class="details-table">
+    <thead>
+      <tr>
+        <th class="field">Field</th>
+        <th class="value">Value (Auto-Fetched)</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows.map(([label, val]) => {
+        const safeVal = String(val || "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        return `<tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>`;
+      }).join("\n")}
+    </tbody>
+  </table>
+`;
+
+const html = `
+<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -131,8 +150,9 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   <style>
     @page {
       size: A4;
-      margin: 30px 30px 60px 30px; /* extra bottom margin for footer */
+      margin: 30px 30px 60px 30px;
     }
+
     html, body {
       height: 100%;
       margin: 0;
@@ -140,23 +160,37 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       font-family: "Times New Roman", serif;
       background: #fff;
     }
-    .sheet {
-      position: relative;
-      min-height: 100%;
-      box-sizing: border-box;
-      padding: 20px;
-      padding-bottom: 120px; /* Added padding for watermark + footer space */
+
+    body::before {
+      content: "";
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
       background-image: url("${bgUrl}");
       background-repeat: no-repeat;
-      background-position: center bottom; /* Changed to bottom */
-      background-size: contain; /* Make watermark fit bottom area */
+      background-position: center bottom;
+      background-size: contain;
+      opacity: 0.15;
+      z-index: -1;
     }
+
+    .sheet {
+      position: relative;
+      box-sizing: border-box;
+      padding: 20px;
+      padding-bottom: 120px;
+      background: rgba(255,255,255,0.9);
+    }
+
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 10px 0;
     }
+
     .title {
       text-align: center;
       font-size: 22px;
@@ -164,7 +198,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       margin: 10px 0 20px 0;
       letter-spacing: 0.5px;
     }
-    /* Table styling */
+
     .details-table {
       width: 100%;
       border-collapse: collapse;
@@ -172,6 +206,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       margin: 0 auto;
       background: rgba(255,255,255,0.85);
     }
+
     .details-table th,
     .details-table td {
       border: 1px solid #000;
@@ -179,77 +214,85 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       vertical-align: top;
       word-wrap: break-word;
     }
+
     .details-table thead th {
       background: #fff;
       font-weight: bold;
       text-align: center;
     }
+
     .field {
       width: 35%;
       font-weight: 700;
     }
+
     .value {
       width: 65%;
       color: #b00000;
     }
-    /* Page break rules */
-    .details-table { page-break-inside: auto; }
-    .details-table tr { page-break-inside: avoid; page-break-after: auto; }
-    .details-table td { page-break-inside: avoid; }
+
     .page-break { page-break-after: always; }
-    /* Footer fix */
+
     .footer {
-      position: fixed; /* instead of absolute */
+      position: fixed;
       bottom: 10px;
       left: 0;
       right: 0;
       text-align: center;
       font-size: 12px;
       color: #333;
-      background: rgba(255,255,255,0.9); /* To avoid watermark overlap */
+      background: rgba(255,255,255,0.9);
       padding: 4px 0;
     }
-    /* Print specific: repeat header/footer on each page */
+
     @media print {
       thead { display: table-header-group; }
       tfoot { display: table-footer-group; }
+      body::before { position: fixed; }
     }
   </style>
 </head>
 <body>
+  <!-- PAGE 1 -->
   <div class="sheet">
     <div class="header">
-      
+      <div style="width: 150px;">
+        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
+      </div>
       <div style="flex:1"></div>
-      <div style="width:150px; text-align:right; font-size:12px; margin-top: 2.2%;">
+      <div style="width:150px; text-align:right; font-size:12px;">
         ${generatedOn}
       </div>
     </div>
-    <div class="title" style="margin-top: 10%;">MY INTERNSHIP DETAILS</div>
-    <table class="details-table">
-      <thead>
-        <tr>
-          <th class="field">Field</th>
-          <th class="value">Value (Auto-Fetched)</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${visibleRows.map(([label, val]) => {
-          const safeVal = String(val || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return `<tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>`;
-        }).join("\n")}
-      </tbody>
-    </table>
 
-    <!-- Optional manual page break if needed -->
-    <!-- <div class="page-break"></div> -->
+    <div class="title">MY INTERNSHIP DETAILS</div>
+    ${renderTable(personalDetailsRows)}
 
-    <!-- Footer will now appear on every page without overlap -->
+    <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
+  </div>
+
+  <div class="page-break"></div>
+
+  <!-- PAGE 2 -->
+  <div class="sheet">
+    <div class="header">
+      <div style="width: 150px;">
+        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
+      </div>
+      <div style="flex:1"></div>
+      <div style="width:150px; text-align:right; font-size:12px;">
+        ${generatedOn}
+      </div>
+    </div>
+
+    <div class="title">INTERNSHIP & BANK DETAILS</div>
+    ${renderTable(internshipDetailsRows)}
+
     <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
   </div>
 </body>
 </html>
-  `;
+`;
 
   // Render PDF with Puppeteer
   let pdfBuffer;
