@@ -203,47 +203,38 @@ module.exports.listAllFundsAudit = listAllFundsAudit;
 const listAllFundsAuditByUser = async (req, res) => {
   try {
     const { teamManagerName } = req.query;
-
-    // ✅ Pagination params
-    const limit = parseInt(req.query.limit) || 100;
-    const page = parseInt(req.query.page) || 1;
-    const offset = (page - 1) * limit;
-
     let userIds = null;
 
+    // ✅ If a team manager name is given, find all users under them
     if (teamManagerName) {
-      // Partial, case-insensitive match
       const statuses = await Status.findAll({
         where: {
-          teamManager: { [Op.iLike]: `%${teamManagerName}%` }
+          teamManager: { [Op.iLike]: `%${teamManagerName}%` } // partial match
         },
         attributes: ["userId"]
       });
 
       userIds = statuses.map(s => s.userId);
 
+      // ✅ If no users found under that manager, return empty response
       if (!userIds.length) {
         return res.status(200).json({
           success: true,
           totalRecords: 0,
-          totalPages: 0,
-          currentPage: page,
-          limit,
           data: []
         });
       }
     }
 
-    // Fetch FundsAudit with optional filter
-    const { count: totalRecords, rows: fundsAudits } = await FundsAudit.findAndCountAll({
-      where: userIds ? { userId: userIds } : {},
-      limit,
-      offset,
+    // ✅ Fetch all FundsAudit records (filtered if userIds exist)
+    const fundsAudits = await FundsAudit.findAll({
+      where: userIds ? { userId: { [Op.in]: userIds } } : {},
       order: [["createdAt", "DESC"]]
     });
 
     const response = [];
 
+    // ✅ Build final response with user and manager details
     for (const audit of fundsAudits) {
       const user = await User.findOne({
         where: { id: audit.userId },
@@ -256,13 +247,13 @@ const listAllFundsAuditByUser = async (req, res) => {
           "collegeName",
           "businessTargets",
           "subscriptionWallet",
-          "createdAt",
-        ],
+          "createdAt"
+        ]
       });
 
       const status = await Status.findOne({
         where: { userId: audit.userId },
-        attributes: ["teamManager"],
+        attributes: ["teamManager"]
       });
 
       response.push({
@@ -285,26 +276,25 @@ const listAllFundsAuditByUser = async (req, res) => {
               collegeName: user.collegeName,
               businessTargets: user.businessTargets,
               subscriptionWallet: user.subscriptionWallet,
-              registeredAt: user.createdAt,
+              registeredAt: user.createdAt
             }
           : null,
-        teamManager: status ? status.teamManager : null,
+
+        teamManager: status ? status.teamManager : null
       });
     }
 
+    // ✅ Final response
     return res.status(200).json({
       success: true,
-      totalRecords,
-      totalPages: Math.ceil(totalRecords / limit),
-      currentPage: page,
-      limit,
+      totalRecords: response.length,
       data: response
     });
   } catch (err) {
-    console.error("Error in listAllFundsAudit:", err);
+    console.error("Error in listAllFundsAuditByUser:", err);
     return res.status(500).json({
       success: false,
-      message: err.message,
+      message: err.message
     });
   }
 };
