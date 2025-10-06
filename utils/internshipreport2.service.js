@@ -221,11 +221,11 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     <div class="header">
       
       <div style="flex:1"></div>
-      <div style="width:150px; text-align:right; font-size:12px; margin-top: 2%;">
+      <div style="width:150px; text-align:right; font-size:12px; margin-top: 2.2%;">
         ${generatedOn}
       </div>
     </div>
-    <div class="title" style="margin-top: 5%;">MY INTERNSHIP DETAILS</div>
+    <div class="title" style="margin-top: 10%;">MY INTERNSHIP DETAILS</div>
     <table class="details-table">
       <thead>
         <tr>
