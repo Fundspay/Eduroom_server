@@ -3,7 +3,7 @@ const router = express.Router();
 const fundsauditController = require("../controllers/fundsaudit.controller");
 
 // ✅ FundsAudit Routes
-router.post("/add", fundsauditController.addFundsAudit);               
+router.post("/add", fundsauditController.addFundsAudit);
 router.get("/all", fundsauditController.fetchAllFundsAudit);          
 router.get("/list/:id", fundsauditController.fetchSingleFundsAudit);  
 router.put("/update/:id", fundsauditController.updateFundsAudit);    
