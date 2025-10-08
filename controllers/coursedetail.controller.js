@@ -5,7 +5,10 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const axios = require("axios");
 const { Op } = require("sequelize");
 const dayjs = require("dayjs");
-model.InternshipStatus = require("../models/status.model.js"); // or the correct path
+model.InternshipStatus = require("../models/status.model.js");
+const { sendMail } = require("../middleware/mailer.middleware");
+ 
+
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
@@ -1459,47 +1462,68 @@ const setCourseStartEndDates = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Fetch the course to get duration
+    // Fetch the course to get duration and businessTarget
     const course = await model.Course.findByPk(courseId);
     if (!course || !course.duration) {
       return ReE(res, "Course not found or duration not set", 404);
     }
 
     // Calculate end date
-    const start = dayjs(startDate); // use dayjs
-    const durationDays = parseInt(course.duration, 10); // assuming duration is in days
+    const start = dayjs(startDate);
+    const durationDays = parseInt(course.duration, 10);
     const end = start.add(durationDays, "day");
 
-    // 🔹 Reload latest user data to avoid overwriting in concurrent updates
+    // Reload latest user data
     await user.reload();
 
-    // 🔹 Update user's courseDates JSON safely
+    // Update user's courseDates JSON safely
     const courseDates = { ...(user.courseDates || {}) };
     courseDates[courseId] = {
-      courseName: course.name, // include course name
-      startDate: start.format("YYYY-MM-DD"), // proper date format
+      courseName: course.name,
+      startDate: start.format("YYYY-MM-DD"),
       endDate: end.format("YYYY-MM-DD"),
       started: true,
     };
 
     user.courseDates = courseDates;
-    await user.save(); // safer than user.update()
+    await user.save();
 
-    // 🔹 Trigger internal Offer Letter API (non-blocking)
+    // Trigger internal Offer Letter API (non-blocking)
     try {
-      await axios.post(`https://eduroom.in/api/v1/offerletter/send/${userId}/${courseId}`, {
-        courseId,
-        courseName: course.name, // send course name
-        startDate: courseDates[courseId].startDate,
-        endDate: courseDates[courseId].endDate,
-      });
+      await axios.post(
+        `https://eduroom.in/api/v1/offerletter/send/${userId}/${courseId}`,
+        {
+          courseId,
+          courseName: course.name,
+          startDate: courseDates[courseId].startDate,
+          endDate: courseDates[courseId].endDate,
+        }
+      );
       console.log(`Offer letter triggered for user ${userId}`);
     } catch (err) {
-      console.error(
-        `Failed to trigger offer letter for user ${userId}:`,
-        err.message
-      );
-      //  Don’t fail main request if offerletter fails
+      console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
+    }
+
+    // 🔹 Send email to the user
+    if (user.email) {
+      const emailHtml = `
+        <h2>Course Assigned: ${course.name}</h2>
+        <p>Dear ${user.name || "User"},</p>
+        <p>You have been enrolled in the course <strong>${course.name}</strong>.</p>
+        <ul>
+          <li><strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
+          <li><strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
+          <li><strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
+        </ul>
+        <p>Best regards,<br/>EduRoom Team</p>
+      `;
+
+      const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
+      if (!mailResult.success) {
+        console.error(`Failed to send course email to user ${userId}`);
+      }
+    } else {
+      console.warn(`User ${userId} has no email configured`);
     }
 
     return ReS(
@@ -1509,7 +1533,7 @@ const setCourseStartEndDates = async (req, res) => {
         message: "Course start and end dates updated successfully",
         data: {
           courseId,
-          courseName: course.name, // include in response too
+          courseName: course.name,
           startDate: courseDates[courseId].startDate,
           endDate: courseDates[courseId].endDate,
           started: courseDates[courseId].started,
