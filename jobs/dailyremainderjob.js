@@ -51,10 +51,10 @@ const checkUserBusinessTargets = async () => {
           <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
             <p>Dear <strong>${user.firstName}</strong>,</p>
 
-            <p>This is a reminder to complete your pending business targets for your active course(s):</p>
+            <p>This is a reminder to complete your pending business targets for your active Live Project(s):</p>
             ${courseSummaryHtml}
 
-            <p>Please ensure that you meet your daily targets to stay on track with your internship program.</p>
+            <p>Please ensure that you meet your daily targets to stay on track with your Live Project(s).</p>
 
             <p>Best regards,<br/>
             <strong>EduRoom HR & Training Team</strong></p>
