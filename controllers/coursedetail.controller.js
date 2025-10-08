@@ -1507,9 +1507,9 @@ const setCourseStartEndDates = async (req, res) => {
     // 🔹 Send email to the user
     if (user.email) {
       const emailHtml = `
-        <h2>Course Assigned: ${course.name}</h2>
+        <h2>Live Project Assigned: ${course.name}</h2>
         <p>Dear ${user.name || "User"},</p>
-        <p>You have been enrolled in the course <strong>${course.name}</strong>.</p>
+        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>.</p>
         <ul>
           <li><strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
           <li><strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
