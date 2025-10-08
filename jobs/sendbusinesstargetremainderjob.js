@@ -1,7 +1,8 @@
 const cron = require("node-cron");
 const { User } = require("../models");
 const { Op } = require("sequelize");
-const { sendMail } = require("../helpers/mailer");
+const { sendMail } = require("../middleware/mailer.middleware.js");
+
 
 process.env.TZ = "Asia/Kolkata"; // ensure IST timing
 
