@@ -60,7 +60,7 @@ const calculateDailyStatus = async (userId, courseId, coursePreviewId) => {
 
 // 📧 Send daily progress email
 const sendDailyStatusMail = async (user, courseId, courseInfo, progressData) => {
-  const subject = `Your Daily Course Progress - ${courseInfo.courseName || "Course"}`;
+  const subject = `Your Daily Live Project Progress  - ${courseInfo.courseName || "Course"}`;
 
   const html = `
   <div style="font-family: Arial, sans-serif; color: #333;">
