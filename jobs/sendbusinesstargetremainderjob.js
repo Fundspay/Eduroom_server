@@ -89,8 +89,8 @@ const sendBusinessTargetReminders = async () => {
   }
 };
 
-// 🕙 Schedule: Every day at 11:53 AM IST
-cron.schedule("53 11 * * *", async () => {
+// 🕙 Schedule: Every day at 12:00 PM IST
+cron.schedule("0 12 * * *", async () => {
   await sendBusinessTargetReminders();
 });
 

@@ -113,8 +113,8 @@ const sendDailyCourseStatusMails = async () => {
   }
 };
 
-// 🕛 Schedule at 11:53 AM daily (IST)
-cron.schedule("53 11 * * *", async () => {
+// 🕛 Schedule at 12:00 PM daily (IST)
+cron.schedule("0 12 * * *", async () => {
   await sendDailyCourseStatusMails();
 });
 

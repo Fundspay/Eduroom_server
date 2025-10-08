@@ -72,8 +72,8 @@ const checkUserBusinessTargets = async () => {
   }
 };
 
-// Schedule the job twice a day — 11:53 AM and 3:00 PM IST
-cron.schedule("53 11,15 * * *", async () => {
+// Schedule the job twice a day — 12:00 PM and 3:00 PM IST
+cron.schedule("0 12,15 * * *", async () => {
   await checkUserBusinessTargets();
 });
 
