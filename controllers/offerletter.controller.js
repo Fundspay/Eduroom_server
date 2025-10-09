@@ -8,6 +8,7 @@ const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, R
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment");
 const { Op } = require("sequelize");
+const { CaseStudyResult, QuestionModel } = require("../models");
 
 
 // Controller: Send Offer Letter to User Email
