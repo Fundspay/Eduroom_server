@@ -1506,17 +1506,39 @@ const setCourseStartEndDates = async (req, res) => {
 
     // 🔹 Send email to the user
     if (user.email) {
-      const emailHtml = `
-        <h2>Live Project Assigned: ${course.name}</h2>
-        <p>Dear ${user.name || "User"},</p>
-        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>.</p>
-        <ul>
-          <li><strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
-          <li><strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
-          <li><strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
-        </ul>
-        <p>Best regards,<br/>EduRoom Team</p>
-      `;
+  const emailHtml = `
+  <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
+      <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
+    </div>
+
+    <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
+
+    <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
+
+    <ul>
+      <li>📅 <strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
+      <li>📅 <strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
+      <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
+    </ul>
+
+    <p>Tips to succeed in this Live Project:</p>
+    <ul>
+      <li>💡 Plan your sessions daily and stay consistent</li>
+      <li>💪 Focus on completing your business targets</li>
+      <li>🌟 Ask questions and leverage resources whenever needed</li>
+    </ul>
+
+    <p>We are excited to see your progress and achievements! 🚀</p>
+
+    <p style="margin-top: 30px;">Best regards,<br/>
+    <strong>EduRoom Team</strong></p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+    <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
+  </div>
+  `;
 
       const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
       if (!mailResult.success) {
