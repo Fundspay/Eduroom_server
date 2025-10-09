@@ -1,5 +1,5 @@
 require("dotenv").config();
-
+console.log("📌 Daily Status Remainder Job loaded");
 const express = require("express");
 const cors = require("cors");
 const compression = require("compression");
@@ -9,9 +9,11 @@ const model = require("./models/index");
 const CONFIG = require("./config/config");
 const v1 = require("./routes/v1");
 const logger = require("./utils/logger.service");
-require("./jobs/dailyremainderjob");
-require("./jobs/dailystatusremainderjob");
-require("./jobs/sendbusinesstargetremainderjob");
+console.log("📌 Daily Status Remainder Job loaded");
+// require("./jobs/dailyremainderjob");
+// require("./jobs/dailystatusremainderjob");
+// require("./jobs/sendbusinesstargetremainderjob");
+console.log("📌 Daily Status Remainder Job loaded");
 
 
 const app = express();
