@@ -3,6 +3,7 @@
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
+const model = require("../models"); // Sequelize models
 
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
@@ -22,43 +23,72 @@ const escapeHtml = (str) => {
     .replace(/>/g, "&gt;");
 };
 
-const formatDateReadable = (input) => {
-  if (!input) return "";
-  const d = new Date(input);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+/**
+ * Fetch sessions from DB grouped by day
+ */
+const fetchSessions = async () => {
+  if (!model.CourseDetail)
+    throw new Error("Sequelize model 'CourseDetail' not found");
+
+  const sessionsFromDB = await model.CourseDetail.findAll({
+    where: { courseId: 8, isDeleted: false }, // ✅ Added isDeleted filter
+    attributes: ["day", "title"],
+    order: [["day", "ASC"], ["id", "ASC"]],
+    raw: true, // ✅ Get plain objects
   });
+
+  console.log("sessionsFromDB:", sessionsFromDB.length, sessionsFromDB);
+
+
+
+  // Group titles by day
+  const sessionsMap = {};
+  sessionsFromDB.forEach((s) => {
+    if (!sessionsMap[s.day]) sessionsMap[s.day] = [];
+    sessionsMap[s.day].push(s.title);
+  });
+
+  // Convert to array for PDF generation
+  const sessions = Object.keys(sessionsMap)
+    .sort((a, b) => a - b)
+    .map((day) => ({
+      day,
+      sessionTitles: sessionsMap[day],
+    }));
+
+  return sessions;
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
-  const {
-    userId,
-    userName,
-    domainName,
-    courseId,
-    courseName,
-    day,
-    sessionNumber,
-    sessionTitle,
-    sessionDuration,
-    startDate,
-    endDate,
-    mcqs = [],
-    caseStudyResult = null,
-  } = sessionData;
+  let sessions =
+    Array.isArray(sessionData) && sessionData.length
+      ? sessionData
+      : await fetchSessions();
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
-  const title = `${courseName || ""} Internship Report – Session ${
-    sessionNumber
-  }`;
+  const title = "Internship Report – Table of Contents";
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+
+  // Generate table rows
+  const tocRows = sessions
+    .map((s) =>
+      s.sessionTitles
+        .map(
+          (sessionTitle, idx) => `
+        <tr>
+          <td style="text-align:center;">${s.day}.${idx + 1}</td>
+          <td>${escapeHtml(sessionTitle)}</td>
+          <td></td>
+        </tr>
+      `
+        )
+        .join("")
+    )
+    .join("");
 
   const html = `
 <!DOCTYPE html>
@@ -67,154 +97,60 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
 <meta charset="UTF-8">
 <title>${escapeHtml(title)}</title>
 <style>
-  body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Times New Roman', serif;
-  }
-
+  body { margin:0; padding:0; font-family:'Times New Roman', serif; }
   .page {
-    width: 100%;
-    min-height: 100vh;
+    width:100%;
+    min-height:100vh;
     background: url("${bgUrl}") no-repeat center top;
     background-size: cover;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    color: #000;
-    position: relative;
+    display:flex;
+    flex-direction:column;
+    box-sizing:border-box;
+    color:#000;
+    position:relative;
   }
-
-  /* main content area with white translucent background */
   .content {
     background: rgba(255,255,255,0.85);
-    margin: 180px 40px 80px 40px; /* space for top header + bottom logo */
-    padding: 40px;
-    border-radius: 8px;
-    box-sizing: border-box;
+    margin:180px 40px 80px 40px;
+    padding:40px;
+    border-radius:8px;
+    box-sizing:border-box;
   }
-
-  .main-title {
-    font-size: 32px;
-    font-weight: bold;
-    text-align: center;
-    margin-bottom: 20px;
-  }
-
-  .meta {
-    font-size: 16px;
-    line-height: 1.5;
-    margin-bottom: 20px;
-  }
-
-  .meta b { font-weight: bold; }
-
-  .section-title {
-    font-size: 18px;
-    font-weight: bold;
-    margin: 16px 0 8px 0;
-  }
-
-  .question { margin-bottom: 12px; }
-  .options { margin-left: 20px; margin-top: 6px; }
-  .option { margin-bottom: 4px; }
-  .correct { color: green; font-weight: 600; }
-  .answer-block { margin-top: 6px; font-style: normal; }
-
-  .case-study {
-    margin-top: 12px;
-    padding: 8px;
-    border-left: 3px solid #ddd;
-    background: rgba(255,255,255,0.8);
-  }
-
-  .footer {
-    position: absolute;
-    bottom: 30px;
-    width: 100%;
-    text-align: center;
-    font-size: 14px;
-    color: #444;
-  }
+  .main-title { font-size:32px; font-weight:bold; text-align:center; margin-bottom:20px; }
+  .section-title { font-size:18px; font-weight:bold; margin:16px 0 8px 0; }
+  .toc-table th { background-color: #f0f0f0; font-weight: bold; }
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; }
 </style>
 </head>
 <body>
   <div class="page">
     <div class="content">
       <div class="main-title">${escapeHtml(title)}</div>
-      <div class="meta">
-        <div><b>Intern Name:</b> ${escapeHtml(userName || "")}</div>
-        <div><b>Domain:</b> ${escapeHtml(domainName || "")}</div>
-        <div><b>Course:</b> ${escapeHtml(courseName || "")}</div>
-        <div><b>Session:</b> Session ${escapeHtml(
-          String(sessionNumber || "")
-        )} ${sessionTitle ? "– " + escapeHtml(sessionTitle) : ""}</div>
-        <div><b>Video Duration:</b> ${escapeHtml(sessionDuration || "")}</div>
-        <div><b>Start Date:</b> ${escapeHtml(
-          formatDateReadable(startDate)
-        )} <b>End Date:</b> ${escapeHtml(formatDateReadable(endDate))}</div>
-      </div>
-
-      <div class="section-title">1. MCQ Quiz – Session ${escapeHtml(
-        String(sessionNumber || "")
-      )}</div>
-      ${
-        mcqs.length
-          ? mcqs
-              .map((q, idx) => {
-                const opts = Array.isArray(q.options) ? q.options : [];
-                const correct = q.correctAnswer || "";
-                return `<div class="question">
-                  <div><b>Question ${idx + 1}:</b> ${escapeHtml(
-                  q.question || `Question ${idx + 1}`
-                )}</div>
-                  <div class="options">
-                    ${opts
-                      .map(
-                        (opt, j) =>
-                          `<div class="option">${j + 1}. ${escapeHtml(opt)}${
-                            opt == correct
-                              ? ' <span class="correct">(Correct)</span>'
-                              : ""
-                          }</div>`
-                      )
-                      .join("")}
-                  </div>
-                  <div class="answer-block"><b>Answer:</b> ${escapeHtml(
-                    correct
-                  )}</div>
-                </div>`;
-              })
-              .join("")
-          : `<div><i>No MCQ data available.</i></div>`
-      }
-
-      ${
-        caseStudyResult
-          ? `<div class="case-study">
-               <div class="section-title">2. Case Study</div>
-               <div><b>Match Percentage:</b> ${escapeHtml(
-                 String(caseStudyResult.matchPercentage || "")
-               )}%</div>
-               ${
-                 caseStudyResult.summary
-                   ? `<div><b>Summary:</b> ${escapeHtml(
-                       caseStudyResult.summary
-                     )}</div>`
-                   : ""
-               }
-             </div>`
-          : ""
-      }
+      <div class="section-title">Table of Contents</div>
+      <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+          <tr>
+            <th style="width:10%; text-align:center;">Sr No</th>
+            <th style="width:30%; text-align:left;">Session</th>
+            <th style="width:60%; text-align:left;">Topics</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            tocRows ||
+            `<tr><td colspan="3" style="text-align:center;"><i>No sessions available</i></td></tr>`
+          }
+        </tbody>
+      </table>
     </div>
-
-    <div class="footer">Generated on ${today}</div>
+    <div class="footer" style="position:absolute; bottom:30px; width:100%; text-align:center; font-size:14px; color:#444;">
+      Generated on ${today}
+    </div>
   </div>
 </body>
 </html>
 `;
 
-  // Puppeteer PDF generation
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -233,12 +169,8 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await page.close();
   await browser.close();
 
-  // Upload to S3
-  const safeCourseId = courseId ? String(courseId) : "generic";
-  const fileName = `session-${day || "d"}-s${sessionNumber || "0"}.pdf`;
-  const s3KeyPrefix =
-    options.bucketPrefix || `internshipReports/${userId}/course-${safeCourseId}`;
-  const s3Key = `${s3KeyPrefix}/${fileName}`;
+  const s3KeyPrefix = options.bucketPrefix || `internshipReports/toc`;
+  const s3Key = `${s3KeyPrefix}/table-of-contents.pdf`;
 
   await s3
     .putObject({
@@ -250,7 +182,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     .promise();
 
   return {
-    fileName,
+    fileName: "table-of-contents.pdf",
     fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
     s3Key,
   };
