@@ -31,7 +31,7 @@ const fetchSessions = async () => {
     throw new Error("Sequelize model 'CourseDetail' not found");
 
   const sessionsFromDB = await model.CourseDetail.findAll({
-    where: { courseId: 8, isDeleted: false }, // ✅ Filter
+    where: { courseId: 8, isDeleted: false },
     attributes: ["day", "title"],
     order: [["day", "ASC"], ["id", "ASC"]],
     raw: true,
@@ -39,14 +39,14 @@ const fetchSessions = async () => {
 
   console.log("sessionsFromDB:", sessionsFromDB.length, sessionsFromDB);
 
-  // ✅ Group titles by day
+  // Group titles by day
   const sessionsMap = {};
   sessionsFromDB.forEach((s) => {
     if (!sessionsMap[s.day]) sessionsMap[s.day] = [];
     sessionsMap[s.day].push(s.title);
   });
 
-  // ✅ Convert to array for easier rendering
+  // Convert to array for PDF generation
   const sessions = Object.keys(sessionsMap)
     .sort((a, b) => a - b)
     .map((day) => ({
@@ -71,22 +71,63 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     year: "numeric",
   });
 
-  // ✅ Build each session row (topics combined in one cell)
-  const tocRows = sessions
-    .map((s, index) => {
-      const combinedTopics = s.sessionTitles
-        .map((t) => `• ${escapeHtml(t)}`)
-        .join("<br>");
-      return `
-        <tr>
-          <td style="text-align:center;">${index + 1}</td>
-          <td>Session ${s.day}</td>
-          <td>${combinedTopics}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  // 🔹 Split sessions into pages (10 sessions per page)
+  const sessionsPerPage = 10;
+  const pages = [];
+  for (let i = 0; i < sessions.length; i += sessionsPerPage) {
+    pages.push(sessions.slice(i, i + sessionsPerPage));
+  }
 
+  // 🔹 Generate each page HTML
+  const pageHtml = pages
+    .map((pageSessions, pageIndex) => {
+      const tocRows = pageSessions
+        .map((s, idx) => {
+          const srNo = pageIndex * sessionsPerPage + (idx + 1);
+          const topics = s.sessionTitles
+            .map((t) => `<div>${escapeHtml(t)}</div>`)
+            .join("");
+          return `
+            <tr>
+              <td style="text-align:center;">${srNo}</td>
+              <td>Session ${s.day}</td>
+              <td>${topics}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      return `
+      <div class="page">
+        <div class="content">
+          <div class="main-title">${escapeHtml(title)}</div>
+          <div class="section-title">Table of Contents (Page ${
+            pageIndex + 1
+          })</div>
+          <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+              <tr>
+                <th style="width:10%; text-align:center;">Sr No</th>
+                <th style="width:30%; text-align:left;">Session</th>
+                <th style="width:60%; text-align:left;">Topics</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                tocRows ||
+                `<tr><td colspan="3" style="text-align:center;"><i>No sessions available</i></td></tr>`
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="footer" style="position:absolute; bottom:30px; width:100%; text-align:center; font-size:14px; color:#444;">
+          Generated on ${today}
+        </div>
+      </div>`;
+    })
+    .join("<div style='page-break-after: always;'></div>");
+
+  // 🔹 Full HTML document with all pages
   const html = `
 <!DOCTYPE html>
 <html lang="en">
@@ -106,48 +147,27 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     color:#000;
     position:relative;
   }
+  /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:180px 40px 80px 40px;
-    padding:40px;
+    margin:120px 40px 60px 40px; /* reduced from 180px top to 120px */
+    padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;
   }
-  .main-title { font-size:32px; font-weight:bold; text-align:center; margin-bottom:20px; }
-  .section-title { font-size:18px; font-weight:bold; margin:16px 0 8px 0; }
+  .main-title { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
+  .section-title { font-size:18px; font-weight:bold; margin:12px 0 6px 0; }
   .toc-table th { background-color: #f0f0f0; font-weight: bold; }
-  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align:top; }
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: top; }
 </style>
 </head>
 <body>
-  <div class="page">
-    <div class="content">
-      <div class="main-title">${escapeHtml(title)}</div>
-      <div class="section-title">Table of Contents</div>
-      <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
-        <thead>
-          <tr>
-            <th style="width:10%; text-align:center;">Sr No</th>
-            <th style="width:30%; text-align:left;">Session</th>
-            <th style="width:60%; text-align:left;">Topics</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${
-            tocRows ||
-            `<tr><td colspan="3" style="text-align:center;"><i>No sessions available</i></td></tr>`
-          }
-        </tbody>
-      </table>
-    </div>
-    <div class="footer" style="position:absolute; bottom:30px; width:100%; text-align:center; font-size:14px; color:#444;">
-      Generated on ${today}
-    </div>
-  </div>
+  ${pageHtml}
 </body>
 </html>
 `;
 
+  // 🔹 Generate PDF
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -166,6 +186,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await page.close();
   await browser.close();
 
+  // 🔹 Upload to S3
   const s3KeyPrefix = options.bucketPrefix || `internshipReports/toc`;
   const s3Key = `${s3KeyPrefix}/table-of-contents.pdf`;
 
