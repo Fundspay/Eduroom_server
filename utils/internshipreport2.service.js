@@ -155,7 +155,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       position: relative;
       min-height: 100%;
       box-sizing: border-box;
-      padding: 20px;
+      padding: 10px;
       padding-bottom: 120px; /* Added padding for watermark + footer space */
       background-image: url("${bgUrl}");
       background-repeat: no-repeat;
@@ -172,7 +172,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       text-align: center;
       font-size: 22px;
       font-weight: 700;
-      margin: 10px 0 20px 0;
+      margin: 5px 0 15px 0;
       letter-spacing: 0.5px;
     }
     /* Table styling */
@@ -231,7 +231,6 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   <div class="sheet">
     <div class="header">
       <div style="width: 150px;">
-        <img src="${ASSET_BASE}/fundsweb-logo.png" alt="logo" style="max-width:150px; height:auto;" onerror="this.style.display='none'"/>
       </div>
       <div style="flex:1"></div>
       <div style="width:150px; text-align:right; font-size:12px;">
