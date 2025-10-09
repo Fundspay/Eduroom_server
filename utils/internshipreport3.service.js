@@ -101,9 +101,6 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       <div class="page">
         <div class="content">
           <div class="main-title">${escapeHtml(title)}</div>
-          <div class="section-title">Table of Contents (Page ${
-            pageIndex + 1
-          })</div>
           <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
               <tr>
@@ -120,7 +117,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
             </tbody>
           </table>
         </div>
-        <div class="footer" style="position:absolute; bottom:30px; width:100%; text-align:center; font-size:14px; color:#444;">
+        <div class="footer" style="position:absolute; bottom:10px; width:100%; text-align:center; font-size:14px; color:#444;">
           Generated on ${today}
         </div>
       </div>`;
@@ -150,7 +147,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:120px 40px 60px 40px; /* reduced from 180px top to 120px */
+    margin:135px 40px 60px 40px; /* reduced from 180px top to 120px */
     padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;
