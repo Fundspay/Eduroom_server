@@ -20,6 +20,18 @@ const raisequeryRouter = require("./raisequery.route");
 const fundsauditRouter = require("./fundsaudit.route");
 const statusRouter = require("./status.route");
 
+
+const cosheetRouter = require("./cosheet.route"); 
+
+const resumedetailsRouter =require("./resumedetails.route")
+const mytargetRouter = require("./mytarget.route");
+
+const studentresumeRouter = require("./studentresume.route");
+const analysis = require("./analysis.route");
+
+
+
+
 // Health Check Route
 router.get("/health", (req, res) => {
   res.status(200).send("Healthy Server!");
@@ -43,5 +55,13 @@ router.use("/internshipcertificate", internshipcertificateRouter);
 router.use("/raisequery", raisequeryRouter);
 router.use("/fundsaudit", fundsauditRouter);
 router.use("/status", statusRouter);
+router.use("/cosheet", cosheetRouter);
+
+router.use("/resumedetails", resumedetailsRouter);
+router.use("/mytarget", mytargetRouter);
+
+router.use("/studentresume", studentresumeRouter);
+router.use("/analysis", analysis);
+
 
 module.exports = router;
