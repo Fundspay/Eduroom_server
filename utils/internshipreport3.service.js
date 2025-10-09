@@ -25,13 +25,16 @@ const escapeHtml = (str) => {
 
 /**
  * Fetch sessions from DB grouped by day
+ * @param {number} courseId - dynamic courseId
  */
-const fetchSessions = async () => {
+const fetchSessions = async (courseId) => {
   if (!model.CourseDetail)
     throw new Error("Sequelize model 'CourseDetail' not found");
 
+  if (!courseId) throw new Error("Missing courseId");
+
   const sessionsFromDB = await model.CourseDetail.findAll({
-    where: { courseId: 8, isDeleted: false },
+    where: { courseId, isDeleted: false }, // ✅ dynamic courseId
     attributes: ["day", "title"],
     order: [["day", "ASC"], ["id", "ASC"]],
     raw: true,
@@ -58,10 +61,11 @@ const fetchSessions = async () => {
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
+  const courseId = options.courseId;
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData
-      : await fetchSessions();
+      : await fetchSessions(courseId); // ✅ pass courseId dynamically
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const title = "Internship Report – Table of Contents";
