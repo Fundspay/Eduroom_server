@@ -487,17 +487,15 @@ const fetchCategoryData = async (req, res, category) => {
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    const userList = users.map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      fullName: `${u.firstName?.trim() || ""} ${u.lastName?.trim() || ""}`.trim(),
-      email: u.email,
+    const userList = managers.map((TeamManager) => ({
+      id: TeamManager.id,
+      name: TeamManager.name,
+      email: TeamManager.email,
     }));
 
     return ReS(res, {
@@ -506,7 +504,7 @@ const fetchCategoryData = async (req, res, category) => {
       category,
       totalRecords: rows.length,
       data: rows,
-      users: userList,
+      managers: userList,
     });
   } catch (error) {
     console.error(`Fetch ${category} Error:`, error);
@@ -549,8 +547,8 @@ const getAllPendingFollowUps = async (req, res) => {
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
       raw: true,
     });
 
@@ -558,7 +556,7 @@ const getAllPendingFollowUps = async (req, res) => {
       success: true,
       totalRecords: coSheetData.length,
       data: coSheetData,
-      users,
+      managers: managers,
     });
   } catch (error) {
     console.error("Get All Pending FollowUps Error:", error);
