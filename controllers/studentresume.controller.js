@@ -174,7 +174,7 @@ const listResumes = async (req, res) => {
     // ---------------------------
     // 3️⃣ Fetch all team managers separately
     // ---------------------------
-    const teamManagers = await model.TeamManager.findAll({
+    const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
@@ -182,7 +182,7 @@ const listResumes = async (req, res) => {
     // ---------------------------
     // 4️⃣ Return response
     // ---------------------------
-    return ReS(res, { success: true, data: records, teamManagers }, 200);
+    return ReS(res, { success: true, data: records, managers }, 200);
   } catch (error) {
     console.error("StudentResume List Error:", error);
     return ReE(res, error.message, 500);
