@@ -27,18 +27,20 @@ const createCoSheet = async (req, res) => {
 
     const results = await Promise.all(
       dataArray.flatMap((data, index) => {
-        // Split mobileNumbers and emailIds by '/' if they exist
+        // -------------------
+        // Safe splitting for mobiles/emails
+        // -------------------
         const mobiles = data.collegeDetails?.mobileNumber
-          ? data.collegeDetails.mobileNumber.split("/").map((m) => m.trim())
+          ? String(data.collegeDetails.mobileNumber).split("/").map((m) => m.trim())
           : data.mobileNumber
-          ? data.mobileNumber.split("/").map((m) => m.trim())
-          : [null];
+            ? String(data.mobileNumber).split("/").map((m) => m.trim())
+            : [null];
 
         const emails = data.collegeDetails?.emailId
-          ? data.collegeDetails.emailId.split("/").map((e) => e.trim())
+          ? String(data.collegeDetails.emailId).split("/").map((e) => e.trim())
           : data.emailId
-          ? data.emailId.split("/").map((e) => e.trim())
-          : [null];
+            ? String(data.emailId).split("/").map((e) => e.trim())
+            : [null];
 
         // Generate all combinations of mobiles and emails
         return mobiles.flatMap((mobile) =>
@@ -64,7 +66,9 @@ const createCoSheet = async (req, res) => {
         );
       }).map(async ({ index, payload }) => {
         try {
+          // -------------------
           // Null field check
+          // -------------------
           const nullFields = Object.keys(payload).filter(
             (key) => payload[key] === null && key !== "teamManagerId"
           );
@@ -72,7 +76,9 @@ const createCoSheet = async (req, res) => {
             nullFieldDetails.push({ row: index + 1, nullFields, rowData: payload });
           }
 
-          // Validate mobile/email
+          // -------------------
+          // Invalid data check
+          // -------------------
           const invalidReasons = [];
           if (payload.mobileNumber && !/^[0-9]{10}$/.test(payload.mobileNumber)) {
             invalidReasons.push("Invalid mobile number");
@@ -85,7 +91,9 @@ const createCoSheet = async (req, res) => {
             return { success: false, type: "invalid", reasons: invalidReasons, data: payload };
           }
 
+          // -------------------
           // Duplicate check
+          // -------------------
           const whereClause = { teamManagerId: payload.teamManagerId, collegeName: payload.collegeName };
           if (payload.mobileNumber) whereClause.mobileNumber = payload.mobileNumber;
           if (payload.emailId) whereClause.emailId = payload.emailId;
@@ -96,7 +104,9 @@ const createCoSheet = async (req, res) => {
             return { success: false, type: "duplicate", error: "Duplicate record skipped", data: payload };
           }
 
+          // -------------------
           // Insert valid record
+          // -------------------
           const record = await model.CoSheet.create(payload);
           validDetails.push({ row: index + 1, rowData: record });
           return { success: true, type: "valid", data: record };
@@ -107,7 +117,9 @@ const createCoSheet = async (req, res) => {
       })
     );
 
-    // Return structured response (unchanged)
+    // -------------------
+    // Final structured response (unchanged for frontend)
+    // -------------------
     return ReS(res, {
       success: true,
       summary: {
@@ -127,6 +139,7 @@ const createCoSheet = async (req, res) => {
 };
 
 module.exports.createCoSheet = createCoSheet;
+
 
 // Update connect fields
 const updateConnectFields = async (req, res) => {
