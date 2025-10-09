@@ -33,12 +33,14 @@ module.exports = (sequelize, Sequelize) => {
     }
   );
 
+  // 🔹 Association (simplified)
   TeamManager.associate = (models) => {
     TeamManager.hasMany(models.User, {
       foreignKey: "assignedTeamManager",
-      as: "users",
       onDelete: "SET NULL",
-      onUpdate: "CASCADE"
+      onUpdate: "CASCADE",
+      constraints: true,
+
     });
   };
 
