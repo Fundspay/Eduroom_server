@@ -24,29 +24,43 @@ const escapeHtml = (str) => {
 };
 
 /**
- * Fetch sessions and MCQs from DB
+ * Fetch MCQs and Case Study results from DB
  * @param {number} courseId
  */
 const fetchSessionsWithMCQs = async (courseId) => {
   if (!courseId) courseId = 1; // default to 1 if missing
 
-  // Fetch sessions
-  const sessions = await model.CourseDetail.findAll({
-    where: { courseId, isDeleted: false },
-    attributes: ["id", "day", "title", "videoDuration", "startDate", "endDate", "domainId"],
-    order: [["day", "ASC"]],
+  // Fetch distinct session numbers from CaseStudyResults
+  const sessionsNumbers = await model.CaseStudyResults.findAll({
+    where: { courseId },
+    attributes: [
+      [model.Sequelize.fn("DISTINCT", model.Sequelize.col("sessionNumber")), "day"],
+    ],
+    order: [["sessionNumber", "ASC"]],
     raw: true,
   });
 
-  // Fetch MCQs for each session
-  for (let session of sessions) {
-    const mcqs = await model.MCQs.findAll({
-      where: { courseId, domainId: session.domainId },
-      attributes: ["questionText", "serialNo"],
-      order: [["serialNo", "ASC"]],
+  // Build sessions array
+  const sessions = [];
+  for (let sessionObj of sessionsNumbers) {
+    const day = sessionObj.day;
+
+    // Fetch all CaseStudyResults for this session
+    const mcqs = await model.CaseStudyResults.findAll({
+      where: { courseId, sessionNumber: day },
+      attributes: ["questionId", "answer", "day"],
+      order: [["id", "ASC"]],
       raw: true,
     });
-    session.mcqs = mcqs;
+
+    sessions.push({
+      day,
+      title: `Session ${day}`, // You can adjust title if needed
+      videoDuration: "~15 mins",
+      startDate: "N/A",
+      endDate: "N/A",
+      mcqs,
+    });
   }
 
   return sessions;
@@ -70,12 +84,8 @@ const generateMCQCaseStudyReport = async (options = {}) => {
       const mcqHtml = s.mcqs
         .map((q, qIdx) => {
           return `
-            <p><b>Question ${q.serialNo || qIdx + 1}:</b> ${escapeHtml(q.questionText)}</p>
-            <p>● Options:</p>
-            <div>1. Option A</div>
-            <div>2. Option B</div>
-            <div>3. Option C</div>
-            <p><b>Answer:</b> [Correct Answer]</p>
+            <p><b>Question ${qIdx + 1}:</b> Question ID ${q.questionId}</p>
+            <p><b>Answer:</b> ${escapeHtml(q.answer)}</p>
           `;
         })
         .join("<br/>");
@@ -88,9 +98,9 @@ const generateMCQCaseStudyReport = async (options = {}) => {
             <p><b>Domain:</b> ${escapeHtml(domain)}</p>
             <p><b>Course:</b> ${escapeHtml(courseName)}</p>
             <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
-            <p><b>Video Duration:</b> ${s.videoDuration || "~15 mins"} MCQ + Case Study (~1500 words)</p>
-            <p><b>Start Date:</b> ${s.startDate || "N/A"}</p>
-            <p><b>End Date:</b> ${s.endDate || "N/A"}</p>
+            <p><b>Video Duration:</b> ${s.videoDuration} MCQ + Case Study (~1500 words)</p>
+            <p><b>Start Date:</b> ${s.startDate}</p>
+            <p><b>End Date:</b> ${s.endDate}</p>
             <br/>
             <h3>MCQ Quiz – Session ${s.day}</h3>
             ${mcqHtml || "<p>No MCQs available</p>"}
