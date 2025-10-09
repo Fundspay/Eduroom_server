@@ -25,13 +25,13 @@ const escapeHtml = (str) => {
 
 /**
  * Fetch sessions from DB grouped by day
- * @param {number} courseId
+ * @param {number} courseId - dynamic courseId
  */
 const fetchSessions = async (courseId) => {
   if (!model.CourseDetail)
     throw new Error("Sequelize model 'CourseDetail' not found");
 
-  if (!courseId) throw new Error("courseId is required");
+  if (!courseId) throw new Error("Missing courseId");
 
   const sessionsFromDB = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false }, // ✅ dynamic courseId
@@ -49,6 +49,7 @@ const fetchSessions = async (courseId) => {
     sessionsMap[s.day].push(s.title);
   });
 
+  // Convert to array for PDF generation
   const sessions = Object.keys(sessionsMap)
     .sort((a, b) => a - b)
     .map((day) => ({
@@ -59,17 +60,12 @@ const fetchSessions = async (courseId) => {
   return sessions;
 };
 
-/**
- * Generate Internship Report PDF
- * @param {number} courseId - dynamic courseId
- * @param {array} sessionData - optional
- * @param {object} options - optional
- */
-const generateSessionReport = async (courseId, sessionData = {}, options = {}) => {
+const generateSessionReport = async (sessionData = {}, options = {}) => {
+  const courseId = options.courseId;
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData
-      : await fetchSessions(courseId); // ✅ pass dynamic courseId
+      : await fetchSessions(courseId); // ✅ pass courseId dynamically
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const title = "Internship Report – Table of Contents";
@@ -152,9 +148,10 @@ const generateSessionReport = async (courseId, sessionData = {}, options = {}) =
     color:#000;
     position:relative;
   }
+  /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:135px 40px 60px 40px;
+    margin:135px 40px 60px 40px; /* reduced from 180px top to 120px */
     padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;
