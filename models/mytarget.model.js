@@ -5,8 +5,6 @@ module.exports = (sequelize, Sequelize) => {
     {
       id: { type: Sequelize.BIGINT, autoIncrement: true, primaryKey: true },
 
-      Id: { type: Sequelize.BIGINT, allowNull: false },
-
       // 🔹 Foreign Key to TeamManager instead of User
       teamManagerId: { type: Sequelize.BIGINT, allowNull: false },
 
