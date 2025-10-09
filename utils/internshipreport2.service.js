@@ -249,7 +249,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       <tbody>
         ${visibleRows.map(([label, val]) => {
           const safeVal = String(val || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-          return <tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>;
+          return `<tr><td class="field">${label}</td><td class="value">${safeVal || "&nbsp;"}</td></tr>`;
         }).join("\n")}
       </tbody>
     </table>
