@@ -2,6 +2,7 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service.js");
 const {generateSessionReport} = require("../utils/internshipreport3.service.js");
+const {generateMCQCaseStudyReport} = require("../utils/internshipreport4.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
 const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
@@ -148,7 +149,7 @@ const sendInternshipReport = async (req, res) => {
     }
 
     // Generate Internship Report (PDF uploaded to S3 + DB saved)
-    const report = await generateSessionReport([], { courseId, userId });
+    const report = await generateMCQCaseStudyReport([], { courseId, userId });
     // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
 
     // Build email content
