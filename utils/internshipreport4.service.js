@@ -28,7 +28,7 @@ const escapeHtml = (str) => {
  * @param {number} courseId
  */
 const fetchSessionsWithMCQs = async (courseId) => {
-  if (!courseId) throw new Error("Missing courseId");
+  if (!courseId) courseId = 1; // default to 1 if missing
 
   // Fetch sessions
   const sessions = await model.CourseDetail.findAll({
@@ -53,8 +53,8 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 const generateMCQCaseStudyReport = async (options = {}) => {
-  const { courseId, internName, domain, courseName } = options;
-  if (!courseId) throw new Error("Missing courseId");
+  let courseId = options.courseId || 1; // default to 1 if missing
+  const { internName, domain, courseName } = options;
 
   const sessions = await fetchSessionsWithMCQs(courseId);
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
