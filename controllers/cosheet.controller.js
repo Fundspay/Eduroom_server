@@ -209,13 +209,13 @@ module.exports.updateConnectFields = updateConnectFields;
 const getCoSheets = async (req, res) => {
   try {
     const records = await model.CoSheet.findAll();
-    const users = await model.User.findAll({
+    const managers = await model.TeamManager.findAll({
       where: { isActive: true, isDeleted: false },
-      attributes: ["id", "firstName", "lastName", "email"],
-      order: [["firstName", "ASC"]],
+      attributes: ["id", "name", "email"],
+      order: [["name", "ASC"]],
     });
 
-    return ReS(res, { success: true, data: records, users }, 200);
+    return ReS(res, { success: true, data: records, managers }, 200);
   } catch (error) {
     console.error("CoSheet Fetch All Error:", error);
     return ReE(res, error.message, 500);
