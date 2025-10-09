@@ -9,12 +9,12 @@ const studentresumeController = require("../controllers/studentresume.controller
 router.post("/create", studentresumeController.createResume);
 router.put("/update/:id", studentresumeController.updateResume);
 router.get("/list", studentresumeController.listResumes);
-router.get("/list/user/:userId", studentresumeController.listResumesByUserId);
+router.get("/list/user/:teamManagerId", studentresumeController.listResumesByUserId);
 router.delete("/delete/:id", studentresumeController.deleteResume);
 router.get("/work-analysis", studentresumeController.getUserTargetAnalysis);
 router.post("/send-mail/:id",studentresumeController.sendMailToStudent);
 
-router.get("/list/user/future/:userId", studentresumeController.listResumesByUserIdfuture);
+router.get("/list/user/future/:teamManagerId", studentresumeController.listResumesByUserIdfuture);
 
 router.get("/resumes-achieved", studentresumeController.getUserResumesAchieved);
 
