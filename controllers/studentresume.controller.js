@@ -174,15 +174,15 @@ const listResumes = async (req, res) => {
     // ---------------------------
     // 3️⃣ Fetch all team managers separately
     // ---------------------------
-    const teamManagers = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
       raw: true,
     });
 
     // ---------------------------
     // 4️⃣ Return response
     // ---------------------------
-    return ReS(res, { success: true, data: records, teamManagers }, 200);
+    return ReS(res, { success: true, data: records, managers }, 200);
   } catch (error) {
     console.error("StudentResume List Error:", error);
     return ReE(res, error.message, 500);
@@ -513,41 +513,37 @@ const listResumesByUserId = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    const user = await model.User.findOne({
+    const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
-      attributes: ["firstName", "lastName"],
+      attributes: ["name", "email"],
       raw: true,
     });
 
-    if (!user) return ReE(res, "User not found", 404);
+    if (!manager) return ReE(res, "Manager not found", 404);
 
-    const firstName = user.firstName.trim();
-    const lastName = user.lastName ? user.lastName.trim() : "";
-    const fullName = `${firstName} ${lastName}`.trim();
+    const fullName = manager.name.trim();
 
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         [Op.or]: [
           { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: firstName } },
+          { followupBy: { [Op.iLike]: fullName } },
         ],
       },
       order: [["createdAt", "ASC"]],
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    const userList = users.map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      fullName: `${u.firstName?.trim() || ""} ${u.lastName?.trim() || ""}`.trim(),
-      email: u.email,
+    const managerList = managers.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
     }));
 
     return ReS(res, {
@@ -556,7 +552,7 @@ const listResumesByUserId = async (req, res) => {
       followUpBy: fullName,
       totalRecords: resumes.length,
       data: resumes,
-      users: userList,
+      managers: managerList,
     });
   } catch (error) {
     console.error("ListResumes Error:", error);
@@ -745,16 +741,14 @@ const getUserResumesAchieved = async (req, res) => {
     if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
 
-    const user = await model.User.findOne({
+    const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
-      attributes: ["firstName", "lastName"],
+      attributes: ["name"],
       raw: true,
     });
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
+    if (!manager) return res.status(404).json({ success: false, error: "Manager not found" });
 
-    const firstName = user.firstName.trim();
-    const lastName = user.lastName ? user.lastName.trim() : "";
-    const fullName = `${firstName} ${lastName}`.trim();
+    const fullName = manager.name.trim();
 
     let dateFilter = {};
     if (fromDate && toDate) {
@@ -768,15 +762,15 @@ const getUserResumesAchieved = async (req, res) => {
         teamManagerId,
         [Op.or]: [
           { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: firstName } },
+          { followupBy: { [Op.iLike]: fullName } },
         ],
         ...dateFilter,
       },
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
       raw: true,
     });
 
@@ -784,7 +778,7 @@ const getUserResumesAchieved = async (req, res) => {
       success: true,
       resumesAchieved: resumes.length,
       resumesData: resumes,
-      users,
+      managers,
     });
   } catch (error) {
     console.error("Error in getUserResumesAchieved:", error);
@@ -855,17 +849,15 @@ const listResumesByUserIdfuture = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    const user = await model.User.findOne({
+    const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
-      attributes: ["firstName", "lastName"],
+      attributes: ["name"],
       raw: true,
     });
 
-    if (!user) return ReE(res, "User not found", 404);
+    if (!manager) return ReE(res, "Manager not found", 404);
 
-    const firstName = user.firstName.trim();
-    const lastName = user.lastName ? user.lastName.trim() : "";
-    const fullName = `${firstName} ${lastName}`.trim();
+    const fullName = manager.name.trim();
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -877,7 +869,7 @@ const listResumesByUserIdfuture = async (req, res) => {
         teamManagerId,
         [Op.or]: [
           { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: firstName } },
+          { followupBy: { [Op.iLike]: fullName } },
         ],
         resumeDate: { [Op.gte]: tomorrow },
       },
