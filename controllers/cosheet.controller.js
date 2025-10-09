@@ -28,30 +28,40 @@ const createCoSheet = async (req, res) => {
     const results = await Promise.all(
       dataArray.flatMap((data, index) => {
         // -------------------
-        // Safe splitting for mobiles/emails
+        // Split mobile, email, coordinator safely
         // -------------------
         const mobiles = data.collegeDetails?.mobileNumber
-          ? String(data.collegeDetails.mobileNumber).split("/").map((m) => m.trim())
+          ? String(data.collegeDetails.mobileNumber).split("/").map(m => m.trim())
           : data.mobileNumber
-            ? String(data.mobileNumber).split("/").map((m) => m.trim())
+            ? String(data.mobileNumber).split("/").map(m => m.trim())
             : [null];
 
         const emails = data.collegeDetails?.emailId
-          ? String(data.collegeDetails.emailId).split("/").map((e) => e.trim())
+          ? String(data.collegeDetails.emailId).split("/").map(e => e.trim())
           : data.emailId
-            ? String(data.emailId).split("/").map((e) => e.trim())
+            ? String(data.emailId).split("/").map(e => e.trim())
             : [null];
 
-        // Generate all combinations of mobiles and emails
-        return mobiles.flatMap((mobile) =>
-          emails.map((email) => ({
+        const coordinators = data.collegeDetails?.coordinatorName
+          ? String(data.collegeDetails.coordinatorName).split("/").map(c => c.trim())
+          : data.coordinatorName
+            ? String(data.coordinatorName).split("/").map(c => c.trim())
+            : [null];
+
+        // -------------------
+        // Align by index
+        // -------------------
+        const maxLength = Math.max(mobiles.length, emails.length, coordinators.length);
+
+        return Array.from({ length: maxLength }, (_, i) => {
+          return {
             index,
             payload: {
               sr: data.collegeDetails?.sr ?? data.sr ?? null,
               collegeName: data.collegeDetails?.collegeName ?? data.collegeName ?? null,
-              coordinatorName: data.collegeDetails?.coordinatorName ?? data.coordinatorName ?? null,
-              mobileNumber: mobile,
-              emailId: email,
+              coordinatorName: coordinators[i] ?? coordinators[0] ?? null,
+              mobileNumber: mobiles[i] ?? mobiles[0] ?? null,
+              emailId: emails[i] ?? emails[0] ?? null,
               city: data.collegeDetails?.city ?? data.city ?? null,
               state: data.collegeDetails?.state ?? data.state ?? null,
               course: data.collegeDetails?.course ?? data.course ?? null,
@@ -62,15 +72,15 @@ const createCoSheet = async (req, res) => {
               connectedBy: data.connect?.connectedBy ?? data.connectedBy ?? null,
               teamManagerId: data.teamManagerId ?? req.user?.id ?? null,
             },
-          }))
-        );
+          };
+        });
       }).map(async ({ index, payload }) => {
         try {
           // -------------------
           // Null field check
           // -------------------
           const nullFields = Object.keys(payload).filter(
-            (key) => payload[key] === null && key !== "teamManagerId"
+            key => payload[key] === null && key !== "teamManagerId"
           );
           if (nullFields.length > 0) {
             nullFieldDetails.push({ row: index + 1, nullFields, rowData: payload });
@@ -118,7 +128,7 @@ const createCoSheet = async (req, res) => {
     );
 
     // -------------------
-    // Final structured response (unchanged for frontend)
+    // Final response (same format)
     // -------------------
     return ReS(res, {
       success: true,
@@ -129,7 +139,12 @@ const createCoSheet = async (req, res) => {
         invalid: invalidDetails.length,
         nullFields: nullFieldDetails.length,
       },
-      data: { duplicates: duplicateDetails, invalid: invalidDetails, nullFields: nullFieldDetails, valid: validDetails },
+      data: {
+        duplicates: duplicateDetails,
+        invalid: invalidDetails,
+        nullFields: nullFieldDetails,
+        valid: validDetails,
+      },
     }, 201);
 
   } catch (error) {
