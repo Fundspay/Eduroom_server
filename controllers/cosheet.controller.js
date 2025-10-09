@@ -28,9 +28,6 @@ const createCoSheet = async (req, res) => {
     const results = await Promise.all(
       dataArray.map(async (data, index) => {
         try {
-          // -------------------
-          // Build payload safely
-          // -------------------
           const payload = {
             sr: data.collegeDetails?.sr ?? data.sr ?? null,
             collegeName: data.collegeDetails?.collegeName ?? data.collegeName ?? null,
@@ -53,17 +50,7 @@ const createCoSheet = async (req, res) => {
           };
 
           // -------------------
-          // Auto-assign teamManagerId if missing
-          // -------------------
-          if (!payload.teamManagerId && payload.connectedBy) {
-            const manager = await model.TeamManager.findOne({
-              where: { name: payload.connectedBy.trim() },
-            });
-            if (manager) payload.teamManagerId = manager.id;
-          }
-
-          // -------------------
-          // Null Field Check
+          // 1. Null Field Check
           // -------------------
           const nullFields = Object.keys(payload).filter(
             (key) => payload[key] === null && key !== "teamManagerId"
@@ -77,7 +64,29 @@ const createCoSheet = async (req, res) => {
           }
 
           // -------------------
-          // Duplicate Check
+          // 2. Invalid Data Check
+          // -------------------
+          let invalidReasons = [];
+
+          if (payload.mobileNumber && !/^[0-9]{10}$/.test(payload.mobileNumber)) {
+            invalidReasons.push("Invalid mobile number");
+          }
+
+          if (payload.emailId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.emailId)) {
+            invalidReasons.push("Invalid email format");
+          }
+
+          if (invalidReasons.length > 0) {
+            invalidDetails.push({
+              row: index + 1,
+              reasons: invalidReasons,
+              rowData: payload,
+            });
+            return { success: false, type: "invalid", reasons: invalidReasons, data: payload };
+          }
+
+          // -------------------
+          // 3. Duplicate Check
           // -------------------
           const whereClause = {
             teamManagerId: payload.teamManagerId,
@@ -98,7 +107,7 @@ const createCoSheet = async (req, res) => {
           }
 
           // -------------------
-          // Insert Valid Record
+          // 4. Insert Valid Record
           // -------------------
           const record = await model.CoSheet.create(payload);
           validDetails.push({
@@ -119,7 +128,7 @@ const createCoSheet = async (req, res) => {
     );
 
     // -------------------
-    // Final Response
+    // Final Structured Response
     // -------------------
     return ReS(
       res,
@@ -142,7 +151,7 @@ const createCoSheet = async (req, res) => {
       201
     );
   } catch (error) {
-    console.error("CoSheet Create Error:", error);
+    console.error("CoSheet Create Error:", error);c
     return ReE(res, error.message, 500);
   }
 };
