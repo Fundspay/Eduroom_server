@@ -142,7 +142,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   <style>
     @page {
       size: A4;
-      margin: 30px 30px 60px 30px; /* extra bottom margin for footer */
+      margin: 60px 30px 70px 30px; /* top and bottom margin for header/footer space */
     }
     html, body {
       height: 100%;
@@ -155,24 +155,25 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       position: relative;
       min-height: 100%;
       box-sizing: border-box;
-      padding: 20px;
-      padding-bottom: 120px; /* Added padding for watermark + footer space */
+      /* Ensure content never overlaps header/footer */
+      padding: 40px 20px 90px 20px; /* top, right, bottom, left */
       background-image: url("${bgUrl}");
       background-repeat: no-repeat;
-      background-position: center bottom; /* Changed to bottom */
-      background-size: contain; /* Make watermark fit bottom area */
+      background-position: center bottom;
+      background-size: contain;
     }
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 10px 0;
+      margin-bottom: 20px;
     }
     .title {
       text-align: center;
       font-size: 22px;
       font-weight: 700;
-      margin: 10px 0 20px 0;
+      margin: 20px 0 30px 0;
       letter-spacing: 0.5px;
     }
     /* Table styling */
@@ -186,9 +187,10 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     .details-table th,
     .details-table td {
       border: 1px solid #000;
-      padding: 6px 8px;
+      padding: 10px 12px;
       vertical-align: top;
       word-wrap: break-word;
+      font-size: 14px;
     }
     .details-table thead th {
       background: #fff;
@@ -202,23 +204,26 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     .value {
       width: 65%;
       color: #b00000;
+      word-break: break-word;
     }
-    /* Page break rules */
+    /* Improved page break control */
     .details-table { page-break-inside: auto; }
     .details-table tr { page-break-inside: avoid; page-break-after: auto; }
     .details-table td { page-break-inside: avoid; }
     .page-break { page-break-after: always; }
     /* Footer fix */
     .footer {
-      position: fixed; /* instead of absolute */
+      position: fixed;
       bottom: 10px;
       left: 0;
       right: 0;
       text-align: center;
       font-size: 12px;
       color: #333;
-      background: rgba(255,255,255,0.9); /* To avoid watermark overlap */
-      padding: 4px 0;
+      background: rgba(255,255,255,0.96);
+      padding: 8px 0 6px 0;
+      z-index: 10;
+      box-shadow: 0 -2px 8px #eee;
     }
     /* Print specific: repeat header/footer on each page */
     @media print {
@@ -231,6 +236,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
   <div class="sheet">
     <div class="header">
       <div style="width: 150px;">
+        <!-- Optionally add logo here if wanted -->
       </div>
       <div style="flex:1"></div>
       <div style="width:150px; text-align:right; font-size:12px;">
