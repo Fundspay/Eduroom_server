@@ -174,7 +174,7 @@ const listResumes = async (req, res) => {
     // ---------------------------
     // 3️⃣ Fetch all team managers separately
     // ---------------------------
-    const teamManagers = await model.User.findAll({
+    const teamManagers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
