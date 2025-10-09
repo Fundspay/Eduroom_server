@@ -449,11 +449,11 @@ const getFollowUpData = async (req, res) => {
       raw: true,
     });
 
-    const userList = managers.map((u) => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      mobileNumber: u.mobileNumber,
+    const userList = managers.map((TeamManager) => ({
+      id: TeamManager.id,
+      name: TeamManager.name,
+      email: TeamManager.email,
+      mobileNumber: TeamManager.mobileNumber,
     }));
    
 
