@@ -25,13 +25,16 @@ const escapeHtml = (str) => {
 
 /**
  * Fetch sessions from DB grouped by day
+ * @param {number} courseId
  */
-const fetchSessions = async () => {
+const fetchSessions = async (courseId) => {
   if (!model.CourseDetail)
     throw new Error("Sequelize model 'CourseDetail' not found");
 
+  if (!courseId) throw new Error("courseId is required");
+
   const sessionsFromDB = await model.CourseDetail.findAll({
-    where: { courseId: 8, isDeleted: false },
+    where: { courseId, isDeleted: false }, // ✅ dynamic courseId
     attributes: ["day", "title"],
     order: [["day", "ASC"], ["id", "ASC"]],
     raw: true,
@@ -46,7 +49,6 @@ const fetchSessions = async () => {
     sessionsMap[s.day].push(s.title);
   });
 
-  // Convert to array for PDF generation
   const sessions = Object.keys(sessionsMap)
     .sort((a, b) => a - b)
     .map((day) => ({
@@ -57,11 +59,17 @@ const fetchSessions = async () => {
   return sessions;
 };
 
-const generateSessionReport = async (sessionData = {}, options = {}) => {
+/**
+ * Generate Internship Report PDF
+ * @param {number} courseId - dynamic courseId
+ * @param {array} sessionData - optional
+ * @param {object} options - optional
+ */
+const generateSessionReport = async (courseId, sessionData = {}, options = {}) => {
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData
-      : await fetchSessions();
+      : await fetchSessions(courseId); // ✅ pass dynamic courseId
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const title = "Internship Report – Table of Contents";
@@ -144,10 +152,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     color:#000;
     position:relative;
   }
-  /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:135px 40px 60px 40px; /* reduced from 180px top to 120px */
+    margin:135px 40px 60px 40px;
     padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;

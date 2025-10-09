@@ -125,11 +125,11 @@ module.exports = { sendOfferLetter };
 
 const sendInternshipReport = async (req, res) => {
   try {
-    const { userId } = req.params; // only userId from params
-    if (!userId) {
+    const { userId, courseId } = req.params; // get both userId and courseId
+    if (!userId || !courseId) {
       return res.status(400).json({
         success: false,
-        message: "Missing userId",
+        message: "Missing userId or courseId",
       });
     }
 
@@ -148,7 +148,7 @@ const sendInternshipReport = async (req, res) => {
     }
 
     // Generate Internship Report (PDF uploaded to S3 + DB saved)
-    const report = await generateSessionReport(userId);
+    const report = await generateSessionReport(userId, courseId);
     // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
 
     // Build email content
