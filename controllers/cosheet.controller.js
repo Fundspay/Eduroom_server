@@ -1,7 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { sendMail } = require("../middleware/mailerhr.middleware.js");
+const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 const AWS = require("aws-sdk");
 const { Op } = require("sequelize");
 
@@ -239,133 +239,133 @@ const getCoSheetById = async (req, res) => {
 module.exports.getCoSheetById = getCoSheetById;
 
 
-// Send JD to college email
-// const sendJDToCollege = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { cc, bcc } = req.body;
 
-//     const record = await model.CoSheet.findByPk(id);
-//     if (!record) return ReE(res, "CoSheet record not found", 404);
+const sendJDToCollege = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { cc, bcc } = req.body;
 
-//     if (!record.emailId) {
-//       return ReE(res, "No email found for this college", 400);
-//     }
+    const record = await model.CoSheet.findByPk(id);
+    if (!record) return ReE(res, "CoSheet record not found", 404);
 
-//     if (!record.internshipType) {
-//       return ReE(res, "No internshipType set for this record", 400);
-//     }
+    if (!record.emailId) {
+      return ReE(res, "No email found for this college", 400);
+    }
 
-//     // JD mapping
-//     const JD_MAP = {
-//       fulltime: "jds/fulltime.pdf",
-//       liveproject: "jds/liveproject.pdf",
-//       sip: "jds/sip.pdf",
-//       wip: "jds/wip.pdf",
-//       others: "jds/others.pdf",
-//     };
+    if (!record.internshipType) {
+      return ReE(res, "No internshipType set for this record", 400);
+    }
 
-//     const jdKeyType = record.internshipType
-//       .trim()
-//       .toLowerCase()
-//       .replace(/\s+/g, '');
-//     const jdKey = JD_MAP[jdKeyType];
+    // JD mapping
+    const JD_MAP = {
+      fulltime: "jds/fulltime.pdf",
+      liveproject: "jds/liveproject.pdf",
+      sip: "jds/sip.pdf",
+      wip: "jds/wip.pdf",
+      others: "jds/others.pdf",
+    };
 
-//     if (!jdKey) {
-//       return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
-//     }
+    const jdKeyType = record.internshipType
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '');
+    const jdKey = JD_MAP[jdKeyType];
 
-//     // fetch JD file from S3
-//     const jdFile = await s3
-//       .getObject({ Bucket: "fundsroomhr", Key: jdKey })
-//       .promise();
+    if (!jdKey) {
+      return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
+    }
 
-//     const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
+    // fetch JD file from S3
+    const jdFile = await s3
+      .getObject({ Bucket: "fundsroomhr", Key: jdKey })
+      .promise();
 
-//     // HTML email body like your proposal
-//     const html = `
-//       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
+    const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
 
-//       <p>Warm greetings from FundsAudit!</p>
+    // HTML email body like your proposal
+    const html = `
+      <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
 
-//       <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName ||
-//       ""}, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
+      <p>Warm greetings from FundsAudit!</p>
 
-//       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName ||
+      ""}, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
-//       <h4>Collaboration Proposal:</h4>
-//       <ul>
-//         <li><b>Flexible Participation:</b> 2-hour/day commitment (1 hour training + 1 hour individual work)</li>
-//         <li><b>Performance-Based Stipend:</b> INR 1,000 to INR 7,000 based on quality, innovation, and project delivery</li>
-//         <li><b>Value-Added Certifications:</b> Specialized certificates + POWER-Bi & Financial/Marketing Modelling certificate; recognition for top performers</li>
-//         <li><b>Open to:</b> MBA 1st & 2nd year students (Finance & Marketing)</li>
-//       </ul>
+      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
 
-//       <p>Next Steps: JD for the Internship is attached. If your institution is interested, we can formalize this collaboration by signing a Memorandum of Understanding (MoU). Upon signing, eligible students will be onboarded with orientation and training to commence the live project.</p>
+      <h4>Collaboration Proposal:</h4>
+      <ul>
+        <li><b>Flexible Participation:</b> 2-hour/day commitment (1 hour training + 1 hour individual work)</li>
+        <li><b>Performance-Based Stipend:</b> INR 1,000 to INR 7,000 based on quality, innovation, and project delivery</li>
+        <li><b>Value-Added Certifications:</b> Specialized certificates + POWER-Bi & Financial/Marketing Modelling certificate; recognition for top performers</li>
+        <li><b>Open to:</b> MBA 1st & 2nd year students (Finance & Marketing)</li>
+      </ul>
 
-//       <p>As discussed on the call, kindly share your response by <b>23rd August 2025, 11 AM</b>. Preplacement interviews will be conducted on the same day, with joining on <b>25th August 2025</b>.</p>
+      <p>Next Steps: JD for the Internship is attached. If your institution is interested, we can formalize this collaboration by signing a Memorandum of Understanding (MoU). Upon signing, eligible students will be onboarded with orientation and training to commence the live project.</p>
 
-//       <p><b>Role:</b> Marketing Analyst & Financial Analyst<br/>
-//       <b>Eligibility:</b> Management Students</p>
+      <p>As discussed on the call, kindly share your response by <b>23rd August 2025, 11 AM</b>. Preplacement interviews will be conducted on the same day, with joining on <b>25th August 2025</b>.</p>
 
-//       <p>Following the live project, students may also be considered for:</p>
-//       <ul>
-//         <li>Summer/Winter Internships</li>
-//         <li>Pre-placement offers (PPOs)</li>
-//         <li>Final placement opportunities</li>
-//       </ul>
+      <p><b>Role:</b> Marketing Analyst & Financial Analyst<br/>
+      <b>Eligibility:</b> Management Students</p>
 
-//       <p>Perks of the collaboration:</p>
-//       <ul>
-//         <li>Exposure to real-time fintech operations</li>
-//         <li>Skill development aligned with industry expectations</li>
-//         <li>Improved employability and practical insight alongside academics</li>
-//         <li>Final placement opportunities</li>
-//       </ul>
+      <p>Following the live project, students may also be considered for:</p>
+      <ul>
+        <li>Summer/Winter Internships</li>
+        <li>Pre-placement offers (PPOs)</li>
+        <li>Final placement opportunities</li>
+      </ul>
 
-//       <p>Looking forward to a meaningful and mutually beneficial association.</p>
+      <p>Perks of the collaboration:</p>
+      <ul>
+        <li>Exposure to real-time fintech operations</li>
+        <li>Skill development aligned with industry expectations</li>
+        <li>Improved employability and practical insight alongside academics</li>
+        <li>Final placement opportunities</li>
+      </ul>
 
-//       <p>Pooja M. Shedge<br/>
-//       Branch Manager – Pune<br/>
-//       +91 7385234536 | +91 7420861507<br/>
-//       Pune, Maharashtra<br/>
-//       <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
-//       <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
-//       </p>
-//     `;
+      <p>Looking forward to a meaningful and mutually beneficial association.</p>
 
-//     // send mail with attachment + cc/bcc
-//     const mailResponse = await sendMail(
-//       record.emailId,
-//       subject,
-//       html,
-//       [
-//         {
-//           filename: `${record.internshipType}.pdf`,
-//           content: jdFile.Body,
-//         },
-//       ],
-//       cc,
-//       bcc
-//     );
+      <p>Pooja M. Shedge<br/>
+      Branch Manager – Pune<br/>
+      +91 7385234536 | +91 7420861507<br/>
+      Pune, Maharashtra<br/>
+      <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
+      <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
+      </p>
+    `;
 
-//     if (!mailResponse.success) {
-//       return ReE(res, "Failed to send JD email", 500);
-//     }
+    // send mail with attachment + cc/bcc
+    const mailResponse = await sendhrMail(
+      record.emailId,
+      subject,
+      html,
+      [
+        {
+          filename: `${record.internshipType}.pdf`,
+          content: jdFile.Body,
+        },
+      ],
+      cc,
+      bcc
+    );
 
-//     await record.update({
-//       jdSentAt: new Date()
-//     });
+    if (!mailResponse.success) {
+      return ReE(res, "Failed to send JD email", 500);
+    }
+
+    await record.update({
+      jdSentAt: new Date()
+    });
 
 
-//     return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
-//   } catch (error) {
-//     console.error("Send JD Error:", error);
-//     return ReE(res, error.message, 500);
-//   }
-// };
+    return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
+  } catch (error) {
+    console.error("Send JD Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
 
-// module.exports.sendJDToCollege = sendJDToCollege;
+module.exports.sendJDToCollege = sendJDToCollege;
 
 const getCallStatsByUserWithTarget = async (req, res) => {
   try {
