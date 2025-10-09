@@ -437,7 +437,7 @@ const getFollowUpData = async (req, res) => {
         teamManagerId,
         [Op.or]: [
           { followUpBy: { [Op.iLike]: fullName } },
-          { followUpBy: { [Op.iLike]: firstName } },
+          { followUpBy: { [Op.iLike]: fullName } },
         ],
       },
       order: [["resumeDate", "ASC"]],
