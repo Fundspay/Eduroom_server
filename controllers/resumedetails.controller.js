@@ -3,7 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, fn, col } = model.Sequelize;
 const moment = require("moment");
-const { sendMail } = require("../middleware/mailerhr.middleware.js");
+const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 
 
 
@@ -616,7 +616,7 @@ const sendFollowUpEmail = async (req, res) => {
       </p>
     `;
 
-    const mailResponse = await sendMail(
+    const mailResponse = await sendhrMail(
       record.emailId,
       subject,
       html,

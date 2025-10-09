@@ -2,7 +2,7 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, fn, col } = require("sequelize");
-const { sendMail } = require("../middleware/mailerhr.middleware.js");
+const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 
 
 // Allowed values
@@ -690,7 +690,7 @@ const sendMailToStudent = async (req, res) => {
 
     const html = type === "custom" ? customMessage : hardcodedHtml;
 
-    const mailResponse = await sendMail(student.emailId, subject, html);
+    const mailResponse = await sendhrMail(student.emailId, subject, html);
     if (!mailResponse.success) return ReE(res, "Failed to send email to student", 500);
 
     await student.update({
