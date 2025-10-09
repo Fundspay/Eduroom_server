@@ -26,79 +26,36 @@ const createCoSheet = async (req, res) => {
     const validDetails = [];
 
     const results = await Promise.all(
-      dataArray.flatMap((data, index) => {
-        // -------------------
-        // Split mobile, email, coordinator safely
-        // -------------------
-        const mobiles = data.collegeDetails?.mobileNumber
-          ? String(data.collegeDetails.mobileNumber).split("/").map(m => m.trim())
-          : data.mobileNumber
-            ? String(data.mobileNumber).split("/").map(m => m.trim())
-            : [null];
-
-        const emails = data.collegeDetails?.emailId
-          ? String(data.collegeDetails.emailId).split("/").map(e => e.trim())
-          : data.emailId
-            ? String(data.emailId).split("/").map(e => e.trim())
-            : [null];
-
-        const coordinators = data.collegeDetails?.coordinatorName
-          ? String(data.collegeDetails.coordinatorName).split("/").map(c => c.trim())
-          : data.coordinatorName
-            ? String(data.coordinatorName).split("/").map(c => c.trim())
-            : [null];
-
-        // -------------------
-        // Align by index
-        // -------------------
-        const maxLength = Math.max(mobiles.length, emails.length, coordinators.length);
-
-        return Array.from({ length: maxLength }, (_, i) => {
-          return {
-            index,
-            payload: {
-              sr: data.collegeDetails?.sr ?? data.sr ?? null,
-              collegeName: data.collegeDetails?.collegeName ?? data.collegeName ?? null,
-              coordinatorName: coordinators[i] ?? coordinators[0] ?? null,
-              mobileNumber: mobiles[i] ?? mobiles[0] ?? null,
-              emailId: emails[i] ?? emails[0] ?? null,
-              city: data.collegeDetails?.city ?? data.city ?? null,
-              state: data.collegeDetails?.state ?? data.state ?? null,
-              course: data.collegeDetails?.course ?? data.course ?? null,
-              dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
-              callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
-              internshipType: data.connect?.internshipType ?? data.internshipType ?? null,
-              detailedResponse: data.connect?.detailedResponse ?? data.detailedResponse ?? null,
-              connectedBy: data.connect?.connectedBy ?? data.connectedBy ?? null,
-              teamManagerId: data.teamManagerId ?? req.user?.id ?? null,
-            },
-          };
-        });
-      }).map(async ({ index, payload }) => {
+      dataArray.map(async (data, index) => {
         try {
+          // -------------------
+          // Build payload (keep mobile/email as-is, allow slashes)
+          // -------------------
+          const payload = {
+            sr: data.collegeDetails?.sr ?? data.sr ?? null,
+            collegeName: data.collegeDetails?.collegeName ?? data.collegeName ?? null,
+            coordinatorName: data.collegeDetails?.coordinatorName ?? data.coordinatorName ?? null,
+            mobileNumber: data.collegeDetails?.mobileNumber ?? data.mobileNumber ?? null,
+            emailId: data.collegeDetails?.emailId ?? data.emailId ?? null,
+            city: data.collegeDetails?.city ?? data.city ?? null,
+            state: data.collegeDetails?.state ?? data.state ?? null,
+            course: data.collegeDetails?.course ?? data.course ?? null,
+            dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
+            callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
+            internshipType: data.connect?.internshipType ?? data.internshipType ?? null,
+            detailedResponse: data.connect?.detailedResponse ?? data.detailedResponse ?? null,
+            connectedBy: data.connect?.connectedBy ?? data.connectedBy ?? null,
+            teamManagerId: data.teamManagerId ?? req.user?.id ?? null,
+          };
+
           // -------------------
           // Null field check
           // -------------------
           const nullFields = Object.keys(payload).filter(
-            key => payload[key] === null && key !== "teamManagerId"
+            (key) => payload[key] === null && key !== "teamManagerId"
           );
           if (nullFields.length > 0) {
             nullFieldDetails.push({ row: index + 1, nullFields, rowData: payload });
-          }
-
-          // -------------------
-          // Invalid data check
-          // -------------------
-          const invalidReasons = [];
-          if (payload.mobileNumber && !/^[0-9]{10}$/.test(payload.mobileNumber)) {
-            invalidReasons.push("Invalid mobile number");
-          }
-          if (payload.emailId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.emailId)) {
-            invalidReasons.push("Invalid email format");
-          }
-          if (invalidReasons.length > 0) {
-            invalidDetails.push({ row: index + 1, reasons: invalidReasons, rowData: payload });
-            return { success: false, type: "invalid", reasons: invalidReasons, data: payload };
           }
 
           // -------------------
@@ -121,14 +78,14 @@ const createCoSheet = async (req, res) => {
           validDetails.push({ row: index + 1, rowData: record });
           return { success: true, type: "valid", data: record };
         } catch (err) {
-          invalidDetails.push({ row: index + 1, reasons: [err.message], rowData: payload });
-          return { success: false, type: "invalid", error: err.message, data: payload };
+          invalidDetails.push({ row: index + 1, reasons: [err.message], rowData: data });
+          return { success: false, type: "invalid", error: err.message, data };
         }
       })
     );
 
     // -------------------
-    // Final response (same format)
+    // Final structured response (unchanged for frontend)
     // -------------------
     return ReS(res, {
       success: true,
@@ -139,12 +96,7 @@ const createCoSheet = async (req, res) => {
         invalid: invalidDetails.length,
         nullFields: nullFieldDetails.length,
       },
-      data: {
-        duplicates: duplicateDetails,
-        invalid: invalidDetails,
-        nullFields: nullFieldDetails,
-        valid: validDetails,
-      },
+      data: { duplicates: duplicateDetails, invalid: invalidDetails, nullFields: nullFieldDetails, valid: validDetails },
     }, 201);
 
   } catch (error) {
@@ -154,6 +106,7 @@ const createCoSheet = async (req, res) => {
 };
 
 module.exports.createCoSheet = createCoSheet;
+
 
 
 // Update connect fields
