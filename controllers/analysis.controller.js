@@ -3,7 +3,6 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op } = require("sequelize");
 
-// Daily Analysis for ALL CoSheet records by teamManagerId
 const getDailyAnalysis = async (req, res) => {
   try {
     const { teamManagerId, startDate, endDate, month } = req.query;
@@ -24,12 +23,13 @@ const getDailyAnalysis = async (req, res) => {
       eDate = new Date(endDate);
       eDate.setHours(23, 59, 59, 999);
     } else {
-      sDate = new Date(today);
-      sDate.setHours(0, 0, 0, 0);
-      eDate = new Date(today);
+      // 🟡 Default: full data range (so you always get something)
+      sDate = new Date("2000-01-01");
+      eDate = new Date();
       eDate.setHours(23, 59, 59, 999);
     }
 
+    // Prepare list of all dates
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       dateList.push({
@@ -49,18 +49,18 @@ const getDailyAnalysis = async (req, res) => {
       });
     }
 
-    // Fetch ALL MyTargets for this teamManager in range
+    // 🔹 Fetch targets for the given manager & date range
     const targets = await model.MyTarget.findAll({
       where: {
-        teamManagerId,
+        teamManagerId: teamManagerId.toString(),
         targetDate: { [Op.between]: [sDate, eDate] }
       }
     });
 
-    // Fetch ALL CoSheet records for this teamManager in range
+    // 🔹 Fetch CoSheet records for that manager & range
     const allRecords = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
+        teamManagerId: teamManagerId.toString(),
         [Op.or]: [
           { dateOfConnect: { [Op.between]: [sDate, eDate] } },
           { jdSentAt: { [Op.between]: [sDate, eDate] } }
@@ -71,6 +71,7 @@ const getDailyAnalysis = async (req, res) => {
     const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
 
     const merged = dateList.map(d => {
+      // match targets
       const target = targets.find(
         t => t.targetDate && new Date(t.targetDate).toISOString().split("T")[0] === d.date
       );
@@ -79,6 +80,7 @@ const getDailyAnalysis = async (req, res) => {
         d.plannedCalls = target.calls;
       }
 
+      // match records for that date
       const dayRecords = allRecords.filter(r => {
         const connectDate = r.dateOfConnect ? new Date(r.dateOfConnect).toISOString().split("T")[0] : null;
         const jdDate = r.jdSentAt ? new Date(r.jdSentAt).toISOString().split("T")[0] : null;
@@ -102,7 +104,9 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      const jdCount = dayRecords.filter(r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date).length;
+      const jdCount = dayRecords.filter(
+        r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date
+      ).length;
       d.jdSent = jdCount;
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
@@ -110,6 +114,7 @@ const getDailyAnalysis = async (req, res) => {
       return d;
     });
 
+    // 🔹 Totals
     const totals = merged.reduce(
       (sum, d) => {
         sum.plannedJds += d.plannedJds;
@@ -123,7 +128,17 @@ const getDailyAnalysis = async (req, res) => {
         sum.jdSent += d.jdSent;
         return sum;
       },
-      { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 }
+      {
+        plannedJds: 0,
+        plannedCalls: 0,
+        connected: 0,
+        notAnswered: 0,
+        busy: 0,
+        switchOff: 0,
+        invalid: 0,
+        achievedCalls: 0,
+        jdSent: 0
+      }
     );
 
     totals.achievementPercent =
@@ -148,7 +163,9 @@ const getDailyAnalysis = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 // Get all connected CoSheet records for a teamManager
 const getConnectedCoSheetsByManager = async (req, res) => {
