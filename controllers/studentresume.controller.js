@@ -136,7 +136,34 @@ module.exports.updateResume = updateResume;
 // ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
-    // Fetch all resumes with associated CoSheet data
+    // ---------------------------
+    // 1️⃣ Sync Student Registrations
+    // ---------------------------
+    const resumesToSync = await model.StudentResume.findAll({
+      where: { isRegistered: false },
+      attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
+    });
+
+    for (const resume of resumesToSync) {
+      if (!resume.mobileNumber) continue;
+
+      const user = await model.User.findOne({
+        where: { phoneNumber: resume.mobileNumber },
+        attributes: ["id", "createdAt"],
+        raw: true,
+      });
+
+      if (user) {
+        await resume.update({
+          isRegistered: true,
+          dateOfRegistration: user.createdAt,
+        });
+      }
+    }
+
+    // ---------------------------
+    // 2️⃣ Fetch all resumes with associated CoSheet data
+    // ---------------------------
     const records = await model.StudentResume.findAll({
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] }
@@ -144,12 +171,17 @@ const listResumes = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // Fetch all team managers separately
+    // ---------------------------
+    // 3️⃣ Fetch all team managers separately
+    // ---------------------------
     const teamManagers = await model.User.findAll({
       attributes: ["id", "firstName", "lastName", "email"],
       raw: true,
     });
 
+    // ---------------------------
+    // 4️⃣ Return response
+    // ---------------------------
     return ReS(res, { success: true, data: records, teamManagers }, 200);
   } catch (error) {
     console.error("StudentResume List Error:", error);
