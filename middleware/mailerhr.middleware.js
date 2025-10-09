@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
  * @param {string|string[]} cc - Optional CC
  * @param {string|string[]} bcc - Optional BCC
  */
-const sendMail = async (to, subject, html, attachments = [], cc = [], bcc = []) => {
+const sendhrMail = async (to, subject, html, attachments = [], cc = [], bcc = []) => {
   const mailOptions = {
     from: CONFIG.mailUser,
     to,
@@ -54,4 +54,4 @@ const sendMail = async (to, subject, html, attachments = [], cc = [], bcc = []) 
   }
 };
 
-module.exports = { sendMail };
+module.exports = { sendhrMail };
