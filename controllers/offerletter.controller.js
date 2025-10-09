@@ -148,7 +148,7 @@ const sendInternshipReport = async (req, res) => {
     }
 
     // Generate Internship Report (PDF uploaded to S3 + DB saved)
-    const report = await generateSessionReport(userId, courseId);
+    const report = await generateSessionReport([], { courseId, userId });
     // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
 
     // Build email content
@@ -215,7 +215,8 @@ const sendInternshipReport = async (req, res) => {
   }
 };
 
-module.exports. sendInternshipReport = sendInternshipReport;
+module.exports.sendInternshipReport = sendInternshipReport;
+
 
 
 
