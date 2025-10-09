@@ -422,17 +422,15 @@ const getFollowUpData = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    const user = await model.User.findOne({
+    const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
-      attributes: ["firstName", "lastName"],
+      attributes: ["name","email","mobileNumber"],
       raw: true,
     });
 
-    if (!user) return ReE(res, "User not found", 404);
+    if (!manager) return ReE(res, "Manager not found", 404);
 
-    const firstName = user.firstName.trim();
-    const lastName = user.lastName ? user.lastName.trim() : "";
-    const fullName = `${firstName} ${lastName}`.trim();
+    const fullName = manager.name.trim();
 
     const coSheetData = await model.CoSheet.findAll({
       where: {
@@ -446,18 +444,18 @@ const getFollowUpData = async (req, res) => {
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
       raw: true,
     });
 
-    const userList = users.map((u) => ({
+    const userList = managers.map((u) => ({
       id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      fullName: `${u.firstName?.trim() || ""} ${u.lastName?.trim() || ""}`.trim(),
+      name: u.name,
       email: u.email,
+      mobileNumber: u.mobileNumber,
     }));
+   
 
     return ReS(res, {
       success: true,
@@ -465,7 +463,7 @@ const getFollowUpData = async (req, res) => {
       followUpBy: fullName,
       totalRecords: coSheetData.length,
       data: coSheetData,
-      users: userList,
+      managers: userList,
     });
   } catch (error) {
     console.error("Get FollowUp Data Error:", error);
