@@ -31,24 +31,22 @@ const fetchSessions = async () => {
     throw new Error("Sequelize model 'CourseDetail' not found");
 
   const sessionsFromDB = await model.CourseDetail.findAll({
-    where: { courseId: 8, isDeleted: false }, // ✅ Added isDeleted filter
+    where: { courseId: 8, isDeleted: false }, // ✅ Filter
     attributes: ["day", "title"],
     order: [["day", "ASC"], ["id", "ASC"]],
-    raw: true, // ✅ Get plain objects
+    raw: true,
   });
 
   console.log("sessionsFromDB:", sessionsFromDB.length, sessionsFromDB);
 
-
-
-  // Group titles by day
+  // ✅ Group titles by day
   const sessionsMap = {};
   sessionsFromDB.forEach((s) => {
     if (!sessionsMap[s.day]) sessionsMap[s.day] = [];
     sessionsMap[s.day].push(s.title);
   });
 
-  // Convert to array for PDF generation
+  // ✅ Convert to array for easier rendering
   const sessions = Object.keys(sessionsMap)
     .sort((a, b) => a - b)
     .map((day) => ({
@@ -73,21 +71,20 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     year: "numeric",
   });
 
-  // Generate table rows
+  // ✅ Build each session row (topics combined in one cell)
   const tocRows = sessions
-    .map((s) =>
-      s.sessionTitles
-        .map(
-          (sessionTitle, idx) => `
+    .map((s, index) => {
+      const combinedTopics = s.sessionTitles
+        .map((t) => `• ${escapeHtml(t)}`)
+        .join("<br>");
+      return `
         <tr>
-          <td style="text-align:center;">${s.day}.${idx + 1}</td>
-          <td>${escapeHtml(sessionTitle)}</td>
-          <td></td>
+          <td style="text-align:center;">${index + 1}</td>
+          <td>Session ${s.day}</td>
+          <td>${combinedTopics}</td>
         </tr>
-      `
-        )
-        .join("")
-    )
+      `;
+    })
     .join("");
 
   const html = `
@@ -119,7 +116,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   .main-title { font-size:32px; font-weight:bold; text-align:center; margin-bottom:20px; }
   .section-title { font-size:18px; font-weight:bold; margin:16px 0 8px 0; }
   .toc-table th { background-color: #f0f0f0; font-weight: bold; }
-  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; }
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align:top; }
 </style>
 </head>
 <body>
