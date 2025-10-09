@@ -187,7 +187,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
     .details-table th,
     .details-table td {
       border: 1px solid #000;
-      padding: 10px 12px;
+      padding: 6px 8px;
       vertical-align: top;
       word-wrap: break-word;
       font-size: 14px;
