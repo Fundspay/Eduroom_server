@@ -30,8 +30,8 @@ const escapeHtml = (str) => {
 const fetchSessionsWithMCQs = async (courseId) => {
   if (!courseId) courseId = 1; // default to 1 if missing
 
-  // Fetch distinct session numbers from CaseStudyResults
-  const sessionsNumbers = await model.CaseStudyResults.findAll({
+  // Fetch distinct session numbers from CaseStudyResult
+  const sessionsNumbers = await model.CaseStudyResult.findAll({
     where: { courseId },
     attributes: [
       [model.Sequelize.fn("DISTINCT", model.Sequelize.col("sessionNumber")), "day"],
@@ -46,7 +46,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
     const day = sessionObj.day;
 
     // Fetch all CaseStudyResults for this session
-    const mcqs = await model.CaseStudyResults.findAll({
+    const mcqs = await model.CaseStudyResult.findAll({
       where: { courseId, sessionNumber: day },
       attributes: ["questionId", "answer", "day"],
       order: [["id", "ASC"]],
