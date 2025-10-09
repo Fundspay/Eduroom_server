@@ -3,7 +3,6 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op } = require("sequelize");
 
-// Daily Analysis for ALL CoSheet records by teamManagerId
 const getDailyAnalysis = async (req, res) => {
   try {
     const { teamManagerId, startDate, endDate, month } = req.query;
@@ -30,6 +29,7 @@ const getDailyAnalysis = async (req, res) => {
       eDate.setHours(23, 59, 59, 999);
     }
 
+    // Prepare date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       dateList.push({
@@ -49,15 +49,12 @@ const getDailyAnalysis = async (req, res) => {
       });
     }
 
-    // Fetch ALL MyTargets for this teamManager in range
+    // Fetch targets
     const targets = await model.MyTarget.findAll({
-      where: {
-        teamManagerId,
-        targetDate: { [Op.between]: [sDate, eDate] }
-      }
+      where: { teamManagerId, targetDate: { [Op.between]: [sDate, eDate] } }
     });
 
-    // Fetch ALL CoSheet records for this teamManager in range
+    // Fetch CoSheet records
     const allRecords = await model.CoSheet.findAll({
       where: {
         teamManagerId,
@@ -71,12 +68,13 @@ const getDailyAnalysis = async (req, res) => {
     const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
 
     const merged = dateList.map(d => {
-      const target = targets.find(
-        t => t.targetDate && new Date(t.targetDate).toISOString().split("T")[0] === d.date
-      );
+      const target = targets.find(t => {
+        if (!t.targetDate) return false;
+        return new Date(t.targetDate).toISOString().split("T")[0] === d.date;
+      });
       if (target) {
-        d.plannedJds = target.jds;
-        d.plannedCalls = target.calls;
+        d.plannedJds = target.jds ?? 0;
+        d.plannedCalls = target.calls ?? 0;
       }
 
       const dayRecords = allRecords.filter(r => {
@@ -86,68 +84,59 @@ const getDailyAnalysis = async (req, res) => {
       });
 
       dayRecords.forEach(r => {
-        if (r.dateOfConnect) {
-          const resp = (r.callResponse || "").trim().toLowerCase();
-          if (allowedCallResponses.includes(resp)) {
-            if (resp === "connected") d.connected++;
-            else if (resp === "not answered") d.notAnswered++;
-            else if (resp === "busy") d.busy++;
-            else if (resp === "switch off") d.switchOff++;
-            else if (resp === "invalid") d.invalid++;
-          }
+        const resp = (r.callResponse || "").trim().toLowerCase();
+        if (allowedCallResponses.includes(resp)) {
+          if (resp === "connected") d.connected++;
+          else if (resp === "not answered") d.notAnswered++;
+          else if (resp === "busy") d.busy++;
+          else if (resp === "switch off") d.switchOff++;
+          else if (resp === "invalid") d.invalid++;
         }
       });
 
       d.achievedCalls = d.connected + d.notAnswered + d.busy + d.switchOff + d.invalid;
-      d.achievementPercent =
-        d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
+      d.achievementPercent = d.plannedCalls > 0
+        ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2)
+        : 0;
 
-      const jdCount = dayRecords.filter(r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date).length;
-      d.jdSent = jdCount;
-      d.jdAchievementPercent =
-        d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
+      d.jdSent = dayRecords.filter(r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date).length;
+      d.jdAchievementPercent = d.plannedJds > 0
+        ? ((d.jdSent / d.plannedJds) * 100).toFixed(2)
+        : 0;
 
       return d;
     });
 
-    const totals = merged.reduce(
-      (sum, d) => {
-        sum.plannedJds += d.plannedJds;
-        sum.plannedCalls += d.plannedCalls;
-        sum.connected += d.connected;
-        sum.notAnswered += d.notAnswered;
-        sum.busy += d.busy;
-        sum.switchOff += d.switchOff;
-        sum.invalid += d.invalid;
-        sum.achievedCalls += d.achievedCalls;
-        sum.jdSent += d.jdSent;
-        return sum;
-      },
-      { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 }
-    );
+    // Calculate totals
+    const totals = merged.reduce((sum, d) => {
+      sum.plannedJds += d.plannedJds;
+      sum.plannedCalls += d.plannedCalls;
+      sum.connected += d.connected;
+      sum.notAnswered += d.notAnswered;
+      sum.busy += d.busy;
+      sum.switchOff += d.switchOff;
+      sum.invalid += d.invalid;
+      sum.achievedCalls += d.achievedCalls;
+      sum.jdSent += d.jdSent;
+      return sum;
+    }, { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 });
 
-    totals.achievementPercent =
-      totals.plannedCalls > 0 ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2) : 0;
-    totals.jdAchievementPercent =
-      totals.plannedJds > 0 ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2) : 0;
+    totals.achievementPercent = totals.plannedCalls > 0
+      ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2)
+      : 0;
+    totals.jdAchievementPercent = totals.plannedJds > 0
+      ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2)
+      : 0;
 
     const monthLabel = new Date(sDate).toLocaleString("en-IN", { month: "long", year: "numeric" });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        month: monthLabel,
-        dates: merged,
-        totals
-      },
-      200
-    );
+    return ReS(res, { success: true, month: monthLabel, dates: merged, totals }, 200);
   } catch (error) {
     console.error("Daily Analysis Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getDailyAnalysis = getDailyAnalysis;
 
 // Get all connected CoSheet records for a teamManager
