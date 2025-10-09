@@ -63,18 +63,28 @@ module.exports.registerTeamManager = registerTeamManager;
 
 // Get All Team Managers
 var getTeamManagers = async function (req, res) {
-    try {
-        // Fetch all managers that are not deleted
-        const managers = await model.TeamManager.findAll({
-            where: { isDeleted: false },
-            attributes: ['managerId', 'name', 'email', 'mobileNumber', 'department', 'position', 'internshipStatus', 'createdAt']
-        });
+  try {
+    // Fetch all active managers (not deleted)
+    const managers = await model.TeamManager.findAll({
+      where: { isDeleted: false },
+      attributes: [
+        "id",          // internal DB id
+        "managerId",   // manager unique identifier
+        "name",
+        "email",
+        "mobileNumber",
+        "department",
+        "position",
+        "internshipStatus"
+      ],
+      order: [["name", "ASC"]] // optional: sort by name
+    });
 
-        return ReS(res, { success: true, managers }, 200);
-    } catch (error) {
-        console.error("Error fetching managers:", error);
-        return ReE(res, error.message, 500);
-    }
+    return ReS(res, { success: true, managers }, 200);
+  } catch (error) {
+    console.error("Error fetching managers:", error);
+    return ReE(res, error.message, 500);
+  }
 };
 
 module.exports.getTeamManagers = getTeamManagers;
