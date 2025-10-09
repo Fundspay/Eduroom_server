@@ -625,7 +625,7 @@ const loginWithEmailPassword = async (req, res) => {
       };
     } else {
       payload = {
-        managerId: account.managerId,
+        managerId: account.id,
         name: account.name,
         email: account.email,
         mobileNumber: account.mobileNumber,
