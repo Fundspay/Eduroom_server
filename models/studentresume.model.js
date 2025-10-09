@@ -43,6 +43,8 @@ module.exports = (sequelize, Sequelize) => {
 
       Dateofonboarding: { type: Sequelize.DATE, allowNull: true },
       mailSentAt: { type: Sequelize.DATE, allowNull: true },
+      isRegistered: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+      dateOfRegistration: { type: Sequelize.DATE, allowNull: true },
 
       // Status fields
       isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
