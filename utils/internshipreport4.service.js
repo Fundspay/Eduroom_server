@@ -93,40 +93,79 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH (SAFE)
+// FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return [];
 
+  // Hardcoded coursePreviewId
+  const coursePreviewId = 7; // <-- hardcode here
+
   try {
-    const results = await model.CaseStudyResult.findAll({
-      where: { userId, courseId },
-      include: [
-        {
-          model: model.QuestionModel,
-          attributes: ["question"],
-          required: false, // <-- allow results even if QuestionModel is missing
-        },
+    // First, get all sessions for the course
+    const courseSessions = await model.CourseDetail.findAll({
+      where: { courseId, isDeleted: false },
+      order: [
+        ["day", "ASC"],
+        ["sessionNumber", "ASC"],
       ],
-      order: [["createdAt", "DESC"]],
+      attributes: ["day", "sessionNumber", "id"],
     });
 
-    if (!results.length) return [];
+    const allCaseStudies = [];
 
-    // Map results safely with defaults
-    return results.map((cs) => ({
-      day: cs.day ?? "N/A",
-      sessionNumber: cs.sessionNumber ?? "N/A",
-      question: cs.QuestionModel?.question || cs.question || "No Question Available",
-      answer: cs.answer || "No Answer Submitted",
-      matchPercentage: cs.matchPercentage ?? 0,
-      passed: cs.passed ?? false,
-    }));
+    for (const session of courseSessions) {
+      // Fetch the latest case study result per session
+      const results = await model.CaseStudyResult.findAll({
+        where: {
+          userId,
+          courseId,
+          coursePreviewId, // <-- using hardcoded value
+          day: session.day,
+          sessionNumber: session.sessionNumber,
+        },
+        include: [
+          {
+            model: model.QuestionModel,
+            attributes: ["question"],
+            required: false,
+          },
+        ],
+        order: [["createdAt", "DESC"]],
+      });
+
+      if (!results.length) {
+        // Push a default empty entry so the report can still display the session
+        allCaseStudies.push({
+          day: session.day,
+          sessionNumber: session.sessionNumber,
+          question: "No Case Study Available",
+          answer: "N/A",
+          matchPercentage: 0,
+          passed: false,
+        });
+      } else {
+        // Map all results
+        results.forEach((cs) => {
+          allCaseStudies.push({
+            day: cs.day ?? session.day,
+            sessionNumber: cs.sessionNumber ?? session.sessionNumber,
+            question: cs.QuestionModel?.question || cs.question || "No Question Available",
+            answer: cs.answer || "No Answer Submitted",
+            matchPercentage: cs.matchPercentage ?? 0,
+            passed: cs.passed ?? false,
+          });
+        });
+      }
+    }
+
+    return allCaseStudies;
   } catch (err) {
     console.error("Error fetching case studies:", err);
     return [];
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
