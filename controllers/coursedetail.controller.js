@@ -1163,7 +1163,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-const getBusinessTarget = async (req, res) => {
+const getBusinessUserTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
@@ -1268,7 +1268,7 @@ const getBusinessTarget = async (req, res) => {
   }
 };
 
-module.exports.getBusinessTarget = getBusinessTarget;
+module.exports.getBusinessUserTarget= getBusinessUserTarget;
 
 // const getBusinessUserTarget = async (req, res) => {
 //   try {
