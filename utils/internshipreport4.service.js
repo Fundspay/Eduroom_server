@@ -88,39 +88,42 @@ const fetchSessionsWithMCQs = async (courseId) => {
   return { sessions, domain, courseName };
 };
 
-// Fetch case study results for each session (loop through sessions like MCQs)
-// Added logic here to get the case studies with question, answer, result
+// Fetch all case studies for the given sessions, user, and course
 const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId }) => {
   if (!userId || !sessions || sessions.length === 0) return [];
 
   const allResults = [];
 
   for (const session of sessions) {
-    // Fetch all case studies for this session and user
+    // Fetch all case studies for this session and user (without filtering by questionId)
     const caseStudies = await model.CaseStudyResult.findAll({
       where: {
         userId,
         courseId,
         coursePreviewId,
         day: session.day,
-        sessionNumber: session.sessionNumber, // corrected
+        sessionNumber: session.sessionNumber, // sessionNumber from CourseDetail
       },
-      include: [{ model: model.QuestionModel, attributes: ["question"] }],
+      include: [
+        {
+          model: model.QuestionModel,
+          attributes: ["question"], // get question text
+        },
+      ],
       order: [["createdAt", "DESC"]],
     });
 
-    if (caseStudies.length > 0) {
-      caseStudies.forEach((res) => {
-        allResults.push({
-          day: res.day,
-          sessionNumber: res.sessionNumber,
-          question: res.QuestionModel?.question || "No Question",
-          answer: res.answer || "",
-          matchPercentage: res.matchPercentage || 0,
-          passed: res.passed === undefined ? false : res.passed,
-        });
+    // Loop through all fetched results
+    caseStudies.forEach((res) => {
+      allResults.push({
+        day: res.day,
+        sessionNumber: res.sessionNumber,
+        question: res.QuestionModel?.question || "No Question",
+        answer: res.answer || "",
+        matchPercentage: res.matchPercentage || 0,
+        passed: res.passed === undefined ? false : res.passed,
       });
-    }
+    });
   }
 
   return allResults;
