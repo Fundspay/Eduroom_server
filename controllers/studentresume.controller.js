@@ -790,40 +790,39 @@ module.exports.getUserResumesAchieved = getUserResumesAchieved;
 const getUserInterviewsAchieved = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
-
-    if (!teamManagerId) {
+    if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
-    }
+
+    const user = await model.User.findOne({
+      where: { id: teamManagerId },
+      attributes: ["firstName", "lastName"],
+      raw: true,
+    });
+
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
 
     let dateFilter = {};
-
     if (fromDate && toDate) {
-      // Use provided date range
       const startDate = new Date(fromDate);
       const endDate = new Date(toDate);
       dateFilter = { resumeDate: { [Op.between]: [startDate, endDate] } };
-    } else {
-      // Default to today
-      const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
-      dateFilter = { resumeDate: { [Op.between]: [startOfDay, endOfDay] } };
     }
 
-    // 🔹 Count resumes for this manager with isRegistered = true
-    const registeredCount = await model.StudentResume.count({
+    // Count only resumes where isRegistered is true
+    const registrations = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         isRegistered: true,
         ...dateFilter,
       },
+      raw: true,
     });
 
     return res.json({
       success: true,
-      interviewsAchieved: registeredCount,
+      interviewsAchieved: registrations.length, // keeping original key
+      interviewsData: registrations, // keeping original key
     });
-
   } catch (error) {
     console.error("Error in getUserInterviewsAchieved:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -831,6 +830,7 @@ const getUserInterviewsAchieved = async (req, res) => {
 };
 
 module.exports.getUserInterviewsAchieved = getUserInterviewsAchieved;
+
 
 // ✅ FUTURE RESUMES LIST
 const listResumesByUserIdfuture = async (req, res) => {
