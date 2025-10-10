@@ -34,7 +34,6 @@ const html = `
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Certificate of Completion</title>
 <style>
   body {
     margin: 0;
@@ -97,13 +96,10 @@ const html = `
 </head>
 <body>
 <div class="certificate-container">
-  <div class="title">Certificate of Completion</div>
 
-  <div class="content">
-    This is to certify that
-  </div>
 
-  <div class="candidate-name">${candidateName}</div>
+
+  <div class="candidate-name text-align: left;  "> This is to certify that <b>${candidateName}</b></div>
 
   <div class="content">
     has successfully completed Module 1 of the Live Project on Customer Onboarding.<br><br>
@@ -121,9 +117,7 @@ const html = `
 </html>
 `;
 
-
-
-  // 3. Render PDF with Puppeteer
+// 3. Render PDF with Puppeteer
   let pdfBuffer;
   try {
     const browser = await puppeteer.launch({
