@@ -788,6 +788,9 @@ const getUserResumesAchieved = async (req, res) => {
 module.exports.getUserResumesAchieved = getUserResumesAchieved;
 
 // ✅ USER INTERVIEWS ACHIEVED
+const { Op } = require("sequelize");
+const model = require("../models"); // adjust path as needed
+
 const getUserInterviewsAchieved = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -799,11 +802,8 @@ const getUserInterviewsAchieved = async (req, res) => {
       attributes: ["firstName", "lastName"],
       raw: true,
     });
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
 
-    const firstName = user.firstName.trim();
-    const lastName = user.lastName ? user.lastName.trim() : "";
-    const fullName = `${firstName} ${lastName}`.trim();
+    if (!user) return res.status(404).json({ success: false, error: "User not found" });
 
     let dateFilter = {};
     if (fromDate && toDate) {
@@ -812,36 +812,29 @@ const getUserInterviewsAchieved = async (req, res) => {
       dateFilter = { resumeDate: { [Op.between]: [startDate, endDate] } };
     }
 
-    const interviews = await model.StudentResume.findAll({
+    // Count only resumes where isRegistered is true
+    const registrations = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        [Op.or]: [
-          { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: firstName } },
-        ],
-        interviewDate: { [Op.ne]: null },
+        isRegistered: true,
         ...dateFilter,
       },
       raw: true,
     });
 
-    const users = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email"],
-      raw: true,
-    });
-
     return res.json({
       success: true,
-      interviewsAchieved: interviews.length,
-      interviewsData: interviews,
-      users,
+      interviewsAchieved: registrations.length, // keeping original key
+      interviewsData: registrations, // keeping original key
     });
   } catch (error) {
     console.error("Error in getUserInterviewsAchieved:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 module.exports.getUserInterviewsAchieved = getUserInterviewsAchieved;
+
 
 // ✅ FUTURE RESUMES LIST
 const listResumesByUserIdfuture = async (req, res) => {
