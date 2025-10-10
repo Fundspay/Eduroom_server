@@ -1,3 +1,8 @@
+const { generateInternshipCertificate } = require("../utils/internshipcertificate.service");
+const { sendMail } = require("../middleware/mailer.middleware");
+const model = require("../models");
+const sequelize = model.sequelize;
+
 const createAndSendInternshipCertificate = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
