@@ -87,10 +87,36 @@ const fetchSessionsWithMCQs = async (courseId) => {
   return { sessions, domain, courseName };
 };
 
+// Fetch latest case study result for a session
+const fetchLatestCaseStudy = async ({ courseId, coursePreviewId, day, sessionNumber, userId }) => {
+  if (!userId) return null;
+
+  const result = await model.CaseStudyResult.findOne({
+    where: { courseId, coursePreviewId, day, sessionNumber, userId },
+    include: [
+      {
+        model: model.QuestionModel,
+        attributes: ["question"], // fetch only question text
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  if (!result) return null;
+
+  return {
+    question: result.QuestionModel?.question || "No Question",
+    answer: result.answer || "No Answer",
+    matchPercentage: result.matchPercentage || 0,
+    passed: result.passed === undefined ? false : result.passed,
+  };
+};
+
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
   const userId = options.userId || null; // must pass userId to get scores
+  const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
 
@@ -103,82 +129,102 @@ const generateMCQCaseStudyReport = async (options = {}) => {
 
   const sessionsHtml =
     sessions.length > 0
-      ? sessions
-          .map((s) => {
-            // Generate MCQs HTML
-            const mcqHtml = s.mcqs
-              .map((q, idx) => {
-                const optionsHtml = (q.options || [])
-                  .map(opt =>
-                    opt.key === q.answer
-                      ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt.text)}</li>`
-                      : `<li>${escapeHtml(opt.text)}</li>`
-                  )
-                  .join("");
+      ? await Promise.all(sessions.map(async (s) => {
+          // Generate MCQs HTML
+          const mcqHtml = s.mcqs
+            .map((q, idx) => {
+              const optionsHtml = (q.options || [])
+                .map(opt =>
+                  opt.key === q.answer
+                    ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt.text)}</li>`
+                    : `<li>${escapeHtml(opt.text)}</li>`
+                )
+                .join("");
 
-                return `
-                  <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
-                  <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
-                `;
-              })
-              .join("");
+              return `
+                <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
+                <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
+              `;
+            })
+            .join("");
 
-            // Fetch user progress for this session
-            let correctMCQs = 0,
-                totalMCQs = s.mcqs.length || 0,
-                wrongMCQs = 0;
+          // Fetch user progress for MCQs
+          let correctMCQs = 0,
+              totalMCQs = s.mcqs.length || 0,
+              wrongMCQs = 0;
 
-            if (userId && s.userProgress[userId]) {
-              let progressRaw = s.userProgress[userId];
-              if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
-              if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
-                correctMCQs = progressRaw.answers.filter(a => a.isCorrect).length;
-                wrongMCQs = totalMCQs - correctMCQs;
-              }
-            } else {
-              // default 0 if no data
-              correctMCQs = 0;
-              wrongMCQs = totalMCQs;
+          if (userId && s.userProgress[userId]) {
+            let progressRaw = s.userProgress[userId];
+            if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
+            if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
+              correctMCQs = progressRaw.answers.filter(a => a.isCorrect).length;
+              wrongMCQs = totalMCQs - correctMCQs;
             }
+          } else {
+            correctMCQs = 0;
+            wrongMCQs = totalMCQs;
+          }
 
-            const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
-            const status = percentage >= 60 ? "PASSED" : "FAILED";
+          const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+          const status = percentage >= 60 ? "PASSED" : "FAILED";
 
-            const scoreTableHtml = `
-              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
-                <tr style="background:#f0f0f0; text-align:center;">
-                  <th>Score</th>
-                  <th>PERCENTAGE</th>
-                  <th>STATUS</th>
-                </tr>
-                <tr style="text-align:center;">
-                  <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
-                  <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
-                  <td style="font-weight:bold;">${status}</td>
-                </tr>
-              </table>
-            `;
+          const scoreTableHtml = `
+            <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
+              <tr style="background:#f0f0f0; text-align:center;">
+                <th>Score</th>
+                <th>PERCENTAGE</th>
+                <th>STATUS</th>
+              </tr>
+              <tr style="text-align:center;">
+                <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
+                <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
+                <td style="font-weight:bold;">${status}</td>
+              </tr>
+            </table>
+          `;
 
-            return `
-            <div class="page">
-              <div class="content">
-                <h1>Eduroom Internship Report</h1>
-                <h2>Session ${s.day}</h2>
-                <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
-                <p><b>Domain:</b> ${escapeHtml(domain)}</p>
-                <p><b>Course:</b> ${escapeHtml(courseName)}</p>
-                <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
-                <p><b>Video Duration:</b> ${s.videoDuration} MCQ + Case Study (~1500 words)</p>
-                <p><b>Start Date:</b> ${s.startDate}</p>
-                <p><b>End Date:</b> ${s.endDate}</p>
-                <h3>MCQ Quiz – Session ${s.day}</h3>
-                ${mcqHtml || "<p>No MCQs available</p>"}
-                ${scoreTableHtml}
-              </div>
-              <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-            </div>`;
-          })
-          .join("<div style='page-break-after: always;'></div>")
+          // Fetch latest case study for this session
+          const caseStudy = await fetchLatestCaseStudy({
+            courseId,
+            coursePreviewId,
+            day: s.day,
+            sessionNumber: s.id,
+            userId,
+          });
+
+          const caseStudyHtml = caseStudy
+            ? `
+              <h3>Case Study – Session ${s.day}</h3>
+              <p><b>Question:</b> ${escapeHtml(caseStudy.question)}</p>
+              <p><b>Answer:</b> ${escapeHtml(caseStudy.answer)}</p>
+              <p><b>Match Percentage:</b> ${caseStudy.matchPercentage}%</p>
+              <p><b>Passed:</b> ${caseStudy.passed ? "Yes" : "No"}</p>
+            `
+            : `<h3>Case Study – Session ${s.day}</h3>
+               <p>No Case Study Available</p>
+               <p><b>Match Percentage:</b> 0%</p>
+               <p><b>Passed:</b> No</p>`;
+
+          return `
+          <div class="page">
+            <div class="content">
+              <h1>Eduroom Internship Report</h1>
+              <h2>Session ${s.day}</h2>
+              <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
+              <p><b>Domain:</b> ${escapeHtml(domain)}</p>
+              <p><b>Course:</b> ${escapeHtml(courseName)}</p>
+              <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
+              <p><b>Video Duration:</b> ${s.videoDuration} MCQ + Case Study (~1500 words)</p>
+              <p><b>Start Date:</b> ${s.startDate}</p>
+              <p><b>End Date:</b> ${s.endDate}</p>
+              <h3>MCQ Quiz – Session ${s.day}</h3>
+              ${mcqHtml || "<p>No MCQs available</p>"}
+              ${scoreTableHtml}
+              ${caseStudyHtml}
+            </div>
+            <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
+          </div>`;
+        }))
       : `<div class="page">
           <div class="content">
             <h1>Eduroom Internship Report</h1>
