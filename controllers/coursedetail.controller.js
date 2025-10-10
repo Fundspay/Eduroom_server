@@ -1273,34 +1273,48 @@ module.exports.getBusinessTarget = getBusinessTarget;
 const getBusinessUserTarget = async (req, res) => {
   try {
     let { userId } = req.params;
-
     console.log("Received params:", { userId });
 
-    // Convert ID to integer
+    // Validate userId
     userId = parseInt(userId, 10);
-
-    if (isNaN(userId)) {
-      console.log("Invalid userId provided");
-      return ReE(res, "Invalid userId", 400);
-    }
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
     // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
-    if (!user) {
-      console.log(`User not found for ID: ${userId}`);
-      return ReE(res, "User not found", 404);
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Fetch business target from user data
+    // 2️⃣ Get business target
     const businessTarget = parseInt(user.businessTarget, 10) || 0;
 
-    // 3️⃣ Fetch achieved referral count
+    // 3️⃣ Trigger certificate send endpoint once if target == 1
+    user.triggeredTargets = user.triggeredTargets || {}; // JSON field in DB to track triggers
+
+    if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
+      try {
+        const triggerUrl = `https://edurrom.in/api/v1/offerletter/certificate/send/${userId}`;
+        const response = await axios.get(triggerUrl);
+
+        console.log(`Triggered certificate send for user ${userId}:`, response.status);
+
+        user.triggeredTargets["userLevel"] = true;
+        await user.save({ fields: ["triggeredTargets"] });
+
+        return ReS(res, {
+          success: true,
+          message: "Business target is 1. Certificate endpoint triggered successfully.",
+        });
+      } catch (err) {
+        console.warn("Trigger certificate error:", err.message);
+        return ReE(res, "Failed to trigger certificate endpoint", 500);
+      }
+    }
+
+    // 4️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-
         achievedCount = apiResponse.data?.referral_count?.count || 0;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
@@ -1308,23 +1322,21 @@ const getBusinessUserTarget = async (req, res) => {
       }
     }
 
+    // 5️⃣ Calculate wallet values
     const achievedCountNum = Number(achievedCount) || 0;
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
 
-    // 4️⃣ Update wallet values properly
-    const subscriptionWallet = achievedCountNum; // total achieved
+    const subscriptionWallet = achievedCountNum;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
+    // 6️⃣ Update user
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
-
-    await user.save({
-      fields: ["subscriptionWallet", "subscriptionLeft"],
-    });
+    await user.save({ fields: ["subscriptionWallet", "subscriptionLeft"] });
 
     console.log(`Updated user ${user.id} with business target info`);
 
-    // 5️⃣ Return response
+    // 7️⃣ Response
     return ReS(
       res,
       {
@@ -1336,7 +1348,6 @@ const getBusinessUserTarget = async (req, res) => {
           totalDeducted: alreadyDeducted,
           subscriptionWallet,
           subscriptionLeft,
-          businessTargets: user.businessTargets,
         },
       },
       200
@@ -1348,6 +1359,7 @@ const getBusinessUserTarget = async (req, res) => {
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
+
 
 const getCourseStatus = async (req, res) => {
   try {
