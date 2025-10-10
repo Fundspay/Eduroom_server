@@ -787,10 +787,6 @@ const getUserResumesAchieved = async (req, res) => {
 };
 module.exports.getUserResumesAchieved = getUserResumesAchieved;
 
-// ✅ USER INTERVIEWS ACHIEVED
-const { Op } = require("sequelize");
-const model = require("../models"); // adjust path as needed
-
 const getUserInterviewsAchieved = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
