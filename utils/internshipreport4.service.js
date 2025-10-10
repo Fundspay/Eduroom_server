@@ -87,24 +87,50 @@ const fetchSessionsWithMCQs = async (courseId) => {
   return { sessions, domain, courseName };
 };
 
-// Fetch all case study results for a course & user
-const fetchAllCaseStudies = async ({ courseId, coursePreviewId, userId }) => {
-  if (!userId) return [];
+// Fetch case study results by looking through sessions (same as MCQs)
+const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId }) => {
+  if (!userId || !sessions || sessions.length === 0) return [];
 
-  const results = await model.CaseStudyResult.findAll({
-    where: { courseId, coursePreviewId, userId },
-    include: [{ model: model.QuestionModel, attributes: ["question"] }],
-    order: [["day", "ASC"], ["sessionNumber", "ASC"]],
-  });
+  const allResults = [];
 
-  return results.map((res) => ({
-    day: res.day,
-    sessionNumber: res.sessionNumber,
-    question: res.QuestionModel?.question || "No Question",
-    answer: res.answer || "No Answer",
-    matchPercentage: res.matchPercentage || 0,
-    passed: res.passed === undefined ? false : res.passed,
-  }));
+  for (const session of sessions) {
+    const caseStudies = await model.CaseStudyResult.findAll({
+      where: {
+        courseId,
+        coursePreviewId,
+        userId,
+        day: session.day,
+        sessionNumber: session.id,
+      },
+      include: [{ model: model.QuestionModel, attributes: ["question"] }],
+      order: [["createdAt", "DESC"]],
+    });
+
+    if (caseStudies.length > 0) {
+      caseStudies.forEach((res) => {
+        allResults.push({
+          day: res.day,
+          sessionNumber: res.sessionNumber,
+          question: res.QuestionModel?.question || "No Question",
+          answer: res.answer || "",
+          matchPercentage: res.matchPercentage || 0,
+          passed: res.passed === undefined ? false : res.passed,
+        });
+      });
+    } else {
+      // If no case study, still add a placeholder
+      allResults.push({
+        day: session.day,
+        sessionNumber: session.id,
+        question: "No Case Study Assigned",
+        answer: "",
+        matchPercentage: 0,
+        passed: false,
+      });
+    }
+  }
+
+  return allResults;
 };
 
 const generateMCQCaseStudyReport = async (options = {}) => {
@@ -114,7 +140,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const allCaseStudies = await fetchAllCaseStudies({ courseId, coursePreviewId, userId });
+  const allCaseStudies = await fetchAllCaseStudies({ sessions, courseId, coursePreviewId, userId });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
@@ -142,21 +168,15 @@ const generateMCQCaseStudyReport = async (options = {}) => {
           })
           .join("");
 
-        // Fetch user progress for MCQs
         let correctMCQs = 0,
-            totalMCQs = s.mcqs.length || 0,
-            wrongMCQs = 0;
+            totalMCQs = s.mcqs.length || 0;
 
         if (userId && s.userProgress[userId]) {
           let progressRaw = s.userProgress[userId];
           if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
           if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
             correctMCQs = progressRaw.answers.filter(a => a.isCorrect).length;
-            wrongMCQs = totalMCQs - correctMCQs;
           }
-        } else {
-          correctMCQs = 0;
-          wrongMCQs = totalMCQs;
         }
 
         const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
@@ -210,18 +230,26 @@ const generateMCQCaseStudyReport = async (options = {}) => {
 
   // Generate HTML for all case studies at the end
   const caseStudiesHtml = allCaseStudies.length > 0
-    ? allCaseStudies.map((cs) => `
+    ? allCaseStudies.map((cs, idx) => `
       <div class="page">
         <div class="content">
           <h1>Case Study – Session ${cs.day}</h1>
-          <p><b>Question:</b> ${escapeHtml(cs.question)}</p>
-          <p><b>Answer:</b> ${escapeHtml(cs.answer)}</p>
-          <p><b>Match Percentage:</b> ${cs.matchPercentage}%</p>
-          <p><b>Passed:</b> ${cs.passed ? "Yes" : "No"}</p>
+          <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
+          <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
+            <tr style="background:#f0f0f0; text-align:center;">
+              <th>Answer</th>
+              <th>Match %</th>
+              <th>Passed</th>
+            </tr>
+            <tr style="text-align:center;">
+              <td>${escapeHtml(cs.answer)}</td>
+              <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage}%</td>
+              <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
+            </tr>
+          </table>
         </div>
         <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-      </div>
-    `).join("<div style='page-break-after: always;'></div>")
+      </div>`).join("<div style='page-break-after: always;'></div>")
     : `<div class="page">
         <div class="content">
           <h1>Case Studies</h1>
