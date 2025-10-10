@@ -71,7 +71,12 @@ const fetchSessionsWithMCQs = async (courseId) => {
     endDate: "N/A",
     mcqs: session.QuestionModels.map((q) => ({
       question: q.question,
-      options: [q.optionA, q.optionB, q.optionC, q.optionD],
+      options: [
+        { key: "A", text: q.optionA },
+        { key: "B", text: q.optionB },
+        { key: "C", text: q.optionC },
+        { key: "D", text: q.optionD },
+      ],
       answer: q.answer,
     })),
   }));
@@ -99,10 +104,10 @@ const generateMCQCaseStudyReport = async (options = {}) => {
             const mcqHtml = s.mcqs
               .map((q, idx) => {
                 const optionsHtml = (q.options || [])
-                  .map((opt) =>
-                    opt === q.answer
-                      ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt)}</li>`
-                      : `<li>${escapeHtml(opt)}</li>`
+                  .map(opt =>
+                    opt.key === q.answer
+                      ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt.text)}</li>`
+                      : `<li>${escapeHtml(opt.text)}</li>`
                   )
                   .join("");
 
