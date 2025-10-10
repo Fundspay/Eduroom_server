@@ -53,18 +53,16 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const businessTarget = rawTarget < 0 ? 0 : rawTarget;
 
     // 🔹 Wallet info
-    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // total earned
+    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); 
     let newDeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    let newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
+    let subscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
 
     // 🔹 Check if certificate already exists
     let certificate = await model.InternshipCertificate.findOne({ where: { userId, courseId } });
 
     // 🔹 Deduct wallet and create certificate only first-time
     if (!certificate) {
-      const currentLeft = newSubscriptionLeft;
-
-      if (currentLeft < businessTarget) {
+      if (subscriptionLeft < businessTarget) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
@@ -73,16 +71,16 @@ const createAndSendInternshipCertificate = async (req, res) => {
             totalSubscribed: subscriptionWallet,
             businessTarget,
             totalDeducted: newDeductedWallet,
-            subscriptionLeft: currentLeft
+            subscriptionLeft
           }
         });
       }
 
       newDeductedWallet += businessTarget;
-      newSubscriptionLeft = subscriptionWallet - newDeductedWallet;
+      subscriptionLeft = subscriptionWallet - newDeductedWallet;
 
       user.subscriptiondeductedWallet = newDeductedWallet;
-      user.subscriptionLeft = newSubscriptionLeft;
+      user.subscriptionLeft = subscriptionLeft;
 
       await user.save({
         fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
@@ -106,14 +104,14 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }, { transaction });
     }
 
-    // 🔹 Generate certificate PDF link for download (always)
+    // 🔹 Generate certificate PDF link (always)
     const certificateFile = await generateInternshipCertificate(userId, courseId);
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
       return res.status(500).json({ success: false, message: "Certificate generation failed: fileUrl is missing" });
     }
 
-    // 🔹 Send email every time user clicks download
+    // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
@@ -135,7 +133,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
         totalSubscribed: subscriptionWallet,
         businessTarget,
         totalDeducted: newDeductedWallet,
-        subscriptionLeft: newSubscriptionLeft
+        subscriptionLeft
       }
     });
 
