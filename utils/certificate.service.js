@@ -46,7 +46,7 @@ const html = `
   .certificate-container {
     width: 900px;
     margin: 20px auto;
-    padding: 120px 100px 100px 100px; /* Top padding increased for image alignment */
+    padding: 120px 100px 100px 100px; /* Top padding for background image */
     background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/4.png") no-repeat center top;
     background-size: cover;
     min-height: 1200px;
@@ -66,22 +66,22 @@ const html = `
     font-size: 18px;
     line-height: 1.8;
     text-align: justify;
-    margin-left: -50px; /* Adjusted to align with background */
-    margin-right: -50px; /* Optional if needed for full width alignment */
+    margin-left: -65px; /* Align with background like first certificate */
+    margin-right: -65px;
   }
 
   .candidate-name {
-    text-align: center;
+    text-align: left; /* Matches first certificate style */
     font-size: 24px;
     font-weight: bold;
     margin: 30px 0;
   }
 
   .date {
-    text-align: right;
+    text-align: left; /* Consistent with first certificate */
     margin-top: 80px;
     font-size: 16px;
-    margin-right: -50px; /* Adjusted to align with background */
+    margin-left: -65px;
   }
 
   .footer {
@@ -98,20 +98,29 @@ const html = `
 <body>
 <div class="certificate-container">
   <div class="title">Certificate of Completion</div>
+
   <div class="content">
     This is to certify that
   </div>
+
   <div class="candidate-name">${candidateName}</div>
+
   <div class="content">
     has successfully completed Module 1 of the Live Project on Customer Onboarding.<br><br>
     The candidate has actively participated in all onboarding activities, demonstrating a clear understanding of customer engagement processes, essential procedures, and best practices required for effective onboarding. Through consistent effort and commitment, ${candidateName} has acquired the foundational skills necessary to contribute effectively to customer onboarding initiatives and ensure a smooth, professional experience for clients.<br><br>
     We hereby acknowledge and commend the candidate’s successful completion of this module and their readiness to progress to further stages of the live project.
   </div>
+
   <div class="date">Date: <b>${today}</b></div>
+
+  <div class="footer">
+    Eduroom &copy; ${new Date().getFullYear()}
+  </div>
 </div>
 </body>
 </html>
 `;
+
 
 
   // 3. Render PDF with Puppeteer
