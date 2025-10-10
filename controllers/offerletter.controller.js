@@ -149,8 +149,15 @@ const sendInternshipReport = async (req, res) => {
     }
 
     // Generate Internship Report (PDF uploaded to S3 + DB saved)
-    const report = await generateMCQCaseStudyReport([], { courseId, userId });
-    // 🔹 You’ll need to implement generateInternshipReport similar to generateOfferLetter
+    const options = {
+      courseId,
+      internName: user.fullName || user.firstName,
+      domain: "N/A",       // or fetch domain if available
+      courseName: "N/A",   // or fetch course name if available
+      bucketPrefix: `internshipReports/${userId}_${courseId}`,
+    };
+
+    const report = await generateMCQCaseStudyReport(options);
 
     // Build email content
     const subject = `Your Internship Report - Fundsroom InfoTech Pvt Ltd`;
@@ -217,6 +224,7 @@ const sendInternshipReport = async (req, res) => {
 };
 
 module.exports.sendInternshipReport = sendInternshipReport;
+
 
 
 
