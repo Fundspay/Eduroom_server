@@ -66,6 +66,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
   const sessions = courseDetailRows.map((session) => ({
     id: session.id,
     day: session.day,
+    sessionNumber: session.sessionNumber, // use actual sessionNumber from DB
     title: session.title || `Session ${session.day}`,
     videoDuration: "~15 mins",
     startDate: "N/A",
@@ -87,7 +88,8 @@ const fetchSessionsWithMCQs = async (courseId) => {
   return { sessions, domain, courseName };
 };
 
-// Fetch case study results for each session (like getUserCaseStudyResult)
+// Fetch case study results for each session (loop through sessions like MCQs)
+// Added logic here to get the case studies with question, answer, result
 const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId }) => {
   if (!userId || !sessions || sessions.length === 0) return [];
 
@@ -101,7 +103,7 @@ const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId
         courseId,
         coursePreviewId,
         day: session.day,
-        sessionNumber: session.id,
+        sessionNumber: session.sessionNumber, // corrected
       },
       include: [{ model: model.QuestionModel, attributes: ["question"] }],
       order: [["createdAt", "DESC"]],
@@ -117,16 +119,6 @@ const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId
           matchPercentage: res.matchPercentage || 0,
           passed: res.passed === undefined ? false : res.passed,
         });
-      });
-    } else {
-      // Placeholder if no case study
-      allResults.push({
-        day: session.day,
-        sessionNumber: session.id,
-        question: "No Case Study Assigned",
-        answer: "",
-        matchPercentage: 0,
-        passed: false,
       });
     }
   }
