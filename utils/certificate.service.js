@@ -28,7 +28,8 @@ const generateCertificate = async (userId) => {
   });
 
   // 2. HTML content for certificate
-  const html = `
+  
+const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -41,16 +42,18 @@ const generateCertificate = async (userId) => {
     font-family: 'Times New Roman', serif;
     background: #f9f9f9;
   }
+
   .certificate-container {
     width: 900px;
-    margin: 50px auto;
-    padding: 80px 100px;
+    margin: 20px auto;
+    padding: 120px 100px 100px 100px; /* Top padding increased for image alignment */
     background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/4.png") no-repeat center top;
     background-size: cover;
     min-height: 1200px;
     box-sizing: border-box;
     position: relative;
   }
+
   .title {
     text-align: center;
     font-size: 28px;
@@ -58,23 +61,29 @@ const generateCertificate = async (userId) => {
     margin-bottom: 50px;
     text-transform: uppercase;
   }
+
   .content {
     font-size: 18px;
     line-height: 1.8;
     text-align: justify;
-    margin: 0 50px;
+    margin-left: -50px; /* Adjusted to align with background */
+    margin-right: -50px; /* Optional if needed for full width alignment */
   }
+
   .candidate-name {
     text-align: center;
     font-size: 24px;
     font-weight: bold;
     margin: 30px 0;
   }
+
   .date {
     text-align: right;
     margin-top: 80px;
     font-size: 16px;
+    margin-right: -50px; /* Adjusted to align with background */
   }
+
   .footer {
     text-align: center;
     position: absolute;
@@ -103,6 +112,7 @@ const generateCertificate = async (userId) => {
 </body>
 </html>
 `;
+
 
   // 3. Render PDF with Puppeteer
   let pdfBuffer;
