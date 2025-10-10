@@ -1,8 +1,3 @@
-const { generateInternshipCertificate } = require("../utils/internshipcertificate.service");
-const { sendMail } = require("../middleware/mailer.middleware");
-const model = require("../models");
-const sequelize = model.sequelize;
-
 const createAndSendInternshipCertificate = async (req, res) => {
   const transaction = await sequelize.transaction();
   try {
@@ -24,8 +19,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 🔹 (FundsAudit check removed)
-
     // 🔹 Fetch course
     const course = await model.Course.findOne({
       where: { id: courseId, isDeleted: false },
@@ -39,7 +32,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     // 🔹 Get business target
     const userTarget = user.businessTargets?.[courseId];
     const rawTarget = parseInt(userTarget !== undefined ? userTarget : course?.businessTarget || 0, 10);
-    const businessTarget = rawTarget < 0 ? 0 : rawTarget;
+    const businessTarget = Math.max(0, rawTarget);
 
     // 🔹 Wallet info
     const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // total earned
@@ -47,13 +40,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
     let newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
 
     // 🔹 Check if certificate already exists
-    let certificate = await model.InternshipCertificate.findOne({ where: { userId, courseId } });
+    let certificate = await model.InternshipCertificate.findOne({ where: { userId, courseId }, transaction });
 
-    // 🔹 Deduct wallet and create certificate only first-time
+    // 🔹 Deduct wallet only if first-time issuance
     if (!certificate) {
-      const currentLeft = newSubscriptionLeft;
-
-      if (currentLeft < businessTarget) {
+      if (newSubscriptionLeft < businessTarget) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
@@ -62,7 +53,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
             totalSubscribed: subscriptionWallet,
             businessTarget,
             totalDeducted: newDeductedWallet,
-            subscriptionLeft: currentLeft
+            subscriptionLeft: newSubscriptionLeft
           }
         });
       }
@@ -77,14 +68,22 @@ const createAndSendInternshipCertificate = async (req, res) => {
         fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
         transaction
       });
+    }
 
-      // 🔹 Create certificate record
-      const certificateFile = await generateInternshipCertificate(userId, courseId);
-      if (!certificateFile?.fileUrl) {
-        await transaction.rollback();
-        return res.status(500).json({ success: false, message: "Certificate generation failed: fileUrl is missing" });
-      }
+    // 🔹 Always generate a fresh certificate
+    const certificateFile = await generateInternshipCertificate(userId, courseId);
+    if (!certificateFile?.fileUrl) {
+      await transaction.rollback();
+      return res.status(500).json({ success: false, message: "Certificate generation failed: fileUrl is missing" });
+    }
 
+    // 🔹 If certificate exists, update it; else create new
+    if (certificate) {
+      certificate.certificateUrl = certificateFile.fileUrl;
+      certificate.isIssued = true;
+      certificate.issuedDate = new Date();
+      await certificate.save({ transaction });
+    } else {
       certificate = await model.InternshipCertificate.create({
         userId,
         courseId,
@@ -95,14 +94,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }, { transaction });
     }
 
-    // 🔹 Generate certificate PDF link for download (always)
-    const certificateFile = await generateInternshipCertificate(userId, courseId);
-    if (!certificateFile?.fileUrl) {
-      await transaction.rollback();
-      return res.status(500).json({ success: false, message: "Certificate generation failed: fileUrl is missing" });
-    }
-
-    // 🔹 Send email every time user clicks download
+    // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
@@ -118,7 +110,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Internship Certificate available",
+      message: "Internship Certificate generated successfully",
       certificateUrl: certificateFile.fileUrl,
       wallet: {
         totalSubscribed: subscriptionWallet,
