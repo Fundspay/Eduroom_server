@@ -97,9 +97,7 @@ const html = `
 <body>
 <div class="certificate-container">
 
-
-
-  <div class="candidate-name text-align: left;  "> This is to certify that <b>${candidateName}</b></div>
+  <div class="content" style="text-align: left; margin-top:10%;"> This is to certify that <b>${candidateName}</b></div>
 
   <div class="content">
     has successfully completed Module 1 of the Live Project on Customer Onboarding.<br><br>
@@ -116,6 +114,8 @@ const html = `
 </body>
 </html>
 `;
+
+
 
 // 3. Render PDF with Puppeteer
   let pdfBuffer;
