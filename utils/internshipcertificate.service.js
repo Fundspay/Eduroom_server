@@ -85,7 +85,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
              width: 800px;
              margin: 20px auto;
              padding: 80px 100px;
-             background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/2.jpg") no-repeat center top;
+             background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/9.png") no-repeat center top;
              background-size: cover;
              min-height: 1100px;
              box-sizing: border-box;
@@ -134,13 +134,16 @@ const generateInternshipCertificate = async (userId, courseId) => {
          <div class="date">Date: <b>${today}</b></div>
 
          <div class="content">
-            <b>To Whom so ever it may concern</b>,<br><br>
-We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern  and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
+    <b>To Whom so ever it may concern</b>,<br><br>
+    We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern  and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
 
-During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
+    During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
 
-${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported to overall business and organisational development. We wish ${pronouns.object} all the best in ${pronouns.possessive} future endeavours.<br><br>
-        </div>
+    ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported to overall business and organisational development. We wish ${pronouns.object} all the best in ${pronouns.possessive} future endeavours.<br><br>
+
+    We also firmly believe ${pronouns.subject.toLowerCase()} will become an integral part of a future workplace.<br><br>
+</div>
+
      </div>
  </body>
 
