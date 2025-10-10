@@ -562,7 +562,6 @@ const listResumesByUserId = async (req, res) => {
 
 module.exports.listResumesByUserId = listResumesByUserId;
 
-// ✅ USER TARGET ANALYSIS
 const getUserTargetAnalysis = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -574,15 +573,18 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
+    // Fetch resumes
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        resumeDate: { [Op.between]: [startDate, endDate] },
+        isRegistered: true, // only registered resumes
+        resumeDate: { [Op.between]: [startDate, endDate] }, // filter by resume date
       },
-      attributes: ["followupBy", "resumeDate", "interviewDate", "collegeName"],
+      attributes: ["followupBy", "resumeDate", "collegeName"],
       raw: true,
     });
 
+    // Fetch targets
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -613,13 +615,12 @@ const getUserTargetAnalysis = async (req, res) => {
           followupBy: displayName,
           collegesAchieved: new Set(),
           resumesAchieved: 0,
-          interviewsAchieved: 0,
           resumeDates: [],
-          interviewDates: [],
         };
       }
 
       if (resume.collegeName) achieved[key].collegesAchieved.add(resume.collegeName);
+
       achieved[key].resumesAchieved += 1;
 
       if (resume.resumeDate) {
@@ -631,20 +632,6 @@ const getUserTargetAnalysis = async (req, res) => {
         });
         achieved[key].resumeDates.push(formattedResumeDate);
       }
-
-      if (resume.interviewDate) {
-        const formattedInterviewDate = new Date(resume.interviewDate).toLocaleDateString(
-          "en-GB",
-          {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          }
-        );
-        achieved[key].interviewDates.push(formattedInterviewDate);
-        achieved[key].interviewsAchieved += 1;
-      }
     });
 
     const result = Object.values(achieved).map((item) => ({
@@ -652,11 +639,11 @@ const getUserTargetAnalysis = async (req, res) => {
       collegeTarget: Number(targetData.collegeTarget),
       collegesAchieved: item.collegesAchieved.size,
       interviewsTarget: Number(targetData.interviewsTarget),
-      interviewsAchieved: item.interviewsAchieved,
+      interviewsAchieved: 0, // ignoring interviews completely
       resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
       resumesAchieved: item.resumesAchieved,
       resumeDates: item.resumeDates,
-      interviewDates: item.interviewDates,
+      interviewDates: [], // empty because we're ignoring interviews
     }));
 
     return res.json({
@@ -682,6 +669,7 @@ const getUserTargetAnalysis = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
 
 // ✅ SEND MAIL TO STUDENT
