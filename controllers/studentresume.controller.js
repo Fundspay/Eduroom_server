@@ -568,7 +568,6 @@ const getUserTargetAnalysis = async (req, res) => {
     if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
 
-    // Optional date range, defaults to today
     let startDate = fromDate ? new Date(fromDate) : new Date();
     startDate.setHours(0, 0, 0, 0);
     let endDate = toDate ? new Date(toDate) : new Date();
@@ -585,7 +584,7 @@ const getUserTargetAnalysis = async (req, res) => {
       raw: true,
     });
 
-    // Fetch target data
+    // Fetch targets
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -605,29 +604,31 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Use a single key to aggregate all resumes for the team manager
+    // Aggregate all data for the team manager
     const achieved = {
       followupBy: resumes[0]?.followupBy || "Unknown",
       collegesAchieved: new Set(),
       resumesAchieved: 0,
       interviewsAchieved: 0, // count of registered resumes
       resumeDates: [],
-      interviewDates: [], // keep empty
+      interviewDates: [], // now will also store resume dates
     };
 
     resumes.forEach((resume) => {
       if (resume.collegeName) achieved.collegesAchieved.add(resume.collegeName);
+
       achieved.resumesAchieved += 1;
       achieved.interviewsAchieved += 1; // same as registered resumes
 
       if (resume.resumeDate) {
-        const formattedResumeDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
+        const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
           day: "2-digit",
           month: "long",
           year: "numeric",
         });
-        achieved.resumeDates.push(formattedResumeDate);
+        achieved.resumeDates.push(formattedDate);
+        achieved.interviewDates.push(formattedDate); // mirror resume date
       }
     });
 
@@ -641,7 +642,7 @@ const getUserTargetAnalysis = async (req, res) => {
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved: achieved.resumesAchieved,
         resumeDates: achieved.resumeDates,
-        interviewDates: [], // empty as before
+        interviewDates: achieved.interviewDates, // now shows resume dates
       },
     ];
 
@@ -656,6 +657,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 // ✅ SEND MAIL TO STUDENT
 const sendMailToStudent = async (req, res) => {
