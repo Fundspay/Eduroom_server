@@ -89,7 +89,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
-  const userId = options.userId || ""; // new: evaluate for this user
+  const userId = options.userId || ""; // important: get progress for this user
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
 
@@ -129,14 +129,21 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                   })
                   .join("");
 
-                // Calculate score for this session for the given userId
-                let progress = s.userProgress[userId] || null;
-                if (progress) {
-                  progress.wrongMCQs = progress.totalMCQs - progress.correctMCQs;
+                // Evaluate score like evaluateSessionMCQ
+                const progressRaw = s.userProgress[userId] || null;
+                let correctMCQs = 0,
+                  totalMCQs = 0,
+                  wrongMCQs = 0;
+
+                if (progressRaw && Array.isArray(progressRaw.answers)) {
+                  totalMCQs = progressRaw.answers.length;
+                  correctMCQs = progressRaw.answers.filter((a) => a.isCorrect).length;
+                  wrongMCQs = totalMCQs - correctMCQs;
                 }
 
-                const scoreTableHtml = progress
-                  ? `
+                const scoreTableHtml =
+                  totalMCQs > 0
+                    ? `
                   <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:50%;">
                     <tr style="background:#f0f0f0;">
                       <th>Total Questions</th>
@@ -144,13 +151,13 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                       <th>Wrong</th>
                     </tr>
                     <tr>
-                      <td>${progress.totalMCQs}</td>
-                      <td>${progress.correctMCQs}</td>
-                      <td>${progress.wrongMCQs}</td>
+                      <td>${totalMCQs}</td>
+                      <td>${correctMCQs}</td>
+                      <td>${wrongMCQs}</td>
                     </tr>
                   </table>
                   `
-                  : "";
+                    : "";
 
                 return `
                 <div class="page">
