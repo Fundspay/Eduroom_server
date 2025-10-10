@@ -577,10 +577,9 @@ const getUserTargetAnalysis = async (req, res) => {
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        isRegistered: true, // only registered resumes
-        resumeDate: { [Op.between]: [startDate, endDate] }, // filter by resume date
+        resumeDate: { [Op.between]: [startDate, endDate] },
       },
-      attributes: ["followupBy", "resumeDate", "collegeName"],
+      attributes: ["followupBy", "resumeDate", "collegeName", "isRegistered"],
       raw: true,
     });
 
@@ -615,12 +614,13 @@ const getUserTargetAnalysis = async (req, res) => {
           followupBy: displayName,
           collegesAchieved: new Set(),
           resumesAchieved: 0,
+          interviewsAchieved: 0, // now will count only registered resumes
           resumeDates: [],
+          interviewDates: [], // keep field but empty
         };
       }
 
       if (resume.collegeName) achieved[key].collegesAchieved.add(resume.collegeName);
-
       achieved[key].resumesAchieved += 1;
 
       if (resume.resumeDate) {
@@ -632,6 +632,11 @@ const getUserTargetAnalysis = async (req, res) => {
         });
         achieved[key].resumeDates.push(formattedResumeDate);
       }
+
+      // Updated logic: count only isRegistered=true for interviewsAchieved
+      if (resume.isRegistered) {
+        achieved[key].interviewsAchieved += 1;
+      }
     });
 
     const result = Object.values(achieved).map((item) => ({
@@ -639,11 +644,11 @@ const getUserTargetAnalysis = async (req, res) => {
       collegeTarget: Number(targetData.collegeTarget),
       collegesAchieved: item.collegesAchieved.size,
       interviewsTarget: Number(targetData.interviewsTarget),
-      interviewsAchieved: 0, // ignoring interviews completely
+      interviewsAchieved: item.interviewsAchieved, // now counts only registered resumes
       resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
       resumesAchieved: item.resumesAchieved,
       resumeDates: item.resumeDates,
-      interviewDates: [], // empty because we're ignoring interviews
+      interviewDates: [], // empty, as we removed interview logic
     }));
 
     return res.json({
