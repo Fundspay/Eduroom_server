@@ -801,27 +801,29 @@ const getUserInterviewsAchieved = async (req, res) => {
 
     if (!user) return res.status(404).json({ success: false, error: "User not found" });
 
-    let dateFilter = {};
+    // Build where clause
+    let whereClause = {
+      teamManagerId,
+      isRegistered: true, // strictly true
+    };
+
+    // Apply date filter only if both fromDate and toDate exist
     if (fromDate && toDate) {
       const startDate = new Date(fromDate);
       const endDate = new Date(toDate);
-      dateFilter = { resumeDate: { [Op.between]: [startDate, endDate] } };
+      whereClause.resumeDate = { [Op.between]: [startDate, endDate] };
     }
 
-    // Count only resumes where isRegistered is true
+    // Fetch only strictly registered resumes
     const registrations = await model.StudentResume.findAll({
-      where: {
-        teamManagerId,
-        isRegistered: true,
-        ...dateFilter,
-      },
+      where: whereClause,
       raw: true,
     });
 
     return res.json({
       success: true,
-      interviewsAchieved: registrations.length, // keeping original key
-      interviewsData: registrations, // keeping original key
+      interviewsAchieved: registrations.length,
+      interviewsData: registrations,
     });
   } catch (error) {
     console.error("Error in getUserInterviewsAchieved:", error);
@@ -830,7 +832,6 @@ const getUserInterviewsAchieved = async (req, res) => {
 };
 
 module.exports.getUserInterviewsAchieved = getUserInterviewsAchieved;
-
 
 // ✅ FUTURE RESUMES LIST
 const listResumesByUserIdfuture = async (req, res) => {
