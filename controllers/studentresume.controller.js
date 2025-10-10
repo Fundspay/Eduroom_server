@@ -790,8 +790,10 @@ module.exports.getUserResumesAchieved = getUserResumesAchieved;
 const getUserInterviewsAchieved = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
-    if (!teamManagerId)
+
+    if (!teamManagerId) {
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
+    }
 
     const user = await model.User.findOne({
       where: { id: teamManagerId },
@@ -799,30 +801,31 @@ const getUserInterviewsAchieved = async (req, res) => {
       raw: true,
     });
 
-    if (!user) return res.status(404).json({ success: false, error: "User not found" });
-
-    // Build where clause
-    let whereClause = {
-      teamManagerId,
-      isRegistered: true, // strictly true
-    };
-
-    // Apply date filter only if both fromDate and toDate exist
-    if (fromDate && toDate) {
-      const startDate = new Date(fromDate);
-      const endDate = new Date(toDate);
-      whereClause.resumeDate = { [Op.between]: [startDate, endDate] };
+    if (!user) {
+      return res.status(404).json({ success: false, error: "User not found" });
     }
 
-    // Fetch only strictly registered resumes
+    // Make sure date range is provided
+    if (!fromDate || !toDate) {
+      return res.status(400).json({ success: false, error: "fromDate and toDate are required" });
+    }
+
+    const startDate = new Date(fromDate);
+    const endDate = new Date(toDate);
+
+    // Fetch only resumes with isRegistered true and in the given date range
     const registrations = await model.StudentResume.findAll({
-      where: whereClause,
+      where: {
+        teamManagerId,
+        isRegistered: true, // strictly true
+        resumeDate: { [Op.between]: [startDate, endDate] }, // filter by date
+      },
       raw: true,
     });
 
     return res.json({
       success: true,
-      interviewsAchieved: registrations.length,
+      interviewsAchieved: registrations.length, // count of only true registrations
       interviewsData: registrations,
     });
   } catch (error) {
