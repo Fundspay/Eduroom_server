@@ -573,18 +573,17 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch resumes: only registered ones within date range for this team manager
+    // Fetch all resumes within date range
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         resumeDate: { [Op.between]: [startDate, endDate] },
-        isRegistered: true, // only registered
       },
-      attributes: ["followupBy", "resumeDate", "collegeName"],
+      attributes: ["followupBy", "resumeDate", "collegeName", "isRegistered"],
       raw: true,
     });
 
-    // Fetch targets
+    // Fetch target data
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -604,22 +603,23 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate all data for the team manager
+    // Aggregate data for the team manager
     const achieved = {
       followupBy: resumes[0]?.followupBy || "Unknown",
       collegesAchieved: new Set(),
-      resumesAchieved: 0,
-      interviewsAchieved: 0, // count of registered resumes
+      resumesAchieved: 0,       // all resumes
+      interviewsAchieved: 0,    // only registered
       resumeDates: [],
-      interviewDates: [], // now will also store resume dates
+      interviewDates: [],       // dates of registered resumes
     };
 
     resumes.forEach((resume) => {
       if (resume.collegeName) achieved.collegesAchieved.add(resume.collegeName);
 
+      // Count all resumes
       achieved.resumesAchieved += 1;
-      achieved.interviewsAchieved += 1; // same as registered resumes
 
+      // Add resumeDates for all
       if (resume.resumeDate) {
         const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -628,7 +628,21 @@ const getUserTargetAnalysis = async (req, res) => {
           year: "numeric",
         });
         achieved.resumeDates.push(formattedDate);
-        achieved.interviewDates.push(formattedDate); // mirror resume date
+      }
+
+      // Count only registered resumes for interviewsAchieved
+      if (resume.isRegistered) {
+        achieved.interviewsAchieved += 1;
+        // Add date to interviewDates only if registered
+        if (resume.resumeDate) {
+          const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
+            weekday: "long",
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+          achieved.interviewDates.push(formattedDate);
+        }
       }
     });
 
@@ -642,7 +656,7 @@ const getUserTargetAnalysis = async (req, res) => {
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved: achieved.resumesAchieved,
         resumeDates: achieved.resumeDates,
-        interviewDates: achieved.interviewDates, // now shows resume dates
+        interviewDates: achieved.interviewDates,
       },
     ];
 
@@ -657,7 +671,6 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
-
 
 // ✅ SEND MAIL TO STUDENT
 const sendMailToStudent = async (req, res) => {
