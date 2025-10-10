@@ -70,6 +70,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
     startDate: "N/A",
     endDate: "N/A",
     mcqs: session.QuestionModels.map((q) => ({
+      id: q.id,
       question: q.question,
       options: [
         { key: "A", text: q.optionA },
@@ -79,6 +80,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
       ],
       answer: q.answer,
     })),
+    userProgress: session.userProgress || {},
   }));
 
   return { sessions, domain, courseName };
@@ -87,7 +89,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
-  const userProgress = options.userProgress || {}; // new: session evaluation data
+  const userId = options.userId || ""; // new: evaluate for this user
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
 
@@ -127,8 +129,12 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                   })
                   .join("");
 
-                // Prepare score table if userProgress exists for this session
-                const progress = userProgress[s.day];
+                // Calculate score for this session for the given userId
+                let progress = s.userProgress[userId] || null;
+                if (progress) {
+                  progress.wrongMCQs = progress.totalMCQs - progress.correctMCQs;
+                }
+
                 const scoreTableHtml = progress
                   ? `
                   <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:50%;">
