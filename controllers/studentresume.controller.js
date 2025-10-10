@@ -573,13 +573,13 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch all resumes within date range
+    // Fetch all resumes for the team manager
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         resumeDate: { [Op.between]: [startDate, endDate] },
       },
-      attributes: ["followupBy", "resumeDate", "collegeName", "isRegistered"],
+      attributes: ["resumeDate", "collegeName", "isRegistered", "followupBy"],
       raw: true,
     });
 
@@ -603,7 +603,7 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate data for the team manager
+    // Aggregate all resumes under the team manager
     const achieved = {
       followupBy: resumes[0]?.followupBy || "Unknown",
       collegesAchieved: new Set(),
@@ -619,7 +619,7 @@ const getUserTargetAnalysis = async (req, res) => {
       // Count all resumes
       achieved.resumesAchieved += 1;
 
-      // Add resumeDates for all
+      // Add all resume dates
       if (resume.resumeDate) {
         const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -633,16 +633,14 @@ const getUserTargetAnalysis = async (req, res) => {
       // Count only registered resumes for interviewsAchieved
       if (resume.isRegistered) {
         achieved.interviewsAchieved += 1;
-        // Add date to interviewDates only if registered
-        if (resume.resumeDate) {
-          const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
+        achieved.interviewDates.push(
+          new Date(resume.resumeDate).toLocaleDateString("en-GB", {
             weekday: "long",
             day: "2-digit",
             month: "long",
             year: "numeric",
-          });
-          achieved.interviewDates.push(formattedDate);
-        }
+          })
+        );
       }
     });
 
@@ -671,6 +669,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 // ✅ SEND MAIL TO STUDENT
 const sendMailToStudent = async (req, res) => {
