@@ -93,56 +93,33 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH (DIRECT FETCH USING COURSE + USER)
+// UPDATED CASE STUDY FETCH (ALL CASE STUDIES FOR USER)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return [];
 
-  // Step 1: Get all questions from this course (via CourseDetail → QuestionModel)
-  const courseQuestions = await model.CourseDetail.findAll({
-    where: { courseId, isDeleted: false },
+  // Fetch all CaseStudyResults for the user in the course
+  const results = await model.CaseStudyResult.findAll({
+    where: { userId, courseId },
     include: [
       {
         model: model.QuestionModel,
-        where: { isDeleted: false },
-        required: true,
-        attributes: ["id", "question"],
+        attributes: ["question"],
       },
     ],
-    order: [
-      ["day", "ASC"],
-      ["sessionNumber", "ASC"],
-    ],
+    order: [["createdAt", "DESC"]],
   });
 
-  if (!courseQuestions.length) return [];
+  if (!results.length) return [];
 
-  const allResults = [];
-
-  // Step 2: For each question, get matching CaseStudyResult
-  for (const session of courseQuestions) {
-    for (const q of session.QuestionModels) {
-      const caseStudy = await model.CaseStudyResult.findOne({
-        where: {
-          userId,
-          courseId,
-          questionId: q.id,
-        },
-        order: [["createdAt", "DESC"]],
-      });
-
-      allResults.push({
-        day: session.day || "N/A",
-        sessionNumber: session.sessionNumber || "N/A",
-        question: q.question || "No Question",
-        answer: caseStudy?.answer || "No Answer Submitted",
-        matchPercentage: caseStudy?.matchPercentage || 0,
-        passed: caseStudy?.passed ?? false,
-      });
-    }
-  }
-
-  return allResults;
+  return results.map((cs) => ({
+    day: cs.day || "N/A",
+    sessionNumber: cs.sessionNumber || "N/A",
+    question: cs.QuestionModel?.question || "No Question",
+    answer: cs.answer || "No Answer Submitted",
+    matchPercentage: cs.matchPercentage || 0,
+    passed: cs.passed ?? false,
+  }));
 };
 
 // =======================
