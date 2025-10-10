@@ -99,7 +99,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return [];
 
   // Fetch all CaseStudies for the course
-  const caseStudies = await model.CaseStudy.findAll({
+  const caseStudies = await model.caseStudies.findAll({
     where: { courseId, isDeleted: false },
     order: [["day", "ASC"], ["sessionNumber", "ASC"]],
     include: [
