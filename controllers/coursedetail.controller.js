@@ -1284,7 +1284,7 @@ const getBusinessUserTarget = async (req, res) => {
     if (!user) return ReE(res, "User not found", 404);
 
     // 2️⃣ Get business target
-    const businessTarget = parseInt(user.businessTarget, 10) || 0;
+    const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
 
     // 3️⃣ Trigger certificate send endpoint once if target == 1
     user.triggeredTargets = user.triggeredTargets || {}; // JSON field in DB to track triggers
