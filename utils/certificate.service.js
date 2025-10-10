@@ -145,4 +145,4 @@ const generateCertificate = async (userId) => {
   };
 };
 
-module.exports = { generateCertificate };
+module.exports. generateCertificate = generateCertificate 
