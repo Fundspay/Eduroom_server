@@ -66,7 +66,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
   const sessions = courseDetailRows.map((session) => ({
     id: session.id,
     day: session.day,
-    sessionNumber: session.sessionNumber, // use actual sessionNumber from DB
+    sessionNumber: session.sessionNumber,
     title: session.title || `Session ${session.day}`,
     videoDuration: "~15 mins",
     startDate: "N/A",
@@ -89,35 +89,45 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH
+// UPDATED CASE STUDY FETCH USING CourseDetail
 // =======================
-const fetchAllCaseStudies = async ({ courseId, coursePreviewId, userId }) => {
-  if (!userId) return [];
+const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId }) => {
+  if (!userId || !sessions || sessions.length === 0) return [];
 
-  // Fetch all case studies for the user/course directly, ignoring sessions
-  const caseStudies = await model.CaseStudyResult.findAll({
-    where: {
-      userId,
-      courseId,
-      coursePreviewId,
-    },
-    include: [
-      {
-        model: model.QuestionModel,
-        attributes: ["question"], // get question text
+  const allResults = [];
+
+  for (const session of sessions) {
+    // Fetch case study results for this session and user
+    const caseStudies = await model.CaseStudyResult.findAll({
+      where: {
+        userId,
+        courseId,
+        coursePreviewId,
+        day: session.day,
+        sessionNumber: session.sessionNumber,
       },
-    ],
-    order: [["createdAt", "DESC"]],
-  });
+      include: [
+        {
+          model: model.QuestionModel,
+          attributes: ["question"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
 
-  return caseStudies.map((res) => ({
-    day: res.day,
-    sessionNumber: res.sessionNumber,
-    question: res.QuestionModel?.question || "No Question",
-    answer: res.answer || "",
-    matchPercentage: res.matchPercentage || 0,
-    passed: res.passed === undefined ? false : res.passed,
-  }));
+    caseStudies.forEach((res) => {
+      allResults.push({
+        day: res.day,
+        sessionNumber: res.sessionNumber,
+        question: res.QuestionModel?.question || "No Question",
+        answer: res.answer || "",
+        matchPercentage: res.matchPercentage || 0,
+        passed: res.passed === undefined ? false : res.passed,
+      });
+    });
+  }
+
+  return allResults;
 };
 
 const generateMCQCaseStudyReport = async (options = {}) => {
@@ -127,7 +137,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const allCaseStudies = await fetchAllCaseStudies({ courseId, coursePreviewId, userId });
+  const allCaseStudies = await fetchAllCaseStudies({ sessions, courseId, coursePreviewId, userId });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
