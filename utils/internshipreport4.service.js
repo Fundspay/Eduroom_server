@@ -93,44 +93,51 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH (LOOPS THROUGH ALL QUESTIONS & MATCHES RESULTS)
+// UPDATED CASE STUDY FETCH (DIRECT FETCH USING COURSE + USER)
 // =======================
-const fetchAllCaseStudies = async ({ sessions, courseId, userId }) => {
-  if (!userId || !sessions || sessions.length === 0) return [];
+const fetchAllCaseStudies = async ({ courseId, userId }) => {
+  if (!userId || !courseId) return [];
+
+  // Step 1: Get all questions from this course (via CourseDetail → QuestionModel)
+  const courseQuestions = await model.CourseDetail.findAll({
+    where: { courseId, isDeleted: false },
+    include: [
+      {
+        model: model.QuestionModel,
+        where: { isDeleted: false },
+        required: true,
+        attributes: ["id", "question"],
+      },
+    ],
+    order: [
+      ["day", "ASC"],
+      ["sessionNumber", "ASC"],
+    ],
+  });
+
+  if (!courseQuestions.length) return [];
 
   const allResults = [];
 
-  for (const session of sessions) {
-    // Get all questions linked to this session
-    const questions = session.mcqs || [];
-
-    for (const question of questions) {
-      // Find if user has submitted any case study result for this question
-      const caseStudyResult = await model.CaseStudyResult.findOne({
+  // Step 2: For each question, get matching CaseStudyResult
+  for (const session of courseQuestions) {
+    for (const q of session.QuestionModels) {
+      const caseStudy = await model.CaseStudyResult.findOne({
         where: {
           userId,
           courseId,
-          day: session.day,
-          sessionNumber: session.sessionNumber,
-          questionId: question.id,
+          questionId: q.id,
         },
-        include: [
-          {
-            model: model.QuestionModel,
-            attributes: ["question"],
-          },
-        ],
         order: [["createdAt", "DESC"]],
       });
 
-      // Push even if not found, showing default values
       allResults.push({
-        day: session.day,
-        sessionNumber: session.sessionNumber,
-        question: caseStudyResult?.QuestionModel?.question || question.question || "No Question",
-        answer: caseStudyResult?.answer || "No Answer Submitted",
-        matchPercentage: caseStudyResult?.matchPercentage || 0,
-        passed: caseStudyResult?.passed ?? false,
+        day: session.day || "N/A",
+        sessionNumber: session.sessionNumber || "N/A",
+        question: q.question || "No Question",
+        answer: caseStudy?.answer || "No Answer Submitted",
+        matchPercentage: caseStudy?.matchPercentage || 0,
+        passed: caseStudy?.passed ?? false,
       });
     }
   }
@@ -148,7 +155,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const allCaseStudies = await fetchAllCaseStudies({ sessions, courseId, userId });
+  const allCaseStudies = await fetchAllCaseStudies({ courseId, userId });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
