@@ -1,5 +1,6 @@
 "use strict";
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
+const { generateCertificate } = require("../utils/certificate.service.js");
 const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service.js");
 const {generateSessionReport} = require("../utils/internshipreport3.service.js");
 const {generateMCQCaseStudyReport} = require("../utils/internshipreport4.service.js");
@@ -224,6 +225,81 @@ const sendInternshipReport = async (req, res) => {
 };
 
 module.exports.sendInternshipReport = sendInternshipReport;
+
+const sendCertificate = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "Missing userId" });
+    }
+
+    // Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (!user.email) {
+      return res.status(400).json({ success: false, message: "User has no email" });
+    }
+
+    // Generate Certificate PDF
+    const certificate = await generateCertificate(userId);
+
+    // Build email content
+    const subject = `Your Module 1 Completion Certificate - Eduroom`;
+    const html = `
+      <p>Dear ${user.fullName || user.firstName},</p>
+      <p>Greetings from <b>Eduroom!</b></p>
+
+      <p>
+        Congratulations! Please find your <b>Module 1 Completion Certificate</b> attached:
+      </p>
+
+      <p><a href="${certificate.fileUrl}" target="_blank">${certificate.fileUrl}</a></p>
+
+      <p>We appreciate your effort and commitment during the onboarding process.</p>
+
+      <br/>
+      <p>Best Regards,<br/>Eduroom HR Team</p>
+    `;
+
+    // Send Email
+    const mailResult = await sendMail(user.email, subject, html);
+
+    if (!mailResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send email",
+        error: mailResult.error,
+      });
+    }
+
+    // Optional: Save record to DB if you have a table like CertificateReport
+    if (model.CertificateReport) {
+      await model.CertificateReport.create({
+        userId,
+        fileUrl: certificate.fileUrl,
+        issent: true,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Certificate sent successfully",
+      fileUrl: certificate.fileUrl,
+    });
+
+  } catch (error) {
+    console.error("sendCertificate error:", error);
+    return res.status(500).json({ success: false, message: "Server error", error });
+  }
+};
+
+module.exports.sendCertificate = sendCertificate;
 
 
 

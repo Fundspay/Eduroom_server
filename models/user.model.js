@@ -39,7 +39,7 @@ module.exports = (sequelize, Sequelize) => {
       internshipDuration: { type: Sequelize.STRING, allowNull: true },
       internshipModeId: { type: Sequelize.BIGINT, allowNull: true },
       preferredStartDate: { type: Sequelize.DATEONLY, allowNull: true },
-      referralCode: { type: Sequelize.STRING, allowNull: true},
+      referralCode: { type: Sequelize.STRING, allowNull: true },
       referralLink: { type: Sequelize.STRING, allowNull: true },
       referralSource: { type: Sequelize.STRING, allowNull: true },
 
@@ -53,7 +53,7 @@ module.exports = (sequelize, Sequelize) => {
       bankName: { type: Sequelize.STRING, allowNull: true },
       branchAddress: { type: Sequelize.STRING, allowNull: true },
       ifscCode: { type: Sequelize.STRING, allowNull: true },
-      accountNumber: { type: Sequelize.STRING, allowNull: true},
+      accountNumber: { type: Sequelize.STRING, allowNull: true },
 
       // 🔹 Communication
       preferredCommunicationId: { type: Sequelize.BIGINT, allowNull: true },
@@ -79,6 +79,12 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.JSON,
         allowNull: true,
         defaultValue: {}
+      },
+      triggeredTargets: {
+        type: DataTypes.JSONB, // or DataTypes.JSON if MySQL
+        allowNull: true,
+        defaultValue: {}
+
       },
 
       // 🔹 Auth & System

@@ -1169,53 +1169,64 @@ const getBusinessTarget = async (req, res) => {
 
     console.log("Received params:", { userId, courseId });
 
-    // Convert IDs to integers
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
 
     if (isNaN(userId) || isNaN(courseId)) {
-      console.log("Invalid IDs provided");
       return ReE(res, "Invalid userId or courseId", 400);
     }
 
     // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
-    if (!user) {
-      console.log(`User not found for ID: ${userId}`);
-      return ReE(res, "User not found", 404);
-    }
+    if (!user) return ReE(res, "User not found", 404);
 
     // 2️⃣ Fetch course
     const course = await model.Course.findByPk(courseId);
-    if (!course) {
-      console.log(`Course not found for ID: ${courseId}`);
-      return ReE(res, "Course not found", 404);
-    }
+    if (!course) return ReE(res, "Course not found", 404);
 
-    // 3️⃣ Extract business target
+    // 3️⃣ Business target
     const businessTarget = parseInt(course.businessTarget, 10) || 0;
 
-    // 4️⃣ Fetch achieved referral count
+    // 4️⃣ Check if endpoint should be triggered only once
+    user.triggeredTargets = user.triggeredTargets || {}; // store triggered status per courseId
+
+    if (businessTarget === 1 && !user.triggeredTargets[courseId]) {
+      try {
+        const triggerUrl = "https://edurrom.in.pai";
+        const response = await axios.get(triggerUrl);
+
+        console.log(`Triggered endpoint once for course ${courseId}:`, response.status);
+
+        // mark as triggered
+        user.triggeredTargets[courseId] = true;
+        await user.save({ fields: ["triggeredTargets"] });
+
+        return ReS(res, {
+          success: true,
+          message: "Business target is 1. Endpoint triggered once successfully.",
+        });
+      } catch (err) {
+        console.warn("Trigger endpoint error:", err.message);
+        return ReE(res, "Failed to trigger endpoint", 500);
+      }
+    }
+
+    // 5️⃣ Fetch referral count
     let achievedCount = 0;
     if (user.referralCode) {
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-
-        // ✅ use the `count` field inside referral_count
         achievedCount = apiResponse.data?.referral_count?.count || 0;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
-        achievedCount = 0;
       }
     }
 
-    // 5️⃣ Safe numbers
+    // 6️⃣ Calculate wallet values
     const achievedCountNum = Number(achievedCount) || 0;
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-
-    // 6️⃣ Update wallet values
-    const subscriptionWallet = achievedCountNum; // total achieved
+    const subscriptionWallet = achievedCountNum;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
     user.businessTargets = {
@@ -1231,7 +1242,7 @@ const getBusinessTarget = async (req, res) => {
 
     console.log(`Updated user ${user.id} with business target info`);
 
-    // 7️⃣ Return response
+    // 7️⃣ Send response
     return ReS(
       res,
       {
@@ -1259,84 +1270,84 @@ const getBusinessTarget = async (req, res) => {
 
 module.exports.getBusinessTarget = getBusinessTarget;
 
-const getBusinessUserTarget = async (req, res) => {
-  try {
-    let { userId } = req.params;
+// const getBusinessUserTarget = async (req, res) => {
+//   try {
+//     let { userId } = req.params;
 
-    console.log("Received params:", { userId });
+//     console.log("Received params:", { userId });
 
-    // Convert ID to integer
-    userId = parseInt(userId, 10);
+//     // Convert ID to integer
+//     userId = parseInt(userId, 10);
 
-    if (isNaN(userId)) {
-      console.log("Invalid userId provided");
-      return ReE(res, "Invalid userId", 400);
-    }
+//     if (isNaN(userId)) {
+//       console.log("Invalid userId provided");
+//       return ReE(res, "Invalid userId", 400);
+//     }
 
-    // 1️⃣ Fetch user
-    const user = await model.User.findByPk(userId);
-    if (!user) {
-      console.log(`User not found for ID: ${userId}`);
-      return ReE(res, "User not found", 404);
-    }
+//     // 1️⃣ Fetch user
+//     const user = await model.User.findByPk(userId);
+//     if (!user) {
+//       console.log(`User not found for ID: ${userId}`);
+//       return ReE(res, "User not found", 404);
+//     }
 
-    // 2️⃣ Fetch business target from user data
-    const businessTarget = parseInt(user.businessTarget, 10) || 0;
+//     // 2️⃣ Fetch business target from user data
+//     const businessTarget = parseInt(user.businessTarget, 10) || 0;
 
-    // 3️⃣ Fetch achieved referral count
-    let achievedCount = 0;
-    if (user.referralCode) {
-      try {
-        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-        const apiResponse = await axios.get(apiUrl);
+//     // 3️⃣ Fetch achieved referral count
+//     let achievedCount = 0;
+//     if (user.referralCode) {
+//       try {
+//         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+//         const apiResponse = await axios.get(apiUrl);
 
-        achievedCount = apiResponse.data?.referral_count?.count || 0;
-      } catch (apiError) {
-        console.warn("Referral API error:", apiError.message);
-        achievedCount = 0;
-      }
-    }
+//         achievedCount = apiResponse.data?.referral_count?.count || 0;
+//       } catch (apiError) {
+//         console.warn("Referral API error:", apiError.message);
+//         achievedCount = 0;
+//       }
+//     }
 
-    const achievedCountNum = Number(achievedCount) || 0;
-    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
+//     const achievedCountNum = Number(achievedCount) || 0;
+//     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
 
-    // 4️⃣ Update wallet values properly
-    const subscriptionWallet = achievedCountNum; // total achieved
-    const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+//     // 4️⃣ Update wallet values properly
+//     const subscriptionWallet = achievedCountNum; // total achieved
+//     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-    user.subscriptionWallet = subscriptionWallet;
-    user.subscriptionLeft = subscriptionLeft;
+//     user.subscriptionWallet = subscriptionWallet;
+//     user.subscriptionLeft = subscriptionLeft;
 
-    await user.save({
-      fields: ["subscriptionWallet", "subscriptionLeft"],
-    });
+//     await user.save({
+//       fields: ["subscriptionWallet", "subscriptionLeft"],
+//     });
 
-    console.log(`Updated user ${user.id} with business target info`);
+//     console.log(`Updated user ${user.id} with business target info`);
 
-    // 5️⃣ Return response
-    return ReS(
-      res,
-      {
-        success: true,
-        data: {
-          userId: user.id,
-          businessTarget,
-          achievedCount: subscriptionWallet,
-          totalDeducted: alreadyDeducted,
-          subscriptionWallet,
-          subscriptionLeft,
-          businessTargets: user.businessTargets,
-        },
-      },
-      200
-    );
-  } catch (error) {
-    console.error("Get Business User Target Error:", error);
-    return ReE(res, error.message, 500);
-  }
-};
+//     // 5️⃣ Return response
+//     return ReS(
+//       res,
+//       {
+//         success: true,
+//         data: {
+//           userId: user.id,
+//           businessTarget,
+//           achievedCount: subscriptionWallet,
+//           totalDeducted: alreadyDeducted,
+//           subscriptionWallet,
+//           subscriptionLeft,
+//           businessTargets: user.businessTargets,
+//         },
+//       },
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Get Business User Target Error:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
 
-module.exports.getBusinessUserTarget = getBusinessUserTarget;
+// module.exports.getBusinessUserTarget = getBusinessUserTarget;
 
 const getCourseStatus = async (req, res) => {
   try {

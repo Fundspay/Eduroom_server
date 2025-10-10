@@ -9,5 +9,6 @@ router.post("/send/:userId/:courseId", offerletterController.sendOfferLetter);
 router.post("/send-report/:userId/:courseId", offerletterController.sendInternshipReport);
 router.get("/users/all", offerletterController.listAllUsers);
 router.post("/report/:userId/:courseId/:sessionNumber", offerletterController.generateSingleSessionReport);
+router.post("/certificate/send/:userId", offerletterController.sendCertificate);
 
 module.exports = router;
