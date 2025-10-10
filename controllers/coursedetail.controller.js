@@ -1163,7 +1163,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-const getBusinessUserTarget = async (req, res) => {
+const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
 
@@ -1268,86 +1268,86 @@ const getBusinessUserTarget = async (req, res) => {
   }
 };
 
-module.exports.getBusinessUserTarget= getBusinessUserTarget;
+module.exports.getBusinessTarget = getBusinessTarget;
 
-// const getBusinessUserTarget = async (req, res) => {
-//   try {
-//     let { userId } = req.params;
+const getBusinessUserTarget = async (req, res) => {
+  try {
+    let { userId } = req.params;
 
-//     console.log("Received params:", { userId });
+    console.log("Received params:", { userId });
 
-//     // Convert ID to integer
-//     userId = parseInt(userId, 10);
+    // Convert ID to integer
+    userId = parseInt(userId, 10);
 
-//     if (isNaN(userId)) {
-//       console.log("Invalid userId provided");
-//       return ReE(res, "Invalid userId", 400);
-//     }
+    if (isNaN(userId)) {
+      console.log("Invalid userId provided");
+      return ReE(res, "Invalid userId", 400);
+    }
 
-//     // 1️⃣ Fetch user
-//     const user = await model.User.findByPk(userId);
-//     if (!user) {
-//       console.log(`User not found for ID: ${userId}`);
-//       return ReE(res, "User not found", 404);
-//     }
+    // 1️⃣ Fetch user
+    const user = await model.User.findByPk(userId);
+    if (!user) {
+      console.log(`User not found for ID: ${userId}`);
+      return ReE(res, "User not found", 404);
+    }
 
-//     // 2️⃣ Fetch business target from user data
-//     const businessTarget = parseInt(user.businessTarget, 10) || 0;
+    // 2️⃣ Fetch business target from user data
+    const businessTarget = parseInt(user.businessTarget, 10) || 0;
 
-//     // 3️⃣ Fetch achieved referral count
-//     let achievedCount = 0;
-//     if (user.referralCode) {
-//       try {
-//         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-//         const apiResponse = await axios.get(apiUrl);
+    // 3️⃣ Fetch achieved referral count
+    let achievedCount = 0;
+    if (user.referralCode) {
+      try {
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        const apiResponse = await axios.get(apiUrl);
 
-//         achievedCount = apiResponse.data?.referral_count?.count || 0;
-//       } catch (apiError) {
-//         console.warn("Referral API error:", apiError.message);
-//         achievedCount = 0;
-//       }
-//     }
+        achievedCount = apiResponse.data?.referral_count?.count || 0;
+      } catch (apiError) {
+        console.warn("Referral API error:", apiError.message);
+        achievedCount = 0;
+      }
+    }
 
-//     const achievedCountNum = Number(achievedCount) || 0;
-//     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
+    const achievedCountNum = Number(achievedCount) || 0;
+    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
 
-//     // 4️⃣ Update wallet values properly
-//     const subscriptionWallet = achievedCountNum; // total achieved
-//     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+    // 4️⃣ Update wallet values properly
+    const subscriptionWallet = achievedCountNum; // total achieved
+    const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-//     user.subscriptionWallet = subscriptionWallet;
-//     user.subscriptionLeft = subscriptionLeft;
+    user.subscriptionWallet = subscriptionWallet;
+    user.subscriptionLeft = subscriptionLeft;
 
-//     await user.save({
-//       fields: ["subscriptionWallet", "subscriptionLeft"],
-//     });
+    await user.save({
+      fields: ["subscriptionWallet", "subscriptionLeft"],
+    });
 
-//     console.log(`Updated user ${user.id} with business target info`);
+    console.log(`Updated user ${user.id} with business target info`);
 
-//     // 5️⃣ Return response
-//     return ReS(
-//       res,
-//       {
-//         success: true,
-//         data: {
-//           userId: user.id,
-//           businessTarget,
-//           achievedCount: subscriptionWallet,
-//           totalDeducted: alreadyDeducted,
-//           subscriptionWallet,
-//           subscriptionLeft,
-//           businessTargets: user.businessTargets,
-//         },
-//       },
-//       200
-//     );
-//   } catch (error) {
-//     console.error("Get Business User Target Error:", error);
-//     return ReE(res, error.message, 500);
-//   }
-// };
+    // 5️⃣ Return response
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId: user.id,
+          businessTarget,
+          achievedCount: subscriptionWallet,
+          totalDeducted: alreadyDeducted,
+          subscriptionWallet,
+          subscriptionLeft,
+          businessTargets: user.businessTargets,
+        },
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Get Business User Target Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
 
-// module.exports.getBusinessUserTarget = getBusinessUserTarget;
+module.exports.getBusinessUserTarget = getBusinessUserTarget;
 
 const getCourseStatus = async (req, res) => {
   try {
