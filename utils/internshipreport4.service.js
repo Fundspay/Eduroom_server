@@ -89,20 +89,19 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH USING CourseDetail
+// UPDATED CASE STUDY FETCH - loops through available records
 // =======================
-const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId }) => {
+const fetchAllCaseStudies = async ({ sessions, courseId, userId }) => {
   if (!userId || !sessions || sessions.length === 0) return [];
 
   const allResults = [];
 
   for (const session of sessions) {
-    // Fetch case study results for this session and user
+    // fetch all matching case studies for that session for userId
     const caseStudies = await model.CaseStudyResult.findAll({
       where: {
         userId,
         courseId,
-        coursePreviewId,
         day: session.day,
         sessionNumber: session.sessionNumber,
       },
@@ -115,16 +114,18 @@ const fetchAllCaseStudies = async ({ sessions, courseId, coursePreviewId, userId
       order: [["createdAt", "DESC"]],
     });
 
-    caseStudies.forEach((res) => {
-      allResults.push({
-        day: res.day,
-        sessionNumber: res.sessionNumber,
-        question: res.QuestionModel?.question || "No Question",
-        answer: res.answer || "",
-        matchPercentage: res.matchPercentage || 0,
-        passed: res.passed === undefined ? false : res.passed,
+    if (caseStudies && caseStudies.length > 0) {
+      caseStudies.forEach((res) => {
+        allResults.push({
+          day: res.day,
+          sessionNumber: res.sessionNumber,
+          question: res.QuestionModel?.question || "No Question",
+          answer: res.answer || "",
+          matchPercentage: res.matchPercentage || 0,
+          passed: res.passed === undefined ? false : res.passed,
+        });
       });
-    });
+    }
   }
 
   return allResults;
@@ -137,7 +138,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const allCaseStudies = await fetchAllCaseStudies({ sessions, courseId, coursePreviewId, userId });
+  const allCaseStudies = await fetchAllCaseStudies({ sessions, courseId, userId });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
