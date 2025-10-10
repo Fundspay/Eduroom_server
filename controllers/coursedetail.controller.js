@@ -1283,29 +1283,28 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // 2️⃣ Get business target
+    // 2️⃣ Get business target (using subscriptionWallet or another field)
     const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
 
-    // 3️⃣ Trigger certificate send endpoint once if target == 1
-    user.triggeredTargets = user.triggeredTargets || {}; // JSON field in DB to track triggers
+    // 3️⃣ Trigger certificate internally once if target == 1
+    user.triggeredTargets = user.triggeredTargets || {};
 
     if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
       try {
-        const triggerUrl = `https://eduroom.in/api/v1/offerletter/certificate/send/${userId}`;
-        const response = await axios.get(triggerUrl);
+        // Call sendCertificate directly without HTTP
+        await sendCertificate(
+          { params: { userId } },
+          { status: () => ({ json: () => {} }) } // dummy response object
+        );
 
-        console.log(`Triggered certificate send for user ${userId}:`, response.status);
+        console.log(`Triggered certificate send for user ${userId} internally.`);
 
+        // Mark as triggered
         user.triggeredTargets["userLevel"] = true;
         await user.save({ fields: ["triggeredTargets"] });
-
-        return ReS(res, {
-          success: true,
-          message: "Business target is 1. Certificate endpoint triggered successfully.",
-        });
       } catch (err) {
         console.warn("Trigger certificate error:", err.message);
-        return ReE(res, "Failed to trigger certificate endpoint", 500);
+        // Continue without failing the endpoint
       }
     }
 
@@ -1337,21 +1336,18 @@ const getBusinessUserTarget = async (req, res) => {
     console.log(`Updated user ${user.id} with business target info`);
 
     // 7️⃣ Response
-    return ReS(
-      res,
-      {
-        success: true,
-        data: {
-          userId: user.id,
-          businessTarget,
-          achievedCount: subscriptionWallet,
-          totalDeducted: alreadyDeducted,
-          subscriptionWallet,
-          subscriptionLeft,
-        },
+    return ReS(res, {
+      success: true,
+      data: {
+        userId: user.id,
+        businessTarget,
+        achievedCount: subscriptionWallet,
+        totalDeducted: alreadyDeducted,
+        subscriptionWallet,
+        subscriptionLeft,
       },
-      200
-    );
+    }, 200);
+
   } catch (error) {
     console.error("Get Business User Target Error:", error);
     return ReE(res, error.message, 500);
