@@ -93,34 +93,40 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH (ALL CASE STUDIES FOR USER & COURSE)
+// UPDATED CASE STUDY FETCH (SAFE)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return [];
 
-  const results = await model.CaseStudyResult.findAll({
-    where: { userId, courseId },
-    include: [
-      {
-        model: model.QuestionModel,
-        attributes: ["question"],
-      },
-    ],
-    order: [["createdAt", "DESC"]],
-  });
+  try {
+    const results = await model.CaseStudyResult.findAll({
+      where: { userId, courseId },
+      include: [
+        {
+          model: model.QuestionModel,
+          attributes: ["question"],
+          required: false, // <-- allow results even if QuestionModel is missing
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
 
-  if (!results.length) return [];
+    if (!results.length) return [];
 
-  return results.map((cs) => ({
-    day: cs.day || "N/A",
-    sessionNumber: cs.sessionNumber || "N/A",
-    question: cs.QuestionModel?.question || "No Question",
-    answer: cs.answer || "No Answer Submitted",
-    matchPercentage: cs.matchPercentage || 0,
-    passed: cs.passed ?? false,
-  }));
+    // Map results safely with defaults
+    return results.map((cs) => ({
+      day: cs.day ?? "N/A",
+      sessionNumber: cs.sessionNumber ?? "N/A",
+      question: cs.QuestionModel?.question || cs.question || "No Question Available",
+      answer: cs.answer || "No Answer Submitted",
+      matchPercentage: cs.matchPercentage ?? 0,
+      passed: cs.passed ?? false,
+    }));
+  } catch (err) {
+    console.error("Error fetching case studies:", err);
+    return [];
+  }
 };
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
