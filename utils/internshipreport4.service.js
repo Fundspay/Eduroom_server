@@ -93,38 +93,33 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// UPDATED CASE STUDY FETCH (ALL CASE STUDIES FOR COURSE & USER)
+// UPDATED CASE STUDY FETCH (ALL CASE STUDIES FOR USER)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
-  if (!courseId) return [];
+  if (!userId || !courseId) return [];
 
-  // Fetch all CaseStudy questions for the course
-  const caseStudies = await model.CaseStudy.findAll({
-    where: { courseId, isDeleted: false },
-    order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+  // Fetch all CaseStudyResults for the user in the course
+  const results = await model.CaseStudyResult.findAll({
+    where: { userId, courseId },
     include: [
       {
-        model: model.CaseStudyResult,
-        where: userId ? { userId } : undefined,
-        required: false,
-        attributes: ["answer", "matchPercentage", "passed"],
+        model: model.QuestionModel,
+        attributes: ["question"],
       },
     ],
+    order: [["createdAt", "DESC"]],
   });
 
-  if (!caseStudies.length) return [];
+  if (!results.length) return [];
 
-  return caseStudies.map((cs) => {
-    const result = cs.CaseStudyResults[0]; // pick first if exists
-    return {
-      day: cs.day || "N/A",
-      sessionNumber: cs.sessionNumber || "N/A",
-      question: cs.question || "No Question",
-      answer: result?.answer || "No Answer Submitted",
-      matchPercentage: result?.matchPercentage || 0,
-      passed: result?.passed ?? false,
-    };
-  });
+  return results.map((cs) => ({
+    day: cs.day || "N/A",
+    sessionNumber: cs.sessionNumber || "N/A",
+    question: cs.QuestionModel?.question || "No Question",
+    answer: cs.answer || "No Answer Submitted",
+    matchPercentage: cs.matchPercentage || 0,
+    passed: cs.passed ?? false,
+  }));
 };
 
 // =======================
