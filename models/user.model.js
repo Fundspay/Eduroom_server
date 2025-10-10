@@ -81,7 +81,7 @@ module.exports = (sequelize, Sequelize) => {
         defaultValue: {}
       },
       triggeredTargets: {
-        type: DataTypes.JSONB, // or DataTypes.JSON if MySQL
+        type:  Sequelize.JSONB, // or DataTypes.JSON if MySQL
         allowNull: true,
         defaultValue: {}
 

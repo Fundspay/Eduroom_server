@@ -1192,7 +1192,7 @@ const getBusinessTarget = async (req, res) => {
 
     if (businessTarget === 1 && !user.triggeredTargets[courseId]) {
       try {
-        const triggerUrl = "https://edurrom.in.pai";
+        const triggerUrl = `https://edurrom.in/api/v1/offerletter/certificate/send/${userId}`;
         const response = await axios.get(triggerUrl);
 
         console.log(`Triggered endpoint once for course ${courseId}:`, response.status);
