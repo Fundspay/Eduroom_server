@@ -568,22 +568,24 @@ const getUserTargetAnalysis = async (req, res) => {
     if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
 
+    // Optional date range, defaults to today
     let startDate = fromDate ? new Date(fromDate) : new Date();
     startDate.setHours(0, 0, 0, 0);
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch resumes
+    // Fetch resumes: only registered ones within date range for this team manager
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         resumeDate: { [Op.between]: [startDate, endDate] },
+        isRegistered: true, // only registered
       },
-      attributes: ["followupBy", "resumeDate", "collegeName", "isRegistered"],
+      attributes: ["followupBy", "resumeDate", "collegeName"],
       raw: true,
     });
 
-    // Fetch targets
+    // Fetch target data
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -603,25 +605,20 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    const achieved = {};
+    // Use a single key to aggregate all resumes for the team manager
+    const achieved = {
+      followupBy: resumes[0]?.followupBy || "Unknown",
+      collegesAchieved: new Set(),
+      resumesAchieved: 0,
+      interviewsAchieved: 0, // count of registered resumes
+      resumeDates: [],
+      interviewDates: [], // keep empty
+    };
 
     resumes.forEach((resume) => {
-      const key = (resume.followupBy || "Unknown").trim().toLowerCase();
-      const displayName = resume.followupBy || "Unknown";
-
-      if (!achieved[key]) {
-        achieved[key] = {
-          followupBy: displayName,
-          collegesAchieved: new Set(),
-          resumesAchieved: 0,
-          interviewsAchieved: 0, // now will count only registered resumes
-          resumeDates: [],
-          interviewDates: [], // keep field but empty
-        };
-      }
-
-      if (resume.collegeName) achieved[key].collegesAchieved.add(resume.collegeName);
-      achieved[key].resumesAchieved += 1;
+      if (resume.collegeName) achieved.collegesAchieved.add(resume.collegeName);
+      achieved.resumesAchieved += 1;
+      achieved.interviewsAchieved += 1; // same as registered resumes
 
       if (resume.resumeDate) {
         const formattedResumeDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
@@ -630,44 +627,27 @@ const getUserTargetAnalysis = async (req, res) => {
           month: "long",
           year: "numeric",
         });
-        achieved[key].resumeDates.push(formattedResumeDate);
-      }
-
-      // Updated logic: count only isRegistered=true for interviewsAchieved
-      if (resume.isRegistered) {
-        achieved[key].interviewsAchieved += 1;
+        achieved.resumeDates.push(formattedResumeDate);
       }
     });
 
-    const result = Object.values(achieved).map((item) => ({
-      followupBy: item.followupBy,
-      collegeTarget: Number(targetData.collegeTarget),
-      collegesAchieved: item.collegesAchieved.size,
-      interviewsTarget: Number(targetData.interviewsTarget),
-      interviewsAchieved: item.interviewsAchieved, // now counts only registered resumes
-      resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
-      resumesAchieved: item.resumesAchieved,
-      resumeDates: item.resumeDates,
-      interviewDates: [], // empty, as we removed interview logic
-    }));
+    const result = [
+      {
+        followupBy: achieved.followupBy,
+        collegeTarget: Number(targetData.collegeTarget),
+        collegesAchieved: achieved.collegesAchieved.size,
+        interviewsTarget: Number(targetData.interviewsTarget),
+        interviewsAchieved: achieved.interviewsAchieved,
+        resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
+        resumesAchieved: achieved.resumesAchieved,
+        resumeDates: achieved.resumeDates,
+        interviewDates: [], // empty as before
+      },
+    ];
 
     return res.json({
       success: true,
-      data: result.length
-        ? result
-        : [
-            {
-              followupBy: "N/A",
-              collegeTarget: Number(targetData.collegeTarget),
-              collegesAchieved: 0,
-              interviewsTarget: Number(targetData.interviewsTarget),
-              interviewsAchieved: 0,
-              resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
-              resumesAchieved: 0,
-              resumeDates: [],
-              interviewDates: [],
-            },
-          ],
+      data: result,
     });
   } catch (error) {
     console.error("Error in getUserTargetAnalysis:", error);
