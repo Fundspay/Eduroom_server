@@ -971,7 +971,7 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
-// ✅ Get daily status and wallet info for all courses of a user
+// ✅ Get daily status and wallet info for all courses of a usercourse
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -981,9 +981,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    await user.reload(); // latest values
+    await user.reload();
 
-    // Prepare response with subscription fields
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
@@ -1011,10 +1010,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
-        order: [
-          ["day", "ASC"],
-          ["sessionNumber", "ASC"],
-        ],
+        order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
       const daysMap = {};
@@ -1030,14 +1026,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         let totalMCQs = 0;
         let caseStudyPercentage = null;
 
-        // Fetch latest case study result
         const latestCaseStudy = await model.CaseStudyResult.findOne({
-          where: {
-            userId,
-            courseId,
-            day: session.day,
-            sessionNumber: session.sessionNumber,
-          },
+          where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
           order: [["createdAt", "DESC"]],
         });
 
@@ -1083,9 +1073,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(
-          2
-        );
+        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
         return {
           day: Number(dayKey),
           totalSessions: d.total,
@@ -1101,23 +1089,20 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // Check if business target is met
-      const isBusinessTargetMet =
-        user.subscriptionWallet >= (course.businessTarget || 0) &&
-        user.subscriptiondeductedWallet >= (course.businessTarget || 0);
+      // ✅ FIXED: Proper wallet-based business target check
+      const businessTarget = course.businessTarget || 0;
+      const subscriptionWallet = user.subscriptionWallet || 0;
+      const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
+      const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
+      const isBusinessTargetMet = subscriptionLeft >= businessTarget;
 
-      // ✅ New: Check if all sessions >= 33% (including case study)
+      // ✅ Check all sessions ≥ threshold (default 20%)
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
 
           const latestCaseStudy = await model.CaseStudyResult.findOne({
-            where: {
-              userId,
-              courseId,
-              day: session.day,
-              sessionNumber: session.sessionNumber,
-            },
+            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
             order: [["createdAt", "DESC"]],
           });
 
@@ -1135,39 +1120,25 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         })
       ).then((results) => results.every(Boolean));
 
-      // ✅ Final overallStatus logic
       let overallStatus = "In Progress";
       if (isBusinessTargetMet && allSessionsAboveThreshold) {
         overallStatus = "Completed";
       }
 
-      // ✅ Check Status model for internshipStatus override
+      // ✅ Status overrides
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
 
       if (statusRecord && statusRecord.internshipStatus) {
-        const normalized = statusRecord.internshipStatus
-          .trim()
-          .toLowerCase()
-          .replace(/[-_]/g, " ");
-
-        if (["terminated"].includes(normalized)) {
-          overallStatus = "Terminated";
-        } else if (["on hold", "hold", "onhold"].includes(normalized)) {
-          overallStatus = "On Hold";
-        }
+        const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
+        if (["terminated"].includes(normalized)) overallStatus = "Terminated";
+        else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
       }
 
-      // Update user's courseStatuses
-      const existingStatuses = user.courseStatuses
-        ? { ...user.courseStatuses }
-        : {};
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
-      await user.update(
-        { courseStatuses: existingStatuses },
-        { fields: ["courseStatuses"] }
-      );
+      await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
       response.courses.push({
         courseId,
@@ -1178,8 +1149,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
         dailyStatus,
-         startDate: user.courseDates?.[courseId]?.startDate || null,
-         endDate: user.courseDates?.[courseId]?.endDate || null,
+        startDate: user.courseDates?.[courseId]?.startDate || null,
+        endDate: user.courseDates?.[courseId]?.endDate || null,
       });
     }
 
@@ -1190,8 +1161,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
   }
 };
 
-module.exports.getDailyStatusAllCoursesPerUser =
-  getDailyStatusAllCoursesPerUser;
+module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
 const getBusinessTarget = async (req, res) => {
   try {
