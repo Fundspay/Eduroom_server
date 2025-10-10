@@ -24,18 +24,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 🔹 Check FundsAudit
-    const fundsRecords = await model.FundsAudit.findAll({ where: { userId } });
-    if (fundsRecords.length > 0) {
-      const allPaid = fundsRecords.every(record => record.hasPaid === true);
-      if (!allPaid) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Certificate cannot be issued: not all referred users have paid."
-        });
-      }
-    }
+    // 🔹 (FundsAudit check removed)
 
     // 🔹 Fetch course
     const course = await model.Course.findOne({
