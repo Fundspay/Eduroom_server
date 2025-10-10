@@ -568,18 +568,32 @@ const getUserTargetAnalysis = async (req, res) => {
     if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
 
+    // Fetch team manager info
+    const user = await model.TeamManager.findOne({
+      where: { id: teamManagerId },
+      attributes: ["name"],
+      raw: true,
+    });
+
+    if (!user)
+      return res.status(404).json({ success: false, error: "User not found" });
+
+    const userName = user.name.trim();
+
     let startDate = fromDate ? new Date(fromDate) : new Date();
     startDate.setHours(0, 0, 0, 0);
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch all resumes for the team manager
+    // Fetch resumes only for this team manager and robust followupBy match
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         resumeDate: { [Op.between]: [startDate, endDate] },
+        // robust match: ignore leading/trailing spaces and case
+        followupBy: { [Op.iLike]: userName },
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered", "followupBy"],
+      attributes: ["resumeDate", "collegeName", "isRegistered"],
       raw: true,
     });
 
@@ -603,14 +617,14 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate all resumes under the team manager
+    // Aggregate resumes
     const achieved = {
-      followupBy: resumes[0]?.followupBy || "Unknown",
+      followupBy: userName,
       collegesAchieved: new Set(),
-      resumesAchieved: 0,       // all resumes
-      interviewsAchieved: 0,    // only registered
+      resumesAchieved: 0,
+      interviewsAchieved: 0,
       resumeDates: [],
-      interviewDates: [],       // dates of registered resumes
+      interviewDates: [],
     };
 
     resumes.forEach((resume) => {
@@ -619,7 +633,7 @@ const getUserTargetAnalysis = async (req, res) => {
       // Count all resumes
       achieved.resumesAchieved += 1;
 
-      // Add all resume dates
+      // Add resumeDates for all
       if (resume.resumeDate) {
         const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -630,7 +644,7 @@ const getUserTargetAnalysis = async (req, res) => {
         achieved.resumeDates.push(formattedDate);
       }
 
-      // Count only registered resumes for interviewsAchieved
+      // Only registered resumes count as interviewsAchieved
       if (resume.isRegistered) {
         achieved.interviewsAchieved += 1;
         achieved.interviewDates.push(
@@ -669,6 +683,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 
 // ✅ SEND MAIL TO STUDENT
