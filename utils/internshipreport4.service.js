@@ -26,7 +26,7 @@ const escapeHtml = (str) => {
 const fetchSessionsWithMCQs = async (courseId) => {
   if (!courseId) courseId = 1;
 
-  const courseDetails = await model.CourseDetail.findAll({
+  const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
       ["day", "ASC"],
@@ -37,28 +37,53 @@ const fetchSessionsWithMCQs = async (courseId) => {
         model: model.QuestionModel,
         where: { isDeleted: false },
         required: false,
-        attributes: ["id", "answer", "sessionNumber"],
+        attributes: [
+          "id",
+          "question",
+          "optionA",
+          "optionB",
+          "optionC",
+          "optionD",
+          "answer",
+        ],
+      },
+      {
+        model: model.Course,
+        attributes: ["name"],
+      },
+      {
+        model: model.Domain,
+        attributes: ["name"],
       },
     ],
   });
 
-  return courseDetails.map((session) => ({
+  if (!courseDetailRows.length) return { sessions: [], domain: "", courseName: "" };
+
+  const domain = courseDetailRows[0].Domain?.name || "";
+  const courseName = courseDetailRows[0].Course?.name || "";
+
+  const sessions = courseDetailRows.map((session) => ({
     day: session.day,
     title: session.title || `Session ${session.day}`,
     videoDuration: "~15 mins",
     startDate: "N/A",
     endDate: "N/A",
     mcqs: session.QuestionModels.map((q) => ({
-      questionId: q.id,
+      question: q.question,
+      options: [q.optionA, q.optionB, q.optionC, q.optionD],
       answer: q.answer,
     })),
   }));
+
+  return { sessions, domain, courseName };
 };
 
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
-  const { internName = "", domain = "", courseName = "" } = options;
-  const sessions = (await fetchSessionsWithMCQs(courseId)) || [];
+  const internName = options.internName || "";
+
+  const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
@@ -72,13 +97,21 @@ const generateMCQCaseStudyReport = async (options = {}) => {
       ? sessions
           .map((s) => {
             const mcqHtml = s.mcqs
-              .map(
-                (q, idx) => `
-              <p><b>Question ${idx + 1}:</b> Question ID ${q.questionId}</p>
-              <p><b>Answer:</b> ${escapeHtml(q.answer)}</p>
-            `
-              )
-              .join("<br/>");
+              .map((q, idx) => {
+                const optionsHtml = (q.options || [])
+                  .map((opt) =>
+                    opt === q.answer
+                      ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt)}</li>`
+                      : `<li>${escapeHtml(opt)}</li>`
+                  )
+                  .join("");
+
+                return `
+                  <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
+                  <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
+                `;
+              })
+              .join("");
 
             return `
             <div class="page">
