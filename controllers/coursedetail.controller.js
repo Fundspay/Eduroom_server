@@ -1291,7 +1291,7 @@ const getBusinessUserTarget = async (req, res) => {
 
     if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
       try {
-        const triggerUrl = `https://edurrom.in/api/v1/offerletter/certificate/send/${userId}`;
+        const triggerUrl = `https://eduroom.in/api/v1/offerletter/certificate/send/${userId}`;
         const response = await axios.get(triggerUrl);
 
         console.log(`Triggered certificate send for user ${userId}:`, response.status);
