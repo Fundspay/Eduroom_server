@@ -24,18 +24,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // 🔹 Check FundsAudit
-    const fundsRecords = await model.FundsAudit.findAll({ where: { userId } });
-    if (fundsRecords.length > 0) {
-      const allPaid = fundsRecords.every(record => record.hasPaid === true);
-      if (!allPaid) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Certificate cannot be issued: not all referred users have paid."
-        });
-      }
-    }
+    // 🔹 (FundsAudit check removed)
 
     // 🔹 Fetch course
     const course = await model.Course.findOne({
@@ -53,16 +42,18 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const businessTarget = rawTarget < 0 ? 0 : rawTarget;
 
     // 🔹 Wallet info
-    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); 
+    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // total earned
     let newDeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    let subscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
+    let newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
 
     // 🔹 Check if certificate already exists
     let certificate = await model.InternshipCertificate.findOne({ where: { userId, courseId } });
 
     // 🔹 Deduct wallet and create certificate only first-time
     if (!certificate) {
-      if (subscriptionLeft < businessTarget) {
+      const currentLeft = newSubscriptionLeft;
+
+      if (currentLeft < businessTarget) {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
@@ -71,16 +62,16 @@ const createAndSendInternshipCertificate = async (req, res) => {
             totalSubscribed: subscriptionWallet,
             businessTarget,
             totalDeducted: newDeductedWallet,
-            subscriptionLeft
+            subscriptionLeft: currentLeft
           }
         });
       }
 
       newDeductedWallet += businessTarget;
-      subscriptionLeft = subscriptionWallet - newDeductedWallet;
+      newSubscriptionLeft = subscriptionWallet - newDeductedWallet;
 
       user.subscriptiondeductedWallet = newDeductedWallet;
-      user.subscriptionLeft = subscriptionLeft;
+      user.subscriptionLeft = newSubscriptionLeft;
 
       await user.save({
         fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
@@ -104,14 +95,14 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }, { transaction });
     }
 
-    // 🔹 Generate certificate PDF link (always)
+    // 🔹 Generate certificate PDF link for download (always)
     const certificateFile = await generateInternshipCertificate(userId, courseId);
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
       return res.status(500).json({ success: false, message: "Certificate generation failed: fileUrl is missing" });
     }
 
-    // 🔹 Send email
+    // 🔹 Send email every time user clicks download
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
@@ -133,7 +124,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
         totalSubscribed: subscriptionWallet,
         businessTarget,
         totalDeducted: newDeductedWallet,
-        subscriptionLeft
+        subscriptionLeft: newSubscriptionLeft
       }
     });
 
