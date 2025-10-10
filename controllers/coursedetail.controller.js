@@ -1277,65 +1277,76 @@ const getBusinessUserTarget = async (req, res) => {
 
     // Validate userId
     userId = parseInt(userId, 10);
-    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
+    if (isNaN(userId)) {
+      console.log("Invalid userId provided");
+      return ReE(res, "Invalid userId", 400);
+    }
 
     // 1️⃣ Fetch user
     const user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
+    if (!user) {
+      console.log(`User not found for ID: ${userId}`);
+      return ReE(res, "User not found", 404);
+    }
+    console.log(`Fetched user ${userId}: ${user.fullName || user.firstName}`);
 
-    // 2️⃣ Get business target (using subscriptionWallet or another field)
+    // 2️⃣ Get business target (using subscriptionWallet)
     const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
+    console.log(`Business target for user ${userId}: ${businessTarget}`);
 
-    // 3️⃣ Trigger certificate internally once if target == 1
+    // 3️⃣ Trigger certificate send via URL once if target == 1
     user.triggeredTargets = user.triggeredTargets || {};
 
     if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
+      console.log(`Business target = 1 and certificate not yet triggered for user ${userId}`);
       try {
-        // Call sendCertificate directly without HTTP
-        await sendCertificate(
-          { params: { userId } },
-          { status: () => ({ json: () => {} }) } // dummy response object
-        );
+        const triggerUrl = `https://eduroom.in/api/v1/offerletter/certificate/send/${userId}`;
 
-        console.log(`Triggered certificate send for user ${userId} internally.`);
+        // Make POST request
+        const response = await axios.post(triggerUrl);
+
+        console.log(`Certificate triggered successfully for user ${userId}. Status: ${response.status}`);
 
         // Mark as triggered
         user.triggeredTargets["userLevel"] = true;
         await user.save({ fields: ["triggeredTargets"] });
       } catch (err) {
-        console.warn("Trigger certificate error:", err.message);
-        // Continue without failing the endpoint
+        console.warn(`Trigger certificate error for user ${userId}:`, err.message);
       }
+    } else {
+      console.log(`Certificate trigger skipped for user ${userId}. Either businessTarget != 1 or already triggered`);
     }
 
     // 4️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
+      console.log(`Fetching referral count for user ${userId}`);
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
         achievedCount = apiResponse.data?.referral_count?.count || 0;
+        console.log(`Referral count for user ${userId}: ${achievedCount}`);
       } catch (apiError) {
-        console.warn("Referral API error:", apiError.message);
+        console.warn(`Referral API error for user ${userId}:`, apiError.message);
         achievedCount = 0;
       }
+    } else {
+      console.log(`User ${userId} has no referral code`);
     }
 
     // 5️⃣ Calculate wallet values
-    const achievedCountNum = Number(achievedCount) || 0;
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-
-    const subscriptionWallet = achievedCountNum;
+    const subscriptionWallet = Number(achievedCount) || 0;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
     // 6️⃣ Update user
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
     await user.save({ fields: ["subscriptionWallet", "subscriptionLeft"] });
-
-    console.log(`Updated user ${user.id} with business target info`);
+    console.log(`Updated user ${userId} wallet: subscriptionWallet=${subscriptionWallet}, subscriptionLeft=${subscriptionLeft}`);
 
     // 7️⃣ Response
+    console.log(`Returning business target info for user ${userId}`);
     return ReS(res, {
       success: true,
       data: {
@@ -1349,12 +1360,13 @@ const getBusinessUserTarget = async (req, res) => {
     }, 200);
 
   } catch (error) {
-    console.error("Get Business User Target Error:", error);
+    console.error(`Get Business User Target Error for user ${req.params.userId}:`, error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
+
 
 
 const getCourseStatus = async (req, res) => {
