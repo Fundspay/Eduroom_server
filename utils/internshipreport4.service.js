@@ -98,6 +98,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
+  console.log("Fetching case studies for courseId:", courseId, "userId:", userId);
 
   try {
     const courseDetailRows = await model.CourseDetail.findAll({
@@ -118,13 +119,15 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
+    console.log("Fetched courseDetailRows count:", courseDetailRows.length);
+
     if (!courseDetailRows.length)
       return { sessions: [], domain: "", courseName: "" };
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
+    console.log("Domain:", domain, "CourseName:", courseName);
 
-    // Fetch results for this user from CaseStudyResults
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
@@ -141,25 +144,27 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
           "passed",
         ],
       });
+      console.log("Fetched CaseStudyResults count:", results.length);
 
       results.forEach((r) => {
-        // key = courseId + userId + questionId
         const key = `${r.courseId}_${r.userId}_${r.questionId}`;
+        console.log("Mapping result key:", key, "answer:", r.answer);
         resultMap[key] = r;
       });
     }
 
     const sessions = courseDetailRows
       .map((session) => {
-        // take all case study questions in this session
         const caseStudyQs = session.QuestionModels?.filter(
           (q) => q.caseStudy && q.caseStudy.trim() !== ""
         );
+        console.log("Session id:", session.id, "caseStudyQs count:", caseStudyQs?.length || 0);
         if (!caseStudyQs || caseStudyQs.length === 0) return null;
 
         const caseStudies = caseStudyQs.map((cs) => {
           const key = `${courseId}_${userId}_${cs.id}`;
           const userResult = resultMap[key] || {};
+          console.log("Matching caseStudy id:", cs.id, "with key:", key, "userResult:", userResult);
           return {
             id: cs.id,
             question: cs.caseStudy,
@@ -185,8 +190,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
-
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
