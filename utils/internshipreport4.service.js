@@ -102,47 +102,40 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   const coursePreviewId = 7; // <-- hardcoded value
 
   try {
-    // First, get all sessions for the course
+    // Get all sessions for the course
     const courseSessions = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
         ["day", "ASC"],
         ["sessionNumber", "ASC"],
       ],
-      attributes: ["day", "sessionNumber", "id"],
+      attributes: ["id", "day", "sessionNumber"],
     });
 
     const allCaseStudies = [];
 
     for (const session of courseSessions) {
-      // Build condition dynamically — primarily match by day
-      const whereCondition = {
-        userId,
-        courseId,
-        coursePreviewId, // <-- hardcoded value
-        day: session.day,
-      };
-
-      // Include sessionNumber only if it exists in data
-      if (session.sessionNumber) {
-        whereCondition.sessionNumber = session.sessionNumber;
-      }
-
-      // Fetch the latest case study result(s) for this session/day
-      const results = await model.CaseStudyResult.findAll({
-        where: whereCondition,
-        include: [
-          {
-            model: model.QuestionModel,
-            attributes: ["question"],
-            required: false,
-          },
+      // Fetch all case study questions from QuestionModels (caseStudy = true)
+      const caseStudyQuestions = await model.QuestionModel.findAll({
+        where: {
+          courseId,
+          coursePreviewId,
+          day: session.day,
+          caseStudy: true,
+          isDeleted: false,
+        },
+        order: [["createdAt", "ASC"]],
+        attributes: [
+          "id",
+          "question",
+          "answer",
+          "day",
+          "sessionNumber",
         ],
-        order: [["createdAt", "DESC"]],
       });
 
-      if (!results.length) {
-        // Push a default empty entry so the report can still display the session
+      if (!caseStudyQuestions.length) {
+        // No case studies found for this day/session
         allCaseStudies.push({
           day: session.day,
           sessionNumber: session.sessionNumber,
@@ -152,18 +145,15 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
           passed: false,
         });
       } else {
-        // Map all results into unified format
-        results.forEach((cs) => {
+        // Push all found case studies
+        caseStudyQuestions.forEach((q) => {
           allCaseStudies.push({
-            day: cs.day ?? session.day,
-            sessionNumber: cs.sessionNumber ?? session.sessionNumber,
-            question:
-              cs.QuestionModel?.question ||
-              cs.question ||
-              "No Question Available",
-            answer: cs.answer || "No Answer Submitted",
-            matchPercentage: cs.matchPercentage ?? 0,
-            passed: cs.passed ?? false,
+            day: q.day ?? session.day,
+            sessionNumber: q.sessionNumber ?? session.sessionNumber,
+            question: q.question || "No Question Available",
+            answer: q.answer || "No Answer Provided",
+            matchPercentage: 0, // If you later link with CaseStudyResult, you can replace this dynamically
+            passed: false,
           });
         });
       }
@@ -175,7 +165,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return [];
   }
 };
-
 
 
 // =======================
