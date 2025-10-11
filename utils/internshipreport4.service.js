@@ -96,11 +96,11 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
-
-const fetchAllCaseStudies = async ({ courseId, userId }) => {
-  if (!userId || !courseId) return { sessions: [], domain: "", courseName: "" };
+const fetchAllCaseStudies = async ({ courseId }) => {
+  if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
+    // Fetch all course sessions along with case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -110,12 +110,9 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       include: [
         {
           model: model.QuestionModel,
+          where: { isDeleted: false }, // fetch all questions, caseStudy text will decide
           required: false,
-          where: {
-            isDeleted: false,
-            caseStudy: { [Op.ne]: null }, // fetch only questions where caseStudy is not null
-          },
-          attributes: ["id", "question", "day", "sessionNumber", "caseStudy"],
+          attributes: ["id", "caseStudy", "day", "sessionNumber"],
         },
         { model: model.Course, attributes: ["name"] },
         { model: model.Domain, attributes: ["name"] },
@@ -134,10 +131,9 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
       caseStudies:
-        session.QuestionModels?.map((q) => ({
+        session.QuestionModels?.filter(q => q.caseStudy && q.caseStudy.trim() !== "").map((q) => ({
           id: q.id,
-          question: q.question,
-          answer: q.caseStudy || "N/A",
+          caseStudy: q.caseStudy,
         })) || [],
     }));
 
@@ -147,7 +143,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
