@@ -135,7 +135,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
       results.forEach((r) => {
-        resultMap[r.questionId] = r;
+        resultMap[String(r.questionId)] = r; // ensure string match
       });
     }
 
@@ -147,8 +147,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         );
         if (!cs) return null;
 
-        // Match the result by questionId
-        const userResult = resultMap[cs.id] || {};
+        // Match the result by questionId (corrected)
+        const userResult = resultMap[String(cs.id)] || {};
 
         return {
           id: session.id,
@@ -174,6 +174,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 
 // =======================
