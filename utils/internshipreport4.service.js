@@ -96,11 +96,10 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
-const fetchAllCaseStudies = async ({ courseId }) => {
+const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
-    // Fetch all course sessions along with case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -110,7 +109,7 @@ const fetchAllCaseStudies = async ({ courseId }) => {
       include: [
         {
           model: model.QuestionModel,
-          where: { isDeleted: false }, // fetch all questions, caseStudy text will decide
+          where: { isDeleted: false },
           required: false,
           attributes: ["id", "caseStudy", "question", "day", "sessionNumber"],
         },
@@ -125,10 +124,27 @@ const fetchAllCaseStudies = async ({ courseId }) => {
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
 
+    // Fetch results for this user from CaseStudyResults
+    const results = userId
+      ? await model.CaseStudyResult.findAll({
+          where: { userId, courseId },
+          attributes: ["questionId", "answer", "matchPercentage", "passed"],
+        })
+      : [];
+
+    const resultMap = {};
+    results.forEach((r) => {
+      resultMap[r.questionId] = r;
+    });
+
     const sessions = courseDetailRows
       .map((session) => {
-        const cs = session.QuestionModels?.find(q => q.caseStudy && q.caseStudy.trim() !== "");
-        if (!cs) return null; // skip session if no case study
+        const cs = session.QuestionModels?.find(
+          (q) => q.caseStudy && q.caseStudy.trim() !== ""
+        );
+        if (!cs) return null;
+
+        const userResult = resultMap[cs.id] || {};
 
         return {
           id: session.id,
@@ -139,14 +155,14 @@ const fetchAllCaseStudies = async ({ courseId }) => {
             {
               id: cs.id,
               question: cs.caseStudy,
-              answer: "",
-              matchPercentage: 0,
-              passed: false,
+              answer: userResult.answer || "",
+              matchPercentage: userResult.matchPercentage || 0,
+              passed: userResult.passed || false,
             },
           ],
         };
       })
-      .filter(Boolean); // remove nulls
+      .filter(Boolean);
 
     return { sessions, domain, courseName };
   } catch (err) {
@@ -174,110 +190,118 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     year: "numeric",
   });
 
-  const sessionsHtml = sessions.length > 0
-    ? sessions.map((s) => {
-        const mcqHtml = s.mcqs
-          .map((q, idx) => {
-            const optionsHtml = (q.options || [])
-              .map(opt =>
-                opt.key === q.answer
-                  ? `<li style="font-weight:bold; color:green;">${escapeHtml(opt.text)}</li>`
-                  : `<li>${escapeHtml(opt.text)}</li>`
-              )
+  const sessionsHtml =
+    sessions.length > 0
+      ? sessions
+          .map((s) => {
+            const mcqHtml = s.mcqs
+              .map((q, idx) => {
+                const optionsHtml = (q.options || [])
+                  .map((opt) =>
+                    opt.key === q.answer
+                      ? `<li style="font-weight:bold; color:green;">${escapeHtml(
+                          opt.text
+                        )}</li>`
+                      : `<li>${escapeHtml(opt.text)}</li>`
+                  )
+                  .join("");
+                return `
+                  <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
+                  <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
+                `;
+              })
               .join("");
-            return `
-              <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
-              <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
+
+            let correctMCQs = 0,
+              totalMCQs = s.mcqs.length || 0;
+
+            if (userId && s.userProgress[userId]) {
+              let progressRaw = s.userProgress[userId];
+              if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
+              if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
+                correctMCQs = progressRaw.answers.filter((a) => a.isCorrect).length;
+              }
+            }
+
+            const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+            const status = percentage >= 60 ? "PASSED" : "FAILED";
+
+            const scoreTableHtml = `
+              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
+                <tr style="background:#f0f0f0; text-align:center;">
+                  <th>Score</th>
+                  <th>PERCENTAGE</th>
+                  <th>STATUS</th>
+                </tr>
+                <tr style="text-align:center;">
+                  <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
+                  <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
+                  <td style="font-weight:bold;">${status}</td>
+                </tr>
+              </table>
             `;
+
+            return `
+            <div class="page">
+              <div class="content">
+                <h1>Eduroom Internship Report</h1>
+                <h2>Session ${s.day}</h2>
+                <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
+                <p><b>Domain:</b> ${escapeHtml(domain)}</p>
+                <p><b>Course:</b> ${escapeHtml(courseName)}</p>
+                <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
+                <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
+                <p><b>Start Date:</b> ${s.startDate}</p>
+                <p><b>End Date:</b> ${s.endDate}</p>
+                <h3>MCQ Quiz – Session ${s.day}</h3>
+                ${mcqHtml || "<p>No MCQs available</p>"}
+                ${scoreTableHtml}
+              </div>
+              <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
+            </div>`;
           })
-          .join("");
-
-        let correctMCQs = 0,
-            totalMCQs = s.mcqs.length || 0;
-
-        if (userId && s.userProgress[userId]) {
-          let progressRaw = s.userProgress[userId];
-          if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
-          if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
-            correctMCQs = progressRaw.answers.filter(a => a.isCorrect).length;
-          }
-        }
-
-        const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
-        const status = percentage >= 60 ? "PASSED" : "FAILED";
-
-        const scoreTableHtml = `
-          <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
-            <tr style="background:#f0f0f0; text-align:center;">
-              <th>Score</th>
-              <th>PERCENTAGE</th>
-              <th>STATUS</th>
-            </tr>
-            <tr style="text-align:center;">
-              <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
-              <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
-              <td style="font-weight:bold;">${status}</td>
-            </tr>
-          </table>
-        `;
-
-        return `
-        <div class="page">
+          .join("<div style='page-break-after: always;'></div>")
+      : `<div class="page">
           <div class="content">
             <h1>Eduroom Internship Report</h1>
-            <h2>Session ${s.day}</h2>
+            <h2>No Sessions Available</h2>
             <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
             <p><b>Domain:</b> ${escapeHtml(domain)}</p>
             <p><b>Course:</b> ${escapeHtml(courseName)}</p>
-            <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
-            <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
-            <p><b>Start Date:</b> ${s.startDate}</p>
-            <p><b>End Date:</b> ${s.endDate}</p>
-            <h3>MCQ Quiz – Session ${s.day}</h3>
-            ${mcqHtml || "<p>No MCQs available</p>"}
-            ${scoreTableHtml}
+            <p>There is no data available for this course.</p>
           </div>
           <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
         </div>`;
-      }).join("<div style='page-break-after: always;'></div>")
-    : `<div class="page">
-        <div class="content">
-          <h1>Eduroom Internship Report</h1>
-          <h2>No Sessions Available</h2>
-          <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
-          <p><b>Domain:</b> ${escapeHtml(domain)}</p>
-          <p><b>Course:</b> ${escapeHtml(courseName)}</p>
-          <p>There is no data available for this course.</p>
-        </div>
-        <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-      </div>`;
 
-  const caseStudiesHtml = allCaseStudies.length > 0
-    ? allCaseStudies.map((session) => {
-        const cs = session.caseStudies[0];
-        return `
-          <div class="page">
-            <div class="content">
-              <h1>Case Studies – Session ${session.day}</h1>
-              <p><b>Question 1:</b> ${escapeHtml(cs.question)}</p>
-              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
-                <tr style="background:#f0f0f0; text-align:center;">
-                  <th>Answer</th>
-                  <th>Match %</th>
-                  <th>Passed</th>
-                </tr>
-                <tr style="text-align:center;">
-                  <td>${escapeHtml(cs.answer || "N/A")}</td>
-                  <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
-                  <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                </tr>
-              </table>
+  const caseStudiesHtml =
+    allCaseStudies.length > 0
+      ? allCaseStudies
+          .map((session) => {
+            const cs = session.caseStudies[0];
+            return `
+            <div class="page">
+              <div class="content">
+                <h1>Case Studies – Session ${session.day}</h1>
+                <p><b>Question 1:</b> ${escapeHtml(cs.question)}</p>
+                <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
+                  <tr style="background:#f0f0f0; text-align:center;">
+                    <th>Answer</th>
+                    <th>Match %</th>
+                    <th>Passed</th>
+                  </tr>
+                  <tr style="text-align:center;">
+                    <td>${escapeHtml(cs.answer || "N/A")}</td>
+                    <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
+                    <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
+                  </tr>
+                </table>
+              </div>
+              <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
             </div>
-            <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-          </div>
-        `;
-      }).join("<div style='page-break-after: always;'></div>")
-    : "";
+          `;
+          })
+          .join("<div style='page-break-after: always;'></div>")
+      : "";
 
   const html = `
   <!DOCTYPE html>
