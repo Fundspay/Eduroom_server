@@ -2,6 +2,13 @@ const { generateInternshipCertificate } = require("../utils/internshipcertificat
 const { sendMail } = require("../middleware/mailer.middleware");
 const model = require("../models");
 const sequelize = model.sequelize;
+const { mergePDFsAndUpload } = require("../utils/mergePDFs");
+const { generateInternshipReport } = require("../utils/internshipreport1.service");
+const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service");
+const  { generateSessionReport } = require("../utils/internshipreport3.service");
+const  { generateMCQCaseStudyReport } = require("../utils/internshipreport4.service")
+
+
 
 const createAndSendInternshipCertificate = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -133,3 +140,65 @@ const createAndSendInternshipCertificate = async (req, res) => {
 };
 
 module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
+
+const generateMergedInternshipReportAndEmail = async (req, res) => {
+  const { userId, courseId } = req.params;
+
+  if (!userId) return res.status(400).json({ success: false, message: "Missing userId" });
+  if (!courseId) return res.status(400).json({ success: false, message: "Missing courseId" });
+
+  try {
+    // 1️⃣ Fetch user and email
+    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user.email) return res.status(400).json({ success: false, message: "User has no email" });
+
+    const userEmail = user.email;
+
+    // 2️⃣ Generate all PDFs (pass courseId to relevant reports)
+    const coverPdf = await generateInternshipReport(userId);
+    const detailsPdf = await generateInternshipDetailsReport(userId);
+    const sessionPdf = await generateSessionReport(userId, courseId);
+    const mcqCaseStudyPdf = await generateMCQCaseStudyReport(userId, courseId);
+
+    // 3️⃣ Merge PDFs and upload to S3
+    const merged = await mergePDFsAndUpload(userId, [coverPdf, detailsPdf, sessionPdf, mcqCaseStudyPdf]);
+
+    // 4️⃣ Send email using your mailer
+    const emailHtml = `
+      <p>Hi ${user.fullName || ""},</p>
+      <p>Your merged internship report has been generated successfully.</p>
+      <p>You can download it from the link below:</p>
+      <p><a href="${merged.fileUrl}">${merged.fileUrl}</a></p>
+      <p>Regards,<br/>EduRoom Team</p>
+    `;
+
+    const mailResult = await sendMail(userEmail, "Your Merged Internship Report", emailHtml);
+
+    if (!mailResult.success) {
+      console.error("Email failed to send:", mailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: "Merged PDF generated but email sending failed",
+        fileUrl: merged.fileUrl,
+      });
+    }
+
+    // 5️⃣ Return success
+    return res.status(200).json({
+      success: true,
+      message: "Merged internship report generated and emailed successfully",
+      fileUrl: merged.fileUrl,
+    });
+
+  } catch (error) {
+    console.error("Error generating or emailing merged report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate or email merged internship report",
+      error: error.message,
+    });
+  }
+};
+
+module.exports.generateMergedInternshipReportAndEmail = generateMergedInternshipReportAndEmail;
