@@ -98,73 +98,58 @@ const fetchSessionsWithMCQs = async (courseId) => {
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return [];
 
-  // Hardcoded coursePreviewId
-  const coursePreviewId = 7; // <-- hardcoded value
-
   try {
-    // Get all sessions for the course
-    const courseSessions = await model.CourseDetail.findAll({
+    // Fetch all course sessions along with case study questions
+    const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
         ["day", "ASC"],
         ["sessionNumber", "ASC"],
       ],
-      attributes: ["id", "day", "sessionNumber"],
+      include: [
+        {
+          model: model.QuestionModel,
+          where: { isDeleted: false, caseStudy: true }, // ✅ only case studies
+          required: false,
+          attributes: ["id", "question", "day", "sessionNumber"],
+        },
+        {
+          model: model.Course,
+          attributes: ["name"],
+        },
+        {
+          model: model.Domain,
+          attributes: ["name"],
+        },
+      ],
     });
 
-    const allCaseStudies = [];
+    if (!courseDetailRows.length)
+      return { sessions: [], domain: "", courseName: "" };
 
-    for (const session of courseSessions) {
-      // Fetch all case study questions from QuestionModels (caseStudy = true)
-      const caseStudyQuestions = await model.QuestionModel.findAll({
-        where: {
-          courseId,
-          coursePreviewId,
-          day: session.day,
-          caseStudy: true,
-          isDeleted: false,
-        },
-        order: [["createdAt", "ASC"]],
-        attributes: [
-          "id",
-          "question",
-          "answer",
-          "day",
-          "sessionNumber",
-        ],
-      });
+    const domain = courseDetailRows[0].Domain?.name || "";
+    const courseName = courseDetailRows[0].Course?.name || "";
 
-      if (!caseStudyQuestions.length) {
-        // No case studies found for this day/session
-        allCaseStudies.push({
-          day: session.day,
-          sessionNumber: session.sessionNumber,
-          question: "No Case Study Available",
-          answer: "N/A",
-          matchPercentage: 0,
-          passed: false,
-        });
-      } else {
-        // Push all found case studies
-        caseStudyQuestions.forEach((q) => {
-          allCaseStudies.push({
-            day: q.day ?? session.day,
-            sessionNumber: q.sessionNumber ?? session.sessionNumber,
-            question: q.question || "No Question Available",
-            answer: q.answer || "No Answer Provided",
-            matchPercentage: 0, // If you later link with CaseStudyResult, you can replace this dynamically
-            passed: false,
-          });
-        });
-      }
-    }
+    // Map through sessions and extract case study questions
+    const sessions = courseDetailRows.map((session) => ({
+      id: session.id,
+      day: session.day,
+      sessionNumber: session.sessionNumber,
+      title: session.title || `Session ${session.day}`,
+      caseStudies:
+        session.QuestionModels?.map((q) => ({
+          id: q.id,
+          question: q.question,
+        })) || [], // ✅ only questions for now
+    }));
 
-    return allCaseStudies;
+    return { sessions, domain, courseName };
   } catch (err) {
     console.error("Error fetching case studies:", err);
-    return [];
+    return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 
 // =======================
@@ -177,7 +162,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const coursePreviewId = options.coursePreviewId || 1;
 
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const allCaseStudies = await fetchAllCaseStudies({ courseId, userId });
+  const { sessions: allCaseStudies } = await fetchAllCaseStudies({ courseId, userId });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
