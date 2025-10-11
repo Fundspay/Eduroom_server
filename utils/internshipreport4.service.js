@@ -4,6 +4,7 @@ const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
 const model = require("../models");
+const { Op } = require("sequelize");
 
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
@@ -95,6 +96,8 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
+
+
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return { sessions: [], domain: "", courseName: "" };
 
@@ -108,9 +111,12 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       include: [
         {
           model: model.QuestionModel,
-          where: { isDeleted: false, caseStudy: true },
           required: false,
-          attributes: ["id", "question", "day", "sessionNumber"],
+          where: {
+            isDeleted: false,
+            caseStudy: { [Op.ne]: null }, // fetch only questions where caseStudy is not null
+          },
+          attributes: ["id", "question", "day", "sessionNumber", "caseStudy"],
         },
         { model: model.Course, attributes: ["name"] },
         { model: model.Domain, attributes: ["name"] },
@@ -132,6 +138,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         session.QuestionModels?.map((q) => ({
           id: q.id,
           question: q.question,
+          answer: q.caseStudy || "N/A",
         })) || [],
     }));
 
@@ -141,6 +148,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
