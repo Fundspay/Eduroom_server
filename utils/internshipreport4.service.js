@@ -102,6 +102,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
+    // Fetch all course sessions along with case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -148,6 +149,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 
 // =======================
