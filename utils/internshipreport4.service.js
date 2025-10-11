@@ -99,7 +99,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!userId || !courseId) return [];
 
   // Hardcoded coursePreviewId
-  const coursePreviewId = 7; // <-- hardcode here
+  const coursePreviewId = 7; // <-- hardcoded value
 
   try {
     // First, get all sessions for the course
@@ -115,15 +115,22 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     const allCaseStudies = [];
 
     for (const session of courseSessions) {
-      // Fetch the latest case study result per session
+      // Build condition dynamically — primarily match by day
+      const whereCondition = {
+        userId,
+        courseId,
+        coursePreviewId, // <-- hardcoded value
+        day: session.day,
+      };
+
+      // Include sessionNumber only if it exists in data
+      if (session.sessionNumber) {
+        whereCondition.sessionNumber = session.sessionNumber;
+      }
+
+      // Fetch the latest case study result(s) for this session/day
       const results = await model.CaseStudyResult.findAll({
-        where: {
-          userId,
-          courseId,
-          coursePreviewId, // <-- using hardcoded value
-          day: session.day,
-          sessionNumber: session.sessionNumber,
-        },
+        where: whereCondition,
         include: [
           {
             model: model.QuestionModel,
@@ -145,12 +152,15 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
           passed: false,
         });
       } else {
-        // Map all results
+        // Map all results into unified format
         results.forEach((cs) => {
           allCaseStudies.push({
             day: cs.day ?? session.day,
             sessionNumber: cs.sessionNumber ?? session.sessionNumber,
-            question: cs.QuestionModel?.question || cs.question || "No Question Available",
+            question:
+              cs.QuestionModel?.question ||
+              cs.question ||
+              "No Question Available",
             answer: cs.answer || "No Answer Submitted",
             matchPercentage: cs.matchPercentage ?? 0,
             passed: cs.passed ?? false,
@@ -165,6 +175,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return [];
   }
 };
+
 
 
 // =======================
