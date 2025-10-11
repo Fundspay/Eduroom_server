@@ -132,38 +132,49 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
           userId,
           courseId,
         },
-        attributes: ["questionId", "answer", "matchPercentage", "passed"],
+        attributes: [
+          "courseId",
+          "userId",
+          "questionId",
+          "answer",
+          "matchPercentage",
+          "passed",
+        ],
       });
+
       results.forEach((r) => {
-        resultMap[String(r.questionId)] = r; // ensure string match
+        // key = courseId + userId + questionId
+        const key = `${r.courseId}_${r.userId}_${r.questionId}`;
+        resultMap[key] = r;
       });
     }
 
     const sessions = courseDetailRows
       .map((session) => {
-        // Find the first case study question in this session
-        const cs = session.QuestionModels?.find(
+        // take all case study questions in this session
+        const caseStudyQs = session.QuestionModels?.filter(
           (q) => q.caseStudy && q.caseStudy.trim() !== ""
         );
-        if (!cs) return null;
+        if (!caseStudyQs || caseStudyQs.length === 0) return null;
 
-        // Match the result by questionId (corrected)
-        const userResult = resultMap[String(cs.id)] || {};
+        const caseStudies = caseStudyQs.map((cs) => {
+          const key = `${courseId}_${userId}_${cs.id}`;
+          const userResult = resultMap[key] || {};
+          return {
+            id: cs.id,
+            question: cs.caseStudy,
+            answer: userResult.answer || "",
+            matchPercentage: userResult.matchPercentage || 0,
+            passed: userResult.passed || false,
+          };
+        });
 
         return {
           id: session.id,
           day: session.day,
           sessionNumber: session.sessionNumber,
           title: session.title || `Session ${session.day}`,
-          caseStudies: [
-            {
-              id: cs.id,
-              question: cs.caseStudy,
-              answer: userResult.answer || "",
-              matchPercentage: userResult.matchPercentage || 0,
-              passed: userResult.passed || false,
-            },
-          ],
+          caseStudies,
         };
       })
       .filter(Boolean);
