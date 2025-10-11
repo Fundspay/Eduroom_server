@@ -125,25 +125,29 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     const courseName = courseDetailRows[0].Course?.name || "";
 
     // Fetch results for this user from CaseStudyResults
-    const results = userId
-      ? await model.CaseStudyResult.findAll({
-          where: { userId, courseId },
-          attributes: ["questionId", "answer", "matchPercentage", "passed"],
-        })
-      : [];
-
-    const resultMap = {};
-    results.forEach((r) => {
-      resultMap[r.questionId] = r;
-    });
+    let resultMap = {};
+    if (userId) {
+      const results = await model.CaseStudyResult.findAll({
+        where: {
+          userId,
+          courseId,
+        },
+        attributes: ["questionId", "answer", "matchPercentage", "passed"],
+      });
+      results.forEach((r) => {
+        resultMap[r.questionId] = r;
+      });
+    }
 
     const sessions = courseDetailRows
       .map((session) => {
+        // Find the first case study question in this session
         const cs = session.QuestionModels?.find(
           (q) => q.caseStudy && q.caseStudy.trim() !== ""
         );
         if (!cs) return null;
 
+        // Match the result by questionId
         const userResult = resultMap[cs.id] || {};
 
         return {
@@ -170,6 +174,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
