@@ -95,10 +95,11 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
-const fetchAllCaseStudies = async ({ courseId, userId }) => {
-  if (!userId || !courseId) return { sessions: [], domain: "", courseName: "" };
+const fetchAllCaseStudies = async ({ courseId }) => {
+  if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
+    // Fetch all course sessions along with case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -108,7 +109,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       include: [
         {
           model: model.QuestionModel,
-          where: { isDeleted: false, caseStudy: true },
+          where: { isDeleted: false, caseStudy: true }, // only case studies
           required: false,
           attributes: ["id", "question", "day", "sessionNumber"],
         },
@@ -141,6 +142,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
