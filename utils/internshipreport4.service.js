@@ -112,7 +112,7 @@ const fetchAllCaseStudies = async ({ courseId }) => {
           model: model.QuestionModel,
           where: { isDeleted: false }, // fetch all questions, caseStudy text will decide
           required: false,
-          attributes: ["id", "caseStudy", "day", "sessionNumber"],
+          attributes: ["id", "caseStudy", "question", "day", "sessionNumber"], // added 'question' to map correctly
         },
         { model: model.Course, attributes: ["name"] },
         { model: model.Domain, attributes: ["name"] },
@@ -133,7 +133,10 @@ const fetchAllCaseStudies = async ({ courseId }) => {
       caseStudies:
         session.QuestionModels?.filter(q => q.caseStudy && q.caseStudy.trim() !== "").map((q) => ({
           id: q.id,
-          caseStudy: q.caseStudy,
+          question: q.caseStudy,   // map 'caseStudy' text to 'question' for PDF rendering
+          answer: "",              // default empty
+          matchPercentage: 0,      // default 0
+          passed: false,           // default false
         })) || [],
     }));
 
