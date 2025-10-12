@@ -98,7 +98,6 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
-  console.log("Fetching case studies for courseId:", courseId, "userId:", userId);
 
   try {
     const courseDetailRows = await model.CourseDetail.findAll({
@@ -119,36 +118,17 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    console.log("Fetched courseDetailRows count:", courseDetailRows.length);
-
-    if (!courseDetailRows.length)
-      return { sessions: [], domain: "", courseName: "" };
-
-    const domain = courseDetailRows[0].Domain?.name || "";
-    const courseName = courseDetailRows[0].Course?.name || "";
-    console.log("Domain:", domain, "CourseName:", courseName);
+    const domain = courseDetailRows[0]?.Domain?.name || "";
+    const courseName = courseDetailRows[0]?.Course?.name || "";
 
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
-        where: {
-          userId,
-          courseId,
-        },
-        attributes: [
-          "courseId",
-          "userId",
-          "questionId",
-          "answer",
-          "matchPercentage",
-          "passed",
-        ],
+        where: { userId, courseId },
+        attributes: ["courseId", "userId", "questionId", "answer", "text", "matchPercentage", "passed"],
       });
-      console.log("Fetched CaseStudyResults count:", results.length);
-
       results.forEach((r) => {
         const key = `${r.courseId}_${r.userId}_${r.questionId}`;
-        console.log("Mapping result key:", key, "answer:", r.answer);
         resultMap[key] = r;
       });
     }
@@ -158,17 +138,16 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         const caseStudyQs = session.QuestionModels?.filter(
           (q) => q.caseStudy && q.caseStudy.trim() !== ""
         );
-        console.log("Session id:", session.id, "caseStudyQs count:", caseStudyQs?.length || 0);
         if (!caseStudyQs || caseStudyQs.length === 0) return null;
 
         const caseStudies = caseStudyQs.map((cs) => {
           const key = `${courseId}_${userId}_${cs.id}`;
           const userResult = resultMap[key] || {};
-          console.log("Matching caseStudy id:", cs.id, "with key:", key, "userResult:", userResult);
           return {
             id: cs.id,
             question: cs.caseStudy,
             answer: userResult.answer || "N/A",
+            text: userResult.text || "",               // ✅ text from CaseStudyResults
             matchPercentage: userResult.matchPercentage || 0,
             passed: userResult.passed || false,
             courseId,
@@ -303,22 +282,17 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               .map(
                 (cs, idx) => `
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
+                  ${cs.text ? `<p><b>Text:</b> ${escapeHtml(cs.text)}</p>` : ""}
                   <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
                     <tr style="background:#f0f0f0; text-align:center;">
                       <th>Answer</th>
                       <th>Match %</th>
                       <th>Passed</th>
-                      <th>Course ID</th>
-                      <th>User ID</th>
-                      <th>Question ID</th>
                     </tr>
                     <tr style="text-align:center;">
                       <td>${escapeHtml(cs.answer || "N/A")}</td>
                       <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
                       <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                      <td>${cs.courseId}</td>
-                      <td>${cs.userId}</td>
-                      <td>${cs.id}</td>
                     </tr>
                   </table>
                 `
