@@ -51,14 +51,8 @@ const fetchSessionsWithMCQs = async (courseId) => {
           "answer",
         ],
       },
-      {
-        model: model.Course,
-        attributes: ["name"],
-      },
-      {
-        model: model.Domain,
-        attributes: ["name"],
-      },
+      { model: model.Course, attributes: ["name"] },
+      { model: model.Domain, attributes: ["name"] },
     ],
   });
 
@@ -125,7 +119,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     if (userId) {
       const results = await model.CaseStudyResults.findAll({
         where: { userId, courseId },
-        attributes: ["courseId", "userId", "questionId", "answer", "text", "matchPercentage", "passed"],
+        attributes: ["courseId", "userId", "questionId", "answer", "matchPercentage", "passed"],
       });
       results.forEach((r) => {
         const key = `${r.courseId}_${r.userId}_${r.questionId}`;
@@ -147,7 +141,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             id: cs.id,
             question: cs.caseStudy,
             answer: userResult.answer || "N/A",
-            text: userResult.text || "",
             matchPercentage: userResult.matchPercentage || 0,
             passed: userResult.passed || false,
             courseId,
@@ -284,10 +277,9 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               .map(
                 (cs, idx) => `
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
-                  ${cs.text ? `<p><b>Text:</b> ${escapeHtml(cs.text)}</p>` : ""}
+                  <p><b>Answer Text:</b> ${escapeHtml(cs.answer || "N/A")}</p>
                   <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
                     <tr style="background:#f0f0f0; text-align:center;">
-                      <th>Answer</th>
                       <th>Match %</th>
                       <th>Passed</th>
                       <th>Course ID</th>
@@ -295,7 +287,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                       <th>Question ID</th>
                     </tr>
                     <tr style="text-align:center;">
-                      <td>${escapeHtml(cs.answer || "N/A")}</td>
                       <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
                       <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
                       <td>${cs.courseId}</td>
