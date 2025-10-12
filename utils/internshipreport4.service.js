@@ -123,7 +123,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
     let resultMap = {};
     if (userId) {
-      const results = await model.CaseStudyResult.findAll({
+      const results = await model.CaseStudyResults.findAll({
         where: { userId, courseId },
         attributes: ["courseId", "userId", "questionId", "answer", "text", "matchPercentage", "passed"],
       });
