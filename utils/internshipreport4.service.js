@@ -51,8 +51,14 @@ const fetchSessionsWithMCQs = async (courseId) => {
           "answer",
         ],
       },
-      { model: model.Course, attributes: ["name"] },
-      { model: model.Domain, attributes: ["name"] },
+      {
+        model: model.Course,
+        attributes: ["name"],
+      },
+      {
+        model: model.Domain,
+        attributes: ["name"],
+      },
     ],
   });
 
@@ -88,13 +94,13 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER USER
+// FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
+  console.log("Fetching case studies for courseId:", courseId, "userId:", userId);
 
   try {
-    // 1️⃣ Fetch course details + case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -113,90 +119,74 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    if (!courseDetailRows.length) {
-      console.warn("No courseDetailRows found for courseId:", courseId);
+    console.log("Fetched courseDetailRows count:", courseDetailRows.length);
+
+    if (!courseDetailRows.length)
       return { sessions: [], domain: "", courseName: "" };
-    }
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
+    console.log("Domain:", domain, "CourseName:", courseName);
 
-    console.log(
-      `Course details loaded: ${courseName} (${domain}) | Total Sessions: ${courseDetailRows.length}`
-    );
-
-    // 2️⃣ Fetch all CaseStudyResults for this user & course
-    let results = [];
+    let resultMap = {};
     if (userId) {
-      results = await model.CaseStudyResult.findAll({
-        where: { userId, courseId },
+      const results = await model.CaseStudyResult.findAll({
+        where: {
+          userId,
+          courseId,
+        },
         attributes: [
-          "id",
           "courseId",
           "userId",
-          "day",
-          "sessionNumber",
           "questionId",
           "answer",
           "matchPercentage",
           "passed",
         ],
       });
+      console.log("Fetched CaseStudyResults count:", results.length);
 
-      console.log(
-        `CaseStudyResults fetched for userId=${userId}, courseId=${courseId}: ${results.length}`
-      );
-    } else {
-      console.warn("⚠️ userId not provided — skipping result matching");
-    }
-
-    // 3️⃣ Map sessions and match case studies directly from CaseStudyResults
-    const sessions = [];
-
-    for (const session of courseDetailRows) {
-      const caseStudyQs = session.QuestionModels?.filter(
-        (q) => q.caseStudy && q.caseStudy.trim() !== ""
-      );
-
-      console.log(
-        `Processing session: id=${session.id}, day=${session.day}, sessionNumber=${session.sessionNumber}, caseStudyQs=${caseStudyQs?.length || 0}`
-      );
-
-      if (!caseStudyQs || caseStudyQs.length === 0) continue;
-
-      const caseStudies = [];
-
-      for (const cs of caseStudyQs) {
-        // loop through all results to find one that matches this question
-        const matchedResult = results.find(
-          (r) => Number(r.questionId) === Number(cs.id)
-        );
-
-        caseStudies.push({
-          id: cs.id,
-          question: cs.caseStudy,
-          answer: matchedResult?.answer || "",
-          matchPercentage: matchedResult?.matchPercentage || 0,
-          passed: matchedResult?.passed || false,
-        });
-      }
-
-      sessions.push({
-        id: session.id,
-        day: session.day,
-        sessionNumber: session.sessionNumber,
-        title: session.title || `Session ${session.day}`,
-        caseStudies,
+      results.forEach((r) => {
+        const key = `${r.courseId}_${r.userId}_${r.questionId}`;
+        console.log("Mapping result key:", key, "answer:", r.answer);
+        resultMap[key] = r;
       });
     }
 
-    console.log(
-      `Final sessions mapped: ${sessions.length} | User: ${userId} | Course: ${courseId}`
-    );
+    const sessions = courseDetailRows
+      .map((session) => {
+        const caseStudyQs = session.QuestionModels?.filter(
+          (q) => q.caseStudy && q.caseStudy.trim() !== ""
+        );
+        console.log("Session id:", session.id, "caseStudyQs count:", caseStudyQs?.length || 0);
+        if (!caseStudyQs || caseStudyQs.length === 0) return null;
+
+        const caseStudies = caseStudyQs.map((cs) => {
+          const key = `${courseId}_${userId}_${cs.id}`;
+          const userResult = resultMap[key] || {};
+          console.log("Matching caseStudy id:", cs.id, "with key:", key, "userResult:", userResult);
+          return {
+            id: cs.id,
+            question: cs.caseStudy,
+            answer: userResult.answer || "N/A",
+            matchPercentage: userResult.matchPercentage || 0,
+            passed: userResult.passed || false,
+          };
+        });
+
+        return {
+          id: session.id,
+          day: session.day,
+          sessionNumber: session.sessionNumber,
+          title: session.title || `Session ${session.day}`,
+          caseStudies,
+        };
+      })
+      .filter(Boolean);
 
     return { sessions, domain, courseName };
   } catch (err) {
-    console.error("🔥 Error fetching case studies:", err);
+    console.error("Error fetching case studies:", err);
     return { sessions: [], domain: "", courseName: "" };
   }
 };
@@ -220,7 +210,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     year: "numeric",
   });
 
-  // MCQ Section (unchanged)
   const sessionsHtml =
     sessions.length > 0
       ? sessions
@@ -243,6 +232,35 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               })
               .join("");
 
+            let correctMCQs = 0,
+              totalMCQs = s.mcqs.length || 0;
+
+            if (userId && s.userProgress[userId]) {
+              let progressRaw = s.userProgress[userId];
+              if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
+              if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
+                correctMCQs = progressRaw.answers.filter((a) => a.isCorrect).length;
+              }
+            }
+
+            const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+            const status = percentage >= 60 ? "PASSED" : "FAILED";
+
+            const scoreTableHtml = `
+              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
+                <tr style="background:#f0f0f0; text-align:center;">
+                  <th>Score</th>
+                  <th>PERCENTAGE</th>
+                  <th>STATUS</th>
+                </tr>
+                <tr style="text-align:center;">
+                  <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
+                  <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
+                  <td style="font-weight:bold;">${status}</td>
+                </tr>
+              </table>
+            `;
+
             return `
             <div class="page">
               <div class="content">
@@ -252,16 +270,29 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                 <p><b>Domain:</b> ${escapeHtml(domain)}</p>
                 <p><b>Course:</b> ${escapeHtml(courseName)}</p>
                 <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
+                <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
+                <p><b>Start Date:</b> ${s.startDate}</p>
+                <p><b>End Date:</b> ${s.endDate}</p>
                 <h3>MCQ Quiz – Session ${s.day}</h3>
                 ${mcqHtml || "<p>No MCQs available</p>"}
+                ${scoreTableHtml}
               </div>
               <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
             </div>`;
           })
           .join("<div style='page-break-after: always;'></div>")
-      : `<div class="page"><div class="content"><h1>No Sessions Available</h1></div></div>`;
+      : `<div class="page">
+          <div class="content">
+            <h1>Eduroom Internship Report</h1>
+            <h2>No Sessions Available</h2>
+            <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
+            <p><b>Domain:</b> ${escapeHtml(domain)}</p>
+            <p><b>Course:</b> ${escapeHtml(courseName)}</p>
+            <p>There is no data available for this course.</p>
+          </div>
+          <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
+        </div>`;
 
-  // ✅ Case Studies Section — includes answers from CaseStudyResults
   const caseStudiesHtml =
     allCaseStudies.length > 0
       ? allCaseStudies
@@ -269,34 +300,32 @@ const generateMCQCaseStudyReport = async (options = {}) => {
             const csHtml = session.caseStudies
               .map(
                 (cs, idx) => `
-                <p><b>Case Study ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
-                <p style="margin-left:20px;"><b>User Answer:</b><br>${escapeHtml(
-                  cs.answer
-                )}</p>
-                <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
-                  <tr style="background:#f0f0f0; text-align:center;">
-                    <th>Match %</th>
-                    <th>Passed</th>
-                  </tr>
-                  <tr style="text-align:center;">
-                    <td style="color:#00bfa5; font-weight:bold;">${
-                      cs.matchPercentage || 0
-                    }%</td>
-                    <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                  </tr>
-                </table>
-              `
+                  <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
+                  <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
+                    <tr style="background:#f0f0f0; text-align:center;">
+                      <th>Answer</th>
+                      <th>Match %</th>
+                      <th>Passed</th>
+                    </tr>
+                    <tr style="text-align:center;">
+                      <td>${escapeHtml(cs.answer || "N/A")}</td>
+                      <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
+                      <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
+                    </tr>
+                  </table>
+                `
               )
               .join("");
 
             return `
-              <div class="page">
-                <div class="content">
-                  <h1>Case Studies – Session ${session.day}</h1>
-                  ${csHtml}
-                </div>
-                <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
-              </div>`;
+            <div class="page">
+              <div class="content">
+                <h1>Case Studies – Session ${session.day}</h1>
+                ${csHtml}
+              </div>
+              <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
+            </div>
+            `;
           })
           .join("<div style='page-break-after: always;'></div>")
       : "";
@@ -309,13 +338,36 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     <title>MCQ & Case Study Report</title>
     <style>
       body { margin:0; padding:0; font-family:'Times New Roman', serif; }
-      .page { width:100%; min-height:100vh; background: url("${bgUrl}") no-repeat center top; background-size: cover; display:flex; flex-direction:column; position:relative; color:#000; }
-      .content { background: rgba(255,255,255,0.85); margin:135px 40px 60px 40px; padding:30px 40px; border-radius:8px; }
-      h1 { font-size:28px; font-weight:bold; text-align:center; }
+      .page {
+        width:100%;
+        min-height:100vh;
+        background: url("${bgUrl}") no-repeat center top;
+        background-size: cover;
+        display:flex;
+        flex-direction:column;
+        position:relative;
+        color:#000;
+        box-sizing:border-box;
+      }
+      .content {
+        background: rgba(255,255,255,0.85);
+        margin:135px 40px 60px 40px;
+        padding:30px 40px;
+        border-radius:8px;
+        box-sizing:border-box;
+      }
+      h1 { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
       h2 { font-size:20px; margin:10px 0; }
       h3 { font-size:18px; margin-top:12px; }
       p { font-size:16px; margin:4px 0; }
-      .footer { position:absolute; bottom:10px; width:100%; text-align:center; font-size:14px; color:#444; }
+      .footer {
+        position:absolute;
+        bottom:10px;
+        width:100%;
+        text-align:center;
+        font-size:14px;
+        color:#444;
+      }
     </style>
   </head>
   <body>
@@ -328,7 +380,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
-
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
   await page.evaluateHandle("document.fonts.ready");
@@ -346,14 +397,12 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const fileName = `mcq-case-report-${timestamp}.pdf`;
   const s3Key = `internshipReports/mcq-case/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
