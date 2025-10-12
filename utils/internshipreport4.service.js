@@ -88,15 +88,13 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER
+// FETCH ALL CASE STUDIES PER USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
-    // =======================
-    // 1️ Fetch course details + case study questions
-    // =======================
+    // 1️⃣ Fetch course details + case study questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -116,7 +114,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     });
 
     if (!courseDetailRows.length) {
-      console.warn(" No courseDetailRows found for courseId:", courseId);
+      console.warn("No courseDetailRows found for courseId:", courseId);
       return { sessions: [], domain: "", courseName: "" };
     }
 
@@ -124,12 +122,10 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     const courseName = courseDetailRows[0].Course?.name || "";
 
     console.log(
-      ` Course details loaded: ${courseName} (${domain}) | Total Sessions: ${courseDetailRows.length}`
+      `Course details loaded: ${courseName} (${domain}) | Total Sessions: ${courseDetailRows.length}`
     );
 
-    // =======================
-    // 2 Fetch all CaseStudyResults for this user & course
-    // =======================
+    // 2️⃣ Fetch all CaseStudyResults for this user & course
     let results = [];
     if (userId) {
       results = await model.CaseStudyResult.findAll({
@@ -148,15 +144,13 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       });
 
       console.log(
-        ` CaseStudyResults fetched for userId=${userId}, courseId=${courseId}: ${results.length}`
+        `CaseStudyResults fetched for userId=${userId}, courseId=${courseId}: ${results.length}`
       );
     } else {
       console.warn("⚠️ userId not provided — skipping result matching");
     }
 
-    // =======================
-    // 3️ Map sessions and match case studies across days/sessions
-    // =======================
+    // 3️⃣ Map sessions and match case studies directly from CaseStudyResults
     const sessions = [];
 
     for (const session of courseDetailRows) {
@@ -165,7 +159,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       );
 
       console.log(
-        ` Processing session: id=${session.id}, day=${session.day}, sessionNumber=${session.sessionNumber}, caseStudyQs=${caseStudyQs?.length || 0}`
+        `Processing session: id=${session.id}, day=${session.day}, sessionNumber=${session.sessionNumber}, caseStudyQs=${caseStudyQs?.length || 0}`
       );
 
       if (!caseStudyQs || caseStudyQs.length === 0) continue;
@@ -173,24 +167,10 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       const caseStudies = [];
 
       for (const cs of caseStudyQs) {
-        // loop through all results to find one that matches this question across days/sessions
+        // loop through all results to find one that matches this question
         const matchedResult = results.find(
-          (r) =>
-            Number(r.questionId) === Number(cs.id) &&
-            Number(r.courseId) === Number(courseId) &&
-            Number(r.userId) === Number(userId) &&
-            Number(r.day) === Number(session.day)
+          (r) => Number(r.questionId) === Number(cs.id)
         );
-
-        if (matchedResult) {
-          console.log(
-            ` Match found for questionId=${cs.id}, userId=${userId}, day=${session.day}, session=${session.sessionNumber}`
-          );
-        } else {
-          console.log(
-            ` No match for questionId=${cs.id}, userId=${userId}, day=${session.day}, session=${session.sessionNumber}`
-          );
-        }
 
         caseStudies.push({
           id: cs.id,
@@ -210,11 +190,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       });
     }
 
-    // =======================
-    // 4️ Final result
-    // =======================
     console.log(
-      ` Final sessions mapped: ${sessions.length} | User: ${userId} | Course: ${courseId}`
+      `Final sessions mapped: ${sessions.length} | User: ${userId} | Course: ${courseId}`
     );
 
     return { sessions, domain, courseName };
@@ -223,7 +200,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
@@ -285,7 +261,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
           .join("<div style='page-break-after: always;'></div>")
       : `<div class="page"><div class="content"><h1>No Sessions Available</h1></div></div>`;
 
-  // ✅ Case Studies Section — now includes answers below each question
+  // ✅ Case Studies Section — includes answers from CaseStudyResults
   const caseStudiesHtml =
     allCaseStudies.length > 0
       ? allCaseStudies
