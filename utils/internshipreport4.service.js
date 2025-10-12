@@ -92,9 +92,11 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
-  console.log("🟢 Fetching case studies for courseId:", courseId, "userId:", userId);
 
   try {
+    // =======================
+    // 1️ Fetch course details + case study questions
+    // =======================
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -113,84 +115,115 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    console.log("Fetched courseDetailRows count:", courseDetailRows.length);
-
-    if (!courseDetailRows.length)
+    if (!courseDetailRows.length) {
+      console.warn(" No courseDetailRows found for courseId:", courseId);
       return { sessions: [], domain: "", courseName: "" };
+    }
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
-    console.log("Domain:", domain, "CourseName:", courseName);
 
-    // 🟢 Fetch results for this user from CaseStudyResults
-    let resultMap = {};
+    console.log(
+      ` Course details loaded: ${courseName} (${domain}) | Total Sessions: ${courseDetailRows.length}`
+    );
+
+    // =======================
+    // 2 Fetch all CaseStudyResults for this user & course
+    // =======================
+    let results = [];
     if (userId) {
-      const results = await model.CaseStudyResult.findAll({
+      results = await model.CaseStudyResult.findAll({
         where: { userId, courseId },
         attributes: [
+          "id",
           "courseId",
           "userId",
+          "day",
+          "sessionNumber",
           "questionId",
           "answer",
           "matchPercentage",
           "passed",
         ],
       });
-      console.log("Fetched CaseStudyResults count:", results.length);
 
-      results.forEach((r) => {
-        const key = `${r.courseId}_${r.userId}_${r.questionId}`;
-        resultMap[key] = r;
-        console.log(`🧩 Mapped result for key ${key}`);
+      console.log(
+        ` CaseStudyResults fetched for userId=${userId}, courseId=${courseId}: ${results.length}`
+      );
+    } else {
+      console.warn("⚠️ userId not provided — skipping result matching");
+    }
+
+    // =======================
+    // 3️ Map sessions and match case studies across days/sessions
+    // =======================
+    const sessions = [];
+
+    for (const session of courseDetailRows) {
+      const caseStudyQs = session.QuestionModels?.filter(
+        (q) => q.caseStudy && q.caseStudy.trim() !== ""
+      );
+
+      console.log(
+        ` Processing session: id=${session.id}, day=${session.day}, sessionNumber=${session.sessionNumber}, caseStudyQs=${caseStudyQs?.length || 0}`
+      );
+
+      if (!caseStudyQs || caseStudyQs.length === 0) continue;
+
+      const caseStudies = [];
+
+      for (const cs of caseStudyQs) {
+        // loop through all results to find one that matches this question across days/sessions
+        const matchedResult = results.find(
+          (r) =>
+            Number(r.questionId) === Number(cs.id) &&
+            Number(r.courseId) === Number(courseId) &&
+            Number(r.userId) === Number(userId) &&
+            Number(r.day) === Number(session.day)
+        );
+
+        if (matchedResult) {
+          console.log(
+            ` Match found for questionId=${cs.id}, userId=${userId}, day=${session.day}, session=${session.sessionNumber}`
+          );
+        } else {
+          console.log(
+            ` No match for questionId=${cs.id}, userId=${userId}, day=${session.day}, session=${session.sessionNumber}`
+          );
+        }
+
+        caseStudies.push({
+          id: cs.id,
+          question: cs.caseStudy,
+          answer: matchedResult?.answer || "",
+          matchPercentage: matchedResult?.matchPercentage || 0,
+          passed: matchedResult?.passed || false,
+        });
+      }
+
+      sessions.push({
+        id: session.id,
+        day: session.day,
+        sessionNumber: session.sessionNumber,
+        title: session.title || `Session ${session.day}`,
+        caseStudies,
       });
     }
 
-    const sessions = courseDetailRows
-      .map((session) => {
-        const caseStudyQs = session.QuestionModels?.filter(
-          (q) => q.caseStudy && q.caseStudy.trim() !== ""
-        );
-
-        console.log(
-          `Session id: ${session.id} | caseStudyQs count: ${
-            caseStudyQs ? caseStudyQs.length : 0
-          }`
-        );
-
-        if (!caseStudyQs || caseStudyQs.length === 0) return null;
-
-        const caseStudies = caseStudyQs.map((cs) => {
-          const key = `${courseId}_${userId}_${cs.id}`;
-          const userResult = resultMap[key] || {};
-          console.log(
-            `🧠 Matching caseStudy id: ${cs.id} | key: ${key} | found result:`,
-            userResult.answer ? "✅ Found" : "❌ Not Found"
-          );
-          return {
-            id: cs.id,
-            question: cs.caseStudy,
-            answer: userResult.answer || "No answer found for this question",
-            matchPercentage: userResult.matchPercentage || 0,
-            passed: userResult.passed || false,
-          };
-        });
-
-        return {
-          id: session.id,
-          day: session.day,
-          sessionNumber: session.sessionNumber,
-          title: session.title || `Session ${session.day}`,
-          caseStudies,
-        };
-      })
-      .filter(Boolean);
+    // =======================
+    // 4️ Final result
+    // =======================
+    console.log(
+      ` Final sessions mapped: ${sessions.length} | User: ${userId} | Course: ${courseId}`
+    );
 
     return { sessions, domain, courseName };
   } catch (err) {
-    console.error("❌ Error fetching case studies:", err);
+    console.error("🔥 Error fetching case studies:", err);
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
