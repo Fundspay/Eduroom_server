@@ -91,15 +91,14 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
+  // 🔹 Hardcode userId for testing
+  userId = 2;
+
   console.log("📌 Fetching case studies for:", { courseId, userId });
 
-  if (!courseId) {
-    console.warn("⚠️ courseId is missing, returning empty result");
-    return { sessions: [], domain: "", courseName: "" };
-  }
+  if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
-    // 1️⃣ Fetch course details and questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -117,7 +116,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer", // correct answer
+            "answer",
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -125,33 +124,21 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    if (!courseDetailRows.length) {
-      console.info("ℹ️ No course details found for courseId:", courseId);
-      return { sessions: [], domain: "", courseName: "" };
-    }
+    const domain = courseDetailRows[0]?.Domain?.name || "";
+    const courseName = courseDetailRows[0]?.Course?.name || "";
 
-    const domain = courseDetailRows[0].Domain?.name || "";
-    const courseName = courseDetailRows[0].Course?.name || "";
-    console.log("📌 Found course:", courseName, "in domain:", domain);
-
-    // 2️⃣ Fetch user results if userId is provided
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
         where: { userId, courseId },
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
-
       console.log("📌 Fetched user results:", results.map(r => r.toJSON()));
-
       results.forEach((r) => {
         resultMap[String(r.questionId)] = r;
       });
-    } else {
-      console.warn("⚠️ userId is null or missing — returning questions without user answers");
     }
 
-    // 3️⃣ Build sessions and case studies
     const sessions = courseDetailRows
       .map((session) => {
         const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim());
@@ -167,7 +154,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             matchPercentage: userResult.matchPercentage ?? 0,
             passed: userResult.passed ?? false,
             courseId,
-            userId: userId ?? null,
+            userId,
           };
         });
 
@@ -189,7 +176,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
