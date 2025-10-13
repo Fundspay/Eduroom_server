@@ -28,86 +28,60 @@ const escapeHtml = (str) => {
 // FETCH SESSIONS WITH MCQS
 // =======================
 const fetchSessionsWithMCQs = async (userId, courseId) => {
-  if (!courseId) courseId = 1;
+  courseId = Number(courseId);
+  userId = Number(userId);
+  if (!courseId || !userId) return { sessions: [], domain: "", courseName: "", startDate: "N/A", endDate: "N/A" };
 
   // 1️⃣ Fetch user courseDates
-  const user = await model.User.findByPk(userId, {
-    attributes: ["courseDates"],
-  });
-
-  let startDate = "N/A";
-  let endDate = "N/A";
+  const user = await model.User.findByPk(userId, { attributes: ["courseDates"] });
+  let startDate = "N/A", endDate = "N/A";
 
   let courseDatesObj = {};
   if (user?.courseDates) {
-    try {
-      courseDatesObj =
-        typeof user.courseDates === "string" ? JSON.parse(user.courseDates) : user.courseDates;
-    } catch (err) {
-      console.error("Failed to parse courseDates JSON:", err);
+    courseDatesObj = typeof user.courseDates === "string" ? JSON.parse(user.courseDates) : user.courseDates;
+    if (courseDatesObj[courseId]) {
+      startDate = courseDatesObj[courseId].startDate || "N/A";
+      endDate = courseDatesObj[courseId].endDate || "N/A";
     }
   }
 
-  const courseKey = String(courseId);
-  if (courseDatesObj[courseKey]) {
-    startDate = courseDatesObj[courseKey].startDate || "N/A";
-    endDate = courseDatesObj[courseKey].endDate || "N/A";
-  }
-
-  // 2️⃣ Fetch sessions with MCQs
+  // 2️⃣ Fetch sessions
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
-    order: [
-      ["day", "ASC"],
-      ["sessionNumber", "ASC"],
-    ],
+    order: [["day", "ASC"], ["sessionNumber", "ASC"]],
     include: [
-      {
-        model: model.QuestionModel,
-        where: { isDeleted: false },
-        required: false,
-        attributes: [
-          "id",
-          "question",
-          "optionA",
-          "optionB",
-          "optionC",
-          "optionD",
-          "answer",
-        ],
-      },
+      { model: model.QuestionModel, where: { isDeleted: false }, required: false },
       { model: model.Course, attributes: ["name"] },
       { model: model.Domain, attributes: ["name"] },
     ],
   });
 
-  if (!courseDetailRows.length)
+  if (!courseDetailRows.length) {
+    console.log(`No sessions found for courseId=${courseId}`);
     return { sessions: [], domain: "", courseName: "", startDate, endDate };
+  }
 
-  const domain = courseDetailRows[0].Domain?.name || "";
-  const courseName = courseDetailRows[0].Course?.name || "";
-
-  // 3️⃣ Fetch MCQ percentages from CaseStudyResults
+  // 3️⃣ Fetch MCQ results
   const userResults = await model.CaseStudyResults.findAll({
     where: { userId, courseId },
     attributes: ["questionId", "matchPercentage"],
   });
-
   const matchPercentageMap = {};
-  userResults.forEach((r) => {
-    matchPercentageMap[r.questionId] = r.matchPercentage;
-  });
+  userResults.forEach((r) => { matchPercentageMap[r.questionId] = r.matchPercentage; });
 
   // 4️⃣ Map sessions
-  const sessions = courseDetailRows.map((session) => ({
-    id: session.id,
-    day: session.day,
-    sessionNumber: session.sessionNumber,
-    title: session.title || `Session ${session.day}`,
+  const domain = courseDetailRows[0].Domain?.name || "";
+  const courseName = courseDetailRows[0].Course?.name || "";
+
+  const sessions = courseDetailRows.map((s) => ({
+    id: s.id,
+    day: s.day,
+    sessionNumber: s.sessionNumber,
+    title: s.title || `Session ${s.day}`,
     videoDuration: "~15 mins",
     startDate,
     endDate,
-    mcqs: session.QuestionModels.map((q) => ({
+    mcqs: (s.QuestionModels || []).map((q) => ({
       id: q.id,
       question: q.question,
       options: [
@@ -117,9 +91,9 @@ const fetchSessionsWithMCQs = async (userId, courseId) => {
         { key: "D", text: q.optionD },
       ],
       answer: q.answer,
-      percentage: matchPercentageMap[q.id] || 0, // MCQ percentage
+      percentage: matchPercentageMap[q.id] || 0,
     })),
-    userProgress: session.userProgress || {},
+    userProgress: s.userProgress || {},
   }));
 
   return { sessions, domain, courseName, startDate, endDate };
