@@ -27,7 +27,7 @@ const escapeHtml = (str) => {
 // =======================
 // FETCH SESSIONS WITH MCQS
 // =======================
-const fetchSessionsWithMCQs = async (courseId) => {
+const fetchSessionsWithMCQs = async (courseId, userId) => {
   if (!courseId) courseId = 1;
 
   const courseDetailRows = await model.CourseDetail.findAll({
@@ -51,7 +51,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
           "answer",
         ],
       },
-      { model: model.Course, attributes: ["name"] },
+      { model: model.Course, attributes: ["name", "startDate", "endDate"] },
       { model: model.Domain, attributes: ["name"] },
     ],
   });
@@ -61,32 +61,62 @@ const fetchSessionsWithMCQs = async (courseId) => {
 
   const domain = courseDetailRows[0].Domain?.name || "";
   const courseName = courseDetailRows[0].Course?.name || "";
+  const courseStartDate = courseDetailRows[0].Course?.startDate || "N/A";
+  const courseEndDate = courseDetailRows[0].Course?.endDate || "N/A";
 
-  const sessions = courseDetailRows.map((session) => ({
-    id: session.id,
-    day: session.day,
-    sessionNumber: session.sessionNumber,
-    title: session.title || `Session ${session.day}`,
-    videoDuration: "~15 mins",
-    startDate: "N/A",
-    endDate: "N/A",
-    mcqs: session.QuestionModels.map((q) => ({
-      id: q.id,
-      question: q.question,
-      options: [
-        { key: "A", text: q.optionA },
-        { key: "B", text: q.optionB },
-        { key: "C", text: q.optionC },
-        { key: "D", text: q.optionD },
-      ],
-      answer: q.answer,
-    })),
-    userProgress: session.userProgress || {},
-  }));
+  // Fetch user MCQ results
+  let userResultsMap = {};
+  if (userId) {
+    const userResults = await model.CaseStudyResult.findAll({
+      where: { userId, courseId },
+      attributes: ["questionId", "answer", "passed", "matchPercentage"],
+    });
+    userResults.forEach((r) => {
+      userResultsMap[String(r.questionId)] = r;
+    });
+  }
+
+  const sessions = courseDetailRows.map((session) => {
+    const mcqs = session.QuestionModels.map((q) => {
+      const userAnswerObj = userResultsMap[String(q.id)] || {};
+      return {
+        id: q.id,
+        question: q.question,
+        options: [
+          { key: "A", text: q.optionA },
+          { key: "B", text: q.optionB },
+          { key: "C", text: q.optionC },
+          { key: "D", text: q.optionD },
+        ],
+        answer: q.answer,
+        userAnswer: userAnswerObj.answer || null,
+        passed: userAnswerObj.passed ?? false,
+        matchPercentage: userAnswerObj.matchPercentage ?? 0,
+      };
+    });
+
+    let correctMCQs = mcqs.filter((m) => m.userAnswer === m.answer).length;
+    let totalMCQs = mcqs.length;
+    let percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+
+    return {
+      id: session.id,
+      day: session.day,
+      sessionNumber: session.sessionNumber,
+      title: session.title || `Session ${session.day}`,
+      videoDuration: "~15 mins",
+      startDate: courseStartDate,
+      endDate: courseEndDate,
+      mcqs,
+      totalMCQs,
+      correctMCQs,
+      percentage,
+      userProgress: session.userProgress || {},
+    };
+  });
 
   return { sessions, domain, courseName };
 };
-
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
