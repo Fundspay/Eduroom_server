@@ -143,7 +143,7 @@ module.exports.createAndSendInternshipCertificate = createAndSendInternshipCerti
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
-    // 1️⃣ Extract userId and courseId and ensure they are numbers
+    // 1️⃣ Extract and validate userId and courseId from params
     const userId = Number(req.params.userId);
     const courseId = Number(req.params.courseId);
 
@@ -158,7 +158,7 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
         .json({ success: false, message: "Invalid or missing courseId" });
     }
 
-    // 2️⃣ Fetch user
+    // 2️⃣ Fetch user and validate
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false },
     });
@@ -175,23 +175,19 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
     }
 
     const userEmail = user.email;
-    const internName =
-      user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Intern";
+    const internName = user.fullName || user.firstName || "Intern";
 
-    // 3️⃣ Generate all PDFs in parallel for speed
-    const [
-      coverPdf,
-      detailsPdf,
-      sessionPdf,
-      mcqCaseStudyPdf,
-    ] = await Promise.all([
-      generateInternshipReport(userId, courseId),
-      generateInternshipDetailsReport(userId, courseId),
-      generateSessionReport(userId, courseId),
-      generateMCQCaseStudyReport({ userId, courseId }),
-    ]);
+    // 3️⃣ Generate PDFs
+    // ✅ Pass correct arguments per generator's expected signature
+    const coverPdf = await generateInternshipReport(userId);
+    const detailsPdf = await generateInternshipDetailsReport(userId);
+    const sessionPdf = await generateSessionReport(userId, { courseId });
+    const mcqCaseStudyPdf = await generateMCQCaseStudyReport({
+      userId,
+      courseId
+    });
 
-    // 4️⃣ Merge PDFs
+    // 4️⃣ Merge PDFs and upload to S3
     const merged = await mergePDFsAndUpload(userId, [
       coverPdf,
       detailsPdf,
@@ -199,7 +195,7 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
       mcqCaseStudyPdf,
     ]);
 
-    // 5️⃣ Send email
+    // 5️⃣ Send email with the merged PDF link
     const emailHtml = `
       <p>Hi ${internName},</p>
       <p>Your internship report has been generated successfully.</p>
@@ -208,7 +204,11 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
       <p>Regards,<br/>EduRoom Team</p>
     `;
 
-    const mailResult = await sendMail(userEmail, "Your Internship Report", emailHtml);
+    const mailResult = await sendMail(
+      userEmail,
+      "Your Internship Report",
+      emailHtml
+    );
 
     if (!mailResult.success) {
       console.error("Email failed to send:", mailResult.error);
@@ -219,7 +219,7 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
       });
     }
 
-    // 6️⃣ Return success
+    // 6️⃣ Success response
     return res.status(200).json({
       success: true,
       message: "Merged internship report generated and emailed successfully",
@@ -235,4 +235,5 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
   }
 };
 
-module.exports.generateMergedInternshipReportAndEmail = generateMergedInternshipReportAndEmail;
+module.exports.generateMergedInternshipReportAndEmail =
+  generateMergedInternshipReportAndEmail;
