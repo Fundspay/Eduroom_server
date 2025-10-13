@@ -156,8 +156,8 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
     const userEmail = user.email;
 
     // 2️⃣ Generate all PDFs (pass courseId to relevant reports)
-    const coverPdf = await generateInternshipReport(userId);
-    const detailsPdf = await generateInternshipDetailsReport(userId);
+    const coverPdf = await generateInternshipReport(userId, courseId);
+    const detailsPdf = await generateInternshipDetailsReport(userId, courseId);
     const sessionPdf = await generateSessionReport(userId, courseId);
     const mcqCaseStudyPdf = await generateMCQCaseStudyReport(userId, courseId);
 
@@ -167,13 +167,13 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
     // 4️⃣ Send email using your mailer
     const emailHtml = `
       <p>Hi ${user.fullName || ""},</p>
-      <p>Your merged internship report has been generated successfully.</p>
+      <p>Your internship report has been generated successfully.</p>
       <p>You can download it from the link below:</p>
       <p><a href="${merged.fileUrl}">${merged.fileUrl}</a></p>
       <p>Regards,<br/>EduRoom Team</p>
     `;
 
-    const mailResult = await sendMail(userEmail, "Your Merged Internship Report", emailHtml);
+    const mailResult = await sendMail(userEmail, "Your Internship Report", emailHtml);
 
     if (!mailResult.success) {
       console.error("Email failed to send:", mailResult.error);
