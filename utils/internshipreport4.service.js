@@ -27,10 +27,34 @@ const escapeHtml = (str) => {
 // =======================
 // FETCH SESSIONS WITH MCQS
 // =======================
-const fetchSessionsWithMCQs = async (courseId, userId = null) => {
+const fetchSessionsWithMCQs = async (userId, courseId) => {
   if (!courseId) courseId = 1;
 
-  // 1️⃣ Fetch course details with questions
+  // 1️⃣ Fetch user courseDates
+  const user = await model.User.findByPk(userId, {
+    attributes: ["courseDates"],
+  });
+
+  let startDate = "N/A";
+  let endDate = "N/A";
+
+  let courseDatesObj = {};
+  if (user?.courseDates) {
+    try {
+      courseDatesObj =
+        typeof user.courseDates === "string" ? JSON.parse(user.courseDates) : user.courseDates;
+    } catch (err) {
+      console.error("Failed to parse courseDates JSON:", err);
+    }
+  }
+
+  const courseKey = String(courseId);
+  if (courseDatesObj[courseKey]) {
+    startDate = courseDatesObj[courseKey].startDate || "N/A";
+    endDate = courseDatesObj[courseKey].endDate || "N/A";
+  }
+
+  // 2️⃣ Fetch sessions with MCQs
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -58,89 +82,47 @@ const fetchSessionsWithMCQs = async (courseId, userId = null) => {
   });
 
   if (!courseDetailRows.length)
-    return { sessions: [], domain: "", courseName: "" };
+    return { sessions: [], domain: "", courseName: "", startDate, endDate };
 
   const domain = courseDetailRows[0].Domain?.name || "";
   const courseName = courseDetailRows[0].Course?.name || "";
 
-  // 2️⃣ Fetch user MCQ results if userId is provided
-  let resultMap = {};
-  let startDate = "N/A";
-  let endDate = "N/A";
-
-  if (userId) {
-    const user = await model.User.findByPk(userId, { attributes: ["courseDates"] });
-
-    // Parse courseDates safely
-    let courseDatesObj = {};
-    if (user?.courseDates) {
-      try {
-        courseDatesObj = typeof user.courseDates === "string" ? JSON.parse(user.courseDates) : user.courseDates;
-      } catch (err) {
-        console.error("Failed to parse courseDates JSON:", err);
-      }
-    }
-
-    if (courseDatesObj && courseDatesObj[courseId]) {
-      startDate = courseDatesObj[courseId].startDate || "N/A";
-      endDate = courseDatesObj[courseId].endDate || "N/A";
-    }
-
-    // Fetch user MCQ answers from CaseStudyResults
-    const userResults = await model.CaseStudyResult.findAll({
-      where: { userId, courseId },
-      attributes: ["questionId", "answer", "matchPercentage", "passed"],
-    });
-
-    userResults.forEach((r) => {
-      resultMap[String(r.questionId)] = r;
-    });
-  }
-
-  // 3️⃣ Map sessions
-  const sessions = courseDetailRows.map((session) => {
-    const totalMCQs = session.QuestionModels.length;
-    let correctMCQs = 0;
-
-    const mcqs = session.QuestionModels.map((q) => {
-      const userAnswer = resultMap[q.id]?.answer ?? null;
-      if (userAnswer && userAnswer === q.answer) correctMCQs++;
-      return {
-        id: q.id,
-        question: q.question,
-        options: [
-          { key: "A", text: q.optionA },
-          { key: "B", text: q.optionB },
-          { key: "C", text: q.optionC },
-          { key: "D", text: q.optionD },
-        ],
-        answer: q.answer,
-        userAnswer,
-      };
-    });
-
-    const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
-    const status = percentage >= 60 ? "PASSED" : "FAILED";
-
-    return {
-      id: session.id,
-      day: session.day,
-      sessionNumber: session.sessionNumber,
-      title: session.title || `Session ${session.day}`,
-      videoDuration: "~15 mins",
-      startDate,
-      endDate,
-      mcqs,
-      mcqScore: {
-        correct: correctMCQs,
-        total: totalMCQs,
-        percentage,
-        status,
-      },
-    };
+  // 3️⃣ Fetch MCQ percentages from CaseStudyResults
+  const userResults = await model.CaseStudyResults.findAll({
+    where: { userId, courseId },
+    attributes: ["questionId", "matchPercentage"],
   });
 
-  return { sessions, domain, courseName };
+  const matchPercentageMap = {};
+  userResults.forEach((r) => {
+    matchPercentageMap[r.questionId] = r.matchPercentage;
+  });
+
+  // 4️⃣ Map sessions
+  const sessions = courseDetailRows.map((session) => ({
+    id: session.id,
+    day: session.day,
+    sessionNumber: session.sessionNumber,
+    title: session.title || `Session ${session.day}`,
+    videoDuration: "~15 mins",
+    startDate,
+    endDate,
+    mcqs: session.QuestionModels.map((q) => ({
+      id: q.id,
+      question: q.question,
+      options: [
+        { key: "A", text: q.optionA },
+        { key: "B", text: q.optionB },
+        { key: "C", text: q.optionC },
+        { key: "D", text: q.optionD },
+      ],
+      answer: q.answer,
+      percentage: matchPercentageMap[q.id] || 0, // MCQ percentage
+    })),
+    userProgress: session.userProgress || {},
+  }));
+
+  return { sessions, domain, courseName, startDate, endDate };
 };
 
 // =======================
