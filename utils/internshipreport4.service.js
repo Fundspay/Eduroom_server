@@ -111,7 +111,14 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
           model: model.QuestionModel,
           where: { isDeleted: false },
           required: false,
-          attributes: ["id", "caseStudy", "question", "day", "sessionNumber"],
+          attributes: [
+            "id",
+            "caseStudy",
+            "question",
+            "day",
+            "sessionNumber",
+            "answer", // ✅ Added
+          ],
         },
         { model: model.Course, attributes: ["name"] },
         { model: model.Domain, attributes: ["name"] },
@@ -124,30 +131,24 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
 
-    // Fetch results for this user from CaseStudyResults
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
-        where: {
-          userId,
-          courseId,
-        },
+        where: { userId, courseId },
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
       results.forEach((r) => {
-        resultMap[String(r.questionId)] = r; // ensure string match
+        resultMap[String(r.questionId)] = r;
       });
     }
 
     const sessions = courseDetailRows
       .map((session) => {
-        // Find the first case study question in this session
         const cs = session.QuestionModels?.find(
-          (q) => q.caseStudy && q.caseStudy.trim() !== ""
+          (q) => q.caseStudy?.trim()
         );
         if (!cs) return null;
 
-        // Match the result by questionId (corrected)
         const userResult = resultMap[String(cs.id)] || {};
 
         return {
@@ -159,7 +160,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             {
               id: cs.id,
               question: cs.caseStudy,
-              answer: userResult.answer || "",
+              correctAnswer: cs.answer || "", // ✅ from QuestionModel
+              userAnswer: userResult.answer || "", // ✅ from CaseStudyResult
               matchPercentage: userResult.matchPercentage || 0,
               passed: userResult.passed || false,
             },
@@ -174,6 +176,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 
 
