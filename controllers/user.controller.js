@@ -1233,3 +1233,44 @@ const getInternshipStatusByUser = async (req, res) => {
 };
 
 module.exports.getInternshipStatusByUser = getInternshipStatusByUser;
+
+
+// ✅ Get Course Start and End Date for a User (handles numeric/string courseId)
+const getUserCourseDates = async (req, res) => {
+  try {
+    let { userId, courseId } = req.query; // Accept via query params
+    if (!userId || !courseId) return ReE(res, "userId and courseId are required", 400);
+
+    // Convert courseId to string for JSONB key access
+    courseId = String(courseId);
+
+    // Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+      attributes: ["id", "firstName", "lastName", "fullName", "courseDates"]
+    });
+
+    if (!user) return ReE(res, "User not found", 404);
+
+    const courseDates = user.courseDates?.[courseId];
+    if (!courseDates) return ReE(res, "Course dates not found for this user", 404);
+
+    const response = {
+      userId: user.id,
+      courseId,
+      courseName: courseDates.courseName || null,
+      startDate: courseDates.startDate || null,
+      endDate: courseDates.endDate || null,
+      started: courseDates.started || false
+    };
+
+    return ReS(res, { success: true, data: response }, 200);
+
+  } catch (error) {
+    console.error("getUserCourseDates error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getUserCourseDates = getUserCourseDates;
+
