@@ -142,42 +142,73 @@ const createAndSendInternshipCertificate = async (req, res) => {
 module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
-  let { userId, courseId } = req.params;
-
-  userId = Number(userId);
-  courseId = Number(courseId);
-
-  if (!userId || !courseId)
-    return res.status(400).json({ success: false, message: "Missing or invalid userId/courseId" });
-
   try {
-    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
-    if (!user) return res.status(404).json({ success: false, message: "User not found" });
-    if (!user.email) return res.status(400).json({ success: false, message: "User has no email" });
+    // 1️⃣ Get userId and courseId from params and convert to numbers
+    const userId = Number(req.params.userId);
+    const courseId = Number(req.params.courseId);
 
-    // Pass options object
+    if (!userId || isNaN(userId)) {
+      return res.status(400).json({ success: false, message: "Invalid or missing userId" });
+    }
+    if (!courseId || isNaN(courseId)) {
+      return res.status(400).json({ success: false, message: "Invalid or missing courseId" });
+    }
+
+    // 2️⃣ Fetch user and validate
+    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    if (!user.email) {
+      return res.status(400).json({ success: false, message: "User has no email" });
+    }
+
+    const userEmail = user.email;
+    const internName = user.fullName || user.firstName || "Intern";
+
+    // 3️⃣ Generate all PDFs
     const coverPdf = await generateInternshipReport({ userId, courseId });
     const detailsPdf = await generateInternshipDetailsReport({ userId, courseId });
     const sessionPdf = await generateSessionReport({ userId, courseId });
     const mcqCaseStudyPdf = await generateMCQCaseStudyReport({ userId, courseId });
 
+    // 4️⃣ Merge PDFs and upload
     const merged = await mergePDFsAndUpload(userId, [coverPdf, detailsPdf, sessionPdf, mcqCaseStudyPdf]);
 
+    // 5️⃣ Send email
     const emailHtml = `
-      <p>Hi ${user.fullName || ""},</p>
+      <p>Hi ${internName},</p>
       <p>Your internship report has been generated successfully.</p>
-      <p><a href="${merged.fileUrl}">Download Report</a></p>
+      <p>You can download it from the link below:</p>
+      <p><a href="${merged.fileUrl}">${merged.fileUrl}</a></p>
+      <p>Regards,<br/>EduRoom Team</p>
     `;
-    await sendMail(user.email, "Your Internship Report", emailHtml);
 
+    const mailResult = await sendMail(userEmail, "Your Internship Report", emailHtml);
+
+    if (!mailResult.success) {
+      console.error("Email failed to send:", mailResult.error);
+      return res.status(500).json({
+        success: false,
+        message: "Merged PDF generated but email sending failed",
+        fileUrl: merged.fileUrl,
+      });
+    }
+
+    // 6️⃣ Return success
     return res.status(200).json({
       success: true,
       message: "Merged internship report generated and emailed successfully",
       fileUrl: merged.fileUrl,
     });
-  } catch (err) {
-    console.error("Error generating or emailing merged report:", err);
-    return res.status(500).json({ success: false, message: err.message });
+  } catch (error) {
+    console.error("Error generating or emailing merged report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate or email merged internship report",
+      error: error.message,
+    });
   }
 };
+
 module.exports.generateMergedInternshipReportAndEmail = generateMergedInternshipReportAndEmail;
