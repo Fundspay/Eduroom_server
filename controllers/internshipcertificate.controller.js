@@ -143,37 +143,61 @@ module.exports.createAndSendInternshipCertificate = createAndSendInternshipCerti
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
-    // 1️⃣ Get userId and courseId from params and convert to numbers
+    // 1️⃣ Extract userId and courseId and ensure they are numbers
     const userId = Number(req.params.userId);
     const courseId = Number(req.params.courseId);
 
     if (!userId || isNaN(userId)) {
-      return res.status(400).json({ success: false, message: "Invalid or missing userId" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or missing userId" });
     }
     if (!courseId || isNaN(courseId)) {
-      return res.status(400).json({ success: false, message: "Invalid or missing courseId" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid or missing courseId" });
     }
 
-    // 2️⃣ Fetch user and validate
-    const user = await model.User.findOne({ where: { id: userId, isDeleted: false } });
+    // 2️⃣ Fetch user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+    });
+
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
     if (!user.email) {
-      return res.status(400).json({ success: false, message: "User has no email" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User has no email" });
     }
 
     const userEmail = user.email;
-    const internName = user.fullName || user.firstName || "Intern";
+    const internName =
+      user.fullName || `${user.firstName || ""} ${user.lastName || ""}`.trim() || "Intern";
 
-    // 3️⃣ Generate all PDFs
-    const coverPdf = await generateInternshipReport({ userId, courseId });
-    const detailsPdf = await generateInternshipDetailsReport({ userId, courseId });
-    const sessionPdf = await generateSessionReport({ userId, courseId });
-    const mcqCaseStudyPdf = await generateMCQCaseStudyReport({ userId, courseId });
+    // 3️⃣ Generate all PDFs in parallel for speed
+    const [
+      coverPdf,
+      detailsPdf,
+      sessionPdf,
+      mcqCaseStudyPdf,
+    ] = await Promise.all([
+      generateInternshipReport(userId, courseId),
+      generateInternshipDetailsReport(userId, courseId),
+      generateSessionReport(userId, courseId),
+      generateMCQCaseStudyReport({ userId, courseId }),
+    ]);
 
-    // 4️⃣ Merge PDFs and upload
-    const merged = await mergePDFsAndUpload(userId, [coverPdf, detailsPdf, sessionPdf, mcqCaseStudyPdf]);
+    // 4️⃣ Merge PDFs
+    const merged = await mergePDFsAndUpload(userId, [
+      coverPdf,
+      detailsPdf,
+      sessionPdf,
+      mcqCaseStudyPdf,
+    ]);
 
     // 5️⃣ Send email
     const emailHtml = `

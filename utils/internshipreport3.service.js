@@ -61,7 +61,7 @@ const fetchSessions = async (courseId) => {
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
-  const courseId = options.courseId;
+ const courseId = Number(options.courseId);
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData

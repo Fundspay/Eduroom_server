@@ -36,6 +36,7 @@ const display = (val) => {
  * Generate internship details PDF and upload to S3.
  */
 const generateInternshipDetailsReport = async (userId, options = {}) => {
+  userId = Number(userId);
   if (!userId) throw new Error("Missing userId");
 
   const includes = [];

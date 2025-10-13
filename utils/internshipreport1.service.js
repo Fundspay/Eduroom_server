@@ -13,6 +13,7 @@ const s3 = new AWS.S3({
 const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
 const generateInternshipReport = async (userId) => {
+   userId = Number(userId); 
   if (!userId) throw new Error("Missing userId");
 
   // 1️⃣ Load user details
