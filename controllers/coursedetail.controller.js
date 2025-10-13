@@ -988,7 +988,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
       subscriptionWallet: user.subscriptionWallet,
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
-      subscriptionLeft: user.subscriptionLeft,
+      subscriptionLeft: user.subscriptionWallet - user.subscriptiondeductedWallet,
       courses: [],
     };
 
@@ -1008,10 +1008,22 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
       if (!course) continue;
 
-      const sessions = await model.CourseDetail.findAll({
+      let sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
+
+      // ✅ Remove duplicate sessionNumbers per day
+      const uniqueSessions = [];
+      const seenKeys = new Set();
+      for (const s of sessions) {
+        const key = `${s.day}_${s.sessionNumber}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          uniqueSessions.push(s);
+        }
+      }
+      sessions = uniqueSessions;
 
       const daysMap = {};
       let totalSessions = 0;
@@ -1089,14 +1101,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // ✅ FIXED: Proper wallet-based business target check
+      // ✅ Keep existing business target + 20% threshold logic
       const businessTarget = course.businessTarget || 0;
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
       const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
       const isBusinessTargetMet = subscriptionLeft >= businessTarget;
 
-      // ✅ Check all sessions ≥ threshold (default 20%)
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
@@ -1125,7 +1136,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus = "Completed";
       }
 
-      // ✅ Status overrides
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
