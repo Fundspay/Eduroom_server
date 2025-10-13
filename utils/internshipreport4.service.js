@@ -27,10 +27,10 @@ const escapeHtml = (str) => {
 // =======================
 // FETCH SESSIONS WITH MCQS
 // =======================
-const fetchSessionsWithMCQs = async (courseId, userId) => {
+const fetchSessionsWithMCQs = async (courseId, userId = null) => {
   if (!courseId) courseId = 1;
 
-  // Fetch course details with MCQs
+  // 1️⃣ Fetch course details with questions
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -57,46 +57,54 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
     ],
   });
 
-  if (!courseDetailRows.length) return { sessions: [], domain: "", courseName: "" };
+  if (!courseDetailRows.length)
+    return { sessions: [], domain: "", courseName: "" };
 
   const domain = courseDetailRows[0].Domain?.name || "";
   const courseName = courseDetailRows[0].Course?.name || "";
 
-  // Fetch user answers from CaseStudyResults
-  let userAnswersMap = {};
+  // 2️⃣ Fetch user MCQ results if userId is provided
+  let resultMap = {};
+  let startDate = "N/A";
+  let endDate = "N/A";
+
   if (userId) {
+    const user = await model.User.findByPk(userId, { attributes: ["courseDates"] });
+
+    // Parse courseDates safely
+    let courseDatesObj = {};
+    if (user?.courseDates) {
+      try {
+        courseDatesObj = typeof user.courseDates === "string" ? JSON.parse(user.courseDates) : user.courseDates;
+      } catch (err) {
+        console.error("Failed to parse courseDates JSON:", err);
+      }
+    }
+
+    if (courseDatesObj && courseDatesObj[courseId]) {
+      startDate = courseDatesObj[courseId].startDate || "N/A";
+      endDate = courseDatesObj[courseId].endDate || "N/A";
+    }
+
+    // Fetch user MCQ answers from CaseStudyResults
     const userResults = await model.CaseStudyResult.findAll({
       where: { userId, courseId },
       attributes: ["questionId", "answer", "matchPercentage", "passed"],
     });
 
     userResults.forEach((r) => {
-      userAnswersMap[r.questionId] = r;
+      resultMap[String(r.questionId)] = r;
     });
   }
 
-  // Fetch user startDate and endDate from User.courseDates
-  let startDate = "N/A",
-    endDate = "N/A";
-  if (userId) {
-    const user = await model.User.findByPk(userId);
-    if (user?.courseDates && user.courseDates[courseId]) {
-      startDate = user.courseDates[courseId].startDate || "N/A";
-      endDate = user.courseDates[courseId].endDate || "N/A";
-    }
-  }
-
+  // 3️⃣ Map sessions
   const sessions = courseDetailRows.map((session) => {
     const totalMCQs = session.QuestionModels.length;
     let correctMCQs = 0;
 
     const mcqs = session.QuestionModels.map((q) => {
-      const userAnswer = userAnswersMap[q.id]?.answer || null;
-      const passed = userAnswersMap[q.id]?.passed || false;
-      const matchPercentage = userAnswersMap[q.id]?.matchPercentage || 0;
-
-      if (passed) correctMCQs += 1;
-
+      const userAnswer = resultMap[q.id]?.answer ?? null;
+      if (userAnswer && userAnswer === q.answer) correctMCQs++;
       return {
         id: q.id,
         question: q.question,
@@ -108,12 +116,11 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
         ],
         answer: q.answer,
         userAnswer,
-        passed,
-        matchPercentage,
       };
     });
 
     const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+    const status = percentage >= 60 ? "PASSED" : "FAILED";
 
     return {
       id: session.id,
@@ -124,7 +131,12 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
       startDate,
       endDate,
       mcqs,
-      mcqStats: { totalMCQs, correctMCQs, percentage, status: percentage >= 60 ? "PASSED" : "FAILED" },
+      mcqScore: {
+        correct: correctMCQs,
+        total: totalMCQs,
+        percentage,
+        status,
+      },
     };
   });
 
