@@ -206,10 +206,13 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
 // =======================
 // MAIN REPORT GENERATION FUNCTION
 // =======================
+// =======================
+// MAIN REPORT GENERATION FUNCTION
+// =======================
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
-  let userId = options.userId || null; // note: let here to allow reassignment
+  let userId = options.userId || null; // allow reassignment
 
   // Detect userId from request if not passed explicitly
   if (!userId && options.req?.user?.id) {
@@ -217,12 +220,33 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     console.log("📌 Using logged-in userId:", userId);
   }
 
+  // ---------------- Get user's course start/end dates ----------------
+  let courseDates = null;
+  if (userId) {
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+      attributes: ["courseDates"],
+    });
+
+    if (user?.courseDates) {
+      courseDates = user.courseDates[String(courseId)] || null;
+    }
+  }
+
+  // ---------------- Fetch MCQ sessions and case studies ----------------
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
   const { sessions: allCaseStudies } = await fetchAllCaseStudies({
     courseId,
     userId,
     req: options.req,
   });
+
+  // Map sessions to include real start/end dates
+  const sessionsWithDates = sessions.map((s) => ({
+    ...s,
+    startDate: courseDates?.startDate || "N/A",
+    endDate: courseDates?.endDate || "N/A",
+  }));
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
@@ -231,10 +255,10 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     year: "numeric",
   });
 
-  // ---------------- MCQ HTML ----------------
+  // ---------------- Generate MCQ HTML ----------------
   const sessionsHtml =
-    sessions.length > 0
-      ? sessions
+    sessionsWithDates.length > 0
+      ? sessionsWithDates
           .map((s) => {
             const mcqHtml = s.mcqs
               .map((q, idx) => {
@@ -247,7 +271,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                       : `<li>${escapeHtml(opt.text)}</li>`
                   )
                   .join("");
-                return `
+                return ` 
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
                   <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
                 `;
@@ -330,12 +354,10 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                     <tr style="background:#f0f0f0; text-align:center;">
                       <th>Match %</th>
                       <th>Passed</th>
-                      
                     </tr>
                     <tr style="text-align:center;">
                       <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
                       <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                     
                     </tr>
                   </table>
                 `
@@ -366,7 +388,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
       .page {
         width:100%;
         min-height:100vh;
-        background: url("${bgUrl}") no-repeat center top;
+        background: url("${options.bgUrl || ASSET_BASE + "/internshipbg.png"}") no-repeat center top;
         background-size: cover;
         display:flex;
         flex-direction:column;
@@ -418,6 +440,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
 
   await browser.close();
 
-    return pdfBuffer;
+  return pdfBuffer;
 };
+
 module.exports = { generateMCQCaseStudyReport };
