@@ -111,7 +111,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer", // ✅ Added
+            "answer", // ✅ added
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -119,8 +119,11 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    const domain = courseDetailRows[0]?.Domain?.name || "";
-    const courseName = courseDetailRows[0]?.Course?.name || "";
+    if (!courseDetailRows.length)
+      return { sessions: [], domain: "", courseName: "" };
+
+    const domain = courseDetailRows[0].Domain?.name || "";
+    const courseName = courseDetailRows[0].Course?.name || "";
 
     let resultMap = {};
     if (userId) {
@@ -135,9 +138,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
     const sessions = courseDetailRows
       .map((session) => {
-        const cs = session.QuestionModels?.find(
-          (q) => q.caseStudy?.trim()
-        );
+        const cs = session.QuestionModels?.find((q) => q.caseStudy?.trim());
         if (!cs) return null;
 
         const userResult = resultMap[String(cs.id)] || {};
@@ -151,10 +152,12 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             {
               id: cs.id,
               question: cs.caseStudy,
-              correctAnswer: cs.answer || "", // ✅ from QuestionModel
-              userAnswer: userResult.answer || "", // ✅ from CaseStudyResult
-              matchPercentage: userResult.matchPercentage || 0,
-              passed: userResult.passed || false,
+              correctAnswer: cs.answer || "",
+              userAnswer: userResult.answer ?? "N/A",
+              matchPercentage: userResult.matchPercentage ?? 0,
+              passed: userResult.passed ?? false,
+              courseId,
+              userId,
             },
           ],
         };
@@ -167,9 +170,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
-
-
-
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
