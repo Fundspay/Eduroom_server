@@ -330,16 +330,12 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                     <tr style="background:#f0f0f0; text-align:center;">
                       <th>Match %</th>
                       <th>Passed</th>
-                      <th>Course ID</th>
-                      <th>User ID</th>
-                      <th>Question ID</th>
+                      
                     </tr>
                     <tr style="text-align:center;">
                       <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
                       <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                      <td>${cs.courseId}</td>
-                      <td>${cs.userId}</td>
-                      <td>${cs.id}</td>
+                     
                     </tr>
                   </table>
                 `
