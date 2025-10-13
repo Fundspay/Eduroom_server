@@ -91,7 +91,12 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
-  if (!courseId) return { sessions: [], domain: "", courseName: "" };
+  console.log("📌 Fetching case studies for:", { courseId, userId });
+
+  if (!courseId) {
+    console.warn("⚠️ courseId is missing, returning empty result");
+    return { sessions: [], domain: "", courseName: "" };
+  }
 
   try {
     // 1️⃣ Fetch course details and questions
@@ -112,7 +117,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer", // correct answer from QuestionModel
+            "answer", // correct answer
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -121,11 +126,14 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     });
 
     if (!courseDetailRows.length) {
+      console.info("ℹ️ No course details found for courseId:", courseId);
       return { sessions: [], domain: "", courseName: "" };
     }
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
+
+    console.log("📌 Found course:", courseName, "in domain:", domain);
 
     // 2️⃣ Fetch user results if userId is provided
     let resultMap = {};
@@ -134,9 +142,14 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         where: { userId, courseId },
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
+
+      console.log("📌 Fetched user results:", results.map(r => r.toJSON()));
+
       results.forEach((r) => {
-        resultMap[String(r.questionId)] = r; // normalize key as string
+        resultMap[String(r.questionId)] = r;
       });
+    } else {
+      console.info("ℹ️ No userId provided, skipping user results fetch");
     }
 
     // 3️⃣ Build sessions and case studies
@@ -145,7 +158,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim());
         if (!csList || csList.length === 0) return null;
 
-        // Map all case studies for this session
         const caseStudies = csList.map((cs) => {
           const userResult = resultMap[String(cs.id)] || {};
           return {
@@ -170,9 +182,11 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       })
       .filter(Boolean);
 
+    console.log(`📌 Returning ${sessions.length} session(s) with case studies`);
+
     return { sessions, domain, courseName };
   } catch (err) {
-    console.error("Error fetching case studies:", err);
+    console.error("❌ Error fetching case studies:", err);
     return { sessions: [], domain: "", courseName: "" };
   }
 };
