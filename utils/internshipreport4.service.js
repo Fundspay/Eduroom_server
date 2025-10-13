@@ -132,7 +132,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
-
     console.log("📌 Found course:", courseName, "in domain:", domain);
 
     // 2️⃣ Fetch user results if userId is provided
@@ -149,7 +148,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         resultMap[String(r.questionId)] = r;
       });
     } else {
-      console.info("ℹ️ No userId provided, skipping user results fetch");
+      console.warn("⚠️ userId is null or missing — returning questions without user answers");
     }
 
     // 3️⃣ Build sessions and case studies
