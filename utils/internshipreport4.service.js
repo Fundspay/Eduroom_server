@@ -246,20 +246,9 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               })
               .join("");
 
+            //  Calculate score, percentage, and status from MCQs themselves
             const totalMCQs = s.mcqs.length || 0;
-
-            // Correct MCQs: compare userProgress selected answer with correct answer
-            let correctMCQs = 0;
-            if (userId && s.userProgress[userId]) {
-              let progress = s.userProgress[userId];
-              if (typeof progress === "string") progress = JSON.parse(progress);
-              if (progress.answers && Array.isArray(progress.answers)) {
-                correctMCQs = progress.answers.filter(
-                  (a) => a.selected === a.correct
-                ).length;
-              }
-            }
-
+            const correctMCQs = s.mcqs.filter((q) => q.answer).length;
             const percentage =
               totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
             const status = percentage >= 60 ? "PASSED" : "FAILED";
