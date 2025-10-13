@@ -30,6 +30,7 @@ const escapeHtml = (str) => {
 const fetchSessionsWithMCQs = async (courseId, userId) => {
   if (!courseId) courseId = 1;
 
+  // Fetch course details with MCQs
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -51,34 +52,51 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
           "answer",
         ],
       },
-      { model: model.Course, attributes: ["name", "startDate", "endDate"] },
+      { model: model.Course, attributes: ["name"] },
       { model: model.Domain, attributes: ["name"] },
     ],
   });
 
-  if (!courseDetailRows.length)
-    return { sessions: [], domain: "", courseName: "" };
+  if (!courseDetailRows.length) return { sessions: [], domain: "", courseName: "" };
 
   const domain = courseDetailRows[0].Domain?.name || "";
   const courseName = courseDetailRows[0].Course?.name || "";
-  const courseStartDate = courseDetailRows[0].Course?.startDate || "N/A";
-  const courseEndDate = courseDetailRows[0].Course?.endDate || "N/A";
 
-  // Fetch user MCQ results
-  let userResultsMap = {};
+  // Fetch user answers from CaseStudyResults
+  let userAnswersMap = {};
   if (userId) {
     const userResults = await model.CaseStudyResult.findAll({
       where: { userId, courseId },
-      attributes: ["questionId", "answer", "passed", "matchPercentage"],
+      attributes: ["questionId", "answer", "matchPercentage", "passed"],
     });
+
     userResults.forEach((r) => {
-      userResultsMap[String(r.questionId)] = r;
+      userAnswersMap[r.questionId] = r;
     });
   }
 
+  // Fetch user startDate and endDate from User.courseDates
+  let startDate = "N/A",
+    endDate = "N/A";
+  if (userId) {
+    const user = await model.User.findByPk(userId);
+    if (user?.courseDates && user.courseDates[courseId]) {
+      startDate = user.courseDates[courseId].startDate || "N/A";
+      endDate = user.courseDates[courseId].endDate || "N/A";
+    }
+  }
+
   const sessions = courseDetailRows.map((session) => {
+    const totalMCQs = session.QuestionModels.length;
+    let correctMCQs = 0;
+
     const mcqs = session.QuestionModels.map((q) => {
-      const userAnswerObj = userResultsMap[String(q.id)] || {};
+      const userAnswer = userAnswersMap[q.id]?.answer || null;
+      const passed = userAnswersMap[q.id]?.passed || false;
+      const matchPercentage = userAnswersMap[q.id]?.matchPercentage || 0;
+
+      if (passed) correctMCQs += 1;
+
       return {
         id: q.id,
         question: q.question,
@@ -89,15 +107,13 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
           { key: "D", text: q.optionD },
         ],
         answer: q.answer,
-        userAnswer: userAnswerObj.answer || null,
-        passed: userAnswerObj.passed ?? false,
-        matchPercentage: userAnswerObj.matchPercentage ?? 0,
+        userAnswer,
+        passed,
+        matchPercentage,
       };
     });
 
-    let correctMCQs = mcqs.filter((m) => m.userAnswer === m.answer).length;
-    let totalMCQs = mcqs.length;
-    let percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+    const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
 
     return {
       id: session.id,
@@ -105,18 +121,16 @@ const fetchSessionsWithMCQs = async (courseId, userId) => {
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
       videoDuration: "~15 mins",
-      startDate: courseStartDate,
-      endDate: courseEndDate,
+      startDate,
+      endDate,
       mcqs,
-      totalMCQs,
-      correctMCQs,
-      percentage,
-      userProgress: session.userProgress || {},
+      mcqStats: { totalMCQs, correctMCQs, percentage, status: percentage >= 60 ? "PASSED" : "FAILED" },
     };
   });
 
   return { sessions, domain, courseName };
 };
+
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
