@@ -90,15 +90,25 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
-const fetchAllCaseStudies = async ({ courseId, userId }) => {
-  // 🔹 Hardcode userId for testing
-  userId = 2;
+// =======================
+// FETCH ALL CASE STUDIES PER SESSION FOR USER
+// =======================
+const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
+  // 1️⃣ Auto-detect userId if not provided
+  if (!userId && req?.user?.id) {
+    userId = req.user.id;
+    console.log("📌 Detected userId from request:", userId);
+  }
 
   console.log("📌 Fetching case studies for:", { courseId, userId });
 
-  if (!courseId) return { sessions: [], domain: "", courseName: "" };
+  if (!courseId) {
+    console.warn("⚠️ courseId is missing, returning empty result");
+    return { sessions: [], domain: "", courseName: "" };
+  }
 
   try {
+    // 2️⃣ Fetch course details and questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -116,7 +126,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer",
+            "answer", // correct answer
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -124,21 +134,33 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    const domain = courseDetailRows[0]?.Domain?.name || "";
-    const courseName = courseDetailRows[0]?.Course?.name || "";
+    if (!courseDetailRows.length) {
+      console.info("ℹ️ No course details found for courseId:", courseId);
+      return { sessions: [], domain: "", courseName: "" };
+    }
 
+    const domain = courseDetailRows[0].Domain?.name || "";
+    const courseName = courseDetailRows[0].Course?.name || "";
+    console.log("📌 Found course:", courseName, "in domain:", domain);
+
+    // 3️⃣ Fetch user results if userId is available
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
         where: { userId, courseId },
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
+
       console.log("📌 Fetched user results:", results.map(r => r.toJSON()));
+
       results.forEach((r) => {
         resultMap[String(r.questionId)] = r;
       });
+    } else {
+      console.warn("⚠️ userId is null or missing — returning questions without user answers");
     }
 
+    // 4️⃣ Build sessions and case studies
     const sessions = courseDetailRows
       .map((session) => {
         const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim());
@@ -150,11 +172,11 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             id: cs.id,
             question: cs.caseStudy,
             correctAnswer: cs.answer || "",
-            userAnswer: userResult.answer ?? "N/A",
+            userAnswer: userResult.answer ?? "N/A", // ✅ Use user answer
             matchPercentage: userResult.matchPercentage ?? 0,
             passed: userResult.passed ?? false,
             courseId,
-            userId,
+            userId: userId ?? null,
           };
         });
 
@@ -295,7 +317,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               .map(
                 (cs, idx) => `
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
-                  <p><b>Answer Text:</b> ${escapeHtml(cs.answer || "N/A")}</p>
+                  <p><b>Answer Text:</b> ${escapeHtml(cs.userAnswer || "N/A")}</p>
                   <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
                     <tr style="background:#f0f0f0; text-align:center;">
                       <th>Match %</th>
