@@ -90,11 +90,8 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // =======================
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
-// =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER
-// =======================
 const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
-  // 1️⃣ Auto-detect userId if not provided
+  // 1️⃣ Detect logged-in user if userId not provided
   if (!userId && req?.user?.id) {
     userId = req.user.id;
     console.log("📌 Detected userId from request:", userId);
@@ -126,7 +123,7 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer", // correct answer
+            "answer",
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -151,19 +148,26 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
 
-      console.log("📌 Fetched user results:", results.map(r => r.toJSON()));
+      console.log(
+        "📌 Fetched user results:",
+        results.map((r) => r.toJSON())
+      );
 
       results.forEach((r) => {
         resultMap[String(r.questionId)] = r;
       });
     } else {
-      console.warn("⚠️ userId is null or missing — returning questions without user answers");
+      console.warn(
+        "⚠️ userId is null or missing — returning questions without user answers"
+      );
     }
 
     // 4️⃣ Build sessions and case studies
     const sessions = courseDetailRows
       .map((session) => {
-        const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim());
+        const csList = session.QuestionModels?.filter(
+          (q) => q.caseStudy?.trim()
+        );
         if (!csList || csList.length === 0) return null;
 
         const caseStudies = csList.map((cs) => {
@@ -172,7 +176,7 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
             id: cs.id,
             question: cs.caseStudy,
             correctAnswer: cs.answer || "",
-            userAnswer: userResult.answer ?? "N/A", // ✅ Use user answer
+            userAnswer: userResult.answer ?? "N/A",
             matchPercentage: userResult.matchPercentage ?? 0,
             passed: userResult.passed ?? false,
             courseId,
@@ -205,17 +209,20 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
-  const userId = options.userId || null;
-  const coursePreviewId = options.coursePreviewId || 1;
+  let userId = options.userId || null; // note: let here to allow reassignment
 
+  // Detect userId from request if not passed explicitly
   if (!userId && options.req?.user?.id) {
     userId = options.req.user.id;
     console.log("📌 Using logged-in userId:", userId);
   }
 
-
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
-  const { sessions: allCaseStudies } = await fetchAllCaseStudies({ courseId, userId });
+  const { sessions: allCaseStudies } = await fetchAllCaseStudies({
+    courseId,
+    userId,
+    req: options.req,
+  });
 
   const bgUrl = options.bgUrl || `${ASSET_BASE}/internshipbg.png`;
   const generatedOn = new Date().toLocaleDateString("en-GB", {
@@ -258,7 +265,8 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               }
             }
 
-            const percentage = totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
+            const percentage =
+              totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
             const status = percentage >= 60 ? "PASSED" : "FAILED";
 
             const scoreTableHtml = `
@@ -418,12 +426,14 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const fileName = `mcq-case-report-${timestamp}.pdf`;
   const s3Key = `internshipReports/mcq-case/${fileName}`;
 
-  await s3.putObject({
-    Bucket: "fundsweb",
-    Key: s3Key,
-    Body: pdfBuffer,
-    ContentType: "application/pdf",
-  }).promise();
+  await s3
+    .putObject({
+      Bucket: "fundsweb",
+      Key: s3Key,
+      Body: pdfBuffer,
+      ContentType: "application/pdf",
+    })
+    .promise();
 
   return {
     fileName,

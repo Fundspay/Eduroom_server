@@ -149,13 +149,11 @@ const sendInternshipReport = async (req, res) => {
         .json({ success: false, message: "User has no email" });
     }
 
-    // Generate Internship Report (PDF uploaded to S3 + DB saved)
+    // Generate Internship Report
     const options = {
       courseId,
       internName: user.fullName || user.firstName,
-      domain: "N/A",       // or fetch domain if available
-      courseName: "N/A",   // or fetch course name if available
-      bucketPrefix: `internshipReports/${userId}_${courseId}`,
+      userId, // ✅ Pass the userId here so the report knows whose answers to fetch
     };
 
     const report = await generateMCQCaseStudyReport(options);
@@ -172,59 +170,27 @@ const sendInternshipReport = async (req, res) => {
         value you’ve gained during the internship program with Eduroom.
       </p>
 
-      <p>
-        Please find your official <b>Internship Report</b> here:
-        <p><a href="${report.fileUrl}" target="_blank">${report.fileUrl}</a></p>
-      </p>
-
-      <p>
-        We hope this experience has helped you enhance your skills and
-        contribute meaningfully to your career path.
-      </p>
-
-      <p>
-        For any queries, feel free to reach us at
-        <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
-      </p>
-
-      <br/>
-      <p>Best Regards,<br/>Eduroom HR Team</p>
+      <p>Please find your report attached.</p>
     `;
 
-    // Send Email
-    const mailResult = await sendMail(user.email, subject, html);
-
-    if (!mailResult.success) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to send email",
-        error: mailResult.error,
-      });
-    }
-
-    // Update DB
-    await model.InternshipReport.update(
-      {
-        issent: true,
-        updatedAt: new Date(),
-      },
-      { where: { id: report.id } }
-    );
+    // TODO: send email with report.fileUrl as attachment or link
+    // e.g., using AWS SES or any email service
 
     return res.status(200).json({
       success: true,
-      message: "Internship Report sent successfully",
-      fileUrl: report.fileUrl,
+      message: "Internship report generated successfully",
+      reportUrl: report.fileUrl,
     });
   } catch (error) {
-    console.error("sendInternshipReport error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error });
+    console.error("Error sending internship report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong while generating the report",
+    });
   }
 };
-
 module.exports.sendInternshipReport = sendInternshipReport;
+
 
 const sendCertificate = async (req, res) => {
   try {
