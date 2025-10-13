@@ -120,25 +120,7 @@ const generateInternshipReport = async (userId) => {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // 5️⃣ Upload to S3
-  const timestamp = Date.now();
-  const fileName = `internship-report-${timestamp}.pdf`;
-  const s3Key = `internshipReports/${userId}/${fileName}`;
-
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
-
-  // 6️⃣ Return S3 file link
-  return {
-    fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
-  };
+    return pdfBuffer;
 };
 
 module.exports = { generateInternshipReport };

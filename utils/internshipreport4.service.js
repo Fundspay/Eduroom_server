@@ -422,23 +422,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
 
   await browser.close();
 
-  const timestamp = Date.now();
-  const fileName = `mcq-case-report-${timestamp}.pdf`;
-  const s3Key = `internshipReports/mcq-case/${fileName}`;
-
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
-
-  return {
-    fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
-  };
+    return pdfBuffer;
 };
-
 module.exports = { generateMCQCaseStudyReport };

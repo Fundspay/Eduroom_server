@@ -188,23 +188,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await browser.close();
 
   // 🔹 Upload to S3
-  const s3KeyPrefix = options.bucketPrefix || `internshipReports/toc`;
-  const s3Key = `${s3KeyPrefix}/table-of-contents.pdf`;
-
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
-
-  return {
-    fileName: "table-of-contents.pdf",
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
-    s3Key,
-  };
+    return pdfBuffer;
 };
 
 module.exports = { generateSessionReport };
