@@ -200,6 +200,12 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const userId = options.userId || null;
   const coursePreviewId = options.coursePreviewId || 1;
 
+  if (!userId && options.req?.user?.id) {
+    userId = options.req.user.id;
+    console.log("📌 Using logged-in userId:", userId);
+  }
+
+
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
   const { sessions: allCaseStudies } = await fetchAllCaseStudies({ courseId, userId });
 
