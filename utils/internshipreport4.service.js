@@ -94,6 +94,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId) return { sessions: [], domain: "", courseName: "" };
 
   try {
+    // 1️⃣ Fetch course details and questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -111,7 +112,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
             "question",
             "day",
             "sessionNumber",
-            "answer", // ✅ added
+            "answer", // correct answer from QuestionModel
           ],
         },
         { model: model.Course, attributes: ["name"] },
@@ -119,12 +120,14 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       ],
     });
 
-    if (!courseDetailRows.length)
+    if (!courseDetailRows.length) {
       return { sessions: [], domain: "", courseName: "" };
+    }
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
 
+    // 2️⃣ Fetch user results if userId is provided
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
@@ -132,34 +135,37 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
       results.forEach((r) => {
-        resultMap[String(r.questionId)] = r;
+        resultMap[String(r.questionId)] = r; // normalize key as string
       });
     }
 
+    // 3️⃣ Build sessions and case studies
     const sessions = courseDetailRows
       .map((session) => {
-        const cs = session.QuestionModels?.find((q) => q.caseStudy?.trim());
-        if (!cs) return null;
+        const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim());
+        if (!csList || csList.length === 0) return null;
 
-        const userResult = resultMap[String(cs.id)] || {};
+        // Map all case studies for this session
+        const caseStudies = csList.map((cs) => {
+          const userResult = resultMap[String(cs.id)] || {};
+          return {
+            id: cs.id,
+            question: cs.caseStudy,
+            correctAnswer: cs.answer || "",
+            userAnswer: userResult.answer ?? "N/A",
+            matchPercentage: userResult.matchPercentage ?? 0,
+            passed: userResult.passed ?? false,
+            courseId,
+            userId: userId ?? null,
+          };
+        });
 
         return {
           id: session.id,
           day: session.day,
           sessionNumber: session.sessionNumber,
           title: session.title || `Session ${session.day}`,
-          caseStudies: [
-            {
-              id: cs.id,
-              question: cs.caseStudy,
-              correctAnswer: cs.answer || "",
-              userAnswer: userResult.answer ?? "N/A",
-              matchPercentage: userResult.matchPercentage ?? 0,
-              passed: userResult.passed ?? false,
-              courseId,
-              userId,
-            },
-          ],
+          caseStudies,
         };
       })
       .filter(Boolean);
@@ -170,6 +176,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     return { sessions: [], domain: "", courseName: "" };
   }
 };
+
 
 // =======================
 // MAIN REPORT GENERATION FUNCTION
