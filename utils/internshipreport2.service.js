@@ -155,9 +155,9 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
               .replace(/&/g, "&amp;")
               .replace(/</g, "&lt;")
               .replace(/>/g, "&gt;");
-            return `<tr><td class="field">${label}</td><td class="value">${
+            return `<tr><td class="field">${label}</td><td class="value"><span class="red-text">${
               safeVal || "&nbsp;"
-            }</td></tr>`;
+            }</span></td></tr>`;
           })
           .join("\n")}
       </tbody>
@@ -198,11 +198,14 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
         padding:6px 8px;
         font-size:14px;
         vertical-align:middle;
-        text-align:center; /* ✅ Only table content centered */
+        text-align:center;
       }
       .details-table thead th {
         background-color:#f0f0f0;
         font-weight:bold;
+      }
+      .red-text {
+        color: red;
       }
       .footer {
         position:absolute;
@@ -264,4 +267,5 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
 
   return pdfBuffer;
 };
+
 module.exports = { generateInternshipDetailsReport };

@@ -78,12 +78,12 @@ const generateInternshipReport = async (userId) => {
       margin-top: 10px;
     }
     .footer {
-      position: absolute;
-      bottom: 40px;
-      width: 100%;
-      text-align: center;
-      font-size: 14px;
-      color: #444;
+        position:absolute;
+        bottom:10px;
+        width:100%;
+        text-align:center;
+        font-size:14px;
+        color:#444;
     }
   </style>
 </head>
