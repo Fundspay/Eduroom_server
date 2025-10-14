@@ -61,11 +61,12 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER
+// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
 
+  // Fetch sessions and case study questions
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -77,35 +78,37 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         model: model.QuestionModel,
         where: { isDeleted: false },
         required: false,
-        attributes: ["id", "caseStudy", "answer"],
+        attributes: ["id", "caseStudy"],
       },
     ],
   });
 
+  // Fetch user case study results
   const caseStudyResults = await model.CaseStudyResult.findAll({
     where: { courseId, userId },
     attributes: ["questionId", "matchPercentage"],
   });
 
+  // Map for quick access
   const resultMap = {};
-  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r));
+  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r.matchPercentage));
 
+  // Compute average match percentage per session
   return courseDetailRows.map((session) => {
-    const csList =
-      session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
+    const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
-      const res = resultMap[String(cs.id)];
-      return acc + (res?.matchPercentage || 0);
+      const match = resultMap[String(cs.id)] || 0;
+      return acc + match;
     }, 0);
-    const percentage = totalCS > 0 ? totalMatch / totalCS : 0;
+    const avgPercentage = totalCS > 0 ? totalMatch / totalCS : 0;
 
     return {
       id: session.id,
       day: session.day,
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
-      caseStudyPercentage: parseFloat(percentage.toFixed(2)),
+      caseStudyPercentage: parseFloat(avgPercentage.toFixed(2)),
     };
   });
 };
