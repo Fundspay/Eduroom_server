@@ -1295,7 +1295,7 @@ const getBusinessUserTarget = async (req, res) => {
     if (!user) return ReE(res, "User not found", 404);
     console.log(`Fetched user ${userId}: ${user.fullName || user.firstName}`);
 
-    // Ensure triggeredTargets is an object
+    // 2️⃣ Ensure triggeredTargets is a valid object
     if (!user.triggeredTargets || typeof user.triggeredTargets !== "object") {
       try {
         user.triggeredTargets = typeof user.triggeredTargets === "string"
@@ -1306,11 +1306,11 @@ const getBusinessUserTarget = async (req, res) => {
       }
     }
 
-    // 2️⃣ Get business target
+    // 3️⃣ Get business target
     const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
     console.log(`Business target for user ${userId}: ${businessTarget}`);
 
-    // 3️⃣ Trigger certificate once if target == 1
+    // 4️⃣ Trigger certificate once if target == 1
     if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
       console.log(`Business target = 1 and certificate not yet triggered for user ${userId}`);
       try {
@@ -1318,9 +1318,9 @@ const getBusinessUserTarget = async (req, res) => {
         const response = await axios.post(triggerUrl);
         console.log(`Certificate triggered successfully for user ${userId}. Status: ${response.status}`);
 
-        // Mark as triggered
+        // Mark as triggered and persist
         user.triggeredTargets["userLevel"] = true;
-        await user.save(); // persist the change
+        await user.save(); // save without restricting fields
         console.log("Updated triggeredTargets:", user.triggeredTargets);
       } catch (err) {
         console.warn(`Trigger certificate error for user ${userId}:`, err.message);
@@ -1329,7 +1329,7 @@ const getBusinessUserTarget = async (req, res) => {
       console.log(`Certificate trigger skipped for user ${userId}. Either businessTarget != 1 or already triggered`);
     }
 
-    // 4️⃣ Fetch achieved referral count
+    // 5️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
       try {
@@ -1342,18 +1342,18 @@ const getBusinessUserTarget = async (req, res) => {
       }
     }
 
-    // 5️⃣ Calculate wallet values
+    // 6️⃣ Calculate wallet values
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
     const subscriptionWallet = Number(achievedCount) || 0;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-    // 6️⃣ Update user wallet
+    // 7️⃣ Update user wallet
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
     await user.save({ fields: ["subscriptionWallet", "subscriptionLeft"] });
     console.log(`Updated user ${userId} wallet: subscriptionWallet=${subscriptionWallet}, subscriptionLeft=${subscriptionLeft}`);
 
-    // 7️⃣ Return response
+    // 8️⃣ Return response
     return ReS(res, {
       success: true,
       data: {
@@ -1373,7 +1373,6 @@ const getBusinessUserTarget = async (req, res) => {
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
-
 
 const getCourseStatus = async (req, res) => {
   try {
