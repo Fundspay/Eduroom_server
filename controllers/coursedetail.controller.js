@@ -1290,6 +1290,8 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
+    const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
+
     // Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
