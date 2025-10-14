@@ -7,6 +7,7 @@ const { generateInternshipReport } = require("../utils/internshipreport1.service
 const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service");
 const  { generateSessionReport } = require("../utils/internshipreport3.service");
 const  { generateMCQCaseStudyReport } = require("../utils/internshipreport4.service")
+const {finalpageinternshipreport} = require("../utils/internshipreport5.service");
 
 
 
@@ -184,8 +185,10 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
     const sessionPdf = await generateSessionReport(userId, { courseId });
     const mcqCaseStudyPdf = await generateMCQCaseStudyReport({
       userId,
-      courseId
+      courseId,
     });
+    // ✅ NEW: final summary table page
+    const summaryPdf = await finalpageinternshipreport({ userId, courseId });
 
     // 4️⃣ Merge PDFs and upload to S3
     const merged = await mergePDFsAndUpload(userId, [
@@ -193,6 +196,7 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
       detailsPdf,
       sessionPdf,
       mcqCaseStudyPdf,
+      summaryPdf, // ✅ added as last page
     ]);
 
     // 5️⃣ Send email with the merged PDF link
