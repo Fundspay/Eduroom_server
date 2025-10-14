@@ -91,21 +91,15 @@ const fetchSessionsWithMCQs = async (courseId) => {
 // FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
-  // 1️⃣ Detect logged-in user if userId not provided
   if (!userId && req?.user?.id) {
     userId = req.user.id;
-    console.log("📌 Detected userId from request:", userId);
   }
 
-  console.log("📌 Fetching case studies for:", { courseId, userId });
-
   if (!courseId) {
-    console.warn("⚠️ courseId is missing, returning empty result");
     return { sessions: [], domain: "", courseName: "" };
   }
 
   try {
-    // 2️⃣ Fetch course details and questions
     const courseDetailRows = await model.CourseDetail.findAll({
       where: { courseId, isDeleted: false },
       order: [
@@ -132,37 +126,23 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
     });
 
     if (!courseDetailRows.length) {
-      console.info("ℹ️ No course details found for courseId:", courseId);
       return { sessions: [], domain: "", courseName: "" };
     }
 
     const domain = courseDetailRows[0].Domain?.name || "";
     const courseName = courseDetailRows[0].Course?.name || "";
-    console.log("📌 Found course:", courseName, "in domain:", domain);
 
-    // 3️⃣ Fetch user results if userId is available
     let resultMap = {};
     if (userId) {
       const results = await model.CaseStudyResult.findAll({
         where: { userId, courseId },
         attributes: ["questionId", "answer", "matchPercentage", "passed"],
       });
-
-      console.log(
-        "📌 Fetched user results:",
-        results.map((r) => r.toJSON())
-      );
-
       results.forEach((r) => {
         resultMap[String(r.questionId)] = r;
       });
-    } else {
-      console.warn(
-        "⚠️ userId is null or missing — returning questions without user answers"
-      );
     }
 
-    // 4️⃣ Build sessions and case studies
     const sessions = courseDetailRows
       .map((session) => {
         const csList = session.QuestionModels?.filter(
@@ -194,11 +174,8 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
       })
       .filter(Boolean);
 
-    console.log(`📌 Returning ${sessions.length} session(s) with case studies`);
-
     return { sessions, domain, courseName };
   } catch (err) {
-    console.error("❌ Error fetching case studies:", err);
     return { sessions: [], domain: "", courseName: "" };
   }
 };
@@ -206,21 +183,15 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
 // =======================
 // MAIN REPORT GENERATION FUNCTION
 // =======================
-// =======================
-// MAIN REPORT GENERATION FUNCTION
-// =======================
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
   const internName = options.internName || "";
-  let userId = options.userId || null; // allow reassignment
+  let userId = options.userId || null;
 
-  // Detect userId from request if not passed explicitly
   if (!userId && options.req?.user?.id) {
     userId = options.req.user.id;
-    console.log("📌 Using logged-in userId:", userId);
   }
 
-  // ---------------- Get user's course start/end dates ----------------
   let courseDates = null;
   if (userId) {
     const user = await model.User.findOne({
@@ -233,7 +204,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     }
   }
 
-  // ---------------- Fetch MCQ sessions and case studies ----------------
   const { sessions, domain, courseName } = await fetchSessionsWithMCQs(courseId);
   const { sessions: allCaseStudies } = await fetchAllCaseStudies({
     courseId,
@@ -241,7 +211,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     req: options.req,
   });
 
-  // Map sessions to include real start/end dates
   const sessionsWithDates = sessions.map((s) => ({
     ...s,
     startDate: courseDates?.startDate || "N/A",
@@ -255,7 +224,6 @@ const generateMCQCaseStudyReport = async (options = {}) => {
     year: "numeric",
   });
 
-  // ---------------- Generate MCQ HTML ----------------
   const sessionsHtml =
     sessionsWithDates.length > 0
       ? sessionsWithDates
@@ -278,42 +246,34 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               })
               .join("");
 
-            let correctMCQs = 0,
-              totalMCQs = s.mcqs.length || 0;
-
-            if (userId && s.userProgress[userId]) {
-              let progressRaw = s.userProgress[userId];
-              if (typeof progressRaw === "string") progressRaw = JSON.parse(progressRaw);
-              if (progressRaw.answers && Array.isArray(progressRaw.answers)) {
-                correctMCQs = progressRaw.answers.filter((a) => a.isCorrect).length;
-              }
-            }
-
+            const totalMCQs = s.mcqs.length || 0;
+            const correctMCQs = s.mcqs.filter((q) => q.answer).length;
             const percentage =
               totalMCQs > 0 ? ((correctMCQs / totalMCQs) * 100).toFixed(2) : "0.00";
             const status = percentage >= 60 ? "PASSED" : "FAILED";
 
+            // ✅ Centered table only
             const scoreTableHtml = `
-              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
-                <tr style="background:#f0f0f0; text-align:center;">
-                  <th>Score</th>
-                  <th>PERCENTAGE</th>
-                  <th>STATUS</th>
-                </tr>
-                <tr style="text-align:center;">
-                  <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
-                  <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
-                  <td style="font-weight:bold;">${status}</td>
-                </tr>
-              </table>
+              <div style="text-align:center; width:100%;">
+                <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%; margin-left:auto; margin-right:auto;">
+                  <tr style="background:#f0f0f0; text-align:center;">
+                    <th>Score</th>
+                    <th>PERCENTAGE</th>
+                    <th>STATUS</th>
+                  </tr>
+                  <tr style="text-align:center;">
+                    <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
+                    <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
+                    <td style="font-weight:bold;">${status}</td>
+                  </tr>
+                </table>
+              </div>
             `;
 
             return `
             <div class="page">
               <div class="content">
                 <h1>Eduroom Internship Report</h1>
-                <h2>Session ${s.day}</h2>
-                <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
                 <p><b>Domain:</b> ${escapeHtml(domain)}</p>
                 <p><b>Course:</b> ${escapeHtml(courseName)}</p>
                 <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
@@ -340,7 +300,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
           <div class="footer">Generated by FundsWeb · ${generatedOn}</div>
         </div>`;
 
-  // ---------------- Case Study HTML ----------------
+  // ✅ Centered only case study tables
   const caseStudiesHtml =
     allCaseStudies.length > 0
       ? allCaseStudies
@@ -350,16 +310,18 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                 (cs, idx) => `
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
                   <p><b>Answer Text:</b> ${escapeHtml(cs.userAnswer || "N/A")}</p>
-                  <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
-                    <tr style="background:#f0f0f0; text-align:center;">
-                      <th>Match %</th>
-                      <th>Passed</th>
-                    </tr>
-                    <tr style="text-align:center;">
-                      <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
-                      <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
-                    </tr>
-                  </table>
+                  <div style="text-align:center; width:100%;">
+                    <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%; margin-left:auto; margin-right:auto;">
+                      <tr style="background:#f0f0f0; text-align:center;">
+                        <th>Match %</th>
+                        <th>Passed</th>
+                      </tr>
+                      <tr style="text-align:center;">
+                        <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
+                        <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
+                      </tr>
+                    </table>
+                  </div>
                 `
               )
               .join("");

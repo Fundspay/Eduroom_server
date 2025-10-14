@@ -61,7 +61,7 @@ const fetchSessions = async (courseId) => {
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
- const courseId = Number(options.courseId);
+  const courseId = Number(options.courseId);
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData
@@ -88,8 +88,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       const tocRows = pageSessions
         .map((s, idx) => {
           const srNo = pageIndex * sessionsPerPage + (idx + 1);
+          // ✅ Added bullet before each topic
           const topics = s.sessionTitles
-            .map((t) => `<div>${escapeHtml(t)}</div>`)
+            .map((t) => `<div>• ${escapeHtml(t)}</div>`)
             .join("");
           return `
             <tr>
@@ -108,9 +109,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
           <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
               <tr>
-                <th style="width:10%; text-align:center;">Sr No</th>
-                <th style="width:30%; text-align:left;">Session</th>
-                <th style="width:60%; text-align:left;">Topics</th>
+                <th style="width:10%;">Sr No</th>
+                <th style="width:30%;">Session</th>
+                <th style="width:60%;">Topics</th>
               </tr>
             </thead>
             <tbody>
@@ -148,10 +149,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     color:#000;
     position:relative;
   }
-  /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:135px 40px 60px 40px; /* reduced from 180px top to 120px */
+    margin:135px 40px 60px 40px;
     padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;
@@ -159,7 +159,8 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   .main-title { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
   .section-title { font-size:18px; font-weight:bold; margin:12px 0 6px 0; }
   .toc-table th { background-color: #f0f0f0; font-weight: bold; }
-  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: top; }
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: middle; text-align: center; }
+  .toc-table td div { text-align: left; margin-left: 10px; } /* keep bullet topics aligned neatly */
 </style>
 </head>
 <body>
@@ -188,7 +189,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await browser.close();
 
   // 🔹 Upload to S3
-    return pdfBuffer;
+  return pdfBuffer;
 };
 
 module.exports = { generateSessionReport };
