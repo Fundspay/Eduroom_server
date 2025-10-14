@@ -62,7 +62,6 @@ const fetchSessionsWithMCQs = async (courseId) => {
   const domain = courseDetailRows[0].Domain?.name || "";
   const courseName = courseDetailRows[0].Course?.name || "";
 
-  // Track counts of the same day to append .1, .2, etc.
   const dayCounter = {};
 
   const sessions = courseDetailRows.map((session) => {
@@ -83,11 +82,11 @@ const fetchSessionsWithMCQs = async (courseId) => {
         id: q.id,
         question: q.question,
         options: [
-          { key: "A", text: q.optionA },
-          { key: "B", text: q.optionB },
-          { key: "C", text: q.optionC },
-          { key: "D", text: q.optionD },
-        ],
+          q.optionA ? { key: "A", text: q.optionA } : null,
+          q.optionB ? { key: "B", text: q.optionB } : null,
+          q.optionC ? { key: "C", text: q.optionC } : null,
+          q.optionD ? { key: "D", text: q.optionD } : null,
+        ].filter(Boolean), // remove nulls
         answer: q.answer,
       })),
       userProgress: session.userProgress || {},
@@ -167,7 +166,9 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
             question: cs.caseStudy,
             correctAnswer: cs.answer || "",
             userAnswer: userResult.answer ?? "N/A",
-            matchPercentage: userResult.matchPercentage ?? 0,
+            matchPercentage: userResult.matchPercentage
+              ? parseFloat(userResult.matchPercentage.toFixed(2))
+              : 0,
             passed: userResult.passed ?? false,
             courseId,
             userId: userId ?? null,
@@ -279,12 +280,11 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               </div>
             `;
 
-            // Only show course/session info on first page
             const courseInfoHtml = index === 0 ? `
               <p><b>Domain:</b> ${escapeHtml(domain)}</p>
               <p><b>Course:</b> ${escapeHtml(courseName)}</p>
               <p><b>Session:</b> ${escapeHtml(s.title)}</p>
-              <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
+              <p><b>Video Duration:</b> ${s.videoDuration} MCQ</p>
               <p><b>Start Date:</b> ${s.startDate}</p>
               <p><b>End Date:</b> ${s.endDate}</p>
             ` : "";
@@ -330,7 +330,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                         <th>Passed</th>
                       </tr>
                       <tr style="text-align:center;">
-                        <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
+                        <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage.toFixed(2)}%</td>
                         <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
                       </tr>
                     </table>
