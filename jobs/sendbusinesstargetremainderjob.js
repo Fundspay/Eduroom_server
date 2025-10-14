@@ -19,23 +19,38 @@ const sendBusinessTargetMail = async (user, activeTargets) => {
   if (!activeTargets.length) return;
 
   const html = `
-  <div style="font-family: Arial, sans-serif; color: #333;">
-    <p>Hi <strong>${user.firstName}</strong>,</p>
+  <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h2 style="color: #1a73e8;">🚀 EduRoom Business Target Update</h2>
+      <p style="color: #555;">Stay on track and achieve your daily goals! 🌟</p>
+    </div>
+
+    <p>Hi <strong>${user.firstName}</strong> 👋,</p>
+
     <p>Here’s your business target update for today:</p>
+
     <ul>
       ${activeTargets
         .map(
           (t) =>
-            `<li><b>${t.courseName || "Course"}:</b> Completed <b>${t.completed}</b> out of <b>${t.total}</b> targets (${t.remaining} remaining)</li>`
+            `<li>📌 <strong>${t.courseName}</strong>: Completed <b>${t.completed}</b> out of <b>${t.total}</b> targets (${t.remaining} remaining)</li>`
         )
         .join("")}
     </ul>
-    <p>Keep pushing — you’re getting closer to 100% completion!</p>
-    <p>Best regards,<br><strong>EduRoom Business Team</strong></p>
+
+    <p>Remember, every target you complete brings you closer to mastering your Live Project(s)! 💪</p>
+
+    <p>Motivational tip: <em>“Small consistent steps lead to big results. Keep pushing!”</em> ✨</p>
+
+    <p style="margin-top: 30px;">Best regards,<br/>
+    <strong>EduRoom Business Team</strong></p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+    <p style="font-size: 12px; color: #999;">This is an automated reminder. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
   </div>
   `;
 
-  const subject = `Your Business Target Progress Update`;
+  const subject = `📊 Your Business Target Progress Update`;
 
   await sendMail(user.email, subject, html);
   console.log(`📨 Sent business target reminder to ${user.email}`);
