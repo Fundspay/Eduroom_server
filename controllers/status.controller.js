@@ -24,7 +24,7 @@ var listAll = async function (req, res) {
                 {
                     model: model.User,
                     where: { isDeleted: false },
-                    attributes: ["id", "name", "email"],
+                    attributes: ["id", "fullName", "email"],
                     include: [
                         {
                             model: model.Status,
