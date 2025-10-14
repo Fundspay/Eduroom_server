@@ -7,7 +7,7 @@ const { Op } = require("sequelize");
 const dayjs = require("dayjs");
 model.InternshipStatus = require("../models/status.model.js");
 const { sendMail } = require("../middleware/mailer.middleware");
-const {User} = require(".../models");
+const {User} = require("../models");
  
 
 
