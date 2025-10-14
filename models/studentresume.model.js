@@ -75,8 +75,7 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "mobileNumber", // column in StudentResume
       targetKey: "phoneNumber",   // column in User
       as: "user",
-      onDelete: "SET NULL",
-      onUpdate: "CASCADE",
+      constraints: false, 
     });
   };
 
