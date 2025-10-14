@@ -15,23 +15,56 @@ var listAll = async function (req, res) {
         // Fetch active team managers
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
-            attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+            attributes: [
+                "id",
+                "managerId",
+                "name",
+                "email",
+                "mobileNumber",
+                "department",
+                "position",
+                "internshipStatus"
+            ]
         });
 
-        // Return response with counts
+        // Fetch all funds audits
+        const allFundsAudits = await model.FundsAudit.findAll({
+            include: [
+                {
+                    model: model.User,
+                    attributes: ["id", "name", "email"]
+                }
+            ]
+        });
+
+        // Merge funds audits into each manager
+        const teamManagersWithAudits = allTeamManagers.map(manager => {
+            const auditsForManager = allFundsAudits.filter(
+                audit => audit.userId === manager.managerId
+            );
+            return {
+                ...manager.get({ plain: true }),
+                fundsAudits: auditsForManager
+            };
+        });
+
+        // Return response
         return ReS(res, {
             success: true,
             data: statuses,
             teamManagers: {
-                total: allTeamManagers.length,
-                list: allTeamManagers
+                total: teamManagersWithAudits.length,
+                list: teamManagersWithAudits
             }
         }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.listAll = listAll;
+
 
 var updateStatus = async function (req, res) {
     try {
