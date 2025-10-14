@@ -205,7 +205,6 @@ const listResumes = async (req, res) => {
             // Status teamManager (string)
             {
               model: model.Status,
-              as: "statuses",
               attributes: ["teamManager"],
             },
 
