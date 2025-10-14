@@ -185,7 +185,6 @@ const listResumes = async (req, res) => {
             // FundsAudit
             {
               model: model.FundsAudit,
-              as: "fundsAudits",
               attributes: [
                 "id",
                 "registeredUserId",
