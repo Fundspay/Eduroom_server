@@ -191,7 +191,7 @@ const listResumes = async (req, res) => {
               ],
             },
             { model: model.Status, attributes: ["teamManager"] },
-            { model: model.TeamManager, attributes: ["id", "name", "email"] },
+            { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
           ],
         },
       ],
