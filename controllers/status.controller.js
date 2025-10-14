@@ -32,7 +32,7 @@ var listAll = async function (req, res) {
             include: [
                 {
                     model: model.User,
-                    attributes: ["id", "name", "email"]
+                    attributes: ["id", "fullName", "email"]
                 }
             ]
         });
