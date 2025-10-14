@@ -1117,7 +1117,8 @@ const getReferralPaymentStatus = async (req, res) => {
         "userId",
         "fundsAuditUserId",
         "phone_number",
-        "email",
+        "email"
+       
       ],
       raw: true,
     });
@@ -1156,6 +1157,7 @@ const getReferralPaymentStatus = async (req, res) => {
       isDownloaded: u.isDownloaded,
       queryStatus: u.queryStatus || null,
       isQueryRaised: u.isQueryRaised,
+      occupation: u.occupation || null,
     }));
 
     await FundsAudit.bulkCreate(rowsToInsert);
