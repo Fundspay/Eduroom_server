@@ -7,59 +7,45 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // 1️⃣ Fetch all active Status records (include all Status model fields)
+        // 1️⃣ Get all Status data
         const statuses = await model.Status.findAll({
             where: { isDeleted: false },
-            raw: true // flatten data for easy mapping
+            raw: true
         });
 
-        // 2️⃣ Fetch all Users with their FundsAudit records
-        const users = await model.User.findAll({
-            include: [
-                {
-                    model: model.FundsAudit,
-                    attributes: [
-                        "id",
-                        "registeredUserId",
-                        "firstName",
-                        "lastName",
-                        "phoneNumber",
-                        "email",
-                        "dateOfPayment",
-                        "dateOfDownload",
-                        "hasPaid",
-                        "isDownloaded",
-                        "queryStatus",
-                        "isQueryRaised",
-                        "occupation"
-                    ]
-                }
-            ],
-            attributes: ["id", "firstName", "lastName"],
+        // 2️⃣ Get all FundsAudit data directly
+        const fundsAudits = await model.FundsAudit.findAll({
+            where: {}, // add conditions if needed
+            raw: true
         });
 
-        const userData = users.map(u => u.get({ plain: true }));
-
-        // 3️⃣ Combine: Match Status.name ↔ User.firstName (you can also use both first/last if needed)
+        // 3️⃣ Map: Match userName in Status ↔ firstName + lastName in FundsAudit
         const statusWithFunds = statuses.map(status => {
-            const matchedUser = userData.find(user =>
-                user.firstName?.toLowerCase() === status.name?.toLowerCase()
-            );
+            const matchedFunds = fundsAudits.filter(fund => {
+                const fullName = `${fund.firstName ?? ""} ${fund.lastName ?? ""}`.trim().toLowerCase();
+                const statusName = (status.userName ?? "").trim().toLowerCase();
+                return fullName === statusName;
+            });
+
+            // if found, attach matchedFunds + first matching user's data
+            const matchedUser = matchedFunds.length > 0
+                ? { firstName: matchedFunds[0].firstName, lastName: matchedFunds[0].lastName, email: matchedFunds[0].email }
+                : null;
 
             return {
-                ...status, // keep all Status model fields
-                matchedUser: matchedUser || null,
-                fundsAudit: matchedUser ? matchedUser.FundsAudits : []
+                ...status,
+                matchedUser,
+                fundsAudit: matchedFunds
             };
         });
 
-        // 4️⃣ Fetch active Team Managers
+        // 4️⃣ Fetch team managers as before
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
 
-        // 5️⃣ Return final structured response
+        // 5️⃣ Return final response
         return ReS(res, {
             success: true,
             data: statusWithFunds,
@@ -75,6 +61,7 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
+
 
 var updateStatus = async function (req, res) {
     try {
