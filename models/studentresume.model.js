@@ -75,7 +75,13 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "mobileNumber", // column in StudentResume
       targetKey: "phoneNumber",   // column in User
       as: "user",
-      constraints: false, 
+      constraints: false,
+    });
+
+    StudentResume.hasMany(models.FundsAuditStudent, {
+      foreignKey: "studentResumeId",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
   };
 
