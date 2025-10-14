@@ -102,7 +102,7 @@ const html = `
   <div class="content">
     has successfully completed Module 1 of the Live Project on Customer Onboarding.<br><br>
     The candidate has actively participated in all onboarding activities, demonstrating a clear understanding of customer engagement processes, essential procedures, and best practices required for effective onboarding. Through consistent effort and commitment, ${candidateName} has acquired the foundational skills necessary to contribute effectively to customer onboarding initiatives and ensure a smooth, professional experience for clients.<br><br>
-    We hereby acknowledge and commend the candidate’s successful completion of this module and their readiness to progress to further stages of the live project.
+    We hereby acknowledge and commend the candidate’s successful completion of this module and promoted to module 2.
   </div>
 
   <div class="date">Date: <b>${today}</b></div>
@@ -114,8 +114,6 @@ const html = `
 </body>
 </html>
 `;
-
-
 
 // 3. Render PDF with Puppeteer
   let pdfBuffer;
