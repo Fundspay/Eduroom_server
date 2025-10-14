@@ -185,6 +185,7 @@ const fetchAllCaseStudies = async ({ courseId, userId, req }) => {
 // =======================
 const generateMCQCaseStudyReport = async (options = {}) => {
   const courseId = options.courseId || 1;
+  const internName = options.internName || "";
   let userId = options.userId || null;
 
   if (!userId && options.req?.user?.id) {
@@ -245,6 +246,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               })
               .join("");
 
+            //  Calculate score, percentage, and status from MCQs themselves
             const totalMCQs = s.mcqs.length || 0;
             const correctMCQs = s.mcqs.filter((q) => q.answer).length;
             const percentage =
@@ -252,14 +254,13 @@ const generateMCQCaseStudyReport = async (options = {}) => {
             const status = percentage >= 60 ? "PASSED" : "FAILED";
 
             const scoreTableHtml = `
-              <table border="1" cellpadding="6" cellspacing="0" 
-                style="margin-top:15px; border-collapse: collapse; width:70%; text-align:center;">
-                <tr style="background:#f0f0f0;">
+              <table border="1" cellpadding="6" cellspacing="0" style="margin-top:15px; border-collapse: collapse; width:70%;">
+                <tr style="background:#f0f0f0; text-align:center;">
                   <th>Score</th>
                   <th>PERCENTAGE</th>
                   <th>STATUS</th>
                 </tr>
-                <tr>
+                <tr style="text-align:center;">
                   <td style="color:#00bfa5; font-weight:bold;">${correctMCQs}/${totalMCQs}</td>
                   <td style="color:#00bfa5; font-weight:bold;">${percentage}%</td>
                   <td style="font-weight:bold;">${status}</td>
@@ -272,6 +273,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               <div class="content">
                 <h1>Eduroom Internship Report</h1>
                 <h2>Session ${s.day}</h2>
+                <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
                 <p><b>Domain:</b> ${escapeHtml(domain)}</p>
                 <p><b>Course:</b> ${escapeHtml(courseName)}</p>
                 <p><b>Session:</b> ${s.day} – ${escapeHtml(s.title)}</p>
@@ -290,6 +292,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
           <div class="content">
             <h1>Eduroom Internship Report</h1>
             <h2>No Sessions Available</h2>
+            <p><b>Intern Name:</b> ${escapeHtml(internName)}</p>
             <p><b>Domain:</b> ${escapeHtml(domain)}</p>
             <p><b>Course:</b> ${escapeHtml(courseName)}</p>
             <p>There is no data available for this course.</p>
@@ -306,13 +309,12 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                 (cs, idx) => `
                   <p><b>Question ${idx + 1}:</b> ${escapeHtml(cs.question)}</p>
                   <p><b>Answer Text:</b> ${escapeHtml(cs.userAnswer || "N/A")}</p>
-                  <table border="1" cellpadding="6" cellspacing="0" 
-                    style="margin-top:10px; border-collapse: collapse; width:70%; text-align:center;">
-                    <tr style="background:#f0f0f0;">
+                  <table border="1" cellpadding="6" cellspacing="0" style="margin-top:10px; border-collapse: collapse; width:70%;">
+                    <tr style="background:#f0f0f0; text-align:center;">
                       <th>Match %</th>
                       <th>Passed</th>
                     </tr>
-                    <tr>
+                    <tr style="text-align:center;">
                       <td style="color:#00bfa5; font-weight:bold;">${cs.matchPercentage || 0}%</td>
                       <td style="font-weight:bold;">${cs.passed ? "Yes" : "No"}</td>
                     </tr>
@@ -361,10 +363,9 @@ const generateMCQCaseStudyReport = async (options = {}) => {
         box-sizing:border-box;
       }
       h1 { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
-      h2 { font-size:20px; margin:10px 0; text-align:center; }
-      h3 { font-size:18px; margin-top:12px; text-align:center; }
-      p { font-size:16px; margin:4px 0; text-align:center; }
-      table { text-align:center; }
+      h2 { font-size:20px; margin:10px 0; }
+      h3 { font-size:18px; margin-top:12px; }
+      p { font-size:16px; margin:4px 0; }
       .footer {
         position:absolute;
         bottom:10px;
