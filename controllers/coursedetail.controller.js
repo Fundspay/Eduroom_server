@@ -1290,34 +1290,6 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Ensure triggeredTargets is an object
-    if (!user.triggeredTargets || typeof user.triggeredTargets !== "object") {
-      try {
-        user.triggeredTargets = typeof user.triggeredTargets === "string"
-          ? JSON.parse(user.triggeredTargets)
-          : {};
-      } catch {
-        user.triggeredTargets = {};
-      }
-    }
-
-    const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
-
-    // Trigger certificate once
-    if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
-      try {
-        const triggerUrl = `https://eduroom.in/api/v1/offerletter/certificate/send/${userId}`;
-        const response = await axios.post(triggerUrl);
-
-        // Mark as triggered
-        user.triggeredTargets["userLevel"] = true;
-        await user.save(); // ✅ Save the triggeredTargets change
-        console.log("Certificate triggered and saved:", user.triggeredTargets);
-      } catch (err) {
-        console.warn("Certificate trigger error:", err.message);
-      }
-    }
-
     // Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
@@ -1338,22 +1310,25 @@ const getBusinessUserTarget = async (req, res) => {
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
 
-    // ✅ Save wallet AND triggeredTargets at the same time
+    // Save wallet AND triggeredTargets at the same time
     await user.save();
     console.log("User wallet and triggeredTargets saved.");
 
-    return ReS(res, {
-      success: true,
-      data: {
-        userId: user.id,
-        businessTarget,
-        achievedCount: subscriptionWallet,
-        totalDeducted: alreadyDeducted,
-        subscriptionWallet,
-        subscriptionLeft,
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId: user.id,
+          businessTarget,
+          achievedCount: subscriptionWallet,
+          totalDeducted: alreadyDeducted,
+          subscriptionWallet,
+          subscriptionLeft,
+        },
       },
-    }, 200);
-
+      200
+    );
   } catch (error) {
     console.error("Get Business User Target Error:", error);
     return ReE(res, error.message, 500);
@@ -1361,6 +1336,7 @@ const getBusinessUserTarget = async (req, res) => {
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
+
 
 const getCourseStatus = async (req, res) => {
   try {
