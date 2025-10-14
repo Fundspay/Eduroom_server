@@ -88,8 +88,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
       const tocRows = pageSessions
         .map((s, idx) => {
           const srNo = pageIndex * sessionsPerPage + (idx + 1);
+          // ✅ Added bullet before each topic
           const topics = s.sessionTitles
-            .map((t) => `<div>${escapeHtml(t)}</div>`)
+            .map((t) => `<div>• ${escapeHtml(t)}</div>`)
             .join("");
           return `
             <tr>
@@ -148,10 +149,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
     color:#000;
     position:relative;
   }
-  /* 🔹 Adjusted spacing to move content upward */
   .content {
     background: rgba(255,255,255,0.85);
-    margin:135px 40px 60px 40px; /* reduced from 180px top to 120px */
+    margin:135px 40px 60px 40px;
     padding:30px 40px;
     border-radius:8px;
     box-sizing:border-box;
@@ -159,7 +159,8 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   .main-title { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
   .section-title { font-size:18px; font-weight:bold; margin:12px 0 6px 0; }
   .toc-table th { background-color: #f0f0f0; font-weight: bold; }
-  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: middle; text-align: center; } /* ✅ Added center alignment */
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: middle; text-align: center; }
+  .toc-table td div { text-align: left; margin-left: 10px; } /* keep bullet topics aligned neatly */
 </style>
 </head>
 <body>
