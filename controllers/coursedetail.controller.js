@@ -1287,39 +1287,40 @@ const getBusinessUserTarget = async (req, res) => {
 
     // Validate userId
     userId = parseInt(userId, 10);
-    if (isNaN(userId)) {
-      console.log("Invalid userId provided");
-      return ReE(res, "Invalid userId", 400);
-    }
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
     // 1️⃣ Fetch user
-    const user = await model.User.findByPk(userId);
-    if (!user) {
-      console.log(`User not found for ID: ${userId}`);
-      return ReE(res, "User not found", 404);
-    }
+    const user = await User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
     console.log(`Fetched user ${userId}: ${user.fullName || user.firstName}`);
 
-    // 2️⃣ Get business target (using subscriptionWallet)
+    // Ensure triggeredTargets is an object
+    if (!user.triggeredTargets || typeof user.triggeredTargets !== "object") {
+      try {
+        user.triggeredTargets = typeof user.triggeredTargets === "string"
+          ? JSON.parse(user.triggeredTargets)
+          : {};
+      } catch {
+        user.triggeredTargets = {};
+      }
+    }
+
+    // 2️⃣ Get business target
     const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
     console.log(`Business target for user ${userId}: ${businessTarget}`);
 
-    // 3️⃣ Trigger certificate send via URL once if target == 1
-    user.triggeredTargets = user.triggeredTargets || {};
-
+    // 3️⃣ Trigger certificate once if target == 1
     if (businessTarget === 1 && !user.triggeredTargets["userLevel"]) {
       console.log(`Business target = 1 and certificate not yet triggered for user ${userId}`);
       try {
         const triggerUrl = `https://eduroom.in/api/v1/offerletter/certificate/send/${userId}`;
-
-        // Make POST request
         const response = await axios.post(triggerUrl);
-
         console.log(`Certificate triggered successfully for user ${userId}. Status: ${response.status}`);
 
         // Mark as triggered
         user.triggeredTargets["userLevel"] = true;
-        await user.save({ fields: ["triggeredTargets"] });
+        await user.save(); // persist the change
+        console.log("Updated triggeredTargets:", user.triggeredTargets);
       } catch (err) {
         console.warn(`Trigger certificate error for user ${userId}:`, err.message);
       }
@@ -1330,7 +1331,6 @@ const getBusinessUserTarget = async (req, res) => {
     // 4️⃣ Fetch achieved referral count
     let achievedCount = 0;
     if (user.referralCode) {
-      console.log(`Fetching referral count for user ${userId}`);
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
@@ -1338,10 +1338,7 @@ const getBusinessUserTarget = async (req, res) => {
         console.log(`Referral count for user ${userId}: ${achievedCount}`);
       } catch (apiError) {
         console.warn(`Referral API error for user ${userId}:`, apiError.message);
-        achievedCount = 0;
       }
-    } else {
-      console.log(`User ${userId} has no referral code`);
     }
 
     // 5️⃣ Calculate wallet values
@@ -1349,14 +1346,13 @@ const getBusinessUserTarget = async (req, res) => {
     const subscriptionWallet = Number(achievedCount) || 0;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-    // 6️⃣ Update user
+    // 6️⃣ Update user wallet
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
     await user.save({ fields: ["subscriptionWallet", "subscriptionLeft"] });
     console.log(`Updated user ${userId} wallet: subscriptionWallet=${subscriptionWallet}, subscriptionLeft=${subscriptionLeft}`);
 
-    // 7️⃣ Response
-    console.log(`Returning business target info for user ${userId}`);
+    // 7️⃣ Return response
     return ReS(res, {
       success: true,
       data: {
@@ -1376,7 +1372,6 @@ const getBusinessUserTarget = async (req, res) => {
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
-
 
 
 const getCourseStatus = async (req, res) => {
