@@ -237,7 +237,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
   const sessionsHtml =
     sessionsWithDates.length > 0
       ? sessionsWithDates
-          .map((s) => {
+          .map((s, index) => {
             const mcqHtml = s.mcqs
               .map((q, idx) => {
                 const optionsHtml = (q.options || [])
@@ -279,16 +279,21 @@ const generateMCQCaseStudyReport = async (options = {}) => {
               </div>
             `;
 
+            // Only show course/session info on first page
+            const courseInfoHtml = index === 0 ? `
+              <p><b>Domain:</b> ${escapeHtml(domain)}</p>
+              <p><b>Course:</b> ${escapeHtml(courseName)}</p>
+              <p><b>Session:</b> ${escapeHtml(s.title)}</p>
+              <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
+              <p><b>Start Date:</b> ${s.startDate}</p>
+              <p><b>End Date:</b> ${s.endDate}</p>
+            ` : "";
+
             return `
             <div class="page">
               <div class="content">
                 <h1>Eduroom Internship Report</h1>
-                <p><b>Domain:</b> ${escapeHtml(domain)}</p>
-                <p><b>Course:</b> ${escapeHtml(courseName)}</p>
-                <p><b>Session:</b> ${escapeHtml(s.title)}</p>
-                <p><b>Video Duration:</b> ${s.videoDuration} MCQ (~1500 words)</p>
-                <p><b>Start Date:</b> ${s.startDate}</p>
-                <p><b>End Date:</b> ${s.endDate}</p>
+                ${courseInfoHtml}
                 <h3>MCQ Quiz – ${escapeHtml(s.title)}</h3>
                 ${mcqHtml || "<p>No MCQs available</p>"}
                 ${scoreTableHtml}
