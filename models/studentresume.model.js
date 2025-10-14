@@ -29,17 +29,17 @@ module.exports = (sequelize, Sequelize) => {
 
       // Interview Score Card fields
       interviewedBy: { type: Sequelize.STRING, allowNull: true },
-      knowledgeScore: { type: Sequelize.INTEGER, allowNull: true }, // Out of 10
-      approachScore: { type: Sequelize.INTEGER, allowNull: true }, // Out of 10
-      skillsScore: { type: Sequelize.INTEGER, allowNull: true },   // Out of 10
-      otherScore: { type: Sequelize.INTEGER, allowNull: true },    // Out of 10
-      totalAverageScore: { type: Sequelize.FLOAT, allowNull: true }, // Calculated average
-      finalSelectionStatus: { type: Sequelize.STRING, allowNull: true }, // e.g., "Selected", "Hold", "Not Selected"
+      knowledgeScore: { type: Sequelize.INTEGER, allowNull: true },
+      approachScore: { type: Sequelize.INTEGER, allowNull: true },
+      skillsScore: { type: Sequelize.INTEGER, allowNull: true },
+      otherScore: { type: Sequelize.INTEGER, allowNull: true },
+      totalAverageScore: { type: Sequelize.FLOAT, allowNull: true },
+      finalSelectionStatus: { type: Sequelize.STRING, allowNull: true },
       comment: { type: Sequelize.TEXT, allowNull: true },
 
       // 🔹 Foreign keys
       coSheetId: { type: Sequelize.BIGINT, allowNull: true },
-      teamManagerId: { type: Sequelize.BIGINT, allowNull: true }, // replaced userId
+      teamManagerId: { type: Sequelize.BIGINT, allowNull: true },
 
       Dateofonboarding: { type: Sequelize.DATE, allowNull: true },
       mailSentAt: { type: Sequelize.DATE, allowNull: true },
@@ -61,15 +61,22 @@ module.exports = (sequelize, Sequelize) => {
       foreignKey: "coSheetId",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
-      constraints: true,
     });
 
-    // 🔹 Link to TeamManager instead of User
+    // Link to TeamManager
     StudentResume.belongsTo(models.TeamManager, {
       foreignKey: "teamManagerId",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
-      constraints: true,
+    });
+
+    // 🔹 Link to User via mobileNumber → phoneNumber
+    StudentResume.belongsTo(models.User, {
+      foreignKey: "mobileNumber", // column in StudentResume
+      targetKey: "phoneNumber",   // column in User
+      as: "user",
+      onDelete: "SET NULL",
+      onUpdate: "CASCADE",
     });
   };
 
