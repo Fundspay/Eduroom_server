@@ -189,6 +189,9 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
+               where: { hasPaid: true }, // 🔹 only paid entries
+          required: false,         // include user even if they have no paid entries
+          separate: true,
             },
             { model: model.Status, attributes: ["teamManager"] },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
@@ -909,27 +912,34 @@ const getUserInterviewsAchieved = async (req, res) => {
 
 module.exports.getUserInterviewsAchieved = getUserInterviewsAchieved;
 
-// ✅ FUTURE RESUMES LIST
 const listResumesByUserIdfuture = async (req, res) => {
   try {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // ---------------------------
+    // Fetch manager info
+    // ---------------------------
     const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
       attributes: ["name"],
       raw: true,
     });
-
     if (!manager) return ReE(res, "Manager not found", 404);
 
     const fullName = manager.name.trim();
 
+    // ---------------------------
+    // Compute tomorrow's date
+    // ---------------------------
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(today.getDate() + 1);
 
+    // ---------------------------
+    // Fetch future resumes with FundsAuditStudent
+    // ---------------------------
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
@@ -939,10 +949,33 @@ const listResumesByUserIdfuture = async (req, res) => {
         ],
         resumeDate: { [Op.gte]: tomorrow },
       },
+      include: [
+        {
+          model: model.FundsAuditStudent,
+          attributes: [
+            "id",
+            "fundsAuditId",
+            "registeredUserId",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "dateOfPayment",
+            "dateOfDownload",
+            "hasPaid",
+            "isDownloaded",
+            "queryStatus",
+            "isQueryRaised",
+            "occupation",
+          ],
+        },
+      ],
       order: [["resumeDate", "ASC"]],
-      raw: true,
     });
 
+    // ---------------------------
+    // Return response
+    // ---------------------------
     return ReS(res, {
       success: true,
       teamManagerId,
@@ -951,8 +984,9 @@ const listResumesByUserIdfuture = async (req, res) => {
       data: resumes,
     });
   } catch (error) {
-    console.error("ListResumes Error:", error);
+    console.error("ListResumesByUserIdfuture Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.listResumesByUserIdfuture = listResumesByUserIdfuture;
