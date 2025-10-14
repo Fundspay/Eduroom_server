@@ -61,7 +61,7 @@ const fetchSessions = async (courseId) => {
 };
 
 const generateSessionReport = async (sessionData = {}, options = {}) => {
- const courseId = Number(options.courseId);
+  const courseId = Number(options.courseId);
   let sessions =
     Array.isArray(sessionData) && sessionData.length
       ? sessionData
@@ -108,9 +108,9 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
           <table class="toc-table" border="1" cellspacing="0" cellpadding="6" style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
             <thead>
               <tr>
-                <th style="width:10%; text-align:center;">Sr No</th>
-                <th style="width:30%; text-align:left;">Session</th>
-                <th style="width:60%; text-align:left;">Topics</th>
+                <th style="width:10%;">Sr No</th>
+                <th style="width:30%;">Session</th>
+                <th style="width:60%;">Topics</th>
               </tr>
             </thead>
             <tbody>
@@ -159,7 +159,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   .main-title { font-size:28px; font-weight:bold; text-align:center; margin-bottom:12px; }
   .section-title { font-size:18px; font-weight:bold; margin:12px 0 6px 0; }
   .toc-table th { background-color: #f0f0f0; font-weight: bold; }
-  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: top; }
+  .toc-table td, .toc-table th { border: 1px solid #000; padding:6px; vertical-align: middle; text-align: center; } /* ✅ Added center alignment */
 </style>
 </head>
 <body>
@@ -188,7 +188,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   await browser.close();
 
   // 🔹 Upload to S3
-    return pdfBuffer;
+  return pdfBuffer;
 };
 
 module.exports = { generateSessionReport };
