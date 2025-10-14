@@ -162,33 +162,75 @@ const listResumes = async (req, res) => {
     }
 
     // ---------------------------
-    // 2️⃣ Fetch all resumes with associated CoSheet data
+    // 2️⃣ Fetch all resumes with associations
     // ---------------------------
     const records = await model.StudentResume.findAll({
       include: [
-        { model: model.CoSheet, attributes: ["id", "collegeName"] }
+        // CoSheet info
+        { model: model.CoSheet, attributes: ["id", "collegeName"] },
+
+        // User info
+        {
+          model: model.User,
+          as: "user",
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "createdAt",
+          ],
+          include: [
+            // FundsAudit
+            {
+              model: model.FundsAudit,
+              as: "fundsAudits",
+              attributes: [
+                "id",
+                "registeredUserId",
+                "firstName",
+                "lastName",
+                "phoneNumber",
+                "email",
+                "dateOfPayment",
+                "dateOfDownload",
+                "hasPaid",
+                "isDownloaded",
+                "queryStatus",
+                "isQueryRaised",
+                "occupation",
+              ],
+            },
+
+            // Status teamManager (string)
+            {
+              model: model.Status,
+              as: "statuses",
+              attributes: ["teamManager"],
+            },
+
+            // Assigned TeamManager (object)
+            {
+              model: model.TeamManager,
+              as: "teamManager",
+              attributes: ["id", "name", "email"],
+            },
+          ],
+        },
       ],
       order: [["createdAt", "DESC"]],
     });
 
     // ---------------------------
-    // 3️⃣ Fetch all team managers separately
+    // 3️⃣ Return response
     // ---------------------------
-    const managers = await model.TeamManager.findAll({
-      attributes: ["id", "name", "email"],
-      raw: true,
-    });
-
-    // ---------------------------
-    // 4️⃣ Return response
-    // ---------------------------
-    return ReS(res, { success: true, data: records, managers }, 200);
+    return ReS(res, { success: true, data: records }, 200);
   } catch (error) {
     console.error("StudentResume List Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.listResumes = listResumes;
 
 
