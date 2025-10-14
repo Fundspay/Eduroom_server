@@ -60,22 +60,41 @@ const calculateDailyStatus = async (userId, courseId, coursePreviewId) => {
 
 // 📧 Send daily progress email
 const sendDailyStatusMail = async (user, courseId, courseInfo, progressData) => {
-  const subject = `Your Daily Live Project Progress  - ${courseInfo.courseName || "Course"}`;
+  const subject = `📈 Your Daily Live Project Progress - ${courseInfo.courseName || "Course"}`;
 
   const html = `
-  <div style="font-family: Arial, sans-serif; color: #333;">
-    <p>Hi <strong>${user.firstName}</strong>,</p>
+  <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
+    <div style="text-align: center; margin-bottom: 20px;">
+      <h2 style="color: #1a73e8;">📊 EduRoom Daily Progress</h2>
+      <p style="color: #555;">Keep up your momentum and achieve your goals! 🚀</p>
+    </div>
+
+    <p>Hi <strong>${user.firstName}</strong> 👋,</p>
+
     <p>Here’s your daily progress update for <strong>${courseInfo.courseName || "your course"}</strong>:</p>
 
     <ul>
-      <li><b>Total Sessions:</b> ${progressData.totalSessions}</li>
-      <li><b>Completed Sessions:</b> ${progressData.completedSessions}</li>
-      <li><b>Completion Rate:</b> ${progressData.completionRate}%</li>
+      <li>📝 <b>Total Sessions:</b> ${progressData.totalSessions}</li>
+      <li>✅ <b>Completed Sessions:</b> ${progressData.completedSessions}</li>
+      <li>📊 <b>Completion Rate:</b> ${progressData.completionRate}%</li>
     </ul>
 
-    <p>Keep up your learning momentum! Try to complete pending sessions before tomorrow.</p>
+    <p>Remember, every session you complete brings you closer to mastering your Live Project! 💡</p>
+    
+    <p>Tips to stay on track:</p>
+    <ul>
+      <li>⏰ Dedicate focused time daily for your sessions</li>
+      <li>💪 Review previous sessions to reinforce learning</li>
+      <li>🎯 Aim to improve your completion rate step by step</li>
+    </ul>
 
-    <p>Best,<br><strong>EduRoom Training Team</strong></p>
+    <p>Keep pushing forward! Your dedication today shapes your success tomorrow. 🌟</p>
+
+    <p style="margin-top: 30px;">Best regards,<br/>
+    <strong>EduRoom Training Team</strong></p>
+
+    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+    <p style="font-size: 12px; color: #999;">This is an automated update. Please do not reply. For any support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
   </div>
   `;
 
