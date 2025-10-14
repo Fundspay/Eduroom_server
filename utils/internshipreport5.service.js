@@ -45,7 +45,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
     ],
   });
 
-  const sessions = courseDetailRows.map((session) => {
+  return courseDetailRows.map((session) => {
     const mcqs = session.QuestionModels.map((q) => ({
       id: q.id,
       answer: q.answer,
@@ -58,8 +58,6 @@ const fetchSessionsWithMCQs = async (courseId) => {
       mcqs,
     };
   });
-
-  return sessions;
 };
 
 // =======================
@@ -92,7 +90,7 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   const resultMap = {};
   caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r));
 
-  const sessions = courseDetailRows.map((session) => {
+  return courseDetailRows.map((session) => {
     const csList =
       session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
@@ -110,8 +108,6 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       caseStudyPercentage: parseFloat(percentage.toFixed(2)),
     };
   });
-
-  return sessions;
 };
 
 // =======================
@@ -138,129 +134,130 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const mcqSessions = await fetchSessionsWithMCQs(courseId);
   const csSessions = await fetchAllCaseStudies({ courseId, userId });
 
-  // Merge MCQ and Case Study percentages by session
-  const mergedSessions = mcqSessions.map((s) => {
+  // Merge MCQ and Case Study percentages
+  const mergedSessions = mcqSessions.map((s, index) => {
     const cs = csSessions.find((c) => c.sessionNumber === s.sessionNumber);
     const totalMCQs = s.mcqs.length;
     const correctMCQs = s.mcqs.filter((q) => q.answer).length;
     const mcqPercentage = totalMCQs > 0 ? (correctMCQs / totalMCQs) * 100 : 0;
 
     return {
-      srNo: s.sessionNumber,
+      srNo: index + 1,
       session: s.title,
       completion: parseFloat(
         ((mcqPercentage + (cs?.caseStudyPercentage || 0)) / 2).toFixed(2)
       ),
+      caseStudyPercentage: cs?.caseStudyPercentage || 0,
     };
   });
 
-  const tableRowsHtml = mergedSessions
-    .map(
-      (s) => `
-      <tr>
-        <td style="text-align:center;">${s.srNo}</td>
-        <td style="text-align:left; padding-left:8px;">${escapeHtml(s.session)}</td>
-        <td style="text-align:center;">${s.completion}%</td>
-      </tr>`
-    )
-    .join("");
+  const renderTable = (rows, type = "completion") => `
+    <table class="details-table">
+      <thead>
+        <tr>
+          <th>Sr No.</th>
+          <th>Session</th>
+          <th>${type === "completion" ? "Completion %" : "Case Study %"}</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows
+          .map(
+            (r) => `
+            <tr>
+              <td>${r.srNo}</td>
+              <td style="text-align:left;">${escapeHtml(r.session)}</td>
+              <td>${type === "completion" ? r.completion : r.caseStudyPercentage}%</td>
+            </tr>`
+          )
+          .join("")}
+      </tbody>
+    </table>
+  `;
 
   const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Final Internship Report</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: 'Arial', sans-serif;
-      position: relative;
-      background: url("${ASSET_BASE}/internshipbg.png") no-repeat center top;
-      background-size: cover;
-    }
-
-    .watermark {
-      position: fixed;
-      top: 35%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 80px;
-      color: rgba(200, 200, 200, 0.15);
-      text-transform: uppercase;
-      font-weight: bold;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    .content {
-      position: relative;
-      z-index: 2;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      padding: 80px 50px;
-      box-sizing: border-box;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 36px;
-      margin-bottom: 30px;
-      color: #000;
-      text-transform: uppercase;
-    }
-
-    table {
-      width: 80%;
-      border-collapse: collapse;
-      margin-top: 20px;
-      font-size: 16px;
-    }
-
-    th, td {
-      border: 1px solid #000;
-      padding: 10px;
-    }
-
-    th {
-      background: #f0f0f0;
-    }
-
-    .footer {
-      position: absolute;
-      bottom: 20px;
-      width: 100%;
-      text-align: center;
-      font-size: 14px;
-      color: #444;
-    }
-  </style>
-</head>
-<body>
-  <div class="watermark">EduRoom</div>
-  <div class="content">
-    <h1>Internship Completion Summary</h1>
-    <table>
-      <tr>
-        <th>Sr No.</th>
-        <th>Session</th>
-        <th>Completion</th>
-      </tr>
-      ${tableRowsHtml}
-    </table>
-    <div style="margin-top:40px; font-size:18px;">
-      Generated for <b>${escapeHtml(fullName)}</b> on ${today}
+  <!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Internship Report - ${fullName}</title>
+    <style>
+      body { margin:0; padding:0; font-family:'Times New Roman', serif; }
+      .page {
+        width:100%;
+        min-height:100vh;
+        background: url("${ASSET_BASE}/internshipbg.png") no-repeat center top;
+        background-size: cover;
+        display:flex;
+        flex-direction:column;
+        position:relative;
+        box-sizing:border-box;
+      }
+      .content {
+        background: rgba(255,255,255,0.85);
+        margin:130px 40px 60px 40px;
+        padding:30px 40px;
+        border-radius:8px;
+        box-sizing:border-box;
+      }
+      .main-title {
+        font-size:26px;
+        font-weight:bold;
+        text-align:center;
+        margin-bottom:20px;
+        text-transform: uppercase;
+      }
+      .details-table {
+        width:100%;
+        border-collapse: collapse;
+        margin: 0 auto;
+      }
+      .details-table th, .details-table td {
+        border:1px solid #000;
+        padding:8px 10px;
+        font-size:14px;
+        text-align:center;
+        vertical-align:middle;
+      }
+      .details-table th {
+        background-color:#f0f0f0;
+      }
+      .footer {
+        position:absolute;
+        bottom:10px;
+        width:100%;
+        text-align:center;
+        font-size:14px;
+        color:#444;
+      }
+      .page-break { page-break-after: always; }
+    </style>
+  </head>
+  <body>
+    <!-- PAGE 1 -->
+    <div class="page">
+      <div class="content">
+        <div class="main-title">Internship Completion Summary</div>
+        ${renderTable(mergedSessions, "completion")}
+      </div>
+      <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
-  </div>
-  <div class="footer">© EduRoom Internship Report</div>
-</body>
-</html>
-`;
 
+    <div class="page-break"></div>
+
+    <!-- PAGE 2 -->
+    <div class="page">
+      <div class="content">
+        <div class="main-title">Case Study Performance Summary</div>
+        ${renderTable(mergedSessions, "caseStudy")}
+      </div>
+      <div class="footer">© EduRoom Internship Report · ${today}</div>
+    </div>
+  </body>
+  </html>
+  `;
+
+  // Generate PDF
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
