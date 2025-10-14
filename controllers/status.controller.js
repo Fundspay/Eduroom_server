@@ -7,58 +7,62 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // Fetch team managers along with their users and statuses
-        const allTeamManagers = await model.TeamManager.findAll({
+        // 1️⃣ Fetch all active Status records (include all Status model fields)
+        const statuses = await model.Status.findAll({
             where: { isDeleted: false },
-            attributes: [
-                "id",
-                "managerId",
-                "name",
-                "email",
-                "mobileNumber",
-                "department",
-                "position",
-                "internshipStatus"
-            ],
-            include: [
-                {
-                    model: model.User,
-                     as: "Users",
-                    attributes: ["id", "fullName", "email"],
-                    include: [
-                        {
-                            model: model.Status,
-                            attributes: [
-                                "id",
-                                "userId",
-                                "userName",
-                                "email",
-                                "phoneNumber",
-                                "collegeName",
-                                "subscriptionWallet",
-                                "subscriptionLeft",
-                                "courses",
-                                "internshipIssued",
-                                "internshipStatus",
-                                "offerLetterSent",
-                                "offerLetterFile",
-                                "teamManager",
-                                "isQueryRaised",
-                                "queryStatus",
-                                "querycount",
-                                "registeredAt",
-                                "createdAt",
-                                "updatedAt"
-                            ],
-                            required: false
-                        }
-                    ]
-                }
-            ]
+            raw: true // flatten data for easy mapping
         });
 
+        // 2️⃣ Fetch all Users with their FundsAudit records
+        const users = await model.User.findAll({
+            include: [
+                {
+                    model: model.FundsAudit,
+                    attributes: [
+                        "id",
+                        "registeredUserId",
+                        "firstName",
+                        "lastName",
+                        "phoneNumber",
+                        "email",
+                        "dateOfPayment",
+                        "dateOfDownload",
+                        "hasPaid",
+                        "isDownloaded",
+                        "queryStatus",
+                        "isQueryRaised",
+                        "occupation"
+                    ]
+                }
+            ],
+            attributes: ["id", "firstName", "lastName"],
+        });
+
+        const userData = users.map(u => u.get({ plain: true }));
+
+        // 3️⃣ Combine: Match Status.name ↔ User.firstName (you can also use both first/last if needed)
+        const statusWithFunds = statuses.map(status => {
+            const matchedUser = userData.find(user =>
+                user.firstName?.toLowerCase() === status.name?.toLowerCase()
+            );
+
+            return {
+                ...status, // keep all Status model fields
+                matchedUser: matchedUser || null,
+                fundsAudit: matchedUser ? matchedUser.FundsAudits : []
+            };
+        });
+
+        // 4️⃣ Fetch active Team Managers
+        const allTeamManagers = await model.TeamManager.findAll({
+            where: { isDeleted: false },
+            attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+        });
+
+        // 5️⃣ Return final structured response
         return ReS(res, {
             success: true,
+            data: statusWithFunds,
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
@@ -71,7 +75,6 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
-
 
 var updateStatus = async function (req, res) {
     try {
