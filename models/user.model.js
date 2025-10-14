@@ -136,6 +136,11 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "CASCADE",
       onUpdate: "CASCADE"
     });
+    User.hasMany(models.FundsAudit, {
+        foreignKey: "userId",
+        onDelete: "CASCADE",
+        onUpdate: "CASCADE"
+    });
 
   };
 
