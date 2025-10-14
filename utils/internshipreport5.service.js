@@ -61,11 +61,12 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER
+// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
 
+  // Fetch sessions that contain case studies
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -77,35 +78,44 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
         model: model.QuestionModel,
         where: { isDeleted: false },
         required: false,
-        attributes: ["id", "caseStudy", "answer"],
+        attributes: ["id", "caseStudy"],
       },
     ],
   });
 
+  // Fetch user case study results
   const caseStudyResults = await model.CaseStudyResult.findAll({
     where: { courseId, userId },
     attributes: ["questionId", "matchPercentage"],
   });
 
+  // Map for quick lookup
   const resultMap = {};
-  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r));
+  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r.matchPercentage));
 
-  return courseDetailRows.map((session) => {
-    const csList =
-      session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
+  // Only sessions with at least one case study should be included
+  const filteredSessions = courseDetailRows.filter(
+    (session) =>
+      session.QuestionModels &&
+      session.QuestionModels.some((q) => q.caseStudy && q.caseStudy.trim())
+  );
+
+  // Compute match percentage for these filtered sessions
+  return filteredSessions.map((session) => {
+    const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
-      const res = resultMap[String(cs.id)];
-      return acc + (res?.matchPercentage || 0);
+      const match = resultMap[String(cs.id)];
+      return acc + (match || 0);
     }, 0);
-    const percentage = totalCS > 0 ? totalMatch / totalCS : 0;
+    const avgPercentage = totalCS > 0 ? totalMatch / totalCS : 0;
 
     return {
       id: session.id,
       day: session.day,
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
-      caseStudyPercentage: parseFloat(percentage.toFixed(2)),
+      caseStudyPercentage: totalCS > 0 ? parseFloat(avgPercentage.toFixed(2)) : null,
     };
   });
 };
@@ -147,9 +157,14 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       completion: parseFloat(
         ((mcqPercentage + (cs?.caseStudyPercentage || 0)) / 2).toFixed(2)
       ),
-      caseStudyPercentage: cs?.caseStudyPercentage || 0,
+      caseStudyPercentage: cs?.caseStudyPercentage ?? null,
     };
   });
+
+  // Only sessions that have case studies
+  const filteredCaseStudySessions = mergedSessions.filter(
+    (s) => s.caseStudyPercentage !== null
+  );
 
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
@@ -163,14 +178,35 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       <tbody>
         ${rows
           .map(
-            (r) => `
+            (r, i) => `
             <tr>
-              <td>${r.srNo}</td>
+              <td>${i + 1}</td>
               <td style="text-align:left;">${escapeHtml(r.session)}</td>
-              <td>${type === "completion" ? r.completion : r.caseStudyPercentage}%</td>
+              <td>${
+                type === "completion"
+                  ? r.completion
+                  : r.caseStudyPercentage !== null
+                  ? r.caseStudyPercentage + "%"
+                  : "Not Attempted"
+              }</td>
             </tr>`
           )
           .join("")}
+      </tbody>
+    </table>
+  `;
+
+  // Empty Business Target table
+  const businessTargetTable = `
+    <table class="details-table">
+      <thead>
+        <tr>
+          <th>Business Target</th>
+          <th>Achieved Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
       </tbody>
     </table>
   `;
@@ -239,6 +275,8 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       <div class="content">
         <div class="main-title">Internship Completion Summary</div>
         ${renderTable(mergedSessions, "completion")}
+        <br/>
+        ${businessTargetTable}
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
@@ -249,7 +287,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(mergedSessions, "caseStudy")}
+        ${renderTable(filteredCaseStudySessions, "caseStudy")}
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
