@@ -558,59 +558,83 @@ const getRAnalysis = async (req, res) => {
 module.exports.getRAnalysis = getRAnalysis;
 
 // ✅ LIST RESUMES BY TEAM MANAGER
+const { Op } = require("sequelize");
+
 const listResumesByUserId = async (req, res) => {
   try {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // ---------------------------
+    // Fetch manager info
+    // ---------------------------
     const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
-      attributes: ["name", "email"],
+      attributes: ["id", "name", "email"],
       raw: true,
     });
-
     if (!manager) return ReE(res, "Manager not found", 404);
 
-    const fullName = manager.name.trim();
-
+    // ---------------------------
+    // Fetch resumes assigned to this manager
+    // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: {
-        teamManagerId,
-        [Op.or]: [
-          { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: fullName } },
-        ],
-      },
+      where: { teamManagerId },
+      include: [
+        {
+          model: model.FundsAuditStudent, // Include associated FundsAuditStudent entries
+          attributes: [
+            "id",
+            "fundsAuditId",
+            "registeredUserId",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "dateOfPayment",
+            "dateOfDownload",
+            "hasPaid",
+            "isDownloaded",
+            "queryStatus",
+            "isQueryRaised",
+            "occupation",
+          ],
+        },
+      ],
       order: [["createdAt", "ASC"]],
-      raw: true,
     });
 
+    // ---------------------------
+    // Fetch all managers for dropdown/reference
+    // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
-
     const managerList = managers.map((m) => ({
       id: m.id,
       name: m.name,
       email: m.email,
     }));
 
+    // ---------------------------
+    // Return response
+    // ---------------------------
     return ReS(res, {
       success: true,
       teamManagerId,
-      followUpBy: fullName,
       totalRecords: resumes.length,
       data: resumes,
       managers: managerList,
     });
   } catch (error) {
-    console.error("ListResumes Error:", error);
+    console.error("ListResumesByUserId Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.listResumesByUserId = listResumesByUserId;
+
 
 const getUserTargetAnalysis = async (req, res) => {
   try {
