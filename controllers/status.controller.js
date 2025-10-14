@@ -7,12 +7,7 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // Fetch active statuses
-        const statuses = await model.Status.findAll({
-            where: { isDeleted: false }
-        });
-
-        // Fetch team managers along with their funds audits
+        // Fetch team managers along with their users and statuses
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: [
@@ -27,33 +22,43 @@ var listAll = async function (req, res) {
             ],
             include: [
                 {
-                    model: model.FundsAudit,
-                    attributes: [
-                        "id",
-                        "registeredUserId",
-                        "firstName",
-                        "lastName",
-                        "phoneNumber",
-                        "email",
-                        "dateOfPayment",
-                        "dateOfDownload",
-                        "hasPaid",
-                        "isDownloaded",
-                        "queryStatus",
-                        "isQueryRaised",
-                        "occupation",
-                        "createdAt",
-                        "updatedAt"
-                    ],
-                    required: false // LEFT JOIN: include even if no audit exists
+                    model: model.User,
+                    where: { isDeleted: false },
+                    attributes: ["id", "name", "email"],
+                    include: [
+                        {
+                            model: model.Status,
+                            attributes: [
+                                "id",
+                                "userId",
+                                "userName",
+                                "email",
+                                "phoneNumber",
+                                "collegeName",
+                                "subscriptionWallet",
+                                "subscriptionLeft",
+                                "courses",
+                                "internshipIssued",
+                                "internshipStatus",
+                                "offerLetterSent",
+                                "offerLetterFile",
+                                "teamManager",
+                                "isQueryRaised",
+                                "queryStatus",
+                                "querycount",
+                                "registeredAt",
+                                "createdAt",
+                                "updatedAt"
+                            ],
+                            required: false
+                        }
+                    ]
                 }
             ]
         });
 
-        // Return response
         return ReS(res, {
             success: true,
-            data: statuses,
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
