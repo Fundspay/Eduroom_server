@@ -66,7 +66,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
 
-  // Fetch sessions and case study questions
+  // Fetch sessions that contain case studies
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -89,12 +89,19 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     attributes: ["questionId", "matchPercentage"],
   });
 
-  // Map for quick access
+  // Map for quick lookup
   const resultMap = {};
   caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r.matchPercentage));
 
-  // Compute average match percentage per session
-  return courseDetailRows.map((session) => {
+  // Only sessions with at least one case study should be included
+  const filteredSessions = courseDetailRows.filter(
+    (session) =>
+      session.QuestionModels &&
+      session.QuestionModels.some((q) => q.caseStudy && q.caseStudy.trim())
+  );
+
+  // Compute match percentage for these filtered sessions
+  return filteredSessions.map((session) => {
     const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
@@ -153,6 +160,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       caseStudyPercentage: cs?.caseStudyPercentage || 0,
     };
   });
+
+  // Only sessions that have case studies
+  const filteredCaseStudySessions = mergedSessions.filter(
+    (s) => s.caseStudyPercentage > 0
+  );
 
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
@@ -252,7 +264,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(mergedSessions, "caseStudy")}
+        ${renderTable(filteredCaseStudySessions, "caseStudy")}
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
