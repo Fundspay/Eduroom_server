@@ -145,7 +145,7 @@ const generateInternshipDetailsReport = async (userId, options = {}) => {
       <thead>
         <tr>
           <th class="field">Field</th>
-          <th class="value">Value (Auto-Fetched)</th>
+          <th class="value">Value</th>
         </tr>
       </thead>
       <tbody>
