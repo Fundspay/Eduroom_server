@@ -169,6 +169,7 @@ const listResumes = async (req, res) => {
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
           model: model.User,
+           as: "user", 
           attributes: ["id", "firstName", "lastName", "phoneNumber", "email", "createdAt"],
           include: [
             {
