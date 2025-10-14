@@ -139,21 +139,23 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const csSessions = await fetchAllCaseStudies({ courseId, userId });
 
   // Merge MCQ and Case Study percentages by session
-  const mergedSessions = mcqSessions.map((s) => {
+  const mergedSessions = mcqSessions.map((s, index) => {
     const cs = csSessions.find((c) => c.sessionNumber === s.sessionNumber);
     const totalMCQs = s.mcqs.length;
     const correctMCQs = s.mcqs.filter((q) => q.answer).length;
     const mcqPercentage = totalMCQs > 0 ? (correctMCQs / totalMCQs) * 100 : 0;
 
     return {
-      srNo: s.sessionNumber,
+      srNo: index + 1, // ✅ sequential numbering 1, 2, 3...
       session: s.title,
       completion: parseFloat(
         ((mcqPercentage + (cs?.caseStudyPercentage || 0)) / 2).toFixed(2)
       ),
+      caseStudyPercentage: cs?.caseStudyPercentage || 0,
     };
   });
 
+  // Table 1 – Internship Completion Summary
   const tableRowsHtml = mergedSessions
     .map(
       (s) => `
@@ -161,6 +163,18 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         <td style="text-align:center;">${s.srNo}</td>
         <td style="text-align:left; padding-left:8px;">${escapeHtml(s.session)}</td>
         <td style="text-align:center;">${s.completion}%</td>
+      </tr>`
+    )
+    .join("");
+
+  // Table 2 – Case Study Percentage Table
+  const caseStudyTableRows = mergedSessions
+    .map(
+      (s) => `
+      <tr>
+        <td style="text-align:center;">${s.srNo}</td>
+        <td style="text-align:left; padding-left:8px;">${escapeHtml(s.session)}</td>
+        <td style="text-align:center;">${s.caseStudyPercentage}%</td>
       </tr>`
     )
     .join("");
@@ -205,6 +219,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       padding: 80px 50px;
       box-sizing: border-box;
       text-align: center;
+      page-break-after: always;
     }
 
     h1 {
@@ -242,6 +257,8 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
 </head>
 <body>
   <div class="watermark">EduRoom</div>
+
+  <!-- ✅ Page 1 -->
   <div class="content">
     <h1>Internship Completion Summary</h1>
     <table>
@@ -252,10 +269,21 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       </tr>
       ${tableRowsHtml}
     </table>
-    <div style="margin-top:40px; font-size:18px;">
-      Generated for <b>${escapeHtml(fullName)}</b> on ${today}
-    </div>
   </div>
+
+  <!-- ✅ Page 2 -->
+  <div class="content">
+    <h1>Case Study Performance Summary</h1>
+    <table>
+      <tr>
+        <th>Sr No.</th>
+        <th>Session</th>
+        <th>Case Study %</th>
+      </tr>
+      ${caseStudyTableRows}
+    </table>
+  </div>
+
   <div class="footer">© EduRoom Internship Report</div>
 </body>
 </html>
