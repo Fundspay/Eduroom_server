@@ -12,7 +12,7 @@ var listAll = async function (req, res) {
             where: { isDeleted: false }
         });
 
-        // Fetch active team managers
+        // Fetch team managers along with their funds audits
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: [
@@ -24,28 +24,30 @@ var listAll = async function (req, res) {
                 "department",
                 "position",
                 "internshipStatus"
-            ]
-        });
-
-        // Fetch all funds audits
-        const allFundsAudits = await model.FundsAudit.findAll({
+            ],
             include: [
                 {
-                    model: model.User,
-                    attributes: ["id", "fullName", "email"]
+                    model: model.FundsAudit,
+                    attributes: [
+                        "id",
+                        "registeredUserId",
+                        "firstName",
+                        "lastName",
+                        "phoneNumber",
+                        "email",
+                        "dateOfPayment",
+                        "dateOfDownload",
+                        "hasPaid",
+                        "isDownloaded",
+                        "queryStatus",
+                        "isQueryRaised",
+                        "occupation",
+                        "createdAt",
+                        "updatedAt"
+                    ],
+                    required: false // LEFT JOIN: include even if no audit exists
                 }
             ]
-        });
-
-        // Merge funds audits into each manager
-        const teamManagersWithAudits = allTeamManagers.map(manager => {
-            const auditsForManager = allFundsAudits.filter(
-                audit => audit.userId === manager.managerId
-            );
-            return {
-                ...manager.get({ plain: true }),
-                fundsAudits: auditsForManager
-            };
         });
 
         // Return response
@@ -53,8 +55,8 @@ var listAll = async function (req, res) {
             success: true,
             data: statuses,
             teamManagers: {
-                total: teamManagersWithAudits.length,
-                list: teamManagersWithAudits
+                total: allTeamManagers.length,
+                list: allTeamManagers
             }
         }, 200);
 
