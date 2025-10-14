@@ -7,61 +7,31 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // 1️⃣ Get all Status data
+        // Fetch active statuses
         const statuses = await model.Status.findAll({
-            where: { isDeleted: false },
-            raw: true
+            where: { isDeleted: false }
         });
 
-        // 2️⃣ Get all FundsAudit data directly
-        const fundsAudits = await model.FundsAudit.findAll({
-            where: {}, // add conditions if needed
-            raw: true
-        });
-
-        // 3️⃣ Map: Match userName in Status ↔ firstName + lastName in FundsAudit
-        const statusWithFunds = statuses.map(status => {
-            const matchedFunds = fundsAudits.filter(fund => {
-                const fullName = `${fund.firstName ?? ""} ${fund.lastName ?? ""}`.trim().toLowerCase();
-                const statusName = (status.userName ?? "").trim().toLowerCase();
-                return fullName === statusName;
-            });
-
-            // if found, attach matchedFunds + first matching user's data
-            const matchedUser = matchedFunds.length > 0
-                ? { firstName: matchedFunds[0].firstName, lastName: matchedFunds[0].lastName, email: matchedFunds[0].email }
-                : null;
-
-            return {
-                ...status,
-                matchedUser,
-                fundsAudit: matchedFunds
-            };
-        });
-
-        // 4️⃣ Fetch team managers as before
+        // Fetch active team managers
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
 
-        // 5️⃣ Return final response
+        // Return response with counts
         return ReS(res, {
             success: true,
-            data: statusWithFunds,
+            data: statuses,
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
             }
         }, 200);
-
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
-
 module.exports.listAll = listAll;
-
 
 var updateStatus = async function (req, res) {
     try {
