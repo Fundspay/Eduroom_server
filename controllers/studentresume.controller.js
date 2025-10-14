@@ -166,23 +166,11 @@ const listResumes = async (req, res) => {
     // ---------------------------
     const records = await model.StudentResume.findAll({
       include: [
-        // CoSheet info
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
-
-        // User info
         {
           model: model.User,
-          as: "user",
-          attributes: [
-            "id",
-            "firstName",
-            "lastName",
-            "phoneNumber",
-            "email",
-            "createdAt",
-          ],
+          attributes: ["id", "firstName", "lastName", "phoneNumber", "email", "createdAt"],
           include: [
-            // FundsAudit
             {
               model: model.FundsAudit,
               attributes: [
@@ -201,19 +189,8 @@ const listResumes = async (req, res) => {
                 "occupation",
               ],
             },
-
-            // Status teamManager (string)
-            {
-              model: model.Status,
-              attributes: ["teamManager"],
-            },
-
-            // Assigned TeamManager (object)
-            {
-              model: model.TeamManager,
-              as: "teamManager",
-              attributes: ["id", "name", "email"],
-            },
+            { model: model.Status, attributes: ["teamManager"] },
+            { model: model.TeamManager, attributes: ["id", "name", "email"] },
           ],
         },
       ],
@@ -221,7 +198,38 @@ const listResumes = async (req, res) => {
     });
 
     // ---------------------------
-    // 3️⃣ Return response
+    // 3️⃣ Store FundsAudit data per studentResume and user
+    // ---------------------------
+    for (const resume of records) {
+      const user = resume.User; // Sequelize default association name is model name
+
+      if (!user || !user.FundsAudits) continue;
+
+      const fundsData = user.FundsAudits.map((fa) => ({
+        studentResumeId: resume.id,
+        userId: user.id,
+        fundsAuditId: fa.id,
+        registeredUserId: fa.registeredUserId,
+        firstName: fa.firstName,
+        lastName: fa.lastName,
+        phoneNumber: fa.phoneNumber,
+        email: fa.email,
+        dateOfPayment: fa.dateOfPayment,
+        dateOfDownload: fa.dateOfDownload,
+        hasPaid: fa.hasPaid,
+        isDownloaded: fa.isDownloaded,
+        queryStatus: fa.queryStatus,
+        isQueryRaised: fa.isQueryRaised,
+        occupation: fa.occupation,
+      }));
+
+      if (fundsData.length > 0) {
+        await model.FundsAuditStudent.bulkCreate(fundsData, { ignoreDuplicates: true });
+      }
+    }
+
+    // ---------------------------
+    // 4️⃣ Return response
     // ---------------------------
     return ReS(res, { success: true, data: records }, 200);
   } catch (error) {
@@ -229,6 +237,7 @@ const listResumes = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.listResumes = listResumes;
 
 
