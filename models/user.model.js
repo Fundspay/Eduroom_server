@@ -118,6 +118,7 @@ module.exports = (sequelize, Sequelize) => {
     User.belongsTo(models.Gender, { foreignKey: "gender", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
     User.belongsTo(models.CommunicationMode, { foreignKey: "preferredCommunicationId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
     User.belongsTo(models.InternshipMode, { foreignKey: "internshipModeId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
+    User.hasMany(models.Status, { foreignKey: "userId", onDelete: "RESTRICT", onUpdate: "RESTRICT" });
     User.belongsTo(models.TeamManager, {
       foreignKey: "assignedTeamManager",
       targetKey: "id",
