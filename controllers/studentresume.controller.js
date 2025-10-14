@@ -557,9 +557,6 @@ const getRAnalysis = async (req, res) => {
 
 module.exports.getRAnalysis = getRAnalysis;
 
-// ✅ LIST RESUMES BY TEAM MANAGER
-const { Op } = require("sequelize");
-
 const listResumesByUserId = async (req, res) => {
   try {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
