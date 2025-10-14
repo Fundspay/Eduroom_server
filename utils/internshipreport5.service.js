@@ -93,7 +93,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
   caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r));
 
   const sessions = courseDetailRows.map((session) => {
-    const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
+    const csList =
+      session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
       const res = resultMap[String(cs.id)];
@@ -155,12 +156,12 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
 
   const tableRowsHtml = mergedSessions
     .map(
-      (s) =>
-        `<tr>
-          <td style="text-align:center;">${s.srNo}</td>
-          <td style="text-align:left; padding-left:8px;">${escapeHtml(s.session)}</td>
-          <td style="text-align:center;">${s.completion}%</td>
-        </tr>`
+      (s) => `
+      <tr>
+        <td style="text-align:center;">${s.srNo}</td>
+        <td style="text-align:left; padding-left:8px;">${escapeHtml(s.session)}</td>
+        <td style="text-align:center;">${s.completion}%</td>
+      </tr>`
     )
     .join("");
 
@@ -171,16 +172,77 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   <meta charset="UTF-8">
   <title>Final Internship Report</title>
   <style>
-    body { font-family:'Arial',sans-serif; margin:0; padding:0; }
-    .page { width:100%; min-height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; }
-    h1 { text-align:center; margin-bottom:30px; }
-    table { width:80%; border-collapse:collapse; }
-    th, td { border:1px solid #000; padding:8px; }
-    th { background:#f0f0f0; }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Arial', sans-serif;
+      position: relative;
+      background: url("${ASSET_BASE}/internshipbg.png") no-repeat center top;
+      background-size: cover;
+    }
+
+    .watermark {
+      position: fixed;
+      top: 35%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      color: rgba(200, 200, 200, 0.15);
+      text-transform: uppercase;
+      font-weight: bold;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .content {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 80px 50px;
+      box-sizing: border-box;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 36px;
+      margin-bottom: 30px;
+      color: #000;
+      text-transform: uppercase;
+    }
+
+    table {
+      width: 80%;
+      border-collapse: collapse;
+      margin-top: 20px;
+      font-size: 16px;
+    }
+
+    th, td {
+      border: 1px solid #000;
+      padding: 10px;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+
+    .footer {
+      position: absolute;
+      bottom: 20px;
+      width: 100%;
+      text-align: center;
+      font-size: 14px;
+      color: #444;
+    }
   </style>
 </head>
 <body>
-  <div class="page">
+  <div class="watermark">EduRoom</div>
+  <div class="content">
     <h1>Internship Completion Summary</h1>
     <table>
       <tr>
@@ -190,8 +252,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       </tr>
       ${tableRowsHtml}
     </table>
-    <div style="margin-top:30px; text-align:center;">Generated for ${escapeHtml(fullName)} on ${today}</div>
+    <div style="margin-top:40px; font-size:18px;">
+      Generated for <b>${escapeHtml(fullName)}</b> on ${today}
+    </div>
   </div>
+  <div class="footer">© EduRoom Internship Report</div>
 </body>
 </html>
 `;
@@ -208,11 +273,10 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
-    margin: { top: "20px", bottom: "20px", left: "20px", right: "20px" },
+    margin: { top: "0px", bottom: "0px", left: "0px", right: "0px" },
   });
 
   await browser.close();
-
   return pdfBuffer;
 };
 
