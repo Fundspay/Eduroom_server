@@ -20,6 +20,7 @@ module.exports = (sequelize, Sequelize) => {
       queryStatus: { type: Sequelize.STRING, allowNull: true },
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: true },
       occupation: { type: Sequelize.STRING, allowNull: true },
+      teamManager: { type: Sequelize.STRING, allowNull: true },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
     },
