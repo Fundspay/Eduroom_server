@@ -91,7 +91,9 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
   // Map for quick lookup
   const resultMap = {};
-  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r.matchPercentage));
+  caseStudyResults.forEach(
+    (r) => (resultMap[String(r.questionId)] = r.matchPercentage)
+  );
 
   // Only sessions with at least one case study should be included
   const filteredSessions = courseDetailRows.filter(
@@ -102,7 +104,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
   // Compute match percentage for these filtered sessions
   return filteredSessions.map((session) => {
-    const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
+    const csList =
+      session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
       const match = resultMap[String(cs.id)];
@@ -115,7 +118,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       day: session.day,
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
-      caseStudyPercentage: totalCS > 0 ? parseFloat(avgPercentage.toFixed(2)) : null,
+      caseStudyPercentage:
+        totalCS > 0 ? parseFloat(avgPercentage.toFixed(2)) : null,
     };
   });
 };
@@ -167,10 +171,13 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   });
 
   // =======================
-  // BUSINESS TARGET LOGIC (from createAndSendInternshipCertificate)
+  // BUSINESS TARGET LOGIC
   // =======================
   const userTarget = user.businessTargets?.[courseId];
-  const rawTarget = parseInt(userTarget !== undefined ? userTarget : course?.businessTarget || 0, 10);
+  const rawTarget = parseInt(
+    userTarget !== undefined ? userTarget : course?.businessTarget || 0,
+    10
+  );
   const businessTarget = Math.max(0, rawTarget);
 
   const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
@@ -293,6 +300,12 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         color:#444;
       }
       .page-break { page-break-after: always; }
+      .declaration {
+        margin-top: 30px;
+        font-size: 15px;
+        line-height: 1.6;
+        text-align: justify;
+      }
     </style>
   </head>
   <body>
@@ -314,6 +327,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
         ${renderTable(filteredCaseStudySessions, "caseStudy")}
+        <div class="declaration">
+          Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
+        </div>
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
