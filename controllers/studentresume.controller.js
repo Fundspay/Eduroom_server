@@ -136,6 +136,8 @@ module.exports.updateResume = updateResume;
 // ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
+    console.log("🚀 Starting StudentResume list sync...");
+
     // ---------------------------
     // 1️⃣ Sync Student Registrations
     // ---------------------------
@@ -143,6 +145,8 @@ const listResumes = async (req, res) => {
       where: { isRegistered: false },
       attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
     });
+
+    console.log(`🟡 Found ${resumesToSync.length} resumes to sync registration status.`);
 
     for (const resume of resumesToSync) {
       if (!resume.mobileNumber) continue;
@@ -158,12 +162,15 @@ const listResumes = async (req, res) => {
           isRegistered: true,
           dateOfRegistration: user.createdAt,
         });
+        console.log(`✅ Synced registration for resume ID ${resume.id} -> userId ${user.id}`);
       }
     }
 
     // ---------------------------
     // 2️⃣ Fetch all resumes with associations
     // ---------------------------
+    console.log("🔍 Fetching all resumes with associations...");
+
     const records = await model.StudentResume.findAll({
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
@@ -189,8 +196,8 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
-              where: { hasPaid: true }, // 🔹 only paid entries
-              required: false, // include user even if they have no paid entries
+              where: { hasPaid: true },
+              required: false,
               separate: true,
             },
             {
@@ -204,48 +211,65 @@ const listResumes = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
+    console.log(`📄 Total resumes fetched: ${records.length}`);
+
     // ---------------------------
     // 3️⃣ Store FundsAudit data per studentResume and user
     // ---------------------------
     for (const resume of records) {
-      const user = resume.User; // Sequelize default association name is model name
-
+      const user = resume.User;
       if (!user || !user.FundsAudits) continue;
 
-      const fundsData = user.FundsAudits.map((fa) => ({
-        studentResumeId: resume.id,
-        userId: user.id,
-        fundsAuditId: fa.id,
-        registeredUserId: fa.registeredUserId,
-        firstName: fa.firstName,
-        lastName: fa.lastName,
-        phoneNumber: fa.phoneNumber,
-        email: fa.email,
-        dateOfPayment: fa.dateOfPayment,
-        dateOfDownload: fa.dateOfDownload,
-        hasPaid: fa.hasPaid,
-        isDownloaded: fa.isDownloaded,
-        queryStatus: fa.queryStatus,
-        isQueryRaised: fa.isQueryRaised,
-        occupation: fa.occupation,
+      console.log(
+        `🧩 Processing resumeId: ${resume.id}, userId: ${user.id}, FundsAudits: ${user.FundsAudits.length}`
+      );
 
-        // ✅ Add team manager info from the associated TeamManager model
-        teamManagerId: user.teamManager?.id || null,
-        teamManagerName: user.teamManager?.name || null,
-        teamManagerEmail: user.teamManager?.email || null,
-      }));
+      const fundsData = user.FundsAudits.map((fa) => {
+        const record = {
+          studentResumeId: resume.id,
+          userId: user.id,
+          fundsAuditId: fa.id,
+          registeredUserId: fa.registeredUserId,
+          firstName: fa.firstName,
+          lastName: fa.lastName,
+          phoneNumber: fa.phoneNumber,
+          email: fa.email,
+          dateOfPayment: fa.dateOfPayment,
+          dateOfDownload: fa.dateOfDownload,
+          hasPaid: fa.hasPaid,
+          isDownloaded: fa.isDownloaded,
+          queryStatus: fa.queryStatus,
+          isQueryRaised: fa.isQueryRaised,
+          occupation: fa.occupation,
+
+          // ✅ Team Manager info (from TeamManager model)
+          teamManagerId: user.teamManager?.id || null,
+          teamManagerName: user.teamManager?.name || null,
+          teamManagerEmail: user.teamManager?.email || null,
+        };
+
+        console.log(
+          `🟢 Prepared FundsAuditStudent record for userId ${user.id} (teamManager: ${record.teamManagerName || "N/A"})`
+        );
+
+        return record;
+      });
 
       if (fundsData.length > 0) {
         await model.FundsAuditStudent.bulkCreate(fundsData, { ignoreDuplicates: true });
+        console.log(
+          `✅ Inserted ${fundsData.length} FundsAuditStudent record(s) for resumeId ${resume.id}, userId ${user.id}`
+        );
       }
     }
 
     // ---------------------------
     // 4️⃣ Return response
     // ---------------------------
+    console.log("🏁 All processing done successfully!");
     return ReS(res, { success: true, data: records }, 200);
   } catch (error) {
-    console.error("StudentResume List Error:", error);
+    console.error("❌ StudentResume List Error:", error);
     return ReE(res, error.message, 500);
   }
 };
