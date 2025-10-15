@@ -600,6 +600,7 @@ const listResumesByUserId = async (req, res) => {
             "queryStatus",
             "isQueryRaised",
             "occupation",
+            "teamManager",
           ],
         },
       ],
