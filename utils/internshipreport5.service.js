@@ -175,17 +175,15 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
   const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
 
-  const filteredCaseStudySessions = mergedSessions.filter(
-    (s) => s.caseStudyPercentage !== null
-  );
-
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
       <thead>
         <tr>
           <th>Sr No.</th>
           <th>Session</th>
-          <th>${type === "completion" ? "Completion %" : "Case Study %"}</th>
+          <th>${
+            type === "completion" ? "Completion %" : "Case Study %"
+          }</th>
         </tr>
       </thead>
       <tbody>
@@ -290,10 +288,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       }
       .stamp {
         position: absolute;
-        left: 50%;
+        left: 40%;
         bottom: 200px;
         width: 120px;
         height: auto;
+        transform: translateX(-50%);
       }
     </style>
   </head>
@@ -315,7 +314,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(filteredCaseStudySessions, "caseStudy")}
+        ${renderTable(mergedSessions, "caseStudy")}
         <div class="declaration">
           Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
         </div>
