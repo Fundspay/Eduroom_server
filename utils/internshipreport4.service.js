@@ -266,7 +266,7 @@ const generateMCQCaseStudyReport = async (options = {}) => {
                   )
                   .join("");
                 return ` 
-                  <p><b>Question ${idx + 1}:</b> ${escapeHtml(q.question)}</p>
+                  <p><b>Question :</b> ${escapeHtml(q.question)}</p>
                   <ul style="margin:0 0 10px 20px;">${optionsHtml}</ul>
                 `;
               })
