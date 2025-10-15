@@ -131,6 +131,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   });
   if (!user) throw new Error("User not found");
 
+  const course = await model.Course.findOne({
+    where: { id: courseId, isDeleted: false },
+  });
+  if (!course) throw new Error("Course not found");
+
   const firstName = user.firstName || "";
   const lastName = user.lastName || "";
   const fullName = `${firstName} ${lastName}`.trim();
@@ -161,7 +166,20 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     };
   });
 
-  // Only sessions that have case studies
+  // =======================
+  // BUSINESS TARGET LOGIC (from createAndSendInternshipCertificate)
+  // =======================
+  const userTarget = user.businessTargets?.[courseId];
+  const rawTarget = parseInt(userTarget !== undefined ? userTarget : course?.businessTarget || 0, 10);
+  const businessTarget = Math.max(0, rawTarget);
+
+  const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
+  const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+  const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
+
+  // =======================
+  // FILTER CASE STUDIES
+  // =======================
   const filteredCaseStudySessions = mergedSessions.filter(
     (s) => s.caseStudyPercentage !== null
   );
@@ -196,7 +214,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  // Empty Business Target table
+  // =======================
+  // UPDATED BUSINESS TARGET TABLE
+  // =======================
   const businessTargetTable = `
     <table class="details-table">
       <thead>
@@ -206,11 +226,17 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         </tr>
       </thead>
       <tbody>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr>
+          <td>${businessTarget}</td>
+          <td>${achievedTarget}</td>
+        </tr>
       </tbody>
     </table>
   `;
 
+  // =======================
+  // HTML STRUCTURE
+  // =======================
   const html = `
   <!doctype html>
   <html>
@@ -295,7 +321,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   </html>
   `;
 
-  // Generate PDF
+  // =======================
+  // GENERATE PDF
+  // =======================
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
