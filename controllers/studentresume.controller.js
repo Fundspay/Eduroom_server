@@ -166,21 +166,11 @@ const listResumes = async (req, res) => {
     // ---------------------------
     const records = await model.StudentResume.findAll({
       include: [
-        {
-          model: model.CoSheet,
-          attributes: ["id", "collegeName"],
-        },
+        { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
           model: model.User,
           as: "user",
-          attributes: [
-            "id",
-            "firstName",
-            "lastName",
-            "phoneNumber",
-            "email",
-            "createdAt",
-          ],
+          attributes: ["id", "firstName", "lastName", "phoneNumber", "email", "createdAt"],
           include: [
             {
               model: model.FundsAudit,
@@ -199,13 +189,9 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
-              where: { hasPaid: true }, // ✅ Only paid entries
-              required: false, // ✅ Include user even if no paid entries
+              where: { hasPaid: true }, // 🔹 only paid entries
+              required: false, // include user even if they have no paid entries
               separate: true,
-            },
-            {
-              model: model.Status,
-              attributes: ["teamManager"], // ✅ pull from Status model
             },
             {
               model: model.TeamManager,
@@ -222,7 +208,8 @@ const listResumes = async (req, res) => {
     // 3️⃣ Store FundsAudit data per studentResume and user
     // ---------------------------
     for (const resume of records) {
-      const user = resume.User;
+      const user = resume.User; // Sequelize default association name is model name
+
       if (!user || !user.FundsAudits) continue;
 
       const fundsData = user.FundsAudits.map((fa) => ({
@@ -242,14 +229,14 @@ const listResumes = async (req, res) => {
         isQueryRaised: fa.isQueryRaised,
         occupation: fa.occupation,
 
-        // ✅ FIXED: pull teamManager from Status model (first record if hasMany)
-        teamManager: user.Statuses?.[0]?.teamManager || null,
+        // ✅ Add team manager info from the associated TeamManager model
+        teamManagerId: user.teamManager?.id || null,
+        teamManagerName: user.teamManager?.name || null,
+        teamManagerEmail: user.teamManager?.email || null,
       }));
 
       if (fundsData.length > 0) {
-        await model.FundsAuditStudent.bulkCreate(fundsData, {
-          ignoreDuplicates: true,
-        });
+        await model.FundsAuditStudent.bulkCreate(fundsData, { ignoreDuplicates: true });
       }
     }
 
