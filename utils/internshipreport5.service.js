@@ -61,7 +61,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER
+// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
@@ -175,9 +175,8 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
   const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
 
-  // Only include sessions that have case studies
   const filteredCaseStudySessions = mergedSessions.filter(
-    (s) => csSessions.some((cs) => cs.sessionNumber === s.sessionNumber)
+    (s) => s.caseStudyPercentage !== null
   );
 
   const renderTable = (rows, type = "completion") => `
@@ -186,9 +185,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         <tr>
           <th>Sr No.</th>
           <th>Session</th>
-          <th>${
-            type === "completion" ? "Completion %" : "Case Study %"
-          }</th>
+          <th>${type === "completion" ? "Completion %" : "Case Study %"}</th>
         </tr>
       </thead>
       <tbody>
@@ -293,11 +290,10 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       }
       .stamp {
         position: absolute;
-        left: 45%;
+        left: 35%;
         bottom: 200px;
         width: 120px;
         height: auto;
-        transform: translateX(-50%);
       }
     </style>
   </head>
