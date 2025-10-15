@@ -1,4 +1,4 @@
-"use strict";
+"use strict"; 
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
 const CONFIG = require("../config/config");
@@ -66,7 +66,6 @@ const fetchSessionsWithMCQs = async (courseId) => {
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
 
-  // Fetch sessions that contain case studies
   const courseDetailRows = await model.CourseDetail.findAll({
     where: { courseId, isDeleted: false },
     order: [
@@ -83,26 +82,22 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
     ],
   });
 
-  // Fetch user case study results
   const caseStudyResults = await model.CaseStudyResult.findAll({
     where: { courseId, userId },
     attributes: ["questionId", "matchPercentage"],
   });
 
-  // Map for quick lookup
   const resultMap = {};
   caseStudyResults.forEach(
     (r) => (resultMap[String(r.questionId)] = r.matchPercentage)
   );
 
-  // Only sessions with at least one case study should be included
   const filteredSessions = courseDetailRows.filter(
     (session) =>
       session.QuestionModels &&
       session.QuestionModels.some((q) => q.caseStudy && q.caseStudy.trim())
   );
 
-  // Compute match percentage for these filtered sessions
   return filteredSessions.map((session) => {
     const csList =
       session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
@@ -153,7 +148,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const mcqSessions = await fetchSessionsWithMCQs(courseId);
   const csSessions = await fetchAllCaseStudies({ courseId, userId });
 
-  // Merge MCQ and Case Study percentages
   const mergedSessions = mcqSessions.map((s, index) => {
     const cs = csSessions.find((c) => c.sessionNumber === s.sessionNumber);
     const totalMCQs = s.mcqs.length;
@@ -170,9 +164,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     };
   });
 
-  // =======================
-  // BUSINESS TARGET LOGIC
-  // =======================
   const userTarget = user.businessTargets?.[courseId];
   const rawTarget = parseInt(
     userTarget !== undefined ? userTarget : course?.businessTarget || 0,
@@ -184,9 +175,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
   const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
 
-  // =======================
-  // FILTER CASE STUDIES
-  // =======================
   const filteredCaseStudySessions = mergedSessions.filter(
     (s) => s.caseStudyPercentage !== null
   );
@@ -221,9 +209,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  // =======================
-  // UPDATED BUSINESS TARGET TABLE
-  // =======================
   const businessTargetTable = `
     <table class="details-table">
       <thead>
@@ -241,9 +226,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  // =======================
-  // HTML STRUCTURE
-  // =======================
   const html = `
   <!doctype html>
   <html>
@@ -306,6 +288,13 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         line-height: 1.6;
         text-align: justify;
       }
+      .stamp {
+        position: absolute;
+        left: 40px;
+        bottom: 40px;
+        width: 120px;
+        height: auto;
+      }
     </style>
   </head>
   <body>
@@ -330,6 +319,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         <div class="declaration">
           Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
         </div>
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
@@ -337,9 +327,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   </html>
   `;
 
-  // =======================
-  // GENERATE PDF
-  // =======================
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
