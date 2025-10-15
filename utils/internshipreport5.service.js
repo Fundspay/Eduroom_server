@@ -91,7 +91,9 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
   // Map for quick lookup
   const resultMap = {};
-  caseStudyResults.forEach((r) => (resultMap[String(r.questionId)] = r.matchPercentage));
+  caseStudyResults.forEach(
+    (r) => (resultMap[String(r.questionId)] = r.matchPercentage)
+  );
 
   // Only sessions with at least one case study should be included
   const filteredSessions = courseDetailRows.filter(
@@ -102,7 +104,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
 
   // Compute match percentage for these filtered sessions
   return filteredSessions.map((session) => {
-    const csList = session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
+    const csList =
+      session.QuestionModels?.filter((q) => q.caseStudy?.trim()) || [];
     const totalCS = csList.length;
     const totalMatch = csList.reduce((acc, cs) => {
       const match = resultMap[String(cs.id)];
@@ -115,7 +118,8 @@ const fetchAllCaseStudies = async ({ courseId, userId }) => {
       day: session.day,
       sessionNumber: session.sessionNumber,
       title: session.title || `Session ${session.day}`,
-      caseStudyPercentage: totalCS > 0 ? parseFloat(avgPercentage.toFixed(2)) : null,
+      caseStudyPercentage:
+        totalCS > 0 ? parseFloat(avgPercentage.toFixed(2)) : null,
     };
   });
 };
@@ -130,6 +134,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     where: { id: userId, isDeleted: false },
   });
   if (!user) throw new Error("User not found");
+
+  const course = await model.Course.findOne({
+    where: { id: courseId, isDeleted: false },
+  });
+  if (!course) throw new Error("Course not found");
 
   const firstName = user.firstName || "";
   const lastName = user.lastName || "";
@@ -161,7 +170,23 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     };
   });
 
-  // Only sessions that have case studies
+  // =======================
+  // BUSINESS TARGET LOGIC
+  // =======================
+  const userTarget = user.businessTargets?.[courseId];
+  const rawTarget = parseInt(
+    userTarget !== undefined ? userTarget : course?.businessTarget || 0,
+    10
+  );
+  const businessTarget = Math.max(0, rawTarget);
+
+  const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
+  const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+  const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
+
+  // =======================
+  // FILTER CASE STUDIES
+  // =======================
   const filteredCaseStudySessions = mergedSessions.filter(
     (s) => s.caseStudyPercentage !== null
   );
@@ -196,7 +221,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  // Empty Business Target table
+  // =======================
+  // UPDATED BUSINESS TARGET TABLE
+  // =======================
   const businessTargetTable = `
     <table class="details-table">
       <thead>
@@ -206,11 +233,17 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         </tr>
       </thead>
       <tbody>
-        <tr><td>&nbsp;</td><td>&nbsp;</td></tr>
+        <tr>
+          <td>${businessTarget}</td>
+          <td>${achievedTarget}</td>
+        </tr>
       </tbody>
     </table>
   `;
 
+  // =======================
+  // HTML STRUCTURE
+  // =======================
   const html = `
   <!doctype html>
   <html>
@@ -267,6 +300,12 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         color:#444;
       }
       .page-break { page-break-after: always; }
+      .declaration {
+        margin-top: 30px;
+        font-size: 15px;
+        line-height: 1.6;
+        text-align: justify;
+      }
     </style>
   </head>
   <body>
@@ -288,6 +327,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
         ${renderTable(filteredCaseStudySessions, "caseStudy")}
+        <div class="declaration">
+          Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
+        </div>
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
@@ -295,7 +337,9 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   </html>
   `;
 
-  // Generate PDF
+  // =======================
+  // GENERATE PDF
+  // =======================
   const browser = await puppeteer.launch({
     headless: true,
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
