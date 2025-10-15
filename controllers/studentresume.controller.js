@@ -843,6 +843,7 @@ const getUserResumesAchieved = async (req, res) => {
     if (!teamManagerId)
       return res.status(400).json({ success: false, error: "teamManagerId is required" });
 
+    // Fetch manager info
     const manager = await model.TeamManager.findOne({
       where: { id: teamManagerId },
       attributes: ["name"],
@@ -852,6 +853,7 @@ const getUserResumesAchieved = async (req, res) => {
 
     const fullName = manager.name.trim();
 
+    // Date filter
     let dateFilter = {};
     if (fromDate && toDate) {
       const startDate = new Date(fromDate);
@@ -859,6 +861,7 @@ const getUserResumesAchieved = async (req, res) => {
       dateFilter = { resumeDate: { [Op.between]: [startDate, endDate] } };
     }
 
+    // Fetch resumes with FundsAuditStudents
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
@@ -868,14 +871,40 @@ const getUserResumesAchieved = async (req, res) => {
         ],
         ...dateFilter,
       },
-      raw: true,
+      include: [
+        {
+          model: model.FundsAuditStudent,
+          attributes: [
+            "id",
+            "fundsAuditId",
+            "registeredUserId",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "dateOfPayment",
+            "dateOfDownload",
+            "hasPaid",
+            "isDownloaded",
+            "queryStatus",
+            "isQueryRaised",
+            "occupation",
+            "teamManager",
+          ],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      raw: false, // Must be false to include associations
+      nest: true, // Keep nested structure
     });
 
+    // Fetch all managers for reference
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
+    // Return response in the same format
     return res.json({
       success: true,
       resumesAchieved: resumes.length,
@@ -887,7 +916,9 @@ const getUserResumesAchieved = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
 module.exports.getUserResumesAchieved = getUserResumesAchieved;
+
 
 const getUserInterviewsAchieved = async (req, res) => {
   try {
