@@ -988,6 +988,7 @@ const listResumesByUserIdfuture = async (req, res) => {
             "queryStatus",
             "isQueryRaised",
             "occupation",
+            "teamManager",
           ],
         },
       ],
