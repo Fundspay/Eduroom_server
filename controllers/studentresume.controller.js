@@ -166,11 +166,21 @@ const listResumes = async (req, res) => {
     // ---------------------------
     const records = await model.StudentResume.findAll({
       include: [
-        { model: model.CoSheet, attributes: ["id", "collegeName"] },
+        {
+          model: model.CoSheet,
+          attributes: ["id", "collegeName"],
+        },
         {
           model: model.User,
           as: "user",
-          attributes: ["id", "firstName", "lastName", "phoneNumber", "email", "createdAt"],
+          attributes: [
+            "id",
+            "firstName",
+            "lastName",
+            "phoneNumber",
+            "email",
+            "createdAt",
+          ],
           include: [
             {
               model: model.FundsAudit,
@@ -189,12 +199,19 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
-              where: { hasPaid: true }, // 🔹 only paid entries
-              required: false,          // include user even if they have no paid entries
+              where: { hasPaid: true }, // ✅ Only paid entries
+              required: false, // ✅ Include user even if no paid entries
               separate: true,
             },
-            { model: model.Status, attributes: ["teamManager"] },
-            { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
+            {
+              model: model.Status,
+              attributes: ["teamManager"], // ✅ pull from Status model
+            },
+            {
+              model: model.TeamManager,
+              as: "teamManager",
+              attributes: ["id", "name", "email"],
+            },
           ],
         },
       ],
@@ -225,12 +242,14 @@ const listResumes = async (req, res) => {
         isQueryRaised: fa.isQueryRaised,
         occupation: fa.occupation,
 
-        // ✅ Added: team manager name from Status model
-        teamManager: user.Status ? user.Status.teamManager : null,
+        // ✅ FIXED: pull teamManager from Status model (first record if hasMany)
+        teamManager: user.Statuses?.[0]?.teamManager || null,
       }));
 
       if (fundsData.length > 0) {
-        await model.FundsAuditStudent.bulkCreate(fundsData, { ignoreDuplicates: true });
+        await model.FundsAuditStudent.bulkCreate(fundsData, {
+          ignoreDuplicates: true,
+        });
       }
     }
 
