@@ -162,7 +162,7 @@ const listResumes = async (req, res) => {
           isRegistered: true,
           dateOfRegistration: user.createdAt,
         });
-        console.log(`✅ Resume ID ${resume.id} marked as registered using user ID ${user.id}`);
+        console.log(`🔄 Updated registration for StudentResume ID ${resume.id}`);
       }
     }
 
@@ -209,14 +209,23 @@ const listResumes = async (req, res) => {
     console.log(`📄 Total resumes fetched: ${records.length}`);
 
     // ---------------------------
-    // 3️⃣ Store FundsAudit data per studentResume and user with logs
+    // 3️⃣ Store FundsAudit data per studentResume and user
     // ---------------------------
     for (const resume of records) {
       const user = resume.user;
       if (!user || !user.FundsAudits) continue;
 
       const fundsData = user.FundsAudits.map((fa) => {
-        const record = {
+        // Use user's assigned team manager if present, else fallback to resume.teamManagerId
+        const teamManagerName = user.teamManager
+          ? user.teamManager.name
+          : resume.teamManagerId;
+
+        console.log(
+          `💾 Preparing FundsAuditStudent entry for StudentResume ID ${resume.id}, User ID ${user.id}, FundsAudit ID ${fa.id}, Team Manager: ${teamManagerName}`
+        );
+
+        return {
           studentResumeId: resume.id,
           userId: user.id,
           fundsAuditId: fa.id,
@@ -232,12 +241,8 @@ const listResumes = async (req, res) => {
           queryStatus: fa.queryStatus,
           isQueryRaised: fa.isQueryRaised,
           occupation: fa.occupation,
-          teamManager: user.teamManager ? user.teamManager.name : null,
+          teamManager: teamManagerName,
         };
-        console.log(
-          `💾 Preparing FundsAuditStudent entry for StudentResume ID ${resume.id}, User ID ${user.id}, FundsAudit ID ${fa.id}, Team Manager: ${record.teamManager}`
-        );
-        return record;
       });
 
       if (fundsData.length > 0) {
