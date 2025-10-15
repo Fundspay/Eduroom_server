@@ -169,7 +169,7 @@ const listResumes = async (req, res) => {
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
           model: model.User,
-           as: "user", 
+          as: "user",
           attributes: ["id", "firstName", "lastName", "phoneNumber", "email", "createdAt"],
           include: [
             {
@@ -189,9 +189,9 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
-               where: { hasPaid: true }, // 🔹 only paid entries
-          required: false,         // include user even if they have no paid entries
-          separate: true,
+              where: { hasPaid: true }, // 🔹 only paid entries
+              required: false,          // include user even if they have no paid entries
+              separate: true,
             },
             { model: model.Status, attributes: ["teamManager"] },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
@@ -205,8 +205,7 @@ const listResumes = async (req, res) => {
     // 3️⃣ Store FundsAudit data per studentResume and user
     // ---------------------------
     for (const resume of records) {
-      const user = resume.User; // Sequelize default association name is model name
-
+      const user = resume.User;
       if (!user || !user.FundsAudits) continue;
 
       const fundsData = user.FundsAudits.map((fa) => ({
@@ -225,6 +224,9 @@ const listResumes = async (req, res) => {
         queryStatus: fa.queryStatus,
         isQueryRaised: fa.isQueryRaised,
         occupation: fa.occupation,
+
+        // ✅ Added: team manager name from Status model
+        teamManager: user.Status ? user.Status.teamManager : null,
       }));
 
       if (fundsData.length > 0) {
