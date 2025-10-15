@@ -61,7 +61,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
+// FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
@@ -174,6 +174,11 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
   const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
   const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
+
+  // Only include sessions that have case studies
+  const filteredCaseStudySessions = mergedSessions.filter(
+    (s) => csSessions.some((cs) => cs.sessionNumber === s.sessionNumber)
+  );
 
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
@@ -288,7 +293,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       }
       .stamp {
         position: absolute;
-        left: 40%;
+        left: 45%;
         bottom: 200px;
         width: 120px;
         height: auto;
@@ -314,7 +319,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(mergedSessions, "caseStudy")}
+        ${renderTable(filteredCaseStudySessions, "caseStudy")}
         <div class="declaration">
           Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
         </div>
