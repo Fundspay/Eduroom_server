@@ -209,45 +209,58 @@ const listResumes = async (req, res) => {
     console.log(`📄 Total resumes fetched: ${records.length}`);
 
     // ---------------------------
-    // 3️⃣ Store FundsAudit data per studentResume and user
+    // 3️⃣ Store FundsAudit data per studentResume and user (duplicate-safe)
     // ---------------------------
     for (const resume of records) {
       const user = resume.user;
-      if (!user || !user.FundsAudits) continue;
+      if (!user || !user.FundsAudits || user.FundsAudits.length === 0) continue;
 
-      const fundsData = user.FundsAudits.map((fa) => {
-        // Use user's assigned team manager if present, else fallback to resume.teamManagerId
-        const teamManagerName = user.teamManager
-          ? user.teamManager.name
-          : resume.teamManagerId;
-
-        console.log(
-          `💾 Preparing FundsAuditStudent entry for StudentResume ID ${resume.id}, User ID ${user.id}, FundsAudit ID ${fa.id}, Team Manager: ${teamManagerName}`
-        );
-
-        return {
+      // Fetch existing FundsAuditStudent entries for this resume
+      const existingRecords = await model.FundsAuditStudent.findAll({
+        where: {
           studentResumeId: resume.id,
-          userId: user.id,
-          fundsAuditId: fa.id,
-          registeredUserId: fa.registeredUserId,
-          firstName: fa.firstName,
-          lastName: fa.lastName,
-          phoneNumber: fa.phoneNumber,
-          email: fa.email,
-          dateOfPayment: fa.dateOfPayment,
-          dateOfDownload: fa.dateOfDownload,
-          hasPaid: fa.hasPaid,
-          isDownloaded: fa.isDownloaded,
-          queryStatus: fa.queryStatus,
-          isQueryRaised: fa.isQueryRaised,
-          occupation: fa.occupation,
-          teamManager: teamManagerName,
-        };
+          fundsAuditId: user.FundsAudits.map(fa => fa.id),
+        },
+        attributes: ["fundsAuditId"],
+        raw: true,
       });
+
+      const existingIds = existingRecords.map(r => r.fundsAuditId);
+
+      const fundsData = user.FundsAudits
+        .filter(fa => !existingIds.includes(fa.id)) // Only new records
+        .map((fa) => {
+          const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
+
+          console.log(
+            `💾 Preparing FundsAuditStudent entry for StudentResume ID ${resume.id}, User ID ${user.id}, FundsAudit ID ${fa.id}, Team Manager: ${teamManagerName}`
+          );
+
+          return {
+            studentResumeId: resume.id,
+            userId: user.id,
+            fundsAuditId: fa.id,
+            registeredUserId: fa.registeredUserId,
+            firstName: fa.firstName,
+            lastName: fa.lastName,
+            phoneNumber: fa.phoneNumber,
+            email: fa.email,
+            dateOfPayment: fa.dateOfPayment,
+            dateOfDownload: fa.dateOfDownload,
+            hasPaid: fa.hasPaid,
+            isDownloaded: fa.isDownloaded,
+            queryStatus: fa.queryStatus,
+            isQueryRaised: fa.isQueryRaised,
+            occupation: fa.occupation,
+            teamManager: teamManagerName,
+          };
+        });
 
       if (fundsData.length > 0) {
         await model.FundsAuditStudent.bulkCreate(fundsData, { ignoreDuplicates: true });
         console.log(`✅ Inserted ${fundsData.length} FundsAuditStudent records for StudentResume ID ${resume.id}`);
+      } else {
+        console.log(`ℹ️ No new FundsAuditStudent records to insert for StudentResume ID ${resume.id}`);
       }
     }
 
@@ -263,7 +276,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 // ✅ Delete resume by ID
 const deleteResume = async (req, res) => {
