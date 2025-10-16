@@ -1360,7 +1360,7 @@ const getBusinessUserTarget = async (req, res) => {
         // achievedCount = apiResponse.data?.referral_count?.count || 0;
 
         // New API call
-        const apiUrl = `{{aws-endpoint}}/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
 
         // Count all registered users as 1 each
