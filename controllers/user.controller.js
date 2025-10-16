@@ -864,9 +864,6 @@ const fetchSingleUserById = async (req, res) => {
     const { id } = req.params;
     if (!id) return ReE(res, "Missing user ID", 400);
 
-    const userId = Number(id);
-if (!id || isNaN(userId)) return ReE(res, "Invalid user ID", 400);
-
     const user = await model.User.findOne({
       where: { id, isDeleted: false },
       include: [
