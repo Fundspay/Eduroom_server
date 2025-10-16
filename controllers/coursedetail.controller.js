@@ -1363,9 +1363,9 @@ const getBusinessUserTarget = async (req, res) => {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
 
-        // Count all registered users as 1 each
+        // Count only registered users who have paid
         const registeredUsers = apiResponse.data?.registered_users || [];
-        achievedCount = registeredUsers.length; // Each user counts as 1
+        achievedCount = registeredUsers.filter(u => u.has_paid).length;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
@@ -1373,7 +1373,7 @@ const getBusinessUserTarget = async (req, res) => {
 
     // Update wallet
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-    const subscriptionWallet = Number(achievedCount) || 0;
+    const subscriptionWallet = achievedCount; // already a number
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
     user.subscriptionWallet = subscriptionWallet;
@@ -1405,7 +1405,6 @@ const getBusinessUserTarget = async (req, res) => {
 };
 
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
-
 
 const getCourseStatus = async (req, res) => {
   try {
