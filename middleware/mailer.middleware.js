@@ -37,7 +37,7 @@
 // module.exports = { sendMail };
 
 const nodemailer = require("nodemailer");
-const nodemailer = require("nodemailer");
+
 
 // Configure GoDaddy SMTP Transporter
 const transporter = nodemailer.createTransport({
