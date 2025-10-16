@@ -52,13 +52,8 @@ const transporter = nodemailer.createTransport({
   debug: true     // show detailed SMTP logs
 });
 
-// Log exactly what credentials transporter is using (mask password)
-console.log("SMTP Transporter configured with:");
-console.log("Host:", transporter.options.host);
-console.log("Port:", transporter.options.port);
-console.log("Secure:", transporter.options.secure);
-console.log("Auth User:", transporter.options.auth.user);
-console.log("Auth Pass:", maskPassword(transporter.options.auth.pass));
+// Log exactly what credentials transporter is using ( password)
+
 
 // Generic mail sender function
 const sendMail = async (to, subject, html) => {
