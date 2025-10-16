@@ -290,7 +290,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
       }
       .stamp {
         position: absolute;
-        left: 40px;
+        left: 38%;
         bottom: 200px;
         width: 120px;
         height: auto;
