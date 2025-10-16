@@ -39,9 +39,6 @@
 const nodemailer = require("nodemailer");
 const CONFIG = require("../config/config");
 
-// Mask password for safe logging
-const maskPassword = (pass) => pass.replace(/./g, "*");
-
 // Configure GoDaddy SMTP Transporter
 const transporter = nodemailer.createTransport({
   host: CONFIG.mailHost || "smtpout.secureserver.net", // GoDaddy SMTP
