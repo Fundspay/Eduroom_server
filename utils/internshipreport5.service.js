@@ -329,7 +329,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: ["--no-sandbox", "--disable-setuid-sandbox" , "--disable-dev-shm-usage"],
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });

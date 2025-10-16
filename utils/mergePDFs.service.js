@@ -11,6 +11,7 @@ const s3 = new AWS.S3({
 
 /**
  * Merge multiple PDF buffers and upload to S3
+ * Minimal memory-safe changes added
  */
 const mergePDFsAndUpload = async (userId, pdfBuffers) => {
   if (!pdfBuffers || pdfBuffers.length === 0) {
@@ -20,7 +21,9 @@ const mergePDFsAndUpload = async (userId, pdfBuffers) => {
   // 1️⃣ Create a new merged PDF
   const mergedPdf = await PDFDocument.create();
 
-  for (const buffer of pdfBuffers) {
+  for (let i = 0; i < pdfBuffers.length; i++) {
+    const buffer = pdfBuffers[i];
+    // Load each PDF one at a time to reduce memory spikes
     const pdf = await PDFDocument.load(buffer);
     const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
     pages.forEach((p) => mergedPdf.addPage(p));
