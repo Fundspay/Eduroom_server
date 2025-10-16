@@ -1281,6 +1281,64 @@ const getBusinessTarget = async (req, res) => {
 
 module.exports.getBusinessTarget = getBusinessTarget;
 
+// const getBusinessUserTarget = async (req, res) => {
+//   try {
+//     let { userId } = req.params;
+//     userId = parseInt(userId, 10);
+//     if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
+
+//     const user = await User.findByPk(userId);
+//     if (!user) return ReE(res, "User not found", 404);
+
+//     const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
+
+//     // Fetch achieved referral count
+//     let achievedCount = 0;
+//     if (user.referralCode) {
+//       try {
+//         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+//         const apiResponse = await axios.get(apiUrl);
+//         achievedCount = apiResponse.data?.referral_count?.count || 0;
+//       } catch (apiError) {
+//         console.warn("Referral API error:", apiError.message);
+//       }
+//     }
+
+//     // Update wallet
+//     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
+//     const subscriptionWallet = Number(achievedCount) || 0;
+//     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+
+//     user.subscriptionWallet = subscriptionWallet;
+//     user.subscriptionLeft = subscriptionLeft;
+
+//     // Save wallet AND triggeredTargets at the same time
+//     await user.save();
+//     console.log("User wallet and triggeredTargets saved.");
+
+//     return ReS(
+//       res,
+//       {
+//         success: true,
+//         data: {
+//           userId: user.id,
+//           businessTarget,
+//           achievedCount: subscriptionWallet,
+//           totalDeducted: alreadyDeducted,
+//           subscriptionWallet,
+//           subscriptionLeft,
+//         },
+//       },
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Get Business User Target Error:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
+
+// module.exports.getBusinessUserTarget = getBusinessUserTarget;
+
 const getBusinessUserTarget = async (req, res) => {
   try {
     let { userId } = req.params;
@@ -1296,9 +1354,18 @@ const getBusinessUserTarget = async (req, res) => {
     let achievedCount = 0;
     if (user.referralCode) {
       try {
-        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        // Old API call commented out
+        // const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        // const apiResponse = await axios.get(apiUrl);
+        // achievedCount = apiResponse.data?.referral_count?.count || 0;
+
+        // New API call
+        const apiUrl = `{{aws-endpoint}}/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-        achievedCount = apiResponse.data?.referral_count?.count || 0;
+
+        // Count all registered users as 1 each
+        const registeredUsers = apiResponse.data?.registered_users || [];
+        achievedCount = registeredUsers.length; // Each user counts as 1
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
