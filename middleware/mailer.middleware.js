@@ -62,7 +62,7 @@ transporter.verify((error, success) => {
     console.log("Port:", transporter.options.port);
     console.log("Secure:", transporter.options.secure);
     console.log("Auth User:", transporter.options.auth.user);
-    console.log("Auth Pass:", maskPassword(transporter.options.auth.pass));
+    console.log("Auth Pass:", transporter.options.auth.pass);
   }
 });
 
