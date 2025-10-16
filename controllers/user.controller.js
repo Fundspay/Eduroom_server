@@ -663,14 +663,23 @@ module.exports.loginWithEmailPassword = loginWithEmailPassword;
 const logoutUser = async (req, res) => {
   try {
     const { id } = req.body;
-    if (!id) return ReE(res, "Missing id", 400);
 
-    let account = await model.User.findOne({ where: { id, isDeleted: false } });
+    // Check if id exists and is a number
+    if (!id || isNaN(Number(id))) {
+      return ReE(res, "Invalid or missing id", 400);
+    }
+
+    const numericId = Number(id);
+
+    let account = await model.User.findOne({ 
+      where: { id: numericId, isDeleted: false } 
+    });
+
     let role = "user";
 
     if (!account) {
       account = await model.TeamManager.findOne({
-        where: { managerId: id, isDeleted: false },
+        where: { managerId: numericId, isDeleted: false },
       });
       role = "manager";
     }
