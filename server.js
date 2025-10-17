@@ -37,6 +37,7 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
+     console.log("🔎 Incoming request origin:", origin); 
     if (!origin) return callback(null, true); // allow non-browser requests (like Postman)
     if (allowedOrigins.indexOf(origin) === -1) {
       return callback(new Error("CORS policy: This origin is not allowed"), false);
