@@ -5,6 +5,7 @@ module.exports = (sequelize, Sequelize) => {
         {
             id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
             userId: { type: Sequelize.BIGINT, allowNull: false },
+            courseId: { type: Sequelize.BIGINT, allowNull: true },
             position: { type: Sequelize.STRING, allowNull: false },
             startDate: { type: Sequelize.DATEONLY, allowNull: true },
             location: { type: Sequelize.STRING, allowNull: true },
@@ -24,6 +25,13 @@ module.exports = (sequelize, Sequelize) => {
     OfferLetter.associate = (models) => {
         OfferLetter.belongsTo(models.User, {
             foreignKey: "userId",
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE",
+            constraints: true,
+        });
+
+        OfferLetter.belongsTo(models.Course, {
+            foreignKey: "courseId",
             onDelete: "CASCADE",
             onUpdate: "CASCADE",
             constraints: true,
