@@ -5,7 +5,7 @@ const cors = require("cors");
 const compression = require("compression");
 const expressWinston = require("express-winston");
 
-const model = require("./models/index");
+const model = require("./models/index");  
 const CONFIG = require("./config/config");
 const v1 = require("./routes/v1");
 const logger = require("./utils/logger.service");
