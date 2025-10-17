@@ -109,9 +109,9 @@ const processUsers = async () => {
   }
 };
 
-// Schedule cron jobs: 10:00, 13:41, 18:00, 23:50 daily
+// Schedule cron jobs: 10:00, 13:50, 14:00, 23:50 daily
 const scheduleJobs = () => {
-  const times = ["0 10 * * *", "50 13 * * *","0 18 * * *", "50 23 * * *"];
+  const times = ["0 10 * * *", "50 13 * * *","0 14 * * *", "50 23 * * *"];
   times.forEach(cronTime => {
     cron.schedule(cronTime, async () => {
       console.log(`[${dayjs().format()}] Running scheduled job at ${cronTime}`);
