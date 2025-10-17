@@ -478,11 +478,20 @@ module.exports.getAllUsersCourseStatus = getAllUsersCourseStatus;
 const getUserWalletDetails = async (req, res) => {
   try {
     const { userId } = req.params;
-    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Validate userId
+    if (!userId) {
+      return ReE(res, "userId is required", 400);
+    }
+
+    const parsedUserId = parseInt(userId, 10);
+    if (isNaN(parsedUserId)) {
+      return ReE(res, "Invalid userId", 400);
+    }
 
     // Fetch user
     const user = await model.User.findOne({
-      where: { id: userId, isDeleted: false },
+      where: { id: parsedUserId, isDeleted: false },
       attributes: [
         "id",
         "firstName",
@@ -494,20 +503,19 @@ const getUserWalletDetails = async (req, res) => {
         "businessTargets"
       ]
     });
+
     if (!user) return ReE(res, "User not found", 404);
 
     const courseDetails = [];
 
     for (const courseId of Object.keys(user.courseStatuses || {})) {
-      // Fetch course
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
         attributes: ["id", "name", "businessTarget"]
       });
 
-      // Sum deducted wallet from certificates for this course
       const certificates = await model.InternshipCertificate.findAll({
-        where: { userId, courseId },
+        where: { userId: parsedUserId, courseId },
         attributes: ["deductedWallet"]
       });
 
@@ -516,7 +524,6 @@ const getUserWalletDetails = async (req, res) => {
         0
       );
 
-      // ✅ Prefer user's businessTargets value; fallback to Course table
       const userTarget = user.businessTargets?.[courseId];
       const rawTarget = parseInt(
         userTarget !== undefined ? userTarget : course?.businessTarget || 0,
@@ -532,13 +539,9 @@ const getUserWalletDetails = async (req, res) => {
       });
     }
 
-    // Ensure values are numbers and never negative
     const subscriptionWalletTotal = parseInt(user.subscriptionWallet || 0, 10);
     const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    const subscriptionLeft = Math.max(
-      0,
-      subscriptionWalletTotal - subscriptiondeductedWallet
-    );
+    const subscriptionLeft = Math.max(0, subscriptionWalletTotal - subscriptiondeductedWallet);
 
     const response = {
       userId: user.id,
@@ -552,7 +555,7 @@ const getUserWalletDetails = async (req, res) => {
     return ReS(res, { success: true, data: response }, 200);
   } catch (error) {
     console.error("getUserWalletDetails error:", error);
-    return ReE(res, error.message, 500);
+    return ReE(res, "Internal Server Error", 500);
   }
 };
 
