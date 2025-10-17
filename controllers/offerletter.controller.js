@@ -46,6 +46,7 @@ const sendOfferLetter = async (req, res) => {
 
       offerLetter = await model.OfferLetter.create({
         userId,
+        courseId,
         position: course.name || "Intern",
         startDate: new Date(),
         location: "Work from Home",
