@@ -63,7 +63,7 @@ const processUsers = async () => {
         const upcomingCourseIds = Object.keys(courseDates).filter(courseId => {
           const courseStart = dayjs(courseDates[courseId].startDate);
           if (courseStart.isAfter(today)) return true; // Future dates
-          if (courseStart.isSame(today) && (now.hour() > 13 || (now.hour() === 13 && now.minute() >= 20))) return true; // Today after 1:20 PM
+          if (courseStart.isSame(today) && (now.hour() > 13 || (now.hour() === 13 && now.minute() >= 35))) return true; // Today after 1:20 PM
           return false; // Old courses or today before 1:20 PM
         });
 
