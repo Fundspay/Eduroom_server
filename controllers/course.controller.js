@@ -92,13 +92,101 @@ var updateCourse = async (req, res) => {
 module.exports.updateCourse = updateCourse;
 
 // ✅ Fetch all Courses
+// const fetchAllCourses = async (req, res) => {
+//   try {
+//     const { userId } = req.query;
+//     if (!userId) return ReE(res, "userId is required", 400);
+
+//     // 🔹 Fetch user with TeamManager
+//     const user = await model.User.findByPk(userId, {
+//       include: [
+//         {
+//           model: model.TeamManager,
+//           as: "teamManager",
+//           attributes: ["internshipStatus", "name", "email"],
+//         },
+//       ],
+//     });
+
+//     if (!user) return ReE(res, "User not found", 404);
+
+//     // 🔹 Fetch all courses with domain
+//     const courses = await model.Course.findAll({
+//       where: { isDeleted: false },
+//       attributes: { exclude: ["createdAt", "updatedAt"] },
+//       include: [{ model: model.Domain, attributes: ["name"] }],
+//     });
+
+//     // 🔹 Fetch all CoursePreviews at once
+//     const previews = await model.CoursePreview.findAll({
+//       where: { isDeleted: false },
+//       attributes: [
+//         ["id", "coursePreviewId"],
+//         "courseId",
+//         "domainId",
+//         "title",
+//         "heading",
+//         "dayCount",
+//       ],
+//       raw: true,
+//     });
+
+//     // 🔹 Map courses with status and previews
+//     const coursesWithStatus = courses.map((course) => {
+//       let status = "Not Started";
+
+//       const courseDates = user.courseDates || {};
+//       const courseStatuses = user.courseStatuses || {};
+//       const courseIdStr = String(course.id); // 🔹 Ensure string key access
+
+//       // ✅ Check if course has started
+//       if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
+//         status = courseStatuses[courseIdStr] || "Started";
+//       } else {
+//         status = "Not Started";
+//       }
+
+//       // 🔹 Attach previews specific to this course
+//       const coursePreviews = previews
+//         .filter((p) => p.courseId === course.id)
+//         .map((p) => ({
+//           coursePreviewId: p.coursePreviewId,
+//           dayCount: p.dayCount,
+//           title: p.title,
+//           heading: p.heading,
+//         }));
+
+//       return {
+//         ...course.toJSON(),
+//         courseId: course.id,
+//         CoursePreviews: coursePreviews,
+//         status,
+//         userCreatedAt: user.createdAt, // 🔹 Add user createdAt here
+//       };
+//     });
+
+//     return ReS(res, { success: true, data: coursesWithStatus }, 200);
+//   } catch (error) {
+//     console.error("Fetch All Courses Error:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
+
+// module.exports.fetchAllCourses = fetchAllCourses;
+
+
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
-    if (!userId) return ReE(res, "userId is required", 400);
+
+    // 🔹 Validate userId: must be a positive integer
+    const userIdNum = Number(userId);
+    if (!userId || isNaN(userIdNum) || !Number.isInteger(userIdNum) || userIdNum <= 0) {
+      return ReE(res, "Valid userId is required", 400);
+    }
 
     // 🔹 Fetch user with TeamManager
-    const user = await model.User.findByPk(userId, {
+    const user = await model.User.findByPk(userIdNum, {
       include: [
         {
           model: model.TeamManager,
@@ -142,8 +230,6 @@ const fetchAllCourses = async (req, res) => {
       // ✅ Check if course has started
       if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
         status = courseStatuses[courseIdStr] || "Started";
-      } else {
-        status = "Not Started";
       }
 
       // 🔹 Attach previews specific to this course
@@ -161,7 +247,7 @@ const fetchAllCourses = async (req, res) => {
         courseId: course.id,
         CoursePreviews: coursePreviews,
         status,
-        userCreatedAt: user.createdAt, // 🔹 Add user createdAt here
+        userCreatedAt: user.createdAt, // 🔹 Add user createdAt
       };
     });
 
@@ -173,8 +259,6 @@ const fetchAllCourses = async (req, res) => {
 };
 
 module.exports.fetchAllCourses = fetchAllCourses;
-
-
 
 
 // ✅ Fetch single Course by ID
