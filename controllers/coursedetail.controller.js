@@ -1197,31 +1197,7 @@ const getBusinessTarget = async (req, res) => {
 
     // 3️⃣ Business target
     const businessTarget = parseInt(course.businessTarget, 10) || 0;
-
-    // 4️⃣ Check if endpoint should be triggered only once
-    user.triggeredTargets = user.triggeredTargets || {}; // store triggered status per courseId
-
-    if (businessTarget === 1 && !user.triggeredTargets[courseId]) {
-      try {
-        const triggerUrl = `https://edurrom.in/api/v1/offerletter/certificate/send/${userId}`;
-        const response = await axios.get(triggerUrl);
-
-        console.log(`Triggered endpoint once for course ${courseId}:`, response.status);
-
-        // mark as triggered
-        user.triggeredTargets[courseId] = true;
-        await user.save({ fields: ["triggeredTargets"] });
-
-        return ReS(res, {
-          success: true,
-          message: "Business target is 1. Endpoint triggered once successfully.",
-        });
-      } catch (err) {
-        console.warn("Trigger endpoint error:", err.message);
-        return ReE(res, "Failed to trigger endpoint", 500);
-      }
-    }
-
+    
     // 5️⃣ Fetch referral count
     let achievedCount = 0;
     if (user.referralCode) {
@@ -1683,7 +1659,7 @@ const setCourseStartEndDates = async (req, res) => {
       </div>
       `;
 
-      const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
+      const mailResult = await sendMailEduroom(user.email, `Course Details: ${course.name}`, emailHtml);
       if (!mailResult.success) {
         console.error(`Failed to send course email to user ${userId}`);
       }
