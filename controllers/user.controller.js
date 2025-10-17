@@ -862,10 +862,19 @@ module.exports.loginWithGoogle = loginWithGoogle;
 const fetchSingleUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) return ReE(res, "Missing user ID", 400);
+
+    // ✅ Validate ID to prevent crashes
+    if (!id || id === "null") {
+      return ReE(res, "Invalid or missing user ID", 400);
+    }
+
+    const parsedId = parseInt(id, 10);
+    if (isNaN(parsedId)) {
+      return ReE(res, "user ID must be a valid number", 400);
+    }
 
     const user = await model.User.findOne({
-      where: { id, isDeleted: false },
+      where: { id: parsedId, isDeleted: false },
       include: [
         {
           model: model.TeamManager,
