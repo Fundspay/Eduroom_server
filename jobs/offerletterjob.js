@@ -1,6 +1,7 @@
 const dayjs = require("dayjs");
-const axios = require("axios");
-const { User, OfferLetter } = require("../models"); // adjust path to your Sequelize models
+const cron = require("node-cron");
+const { User, OfferLetter } = require("../models"); // Adjust path
+const axios = require("axios"); // Backend API to trigger offer letter
 
 // Helper: split array into batches
 const chunkArray = (array, chunkSize) => {
@@ -11,14 +12,12 @@ const chunkArray = (array, chunkSize) => {
   return results;
 };
 
-// Helper: delay function
+// Delay helper
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper: generate random delay between min and max (ms)
 const randomDelay = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-// Trigger Offer Letter API with retry mechanism
-const triggerOfferLetter = async (userId, courseId, courseName, startDate, endDate, retries = 3) => {
+// Trigger Offer Letter via backend API per user and course ID with retry
+const triggerOfferLetterForCourse = async (userId, courseId, courseName, startDate, endDate, retries = 3) => {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await axios.post(
@@ -26,100 +25,100 @@ const triggerOfferLetter = async (userId, courseId, courseName, startDate, endDa
         { courseId, courseName, startDate, endDate }
       );
       console.log(`[${dayjs().format()}] ✅ Offer letter triggered for user ${userId}, course ${courseName}`);
-      return;
+      return true;
     } catch (err) {
       console.error(`[${dayjs().format()}] ❌ Attempt ${attempt} failed for user ${userId}, course ${courseName}: ${err.message}`);
-      if (attempt < retries) {
-        const wait = 2000; // wait 2 seconds before retry
-        console.log(`[${dayjs().format()}] Waiting ${wait}ms before retrying...`);
-        await delay(wait);
-      } else {
-        console.error(`[${dayjs().format()}] ❌ All retries failed for user ${userId}, course ${courseName}`);
-      }
+      if (attempt < retries) await delay(2000);
     }
   }
+  console.error(`[${dayjs().format()}] ❌ All retries failed for user ${userId}, course ${courseName}`);
+  return false;
 };
 
-// Process all users for today
-const processUsersForToday = async () => {
+// Process all users
+const processUsers = async () => {
   try {
-    const today = dayjs().format("YYYY-MM-DD");
+    const now = dayjs();
+    const today = now.format("YYYY-MM-DD");
+
     const users = await User.findAll();
-
-    const usersToday = users.filter(user => {
-      const courseDates = user.courseDates || {};
-      return Object.entries(courseDates).some(([courseId, course]) =>
-        course.startDate === today || course.endDate === today
-      );
-    });
-
-    if (usersToday.length === 0) {
-      console.log(`[${dayjs().format()}] No users found for today (${today})`);
+    if (!users.length) {
+      console.log(`[${dayjs().format()}] No users found`);
       return;
     }
 
-    console.log(`[${dayjs().format()}] Total users for today: ${usersToday.length}`);
-
     const batchSize = 10;
-    const batches = chunkArray(usersToday, batchSize);
+    const batches = chunkArray(users, batchSize);
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
       console.log(`[${dayjs().format()}] Processing batch ${i + 1}/${batches.length} with ${batch.length} users`);
 
       for (const user of batch) {
+        const businessTargets = user.businessTargets || {};
         const courseDates = user.courseDates || {};
-        for (const [courseId, course] of Object.entries(courseDates)) {
-          if (course.startDate === today || course.endDate === today) {
+        const subscriptionWallet = parseInt(user.subscriptionWallet) || 0;
 
+        // Filter courses: future courses OR today after 1:20 PM
+        const upcomingCourseIds = Object.keys(courseDates).filter(courseId => {
+          const courseStart = dayjs(courseDates[courseId].startDate);
+          if (courseStart.isAfter(today)) return true; // Future dates
+          if (courseStart.isSame(today) && (now.hour() > 13 || (now.hour() === 13 && now.minute() >= 20))) return true; // Today after 1:20 PM
+          return false; // Old courses or today before 1:20 PM
+        });
+
+        // Sort courses by courseId for consistency
+        const sortedCourseIds = upcomingCourseIds.sort((a, b) => parseInt(a) - parseInt(b));
+
+        for (const courseId of sortedCourseIds) {
+          const course = courseDates[courseId];
+          const businessTarget = businessTargets[courseId] || 0;
+
+          if (businessTarget >= 1 && subscriptionWallet >= 1) {
+            // Check OfferLetter model to avoid duplicates
             const alreadySent = await OfferLetter.findOne({
               where: {
                 userId: user.id,
+                courseId: courseId,
                 position: course.courseName,
                 issent: true
               }
             });
 
             if (!alreadySent) {
-              await triggerOfferLetter(
-                user.id,
-                courseId,
-                course.courseName,
-                course.startDate,
-                course.endDate
-              );
+              await triggerOfferLetterForCourse(user.id, courseId, course.courseName, course.startDate, course.endDate);
             } else {
               console.log(`[${dayjs().format()}] ℹ️ Offer letter already sent for user ${user.id}, course ${course.courseName}`);
             }
+          } else {
+            console.log(`[${dayjs().format()}] ⚠️ Skipping user ${user.id}, course ${course.courseName} - businessTarget: ${businessTarget}, subscriptionWallet: ${subscriptionWallet}`);
           }
         }
       }
 
-      // Random delay between batches: 1–3 seconds
+      // Delay between batches
       if (i < batches.length - 1) {
         const wait = randomDelay(1000, 3000);
         console.log(`[${dayjs().format()}] Waiting ${wait}ms before next batch...`);
         await delay(wait);
       }
     }
+
   } catch (err) {
-    console.error(`[${dayjs().format()}] Error in processUsersForToday:`, err);
+    console.error(`[${dayjs().format()}] Error in processUsers:`, err);
   }
 };
 
-// Schedule cron job to run every 1.5 hours after previous run finishes
+// Schedule cron jobs: 10:00, 13:00, 18:00, 23:50 daily
 const scheduleJobs = () => {
-  const intervalMs = 90 * 60 * 1000; // 1.5 hours
-
-  const runJob = async () => {
-    console.log(`[${dayjs().format()}] Running cron job`);
-    await processUsersForToday();
-    console.log(`[${dayjs().format()}] Cron job finished, waiting 1.5 hours for next run...`);
-
-    setTimeout(runJob, intervalMs); // wait 1.5 hours and run again
-  };
-
-  runJob(); // start the first run immediately
+  const times = ["0 10 * * *", "0 13 * * *", "0 18 * * *", "50 23 * * *"];
+  times.forEach(cronTime => {
+    cron.schedule(cronTime, async () => {
+      console.log(`[${dayjs().format()}] Running scheduled job at ${cronTime}`);
+      await processUsers();
+      console.log(`[${dayjs().format()}] Scheduled job finished`);
+    });
+  });
 };
 
 module.exports = { scheduleJobs };
