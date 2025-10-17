@@ -1609,103 +1609,79 @@ module.exports.getCourseStatus = getCourseStatus;
 
 // module.exports.setCourseStartEndDates = setCourseStartEndDates;
 
+
 const setCourseStartEndDates = async (req, res) => {
   try {
-    const { userId, courseId, startDate } = req.body;
+    const { userIds, courseId, startDate } = req.body;
 
-    if (!userId || !courseId || !startDate) {
-      return ReE(res, "userId, courseId, and startDate are required", 400);
+    // Validate
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0 || !courseId || !startDate) {
+      return ReE(res, "userIds (array), courseId, and startDate are required", 400);
     }
 
-    // Fetch the user
-    const user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
-
-    // Fetch the course to get duration and businessTarget
+    // Fetch the course once
     const course = await model.Course.findByPk(courseId);
     if (!course || !course.duration) {
       return ReE(res, "Course not found or duration not set", 404);
     }
 
-    // Calculate end date
     const start = dayjs(startDate);
     const durationDays = parseInt(course.duration, 10);
     const end = start.add(durationDays, "day");
 
-    // Reload latest user data
-    await user.reload();
+    // Function to send email safely
+    const sendCourseEmail = async (user) => {
+      if (!user.email) return console.warn(`User ${user.id} has no email configured`);
 
-    // Update user's courseDates JSON safely
-    const courseDates = { ...(user.courseDates || {}) };
-    courseDates[courseId] = {
-      courseName: course.name,
-      startDate: start.format("YYYY-MM-DD"),
-      endDate: end.format("YYYY-MM-DD"),
-      started: true,
+      const emailHtml = `<div style="font-family: 'Segoe UI', sans-serif; ...">
+        <h2>🎯 New Live Project Assigned!</h2>
+        <p>Hi <strong>${user.name || user.firstName || "User"}</strong>,</p>
+        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>.</p>
+        <ul>
+          <li>📅 Start Date: ${start.format("YYYY-MM-DD")}</li>
+          <li>📅 End Date: ${end.format("YYYY-MM-DD")}</li>
+          <li>🎯 Business Target: ${course.businessTarget || "Not Assigned"}</li>
+        </ul>
+        <p>Best regards,<br/>EduRoom Team</p>
+      </div>`;
+
+      const result = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
+      if (!result.success) console.error(`Failed to send email to user ${user.id}`);
     };
 
-    user.courseDates = courseDates;
-    await user.save();
+    // Process users in batches of 10
+    const BATCH_SIZE = 10;
+    for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+      const batchIds = userIds.slice(i, i + BATCH_SIZE);
 
-    // 🔹 Send email to the user
-    if (user.email) {
-      const emailHtml = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
-        <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
-          <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
-        </div>
+      // Fetch users in this batch
+      const users = await model.User.findAll({
+        where: { id: batchIds },
+      });
 
-        <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
+      // Update courseDates and send emails in parallel for this batch
+      await Promise.all(
+        users.map(async (user) => {
+          const courseDates = { ...(user.courseDates || {}) };
+          courseDates[courseId] = {
+            courseName: course.name,
+            startDate: start.format("YYYY-MM-DD"),
+            endDate: end.format("YYYY-MM-DD"),
+            started: true,
+          };
+          user.courseDates = courseDates;
+          await user.save();
 
-        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
-
-        <ul>
-          <li>📅 <strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
-          <li>📅 <strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
-          <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
-        </ul>
-
-        <p>Tips to succeed in this Live Project:</p>
-        <ul>
-          <li>💡 Plan your sessions daily and stay consistent</li>
-          <li>💪 Focus on completing your business targets</li>
-          <li>🌟 Ask questions and leverage resources whenever needed</li>
-        </ul>
-
-        <p>We are excited to see your progress and achievements! 🚀</p>
-
-        <p style="margin-top: 30px;">Best regards,<br/>
-        <strong>EduRoom Team</strong></p>
-
-        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-        <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
-      </div>
-      `;
-
-      const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
-      if (!mailResult.success) {
-        console.error(`Failed to send course email to user ${userId}`);
-      }
-    } else {
-      console.warn(`User ${userId} has no email configured`);
+          await sendCourseEmail(user);
+        })
+      );
     }
 
-    return ReS(
-      res,
-      {
-        success: true,
-        message: "Course start and end dates updated successfully",
-        data: {
-          courseId,
-          courseName: course.name,
-          startDate: courseDates[courseId].startDate,
-          endDate: courseDates[courseId].endDate,
-          started: courseDates[courseId].started,
-        },
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      message: "Course start and end dates updated successfully for all users",
+    }, 200);
+
   } catch (error) {
     console.error("Set Course Start/End Dates Error:", error);
     return ReE(res, error.message, 500);
