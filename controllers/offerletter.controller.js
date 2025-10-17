@@ -16,7 +16,7 @@ const { CaseStudyResult, QuestionModel } = require("../models");
 // Controller: Send Offer Letter to User Email
 const sendOfferLetter = async (req, res) => {
   try {
-    const { userId, courseId } = req.params; // take both from params
+    const { userId, courseId } = req.params;
     if (!userId || !courseId) {
       return res.status(400).json({
         success: false,
@@ -28,29 +28,33 @@ const sendOfferLetter = async (req, res) => {
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false },
     });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    if (!user.email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User has no email" });
-    }
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+    if (!user.email) return res.status(400).json({ success: false, message: "User has no email" });
 
     // Fetch course
     const course = await model.Course.findByPk(courseId);
-    if (!course) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Course not found" });
+    if (!course) return res.status(404).json({ success: false, message: "Course not found" });
+
+    // Check if an offer letter already exists for this user + course
+    let offerLetter = await model.OfferLetter.findOne({
+      where: { userId, position: course.name || "Intern" }, // using course name as position
+    });
+
+    // If not, generate PDF and create new record
+    if (!offerLetter) {
+      const generatedLetter = await generateOfferLetter(userId, courseId);
+
+      offerLetter = await model.OfferLetter.create({
+        userId,
+        position: course.name || "Intern",
+        startDate: new Date(),
+        location: "Work from Home",
+        fileUrl: generatedLetter.fileUrl,
+        issent: false,
+      });
     }
 
-    // Generate Offer Letter (PDF uploaded to S3 + DB saved)
-    const offerLetter = await generateOfferLetter(userId, courseId); 
-    // 🔹 update generateOfferLetter to also accept courseId if needed
-
-    // Build email content (inject course name + duration if available)
+    // Build email content
     const subject = `Your Internship Offer Letter - ${course.name} - Fundsroom InfoTech Pvt Ltd`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
@@ -58,16 +62,8 @@ const sendOfferLetter = async (req, res) => {
 
       <p>
         We are pleased to inform you that you have been selected for the
-        <b>Live Project Internship</b> in <b>${course.name}</b> with Eduroom – India’s leading online internship platform.
+        <b>Live Project Internship</b> in <b>${course.name}</b>.
       </p>
-
-      <p>
-        This internship is designed to provide you with practical industry exposure through:
-      </p>
-      <ul>
-        <li><b>Structured Learning:</b> Video sessions, case studies, and quizzes.</li>
-        <li><b>Hands-on Tasks:</b> Real-time projects and assignments aligned with industry practices.</li>
-      </ul>
 
       <h3>Live Project Details:</h3>
       <p><b>Mode:</b> Online (Virtual)</p>
@@ -75,20 +71,11 @@ const sendOfferLetter = async (req, res) => {
       <p><b>Start Date:</b> Find in the Offer Letter</p>
 
       <p>
-        We welcome you onboard and look forward to your enthusiastic participation.
-        This is a valuable opportunity to build your portfolio, enhance your skills,
-        and gain career-oriented exposure.
-      </p>
-
-      <p>
         Please find your official <b>Offer Letter</b> here:
         <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
       </p>
 
-      <p>
-        For any queries, feel free to reach us at
-        <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a>
-      </p>
+      <p>For any queries, reach us at <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a></p>
 
       <br/>
       <p>Best Regards,<br/>Eduroom HR Team</p>
@@ -98,19 +85,17 @@ const sendOfferLetter = async (req, res) => {
     const mailResult = await sendMail(user.email, subject, html);
 
     if (!mailResult.success) {
-      return res
-        .status(500)
-        .json({ success: false, message: "Failed to send email", error: mailResult.error });
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send email",
+        error: mailResult.error,
+      });
     }
 
-    // Update DB
-    await model.OfferLetter.update(
-      {
-        issent: true,
-        updatedAt: new Date(),
-      },
-      { where: { id: offerLetter.id } }
-    );
+    // Update OfferLetter entry to mark as sent
+    if (!offerLetter.issent) {
+      await offerLetter.update({ issent: true, updatedAt: new Date() });
+    }
 
     return res.status(200).json({
       success: true,
@@ -124,6 +109,7 @@ const sendOfferLetter = async (req, res) => {
 };
 
 module.exports = { sendOfferLetter };
+
 
 const sendInternshipReport = async (req, res) => {
   try {
