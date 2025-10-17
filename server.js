@@ -9,11 +9,13 @@ const model = require("./models/index");
 const CONFIG = require("./config/config");
 const v1 = require("./routes/v1");
 const logger = require("./utils/logger.service");
-console.log("📌 Daily Status Remainder Job loaded");
-// require("./jobs/dailyremainderjob");
-// require("./jobs/dailystatusremainderjob");
-// require("./jobs/sendbusinesstargetremainderjob");
-console.log("📌 Daily Status Remainder Job loaded");
+ require("./jobs/offerletterjob");
+ require("./jobs/dailyremainderjob");
+ require("./jobs/dailystatusremainderjob");
+ require("./jobs/sendbusinesstargetremainderjob");
+console.log("✅ Jobs imported successfully");
+
+
 
 
 const app = express();
