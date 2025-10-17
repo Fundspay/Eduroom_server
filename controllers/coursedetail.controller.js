@@ -1488,6 +1488,127 @@ const getCourseStatus = async (req, res) => {
 
 module.exports.getCourseStatus = getCourseStatus;
 
+// const setCourseStartEndDates = async (req, res) => {
+//   try {
+//     const { userId, courseId, startDate } = req.body;
+
+//     if (!userId || !courseId || !startDate) {
+//       return ReE(res, "userId, courseId, and startDate are required", 400);
+//     }
+
+//     // Fetch the user
+//     const user = await model.User.findByPk(userId);
+//     if (!user) return ReE(res, "User not found", 404);
+
+//     // Fetch the course to get duration and businessTarget
+//     const course = await model.Course.findByPk(courseId);
+//     if (!course || !course.duration) {
+//       return ReE(res, "Course not found or duration not set", 404);
+//     }
+
+//     // Calculate end date
+//     const start = dayjs(startDate);
+//     const durationDays = parseInt(course.duration, 10);
+//     const end = start.add(durationDays, "day");
+
+//     // Reload latest user data
+//     await user.reload();
+
+//     // Update user's courseDates JSON safely
+//     const courseDates = { ...(user.courseDates || {}) };
+//     courseDates[courseId] = {
+//       courseName: course.name,
+//       startDate: start.format("YYYY-MM-DD"),
+//       endDate: end.format("YYYY-MM-DD"),
+//       started: true,
+//     };
+
+//     user.courseDates = courseDates;
+//     await user.save();
+
+//     // Trigger internal Offer Letter API (non-blocking)
+//     try {
+//       await axios.post(
+//         `https://eduroom.in/api/v1/offerletter/send/${userId}/${courseId}`,
+//         {
+//           courseId,
+//           courseName: course.name,
+//           startDate: courseDates[courseId].startDate,
+//           endDate: courseDates[courseId].endDate,
+//         }
+//       );
+//       console.log(`Offer letter triggered for user ${userId}`);
+//     } catch (err) {
+//       console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
+//     }
+
+//     // 🔹 Send email to the user
+//     if (user.email) {
+//   const emailHtml = `
+//   <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
+//     <div style="text-align: center; margin-bottom: 20px;">
+//       <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
+//       <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
+//     </div>
+
+//     <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
+
+//     <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
+
+//     <ul>
+//       <li>📅 <strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
+//       <li>📅 <strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
+//       <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
+//     </ul>
+
+//     <p>Tips to succeed in this Live Project:</p>
+//     <ul>
+//       <li>💡 Plan your sessions daily and stay consistent</li>
+//       <li>💪 Focus on completing your business targets</li>
+//       <li>🌟 Ask questions and leverage resources whenever needed</li>
+//     </ul>
+
+//     <p>We are excited to see your progress and achievements! 🚀</p>
+
+//     <p style="margin-top: 30px;">Best regards,<br/>
+//     <strong>EduRoom Team</strong></p>
+
+//     <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+//     <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
+//   </div>
+//   `;
+
+//       const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
+//       if (!mailResult.success) {
+//         console.error(`Failed to send course email to user ${userId}`);
+//       }
+//     } else {
+//       console.warn(`User ${userId} has no email configured`);
+//     }
+
+//     return ReS(
+//       res,
+//       {
+//         success: true,
+//         message: "Course start and end dates updated successfully",
+//         data: {
+//           courseId,
+//           courseName: course.name,
+//           startDate: courseDates[courseId].startDate,
+//           endDate: courseDates[courseId].endDate,
+//           started: courseDates[courseId].started,
+//         },
+//       },
+//       200
+//     );
+//   } catch (error) {
+//     console.error("Set Course Start/End Dates Error:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
+
+// module.exports.setCourseStartEndDates = setCourseStartEndDates;
+
 const setCourseStartEndDates = async (req, res) => {
   try {
     const { userId, courseId, startDate } = req.body;
@@ -1526,57 +1647,41 @@ const setCourseStartEndDates = async (req, res) => {
     user.courseDates = courseDates;
     await user.save();
 
-    // Trigger internal Offer Letter API (non-blocking)
-    try {
-      await axios.post(
-        `https://eduroom.in/api/v1/offerletter/send/${userId}/${courseId}`,
-        {
-          courseId,
-          courseName: course.name,
-          startDate: courseDates[courseId].startDate,
-          endDate: courseDates[courseId].endDate,
-        }
-      );
-      console.log(`Offer letter triggered for user ${userId}`);
-    } catch (err) {
-      console.error(`Failed to trigger offer letter for user ${userId}:`, err.message);
-    }
-
     // 🔹 Send email to the user
     if (user.email) {
-  const emailHtml = `
-  <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
-    <div style="text-align: center; margin-bottom: 20px;">
-      <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
-      <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
-    </div>
+      const emailHtml = `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
+          <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
+        </div>
 
-    <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
+        <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
 
-    <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
+        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
 
-    <ul>
-      <li>📅 <strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
-      <li>📅 <strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
-      <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
-    </ul>
+        <ul>
+          <li>📅 <strong>Start Date:</strong> ${courseDates[courseId].startDate}</li>
+          <li>📅 <strong>End Date:</strong> ${courseDates[courseId].endDate}</li>
+          <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
+        </ul>
 
-    <p>Tips to succeed in this Live Project:</p>
-    <ul>
-      <li>💡 Plan your sessions daily and stay consistent</li>
-      <li>💪 Focus on completing your business targets</li>
-      <li>🌟 Ask questions and leverage resources whenever needed</li>
-    </ul>
+        <p>Tips to succeed in this Live Project:</p>
+        <ul>
+          <li>💡 Plan your sessions daily and stay consistent</li>
+          <li>💪 Focus on completing your business targets</li>
+          <li>🌟 Ask questions and leverage resources whenever needed</li>
+        </ul>
 
-    <p>We are excited to see your progress and achievements! 🚀</p>
+        <p>We are excited to see your progress and achievements! 🚀</p>
 
-    <p style="margin-top: 30px;">Best regards,<br/>
-    <strong>EduRoom Team</strong></p>
+        <p style="margin-top: 30px;">Best regards,<br/>
+        <strong>EduRoom Team</strong></p>
 
-    <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
-    <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
-  </div>
-  `;
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #999;">This is an automated email. Please do not reply. For support, contact <a href="mailto:support@eduroom.com">support@eduroom.com</a>.</p>
+      </div>
+      `;
 
       const mailResult = await sendMail(user.email, `Course Details: ${course.name}`, emailHtml);
       if (!mailResult.success) {
@@ -1608,6 +1713,7 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
+
 
 const getUserMCQScore = async (req, res) => {
   try {
