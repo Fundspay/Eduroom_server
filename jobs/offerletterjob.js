@@ -1,6 +1,6 @@
 const dayjs = require("dayjs");
 const axios = require("axios");
-const { User, OfferLetter } = require("./models"); // adjust path to your Sequelize models
+const { User, OfferLetter } = require("../models"); // adjust path to your Sequelize models
 
 // Helper: split array into batches
 const chunkArray = (array, chunkSize) => {
