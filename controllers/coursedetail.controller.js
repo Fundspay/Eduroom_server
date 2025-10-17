@@ -8,6 +8,7 @@ const dayjs = require("dayjs");
 model.InternshipStatus = require("../models/status.model.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const {User} = require("../models");
+const { sendMailEduroom } = require("../middleware/eduroommailer.middlware");
  
 
 
@@ -1197,7 +1198,7 @@ const getBusinessTarget = async (req, res) => {
 
     // 3️⃣ Business target
     const businessTarget = parseInt(course.businessTarget, 10) || 0;
-    
+
     // 5️⃣ Fetch referral count
     let achievedCount = 0;
     if (user.referralCode) {
