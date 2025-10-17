@@ -6,8 +6,8 @@ const transporter = nodemailer.createTransport({
   port: 587,
   secure: false, // false for port 587
   auth: {
-    user: "recruitment@fundsroom.com",
-    pass: "R3c!tF7d$M3ntZ"
+    user: "eduroom.ittika@gmail.com",
+    pass: "mkopmktcidbvowtl"
   },
   logger: true,   // log SMTP traffic
   debug: true     // show debug info
@@ -16,14 +16,14 @@ const transporter = nodemailer.createTransport({
 // Generic mail sender
 const sendMailEduroom = async (to, subject, html) => {
   const mailOptions = {
-    from: "recruitment@fundsroom.com", // Gmail user as sender
+    from: "eduroom.ittika@gmail.com", // Gmail user as sender
     to,
     subject,
     html
   };
 
   try {
-    const info = await transporter.sendMailEduroom(mailOptions);
+    const info = await transporter.sendMail(mailOptions);
     console.log("Email sent:", info.response);
     return { success: true, info };
   } catch (error) {
