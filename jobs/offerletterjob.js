@@ -38,9 +38,7 @@ const triggerOfferLetterForCourse = async (userId, courseId, courseName, startDa
 // Process all users
 const processUsers = async () => {
   try {
-    const now = dayjs();
-    const today = now.format("YYYY-MM-DD");
-
+    const today = dayjs().format("YYYY-MM-DD");
     const users = await User.findAll();
     if (!users.length) {
       console.log(`[${dayjs().format()}] No users found`);
@@ -59,12 +57,10 @@ const processUsers = async () => {
         const courseDates = user.courseDates || {};
         const subscriptionWallet = parseInt(user.subscriptionWallet) || 0;
 
-        // Filter courses: future courses OR today after 1:20 PM
+        // Filter courses: today or future dates only
         const upcomingCourseIds = Object.keys(courseDates).filter(courseId => {
           const courseStart = dayjs(courseDates[courseId].startDate);
-          if (courseStart.isAfter(today)) return true; // Future dates
-          if (courseStart.isSame(today) && (now.hour() > 13 || (now.hour() === 13 && now.minute() >= 35))) return true; // Today after 1:20 PM
-          return false; // Old courses or today before 1:20 PM
+          return courseStart.isSame(today) || courseStart.isAfter(today);
         });
 
         // Sort courses by courseId for consistency
@@ -111,7 +107,7 @@ const processUsers = async () => {
 
 // Schedule cron jobs: 10:00, 13:50, 14:00, 23:50 daily
 const scheduleJobs = () => {
-  const times = ["0 10 * * *", "50 13 * * *","0 14 * * *", "50 23 * * *"];
+  const times = ["0 10 * * *", "50 13 * * *", "0 14 * * *", "50 23 * * *"];
   times.forEach(cronTime => {
     cron.schedule(cronTime, async () => {
       console.log(`[${dayjs().format()}] Running scheduled job at ${cronTime}`);
