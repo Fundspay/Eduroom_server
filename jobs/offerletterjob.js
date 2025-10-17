@@ -3,6 +3,8 @@ const cron = require("node-cron");
 const { User, OfferLetter } = require("../models"); // Adjust path
 const axios = require("axios"); // Backend API to trigger offer letter
 
+process.env.TZ = "Asia/Kolkata"; // Ensure IST timing
+
 // Helper: split array into batches
 const chunkArray = (array, chunkSize) => {
   const results = [];
@@ -36,17 +38,29 @@ const triggerOfferLetterForCourse = async (userId, courseId, courseName, startDa
 };
 
 // Process all users
-const processUsers = async () => {
+const processUsers = async (maxDaily = 300) => {
   try {
     const today = dayjs().format("YYYY-MM-DD");
     const users = await User.findAll();
+
     if (!users.length) {
       console.log(`[${dayjs().format()}] No users found`);
       return;
     }
 
+    // Filter only users with course start today or future
+    const usersWithUpcomingCourses = users.filter(u => {
+      const courses = u.courseDates || {};
+      return Object.values(courses).some(c => dayjs(c.startDate).isSame(today) || dayjs(c.startDate).isAfter(today));
+    });
+
+    console.log(`[${dayjs().format()}] Total users with upcoming courses: ${usersWithUpcomingCourses.length}`);
+
+    // Apply maxDaily logic: if more than maxDaily, take only maxDaily for today
+    const usersToProcess = usersWithUpcomingCourses.slice(0, maxDaily);
+
     const batchSize = 10;
-    const batches = chunkArray(users, batchSize);
+    const batches = chunkArray(usersToProcess, batchSize);
 
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
@@ -57,13 +71,12 @@ const processUsers = async () => {
         const courseDates = user.courseDates || {};
         const subscriptionWallet = parseInt(user.subscriptionWallet) || 0;
 
-        // Filter courses: today or future dates only
+        // Filter courses: today or future dates
         const upcomingCourseIds = Object.keys(courseDates).filter(courseId => {
           const courseStart = dayjs(courseDates[courseId].startDate);
           return courseStart.isSame(today) || courseStart.isAfter(today);
         });
 
-        // Sort courses by courseId for consistency
         const sortedCourseIds = upcomingCourseIds.sort((a, b) => parseInt(a) - parseInt(b));
 
         for (const courseId of sortedCourseIds) {
@@ -100,19 +113,30 @@ const processUsers = async () => {
       }
     }
 
+    // Log postponed users (if more than maxDaily)
+    if (usersWithUpcomingCourses.length > maxDaily) {
+      console.log(`[${dayjs().format()}] ⚠️ ${usersWithUpcomingCourses.length - maxDaily} users postponed to next day`);
+    }
+
   } catch (err) {
     console.error(`[${dayjs().format()}] Error in processUsers:`, err);
   }
 };
 
-// Schedule cron jobs: 10:00, 13:50, 14:00, 23:50 daily
+// Schedule cron jobs: 10:00, 13:50, 14:00, 23:50 daily IST
 const scheduleJobs = () => {
-  const times = ["0 10 * * *", "50 13 * * *", "25 14 * * *", "50 23 * * *"];
+  const times = ["0 10 * * *", "50 13 * * *", "43 14 * * *", "50 23 * * *"];
   times.forEach(cronTime => {
     cron.schedule(cronTime, async () => {
-      console.log(`[${dayjs().format()}] Running scheduled job at ${cronTime}`);
-      await processUsers();
-      console.log(`[${dayjs().format()}] Scheduled job finished`);
+      try {
+        console.log(`[${dayjs().format()}] Running scheduled Offer Letter job at ${cronTime}`);
+        await processUsers();
+        console.log(`[${dayjs().format()}] Scheduled job finished`);
+      } catch (err) {
+        console.error(`[${dayjs().format()}] Error in scheduled job at ${cronTime}:`, err);
+      }
+    }, {
+      timezone: "Asia/Kolkata"
     });
   });
 };
