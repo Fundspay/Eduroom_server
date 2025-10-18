@@ -1199,13 +1199,17 @@ const getBusinessTarget = async (req, res) => {
     // 3️⃣ Business target
     const businessTarget = parseInt(course.businessTarget, 10) || 0;
 
-    // 5️⃣ Fetch referral count
+    // 5️⃣ Fetch referral count (UPDATED to match getBusinessUserTarget)
     let achievedCount = 0;
     if (user.referralCode) {
       try {
-        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
+        // ✅ New API call (same as reference)
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-        achievedCount = apiResponse.data?.referral_count?.count || 0;
+
+        // ✅ Count only registered users who have paid
+        const registeredUsers = apiResponse.data?.registered_users || [];
+        achievedCount = registeredUsers.filter(u => u.has_paid).length;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
@@ -1257,6 +1261,7 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
+
 
 // const getBusinessUserTarget = async (req, res) => {
 //   try {
