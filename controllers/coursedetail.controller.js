@@ -7,9 +7,9 @@ const { Op } = require("sequelize");
 const dayjs = require("dayjs");
 model.InternshipStatus = require("../models/status.model.js");
 const { sendMail } = require("../middleware/mailer.middleware");
-const {User} = require("../models");
+const { User } = require("../models");
 const { sendMailEduroom } = require("../middleware/eduroommailer.middleware");
- 
+
 
 
 const addOrUpdateCourseDetail = async (req, res) => {
@@ -44,7 +44,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
       for (const session of sessions) {
         const {
           sessionNumber,
-         minBusinessTarget,
+          minBusinessTarget,
           title,
           description,
           youtubeLink,
@@ -990,7 +990,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
       subscriptionWallet: user.subscriptionWallet,
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
-      subscriptionLeft: user.subscriptionWallet - user.subscriptiondeductedWallet,
+      subscriptionLeft: Math.max(
+        (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0),
+        0
+      ),
       courses: [],
     };
 
@@ -1069,8 +1072,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         const status = latestCaseStudy
           ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
           : sessionCompletionPercentage >= 33
-          ? "Completed"
-          : "In Progress";
+            ? "Completed"
+            : "In Progress";
 
         daysMap[session.day].sessions.push({
           sessionNumber: session.sessionNumber,
