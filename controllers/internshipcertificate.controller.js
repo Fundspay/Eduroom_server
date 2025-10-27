@@ -8,6 +8,7 @@ const { generateInternshipDetailsReport } = require("../utils/internshipreport2.
 const  { generateSessionReport } = require("../utils/internshipreport3.service");
 const  { generateMCQCaseStudyReport } = require("../utils/internshipreport4.service")
 const {finalpageinternshipreport} = require("../utils/internshipreport5.service");
+const { ReS, ReE } = require("../utils/util.service");
 
 
 const createAndSendInternshipCertificate = async (req, res) => {
