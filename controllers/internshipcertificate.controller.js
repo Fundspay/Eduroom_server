@@ -287,7 +287,7 @@ module.exports.generateMergedInternshipReportAndEmail =
         },
         {
           model: model.Course,
-          attributes: ["id", "title", "description"]
+          attributes: ["id", "name", "description"]
         }
       ],
       order: [["createdAt", "DESC"]]
