@@ -274,3 +274,28 @@ const generateMergedInternshipReportAndEmail = async (req, res) => {
 
 module.exports.generateMergedInternshipReportAndEmail =
   generateMergedInternshipReportAndEmail;
+
+
+  var fetchAllInternshipCertificates = async (req, res) => {
+  try {
+    const certificates = await model.InternshipCertificate.findAll({
+      include: [
+        {
+          model: model.User,
+          attributes: ["id", "firstName", "lastName", "email"]
+        },
+        {
+          model: model.Course,
+          attributes: ["id", "title", "description"]
+        }
+      ],
+      order: [["createdAt", "DESC"]]
+    });
+
+    return ReS(res, { success: true, data: certificates }, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
