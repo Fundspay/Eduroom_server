@@ -45,8 +45,8 @@ const transporter = nodemailer.createTransport({
   port: 465,                       // 465 (SSL) or 587 (TLS)
   secure: true ,// true for 465, false for 587
   auth: {
-    user: "eduroom.ittika@gmail.com",      // Your GoDaddy email
-    pass: "mkopmktcidbvowtl",  // Your GoDaddy email password / app password
+    user: "recruitment@fundsroom.com",      // Your GoDaddy email
+    pass: "Fundsroom@#97",  // Your GoDaddy email password / app password
   },
   logger: true,   // log SMTP traffic
   debug: true     // show detailed SMTP logs
