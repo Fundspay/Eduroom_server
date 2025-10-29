@@ -102,6 +102,7 @@ module.exports = (sequelize, Sequelize) => {
       lastLogoutAt: { type: Sequelize.DATE, allowNull: true },
       isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
       isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
+      selected: { type: Sequelize.TEXT, allowNull: true,defaultValue:null },
 
       // 🔹 Sequelize Defaults
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
