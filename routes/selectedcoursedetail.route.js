@@ -7,7 +7,7 @@ router.post("/selected-course", selectedCourseDetailController.addOrUpdateSelect
 
 // 🔹 Delete SelectedCourseDetail (by ID or by domain/day/session)
 router.delete(
-  "/delete/:selectedCourseDetailId?",
+  "/delete/:selectedCourseDetailId",
   selectedCourseDetailController.deleteSelectedCourseDetail
 );
 

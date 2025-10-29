@@ -30,6 +30,8 @@ fs.readdirSync(__dirname)
         db[model.name] = model;
     });
 
+    console.log("📦 Models loaded:", Object.keys(db));
+
 // Apply associations
 Object.keys(db).forEach(modelName => {
     if (db[modelName].associate) {
