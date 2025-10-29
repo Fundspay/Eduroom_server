@@ -841,7 +841,8 @@ const loginWithGoogle = async (req, res) => {
       city: account.city || null,
       state: account.state || null,
       pinCode: account.pinCode || null,
-      internshipStatus: account.internshipStatus || null, // ✅ Added here
+      internshipStatus: account.internshipStatus || null,
+      selected: account.selected || null,
     };
 
     const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
