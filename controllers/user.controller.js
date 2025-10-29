@@ -647,6 +647,7 @@ const loginWithEmailPassword = async (req, res) => {
           ...payload,
           isFirstLogin,
           token,
+          selected: account.selected || null,
           role,
         },
       },
