@@ -29,6 +29,8 @@ const mytargetRouter = require("./mytarget.route");
 const studentresumeRouter = require("./studentresume.route");
 const analysis = require("./analysis.route");
 
+const selectiondomainRouter = require("./selectionDomain.route");
+
 
 
 
@@ -62,6 +64,8 @@ router.use("/mytarget", mytargetRouter);
 
 router.use("/studentresume", studentresumeRouter);
 router.use("/analysis", analysis);
+
+router.use("/selection-domain", selectiondomainRouter);
 
 
 module.exports = router;
