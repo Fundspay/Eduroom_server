@@ -182,3 +182,54 @@ const deleteSelectedCourseDetail = async (req, res) => {
 };
 
 module.exports.deleteSelectedCourseDetail = deleteSelectedCourseDetail;
+
+const getSelectedCourseDetail = async (req, res) => {
+  const { selectedDomainId } = req.params;
+
+  if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
+
+  try {
+    // 🔹 Fetch the main course detail
+    const courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+    });
+
+    if (!courseDetail) return ReE(res, "Selected course detail not found", 404);
+
+    // 🔹 Fetch related questions
+    const questions = await SelectedQuestionModel.findAll({
+      where: { selectedDomainId },
+      order: [["id", "ASC"]],
+    });
+
+    // 🔹 Combine both
+    const result = {
+      id: courseDetail.id,
+      selectedDomainId: courseDetail.selectedDomainId,
+      userId: courseDetail.userId,
+      title: courseDetail.title,
+      description: courseDetail.description,
+      duration: courseDetail.duration,
+      heading: courseDetail.heading,
+      youtubeLink: courseDetail.youtubeLink,
+      questions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        optionA: q.optionA,
+        optionB: q.optionB,
+        optionC: q.optionC,
+        optionD: q.optionD,
+        answer: q.answer,
+        keywords: q.keywords,
+        caseStudy: q.caseStudy,
+      })),
+    };
+
+    return ReS(res, { success: true, data: result }, 200);
+  } catch (error) {
+    console.error("Get SelectedCourseDetail Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getSelectedCourseDetail = getSelectedCourseDetail;

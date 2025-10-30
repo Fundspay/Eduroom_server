@@ -11,4 +11,6 @@ router.delete(
   selectedCourseDetailController.deleteSelectedCourseDetail
 );
 
+router.get("/details/:selectedDomainId", selectedCourseDetailController.getSelectedCourseDetail);
+
 module.exports = router;
