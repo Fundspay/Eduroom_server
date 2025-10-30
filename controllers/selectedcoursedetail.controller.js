@@ -221,9 +221,6 @@ const getSelectedCourseDetail = async (req, res) => {
 
 module.exports.getSelectedCourseDetail = getSelectedCourseDetail;
 
-// ===============================
-//  Evaluate MCQ
-// ===============================
 const evaluateSelectedMCQ = async (req, res) => {
   try {
     const { selectedDomainId } = req.params;
@@ -233,10 +230,15 @@ const evaluateSelectedMCQ = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
 
-    // Fetch course and questions
+    // 🔹 Fetch course detail with all questions
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
-      include: [{ model: SelectedQuestionModel, required: false }],
+      include: [
+        {
+          model: SelectedQuestionModel,
+          required: false,
+        },
+      ],
     });
 
     if (!courseDetail) return ReE(res, "Selected course detail not found", 404);
@@ -247,6 +249,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
+    // 🔹 Evaluate answers
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -263,13 +266,15 @@ const evaluateSelectedMCQ = async (req, res) => {
         selectedOption: ans.selectedOption,
         isCorrect,
         correctAnswer: mcq.answer,
+        keywords: mcq.keywords || null,
+        caseStudy: mcq.caseStudy || null,
       });
     }
 
     const total = mcqs.length;
     const score = `${correctCount}/${total}`;
-    const eligibleForCaseStudy = correctCount === total;
 
+    // 🔹 Normalize userProgress JSON
     let progress = {};
     if (courseDetail.userProgress) {
       progress =
@@ -278,30 +283,38 @@ const evaluateSelectedMCQ = async (req, res) => {
           : courseDetail.userProgress;
     }
 
+    // 🔹 Overwrite existing evaluation for this user (not duplicate)
     progress[userId] = {
-      ...progress[userId],
       correctMCQs: correctCount,
       totalMCQs: total,
-      eligibleForCaseStudy,
-      answers: results,
+      eligibleForCaseStudy: correctCount === total,
+      answers: results, // always replaced, not appended
       updatedAt: new Date().toISOString(),
     };
 
+    // ✅ Ensure courseDetail.id is numeric before updating
+    const courseDetailId = Number(courseDetail.id);
+    if (isNaN(courseDetailId)) {
+      return ReE(res, "Invalid courseDetail ID", 400);
+    }
+
+    // 🔹 Update course detail with updated progress
     await SelectedCourseDetail.update(
       { userProgress: progress },
-      { where: { id: courseDetail.id } }
+      { where: { id: courseDetailId } }
     );
 
     return ReS(
       res,
       {
         success: true,
+        courseDetail,
         evaluation: {
           totalQuestions: total,
           correct: correctCount,
           wrong: total - correctCount,
           score,
-          eligibleForCaseStudy,
+          eligibleForCaseStudy: correctCount === total,
           results,
         },
       },
@@ -313,20 +326,21 @@ const evaluateSelectedMCQ = async (req, res) => {
   }
 };
 
-// ===============================
-//  Evaluate Case Study
-// ===============================
+module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
+
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
-    const { selectedDomainId, questionId } = req.params;
+    const { selectedDomainId, questionId } = req.params; //  include questionId
     const { userId, answers } = req.body;
 
+    // 🔹 Validate input
     if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
-    if (!questionId) return ReE(res, "questionId is required", 400);
+    if (!questionId) return ReE(res, "questionId is required", 400); //  added check
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers) || answers.length === 0)
       return ReE(res, "answers must be a non-empty array", 400);
 
+    // 🔹 Fetch the question directly instead of via include
     const question = await SelectedQuestionModel.findOne({
       where: {
         id: questionId,
@@ -341,6 +355,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const results = [];
     let totalPercentage = 0;
 
+    // 🔹 Evaluate only the specific question
     for (let ans of answers) {
       if (String(ans.questionId) !== String(questionId)) continue;
 
@@ -357,6 +372,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       totalPercentage += parseFloat(matchPercentage);
 
+      // 🔹 Update or insert (no duplicates for same user + question)
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -372,6 +388,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         answer: ans.answer,
         matchPercentage: parseFloat(matchPercentage),
         passed,
+        keywords: question.keywords,
+        caseStudy: question.caseStudy,
       });
     }
 
@@ -380,6 +398,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const failedCount = total - passedCount;
     const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
+    // 🔹 Update progress
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
     });
@@ -409,26 +428,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         { userProgress: progress },
         { where: { id: courseDetail.id } }
       );
-
-      //  Check if user passed both MCQs and Case Study
-      const mcqProgress = progress[userId];
-      const passedMCQs = mcqProgress.correctMCQs === mcqProgress.totalMCQs;
-      const passedCaseStudy = passedCount === total;
-
-      if (passedMCQs && passedCaseStudy) {
-        // 🔹 Fetch domain name
-        const domain = await SelectedDomains.findOne({
-          where: { id: selectedDomainId },
-          attributes: ["name"],
-        });
-
-        if (domain) {
-          await Users.update(
-            { selected: domain.name },
-            { where: { id: userId } }
-          );
-        }
-      }
     }
 
     return ReS(
@@ -451,9 +450,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
   }
 };
 
-module.exports = {
-  evaluateSelectedMCQ,
-  evaluateCaseStudyAnswer,
-};
+module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
+
 
 
