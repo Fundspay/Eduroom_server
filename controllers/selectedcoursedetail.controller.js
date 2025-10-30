@@ -328,79 +328,68 @@ const evaluateSelectedMCQ = async (req, res) => {
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
-const evaluateCaseStudyAnswer = async (req, res) => {
+const evaluateSelectedCaseStudy = async (req, res) => {
   try {
     const { selectedDomainId, questionId } = req.params;
     const { userId, answer } = req.body;
 
-    //  Validate input
-    if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
-    if (!questionId) return ReE(res, "questionId is required", 400);
-    if (!userId) return ReE(res, "userId is required", 400);
-    if (!answer) return ReE(res, "answer is required", 400);
+    if (!userId || !answer)
+      return ReE(res, "userId and answer are required", 400);
 
-    //  Find the question for this domain
-    const question = await SelectedQuestionModel.findOne({
+    // ✅ Fetch case study question
+    const question = await model.SelectedQuestionModel.findOne({
       where: {
         id: questionId,
         selectedDomainId,
-       caseStudy: { [Op.ne]: null }, // ensure it’s a case study question
+        caseStudy: { [Op.ne]: null },
       },
     });
 
-    if (!question) return ReE(res, "Case Study question not found", 404);
+    if (!question) return ReE(res, "Case Study not found", 404);
 
-    //  Evaluate based on keyword matching
+    // ✅ Evaluate using keywords
     const keywords = question.keywords ? question.keywords.split(",") : [];
     const userAnswerLower = answer.toLowerCase();
     let matchedCount = 0;
-
     keywords.forEach((kw) => {
       if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
     });
 
     const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
-    const passed = matchPercentage >= 20; // ✅ pass threshold (20%)
+    const passed = matchPercentage >= 20;
 
-    //  Upsert (insert if not exists, update if exists)
-    const [result, created] = await SelectedCaseStudyResult.upsert(
-      {
-        userId,
-        selectedDomainId,
-        questionId,
-        answer,
-        matchPercentage,
-        passed,
-      },
-      {
-        returning: true,
-        conflictFields: ["userId", "selectedDomainId", "questionId"], // ensures same user+domain+question doesn't duplicate
-      }
-    );
+    // ✅ Save or update result
+    await model.SelectedCaseStudyResult.upsert({
+      userId,
+      selectedDomainId,
+      questionId,
+      answer,
+      matchPercentage,
+      passed,
+    });
 
     return ReS(
       res,
       {
         success: true,
-        message: passed
-          ? " You have passed this Case Study."
-          : " You did not pass. Try again.",
         data: {
           userId,
           selectedDomainId,
           questionId,
           matchPercentage,
           passed,
-          created: created,
+          message: passed
+            ? "You have passed this Case Study"
+            : "You did not pass. Try again.",
         },
       },
       200
     );
   } catch (error) {
-    console.error("Evaluate Case Study Error:", error);
+    console.error("Evaluate Selected Case Study Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
-module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
+module.exports.evaluateSelectedCaseStudy = evaluateSelectedCaseStudy;
 
