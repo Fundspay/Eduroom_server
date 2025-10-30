@@ -168,3 +168,154 @@ const deleteSelectedCourseDetail = async (req, res) => {
 };
 
 module.exports.deleteSelectedCourseDetail = deleteSelectedCourseDetail;
+
+const getSelectedCourseDetail = async (req, res) => {
+  const { selectedDomainId } = req.params;
+
+  if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
+
+  try {
+    // 🔹 Fetch the main course detail
+    const courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+    });
+
+    if (!courseDetail) return ReE(res, "Selected course detail not found", 404);
+
+    // 🔹 Fetch related questions
+    const questions = await SelectedQuestionModel.findAll({
+      where: { selectedDomainId },
+      order: [["id", "ASC"]],
+    });
+
+    // 🔹 Combine both
+    const result = {
+      id: courseDetail.id,
+      selectedDomainId: courseDetail.selectedDomainId,
+      userId: courseDetail.userId,
+      title: courseDetail.title,
+      description: courseDetail.description,
+      duration: courseDetail.duration,
+      heading: courseDetail.heading,
+      youtubeLink: courseDetail.youtubeLink,
+      questions: questions.map((q) => ({
+        id: q.id,
+        question: q.question,
+        optionA: q.optionA,
+        optionB: q.optionB,
+        optionC: q.optionC,
+        optionD: q.optionD,
+        answer: q.answer,
+        keywords: q.keywords,
+        caseStudy: q.caseStudy,
+      })),
+    };
+
+    return ReS(res, { success: true, data: result }, 200);
+  } catch (error) {
+    console.error("Get SelectedCourseDetail Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getSelectedCourseDetail = getSelectedCourseDetail;
+
+const evaluateSelectedMCQ = async (req, res) => {
+  try {
+    const { selectedDomainId } = req.params;
+    const { userId, answers } = req.body;
+
+    if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
+
+    // 🔹 Fetch course detail with all questions
+    const courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+      include: [
+        {
+          model: SelectedQuestionModel,
+          required: false,
+        },
+      ],
+    });
+
+    if (!courseDetail) return ReE(res, "Selected course detail not found", 404);
+
+    const mcqs = courseDetail.SelectedQuestionModels || [];
+    if (mcqs.length === 0) return ReE(res, "No MCQs found for this course", 404);
+
+    let correctCount = 0;
+    const results = [];
+
+    // 🔹 Evaluate answers
+    for (let ans of answers) {
+      const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
+      if (!mcq) continue;
+
+      const isCorrect =
+        String(mcq.answer).trim().toUpperCase() ===
+        String(ans.selectedOption).trim().toUpperCase();
+
+      if (isCorrect) correctCount++;
+
+      results.push({
+        mcqId: mcq.id,
+        question: mcq.question,
+        selectedOption: ans.selectedOption,
+        isCorrect,
+        correctAnswer: mcq.answer,
+        keywords: mcq.keywords || null,
+        caseStudy: mcq.caseStudy || null,
+      });
+    }
+
+    const total = mcqs.length;
+    const score = `${correctCount}/${total}`;
+
+    // 🔹 Normalize userProgress JSON
+    let progress = {};
+    if (courseDetail.userProgress) {
+      progress =
+        typeof courseDetail.userProgress === "string"
+          ? JSON.parse(courseDetail.userProgress)
+          : courseDetail.userProgress;
+    }
+
+    // 🔹 Save new evaluation for this user
+    progress[userId] = {
+      correctMCQs: correctCount,
+      totalMCQs: total,
+      eligibleForCaseStudy: correctCount === total,
+      answers: results,
+    };
+
+    // 🔹 Update course detail with progress
+    await SelectedCourseDetail.update(
+      { userProgress: progress },
+      { where: { id: courseDetail.id } }
+    );
+
+    return ReS(
+      res,
+      {
+        success: true,
+        courseDetail,
+        evaluation: {
+          totalQuestions: total,
+          correct: correctCount,
+          wrong: total - correctCount,
+          score,
+          eligibleForCaseStudy: correctCount === total,
+          results,
+        },
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Evaluate Selected MCQ Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
