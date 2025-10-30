@@ -2,7 +2,7 @@
 const { Op } = require("sequelize");
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, sequelize } = require("../models");
+const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult,sequelize } = require("../models");
 
 
 // 🔹 Create or Update Selected Course Detail and its Questions
