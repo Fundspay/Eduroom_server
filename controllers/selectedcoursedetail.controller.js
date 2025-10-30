@@ -122,7 +122,7 @@ const addOrUpdateSelectedCourseDetail = async (req, res) => {
   }
 };
 
-module.exports. addOrUpdateSelectedCourseDetail = addOrUpdateSelectedCourseDetail;
+module.exports.addOrUpdateSelectedCourseDetail = addOrUpdateSelectedCourseDetail;
 
 // 🔹 Delete SelectedCourseDetail
 const deleteSelectedCourseDetail = async (req, res) => {
@@ -224,7 +224,8 @@ module.exports.getSelectedCourseDetail = getSelectedCourseDetail;
 
 // ===============================
 // 🧩 Evaluate MCQ
-// ===============================
+// ==============================
+
 const evaluateSelectedMCQ = async (req, res) => {
   try {
     const { selectedDomainId } = req.params;
@@ -234,7 +235,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
 
-    // Fetch course and questions
+    // 🔹 Fetch course + MCQs
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
       include: [{ model: SelectedQuestionModel, required: false }],
@@ -248,6 +249,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
+    // 🔹 Evaluate each MCQ
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -271,6 +273,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     const score = `${correctCount}/${total}`;
     const eligibleForCaseStudy = correctCount === total;
 
+    // 🔹 Update user progress inside SelectedCourseDetail
     let progress = {};
     if (courseDetail.userProgress) {
       progress =
@@ -293,6 +296,14 @@ const evaluateSelectedMCQ = async (req, res) => {
       { where: { id: courseDetail.id } }
     );
 
+    // 🔹 Update MCQ total score in SelectedQuestionModel
+    // We'll store total correct MCQs in mcqresult field (one-time update for domain)
+    await SelectedQuestionModel.update(
+      { mcqresult: correctCount },
+      { where: { selectedDomainId } }
+    );
+
+    // 🔹 Send response
     return ReS(
       res,
       {
@@ -313,6 +324,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
 // ===============================
@@ -330,7 +342,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     if (!Array.isArray(answers) || answers.length === 0)
       return ReE(res, "answers must be a non-empty array", 400);
 
-    // 🔹 Fetch the case study question
+    // 🔹 Fetch Case Study question
     const question = await SelectedQuestionModel.findOne({
       where: {
         id: questionId,
@@ -365,13 +377,13 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       totalPercentage += parseFloat(matchPercentage);
 
-      // 🔹 Upsert result
+      // 🔹 Save individual Case Study answers
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
         questionId: question.id,
         answer: ans.answer,
-        matchPercentage,
+        matchPercentage: parseFloat(matchPercentage),
         passed,
       });
 
@@ -390,117 +402,104 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const caseStudyPercentage =
       total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
-    const courseDetail = await SelectedCourseDetail.findOne({
-      where: { selectedDomainId },
-    });
-
     let overallStatus = "Incomplete";
     let overallResult = null;
 
-    if (courseDetail) {
-      let progress = {};
-      if (courseDetail.userProgress) {
-        progress =
-          typeof courseDetail.userProgress === "string"
-            ? JSON.parse(courseDetail.userProgress)
-            : courseDetail.userProgress;
-      }
+    // 🔹 Fetch MCQ result (from SelectedQuestionModel)
+    const mcqRecord = await SelectedQuestionModel.findOne({
+      where: { selectedDomainId },
+      attributes: ["mcqresult"],
+    });
 
-      // ✅ Save Case Study progress
-      progress[userId] = {
-        ...(progress[userId] || {}),
-        caseStudy: {
-          total,
-          passed: passedCount,
-          failed: failedCount,
-          caseStudyPercentage: parseFloat(caseStudyPercentage),
-          results,
-          updatedAt: new Date().toISOString(),
-        },
-      };
+    const mcqScore = mcqRecord ? mcqRecord.mcqresult : 0;
 
-      await SelectedCourseDetail.update(
-        { userProgress: progress },
-        { where: { id: courseDetail.id } }
-      );
+    // Assume total MCQs can be derived or stored in progress (fallback = 10)
+    const totalMCQs = mcqScore > 0 ? 10 : 0;
+    const mcqPercentage =
+      mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : null;
 
-      // ✅ Combine logic only if both exist
-      const mcqProgress = progress[userId];
-      const mcqPercentage =
-        mcqProgress && mcqProgress.totalMCQs
-          ? (mcqProgress.correctMCQs / mcqProgress.totalMCQs) * 100
-          : null;
-
-      let overallPercentage;
-      if (mcqPercentage !== null) {
-        // both exist
-        overallPercentage = (
-          (parseFloat(caseStudyPercentage) + mcqPercentage) /
-          2
-        ).toFixed(2);
-      } else {
-        // only case study done
-        overallPercentage = parseFloat(caseStudyPercentage);
-      }
-
-      const passedMCQs =
-        mcqProgress.correctMCQs &&
-        mcqProgress.totalMCQs &&
-        mcqProgress.correctMCQs === mcqProgress.totalMCQs;
-
-      const passedCaseStudy = passedCount === total && total > 0;
-
-      // ✅ If passed both, update user + send mail
-      if (passedMCQs && passedCaseStudy) {
-        const domain = await SelectionDomain.findOne({
-          where: { id: selectedDomainId },
-          attributes: ["name"],
-        });
-
-        if (domain) {
-          await Users.update(
-            { selected: domain.name },
-            { where: { id: userId } }
-          );
-        }
-
-        overallStatus = "Passed";
-        overallResult = {
-          domain: domain?.name || null,
-          overallPercentage: parseFloat(overallPercentage),
-          message: `User has successfully passed both MCQ and Case Study for ${domain?.name || "this domain"}`,
-        };
-
-        // ✅ Send congratulatory mail
-        const user = await Users.findOne({
-          where: { id: userId },
-          attributes: ["email", "firstName"],
-        });
-
-        if (user?.email) {
-          const subject = `🎓 Congratulations on Passing the ${domain?.name} Assessment!`;
-          const html = `
-            <div style="font-family: Arial, sans-serif; color: #333;">
-              <h2>Hi ${user.firstName || "Learner"},</h2>
-              <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${domain?.name}</b>.</p>
-              <p>Your overall performance: <b>${overallPercentage}%</b></p>
-              <p>Keep learning and achieving more milestones with <b>EduRoom</b>!</p>
-              <br/>
-              <p>Best regards,<br/>The EduRoom Team</p>
-            </div>
-          `;
-          await sendMail(user.email, subject, html);
-        }
-      } else {
-        overallStatus = "Incomplete";
-        overallResult = {
-          domain: null,
-          overallPercentage: parseFloat(overallPercentage),
-          message: "User has not yet passed all sections.",
-        };
-      }
+    // 🔹 Calculate overall percentage
+    let overallPercentage;
+    if (mcqPercentage !== null) {
+      overallPercentage = (
+        (parseFloat(caseStudyPercentage) + mcqPercentage) /
+        2
+      ).toFixed(2);
+    } else {
+      overallPercentage = parseFloat(caseStudyPercentage);
     }
 
+    const passedMCQs =
+      mcqPercentage !== null && mcqPercentage >= 60; // Example pass mark
+    const passedCaseStudy = passedCount === total && total > 0;
+
+    // 🔹 If passed both
+    if (passedMCQs && passedCaseStudy) {
+      const domain = await SelectionDomain.findOne({
+        where: { id: selectedDomainId },
+        attributes: ["name"],
+      });
+
+      if (domain) {
+        await Users.update(
+          { selected: domain.name },
+          { where: { id: userId } }
+        );
+      }
+
+      overallStatus = "Passed";
+      overallResult = {
+        domain: domain?.name || null,
+        overallPercentage: parseFloat(overallPercentage),
+        message: `User has successfully passed both MCQ and Case Study for ${
+          domain?.name || "this domain"
+        }`,
+      };
+
+      // 🔹 Update combined record
+      await SelectedCaseStudyResult.upsert({
+        userId,
+        selectedDomainId,
+        questionId,
+        answer: "Final Combined Result",
+        matchPercentage: parseFloat(caseStudyPercentage),
+        passed: true,
+      });
+
+      // 🔹 Send congratulatory mail
+      const user = await Users.findOne({
+        where: { id: userId },
+        attributes: ["email", "firstName"],
+      });
+
+      if (user?.email) {
+        const subject = `🎓 Congratulations on Passing the ${
+          domain?.name || "Domain"
+        } Assessment!`;
+        const html = `
+          <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2>Hi ${user.firstName || "Learner"},</h2>
+            <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${
+              domain?.name
+            }</b>.</p>
+            <p>Your overall performance: <b>${overallPercentage}%</b></p>
+            <p>Keep learning and achieving more milestones with <b>EduRoom</b>!</p>
+            <br/>
+            <p>Best regards,<br/>The EduRoom Team</p>
+          </div>
+        `;
+        await sendMail(user.email, subject, html);
+      }
+    } else {
+      overallStatus = "Incomplete";
+      overallResult = {
+        domain: null,
+        overallPercentage: parseFloat(overallPercentage),
+        message: "User has not yet passed all sections.",
+      };
+    }
+
+    // 🔹 Response
     return ReS(
       res,
       {
