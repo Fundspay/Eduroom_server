@@ -330,68 +330,86 @@ module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
-    const { selectedDomainId, questionId } = req.params;
-    const { userId, answer } = req.body;
+    const { selectedDomainId } = req.params;
+    const { userId, answers } = req.body;
 
-    //  Validate input
+    // 🔹 Validate input
     if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
-    if (!questionId) return ReE(res, "questionId is required", 400);
     if (!userId) return ReE(res, "userId is required", 400);
-    if (!answer) return ReE(res, "answer is required", 400);
+    if (!Array.isArray(answers) || answers.length === 0)
+      return ReE(res, "answers must be a non-empty array", 400);
 
-    //  Find the question for this domain
-    const question = await SelectedQuestionModel.findOne({
-      where: {
-        id: questionId,
-        selectedDomainId,
-       caseStudy: { [Op.ne]: null }, // ensure it’s a case study question
-      },
+    // 🔹 Fetch course detail with all questions (like MCQs)
+    const courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+      include: [
+        {
+          model: SelectedQuestionModel,
+          required: false,
+        },
+      ],
     });
 
-    if (!question) return ReE(res, "Case Study question not found", 404);
+    if (!courseDetail)
+      return ReE(res, "Selected course detail not found", 404);
 
-    //  Evaluate based on keyword matching
-    const keywords = question.keywords ? question.keywords.split(",") : [];
-    const userAnswerLower = answer.toLowerCase();
-    let matchedCount = 0;
+    const questions = courseDetail.SelectedQuestionModels || [];
+    if (questions.length === 0)
+      return ReE(res, "No questions found for this course", 404);
 
-    keywords.forEach((kw) => {
-      if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
-    });
+    const results = [];
 
-    const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
-    const passed = matchPercentage >= 20; // ✅ pass threshold (20%)
+    // 🔹 Evaluate each answer for case study
+    for (let ans of answers) {
+      const question = questions.find(
+        (q) =>
+          String(q.id) === String(ans.questionId) &&
+          q.caseStudy !== null &&
+          q.caseStudy !== ""
+      );
+      if (!question) continue;
 
-    //  Upsert (insert if not exists, update if exists)
-    const [result, created] = await SelectedCaseStudyResult.upsert(
-      {
+      const keywords = question.keywords ? question.keywords.split(",") : [];
+      const userAnswerLower = ans.answer.toLowerCase();
+      let matchedCount = 0;
+
+      keywords.forEach((kw) => {
+        if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
+      });
+
+      const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
+      const passed = matchPercentage >= 20; // ✅ same pass logic as reference
+
+      // 🔹 Save or update (avoid duplicates for same user/question)
+      await SelectedCaseStudyResults.upsert({
         userId,
         selectedDomainId,
-        questionId,
-        answer,
+        questionId: question.id,
+        answer: ans.answer,
         matchPercentage,
         passed,
-      },
-      {
-        returning: true,
-        conflictFields: ["userId", "selectedDomainId", "questionId"], // ensures same user+domain+question doesn't duplicate
-      }
-    );
+      });
+
+      results.push({
+        questionId: question.id,
+        question: question.question,
+        answer: ans.answer,
+        matchPercentage,
+        passed,
+        keywords: question.keywords,
+        caseStudy: question.caseStudy,
+      });
+    }
 
     return ReS(
       res,
       {
         success: true,
-        message: passed
-          ? " You have passed this Case Study."
-          : " You did not pass. Try again.",
-        data: {
-          userId,
-          selectedDomainId,
-          questionId,
-          matchPercentage,
-          passed,
-          created: created,
+        evaluation: {
+          total: results.length,
+          passed: results.filter((r) => r.passed).length,
+          failed: results.filter((r) => !r.passed).length,
+          results,
         },
       },
       200
@@ -403,4 +421,5 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 };
 
 module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
+
 
