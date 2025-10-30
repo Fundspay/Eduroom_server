@@ -3,6 +3,7 @@ const { Op } = require("sequelize");
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { sendMail } = require("../middleware/mailer.middleware");
+const { User } = require("../models");
 const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult, Users, sequelize } = require("../models");
 
 
@@ -447,7 +448,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         attributes: ["name"],
       });
 
-      await Users.update(
+      await model.User.update(
         { selected: domain?.name || null },
         { where: { id: userId } }
       );
@@ -462,7 +463,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       };
 
       // 🎉 Send congratulatory email
-      const user = await Users.findOne({
+      const user = await model.User.findOne({
         where: { id: userId },
         attributes: ["email", "firstName"],
       });
