@@ -1,6 +1,6 @@
 "use strict";
-const model = require("../models/index");
 const { Op } = require("sequelize");
+const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, sequelize } = require("../models");
 
@@ -344,7 +344,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       where: {
         id: questionId,
         selectedDomainId,
-        caseStudy: { [SelectedQuestionModel.sequelize.Op.ne]: null }, // ensure it’s a case study question
+       caseStudy: { [Op.ne]: null }, // ensure it’s a case study question
       },
     });
 
