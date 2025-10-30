@@ -26,6 +26,7 @@ module.exports = (sequelize, Sequelize) => {
     );
 
     SelectedCourseDetail.associate = function(models) {
+
         // ✅ Updated association for selectedDomainId
         SelectedCourseDetail.belongsTo(models.SelectionDomain, { 
             foreignKey: "selectedDomainId", 
@@ -39,7 +40,13 @@ module.exports = (sequelize, Sequelize) => {
             onUpdate: "RESTRICT" 
         });
 
-        
+        // ✅ Added association with SelectedQuestionModel (no alias)
+        SelectedCourseDetail.hasMany(models.SelectedQuestionModel, {
+            foreignKey: "selectedDomainId",
+            sourceKey: "selectedDomainId",
+            onDelete: "CASCADE",
+            onUpdate: "CASCADE"
+        });
     };
 
     return SelectedCourseDetail;
