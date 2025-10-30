@@ -330,68 +330,116 @@ module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
-    const { selectedDomainId, questionId } = req.params;
-    const { userId, answer } = req.body;
+    const { selectedDomainId, questionId } = req.params; //  include questionId
+    const { userId, answers } = req.body;
 
-    //  Validate input
+    // 🔹 Validate input
     if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
-    if (!questionId) return ReE(res, "questionId is required", 400);
+    if (!questionId) return ReE(res, "questionId is required", 400); //  added check
     if (!userId) return ReE(res, "userId is required", 400);
-    if (!answer) return ReE(res, "answer is required", 400);
+    if (!Array.isArray(answers) || answers.length === 0)
+      return ReE(res, "answers must be a non-empty array", 400);
 
-    //  Find the question for this domain
+    // 🔹 Fetch the question directly instead of via include
     const question = await SelectedQuestionModel.findOne({
       where: {
         id: questionId,
         selectedDomainId,
-       caseStudy: { [Op.ne]: null }, // ensure it’s a case study question
+        caseStudy: { [Op.ne]: null },
       },
     });
 
-    if (!question) return ReE(res, "Case Study question not found", 404);
+    if (!question)
+      return ReE(res, "Case Study question not found for this domain", 404);
 
-    //  Evaluate based on keyword matching
-    const keywords = question.keywords ? question.keywords.split(",") : [];
-    const userAnswerLower = answer.toLowerCase();
-    let matchedCount = 0;
+    const results = [];
+    let totalPercentage = 0;
 
-    keywords.forEach((kw) => {
-      if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
-    });
+    // 🔹 Evaluate only the specific question
+    for (let ans of answers) {
+      if (String(ans.questionId) !== String(questionId)) continue;
 
-    const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
-    const passed = matchPercentage >= 20; // ✅ pass threshold (20%)
+      const keywords = question.keywords ? question.keywords.split(",") : [];
+      const userAnswerLower = ans.answer.toLowerCase();
+      let matchedCount = 0;
 
-    //  Upsert (insert if not exists, update if exists)
-    const [result, created] = await SelectedCaseStudyResult.upsert(
-      {
+      keywords.forEach((kw) => {
+        if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
+      });
+
+      const matchPercentage = ((matchedCount / (keywords.length || 1)) * 100).toFixed(2);
+      const passed = matchPercentage >= 20;
+
+      totalPercentage += parseFloat(matchPercentage);
+
+      // 🔹 Update or insert (no duplicates for same user + question)
+      await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
-        questionId,
-        answer,
+        questionId: question.id,
+        answer: ans.answer,
         matchPercentage,
         passed,
-      },
-      {
-        returning: true,
-        conflictFields: ["userId", "selectedDomainId", "questionId"], // ensures same user+domain+question doesn't duplicate
+      });
+
+      results.push({
+        questionId: question.id,
+        question: question.question,
+        answer: ans.answer,
+        matchPercentage: parseFloat(matchPercentage),
+        passed,
+        keywords: question.keywords,
+        caseStudy: question.caseStudy,
+      });
+    }
+
+    const total = results.length;
+    const passedCount = results.filter((r) => r.passed).length;
+    const failedCount = total - passedCount;
+    const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
+
+    // 🔹 Update progress
+    const courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+    });
+
+    if (courseDetail) {
+      let progress = {};
+      if (courseDetail.userProgress) {
+        progress =
+          typeof courseDetail.userProgress === "string"
+            ? JSON.parse(courseDetail.userProgress)
+            : courseDetail.userProgress;
       }
-    );
+
+      progress[userId] = {
+        ...(progress[userId] || {}),
+        caseStudy: {
+          total,
+          passed: passedCount,
+          failed: failedCount,
+          overallPercentage: parseFloat(overallPercentage),
+          results,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+
+      await SelectedCourseDetail.update(
+        { userProgress: progress },
+        { where: { id: courseDetail.id } }
+      );
+    }
 
     return ReS(
       res,
       {
         success: true,
-        message: passed
-          ? " You have passed this Case Study."
-          : " You did not pass. Try again.",
-        data: {
-          userId,
-          selectedDomainId,
-          questionId,
-          matchPercentage,
-          passed,
-          created: created,
+        evaluation: {
+          total,
+          passed: passedCount,
+          failed: failedCount,
+          overallPercentage: parseFloat(overallPercentage),
+          results,
         },
       },
       200
@@ -403,4 +451,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 };
 
 module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
+
+
 
