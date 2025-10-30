@@ -15,6 +15,7 @@ module.exports = (sequelize, Sequelize) => {
       keywords: { type: Sequelize.TEXT, allowNull: true },
       caseStudy: { type: Sequelize.TEXT, allowNull: true },
       mcqresult: { type: Sequelize.INTEGER, allowNull: true },
+      totalMcqs: { type: Sequelize.INTEGER, allowNull: true },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
     },

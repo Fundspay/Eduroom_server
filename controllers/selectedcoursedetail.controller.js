@@ -301,9 +301,10 @@ const evaluateSelectedMCQ = async (req, res) => {
 
     // 🔹 Save user’s MCQ result (per user + domain)
     await SelectedQuestionModel.update(
-      { mcqresult: correctCount },
-      { where: { selectedDomainId, userId } } // ✅ per-user domain update
+      { mcqresult: correctCount, totalMcqs: total },
+      { where: { selectedDomainId, userId } }
     );
+
 
     // 🔹 Response
     return ReS(
@@ -358,7 +359,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const results = [];
     let totalPercentage = 0;
 
-    // 🔹 Evaluate each answer
+    // 🔹 Evaluate user answers
     for (let ans of answers) {
       if (String(ans.questionId) !== String(questionId)) continue;
 
@@ -375,7 +376,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         100
       ).toFixed(2);
 
-      // ✅ If >20%, treat as 100%
+      // ✅ If >20%, consider it as 100%
       if (parseFloat(matchPercentage) > 20) {
         matchPercentage = 100;
       }
@@ -407,30 +408,28 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const caseStudyPercentage =
       total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
-    // 🔹 Get MCQ score for that user/domain
+    // 🔹 Fetch MCQ result for the same user/domain
     const mcqRecord = await SelectedQuestionModel.findOne({
       where: { selectedDomainId, userId },
-      attributes: ["mcqresult"],
+      attributes: ["mcqresult", "totalMcqs"], // totalMcqs optional if stored
     });
 
     const mcqScore = mcqRecord ? mcqRecord.mcqresult : 0;
-    const totalMCQs = 10; // fallback
+    const totalMCQs = mcqRecord && mcqRecord.totalMcqs ? mcqRecord.totalMcqs : 1; // fallback to 1
     const mcqPercentage =
       mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : 0;
 
-    // ✅ Normalize & calculate final results
-    const csPercent = parseFloat(caseStudyPercentage) || 0;
-    const mcqPercent = parseFloat(mcqPercentage) || 0;
+    // ✅ Passing criteria
+    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 20;
+    const passedMCQs = mcqPercentage >= 50;
 
-    const passedCaseStudy = csPercent >= 20;
-    const passedMCQs = mcqPercent >= 50;
-
-    const overallPercentage = ((csPercent + mcqPercent) / 2).toFixed(2);
+    // ✅ Combine percentages
+    const overallPercentage = ((parseFloat(caseStudyPercentage) + mcqPercentage) / 2).toFixed(2);
 
     let overallStatus = "Incomplete";
     let overallResult = {};
 
-    // ✅ Final status logic
+    // ✅ Final decision
     if (passedCaseStudy && passedMCQs) {
       const domain = await SelectionDomain.findOne({
         where: { id: selectedDomainId },
@@ -498,7 +497,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       };
     }
 
-    // ✅ Response
+    // ✅ Final response
     return ReS(
       res,
       {
