@@ -328,6 +328,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     if (!Array.isArray(answers) || answers.length === 0)
       return ReE(res, "answers must be a non-empty array", 400);
 
+    // 🔹 Fetch the question directly
     const question = await SelectedQuestionModel.findOne({
       where: {
         id: questionId,
@@ -342,6 +343,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const results = [];
     let totalPercentage = 0;
 
+    // 🔹 Evaluate only the specific question
     for (let ans of answers) {
       if (String(ans.questionId) !== String(questionId)) continue;
 
@@ -353,11 +355,15 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
       });
 
-      const matchPercentage = ((matchedCount / (keywords.length || 1)) * 100).toFixed(2);
+      const matchPercentage = (
+        (matchedCount / (keywords.length || 1)) *
+        100
+      ).toFixed(2);
       const passed = matchPercentage >= 20;
 
       totalPercentage += parseFloat(matchPercentage);
 
+      // 🔹 Insert / update without duplicates
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -379,11 +385,15 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const total = results.length;
     const passedCount = results.filter((r) => r.passed).length;
     const failedCount = total - passedCount;
-    const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
+    const overallPercentage =
+      total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
     });
+
+    let overallStatus = "Incomplete";
+    let overallResult = null;
 
     if (courseDetail) {
       let progress = {};
@@ -394,6 +404,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
             : courseDetail.userProgress;
       }
 
+      // ✅ Save case study progress
       progress[userId] = {
         ...(progress[userId] || {}),
         caseStudy: {
@@ -413,11 +424,14 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       // ✅ Check if user passed both MCQs and Case Study
       const mcqProgress = progress[userId];
-      const passedMCQs = mcqProgress.correctMCQs === mcqProgress.totalMCQs;
-      const passedCaseStudy = passedCount === total;
+      const passedMCQs =
+        mcqProgress.correctMCQs &&
+        mcqProgress.totalMCQs &&
+        mcqProgress.correctMCQs === mcqProgress.totalMCQs;
+      const passedCaseStudy = passedCount === total && total > 0;
 
+      // ✅ If both passed, update user’s “selected” field
       if (passedMCQs && passedCaseStudy) {
-        // 🔹 Fetch domain name
         const domain = await SelectedDomains.findOne({
           where: { id: selectedDomainId },
           attributes: ["name"],
@@ -429,6 +443,20 @@ const evaluateCaseStudyAnswer = async (req, res) => {
             { where: { id: userId } }
           );
         }
+
+        overallStatus = "Passed";
+        overallResult = {
+          domain: domain?.name || null,
+          overallPercentage: parseFloat(overallPercentage),
+          message: `User has successfully passed both MCQ and Case Study for ${domain?.name || "this domain"}`,
+        };
+      } else {
+        overallStatus = "Incomplete";
+        overallResult = {
+          domain: null,
+          overallPercentage: parseFloat(overallPercentage),
+          message: "User has not yet passed all sections.",
+        };
       }
     }
 
@@ -443,6 +471,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
           overallPercentage: parseFloat(overallPercentage),
           results,
         },
+        overallStatus,
+        overallResult,
       },
       200
     );
@@ -452,6 +482,4 @@ const evaluateCaseStudyAnswer = async (req, res) => {
   }
 };
 
-module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer
-
-
+module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
