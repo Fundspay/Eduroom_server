@@ -581,10 +581,8 @@ module.exports.deleteUser = deleteUser;
 const loginWithEmailPassword = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) return ReE(res, "Missing email or password", 400);
 
-    // 🔹 Find User (and include TeamManager if assigned)
     let account = await model.User.findOne({
       where: { email, isDeleted: false },
       include: [
@@ -599,7 +597,6 @@ const loginWithEmailPassword = async (req, res) => {
     let role = "user";
     let manager = null;
 
-    // 🔹 If not user, check if they are a Team Manager
     if (!account) {
       manager = await model.TeamManager.findOne({
         where: { email, isDeleted: false },
@@ -607,11 +604,9 @@ const loginWithEmailPassword = async (req, res) => {
       role = "manager";
     }
 
-    // 🔹 If no user or manager found
     if (!account && !manager) return ReE(res, "Invalid credentials", 401);
 
     const activeAccount = account || manager;
-
     const isMatch = await bcrypt.compare(password, activeAccount.password);
     if (!isMatch) return ReE(res, "Invalid credentials", 401);
 
@@ -619,43 +614,28 @@ const loginWithEmailPassword = async (req, res) => {
     if (isFirstLogin) await activeAccount.update({ hasLoggedIn: true });
     await activeAccount.update({ lastLoginAt: new Date() });
 
-    // 🔹 Build payload based on role
-    let payload;
-
+    let payload = {};
     if (role === "user") {
       payload = {
-        user_id: activeAccount.id,
+        userId: activeAccount.id,
         firstName: activeAccount.firstName,
         lastName: activeAccount.lastName,
-        fullName: activeAccount.fullName,
-        dateOfBirth: activeAccount.dateOfBirth,
-        gender: activeAccount.gender,
-        phoneNumber: activeAccount.phoneNumber,
-        alternatePhoneNumber: activeAccount.alternatePhoneNumber,
         email: activeAccount.email,
-        residentialAddress: activeAccount.residentialAddress,
-        emergencyContactName: activeAccount.emergencyContactName,
-        emergencyContactNumber: activeAccount.emergencyContactNumber,
-        city: activeAccount.city,
-        state: activeAccount.state,
-        pinCode: activeAccount.pinCode,
+        phoneNumber: activeAccount.phoneNumber,
         internshipStatus: activeAccount.internshipStatus || null,
         selected: activeAccount.selected || null,
       };
 
-      // ✅ Include Team Manager details if available
       if (activeAccount.teamManager) {
         payload.managerDetails = {
-          id: activeAccount.teamManager.id,
+          managerId: activeAccount.teamManager.id,
           name: activeAccount.teamManager.name,
           email: activeAccount.teamManager.email,
           mobileNumber: activeAccount.teamManager.mobileNumber,
           internshipStatus: activeAccount.teamManager.internshipStatus,
         };
       }
-
     } else {
-      // 🔹 Manager payload
       payload = {
         managerId: activeAccount.id,
         name: activeAccount.name,
@@ -667,16 +647,16 @@ const loginWithEmailPassword = async (req, res) => {
       };
     }
 
-    // 🔹 Generate token
-    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
-      expiresIn: "365d",
-    });
+    const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
+
+    // ✅ dynamic key based on role
+    const responseKey = role === "user" ? "user" : "account";
 
     return ReS(
       res,
       {
         success: true,
-        account: {
+        [responseKey]: {
           ...payload,
           isFirstLogin,
           token,
@@ -692,6 +672,7 @@ const loginWithEmailPassword = async (req, res) => {
 };
 
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
+
 
 // ===================== LOGOUT =====================
 const logoutUser = async (req, res) => {
@@ -903,10 +884,13 @@ const loginWithGoogle = async (req, res) => {
       expiresIn: "365d",
     });
 
-    return ReS(res, {
-      success: true,
-      user: { ...payload, isFirstLogin, token, role },
-    });
+    // ✅ Dynamic response key
+    const responseData =
+      role === "user"
+        ? { user: { ...payload, isFirstLogin, token, role } }
+        : { account: { ...payload, isFirstLogin, token, role } };
+
+    return ReS(res, { success: true, ...responseData });
   } catch (error) {
     console.error("Google login failed:", error);
     return ReE(res, "Login failed", 500);
@@ -914,6 +898,7 @@ const loginWithGoogle = async (req, res) => {
 };
 
 module.exports.loginWithGoogle = loginWithGoogle;
+
 
 //  Fetch Single User Info by ID with profile completion and filtered fields
 const fetchSingleUserById = async (req, res) => {
