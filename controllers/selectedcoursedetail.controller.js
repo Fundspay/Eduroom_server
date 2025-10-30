@@ -1,5 +1,6 @@
 "use strict";
 const model = require("../models/index");
+const { Op } = require("sequelize");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, sequelize } = require("../models");
 
