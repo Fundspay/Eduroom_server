@@ -226,6 +226,9 @@ module.exports.getSelectedCourseDetail = getSelectedCourseDetail;
 // 🧩 Evaluate MCQ
 // ==============================
 
+// ===========================================
+// ✅ Evaluate Selected MCQs
+// ===========================================
 const evaluateSelectedMCQ = async (req, res) => {
   try {
     const { selectedDomainId } = req.params;
@@ -235,7 +238,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
 
-    // 🔹 Fetch course + MCQs
+    // 🔹 Fetch course + questions
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
       include: [{ model: SelectedQuestionModel, required: false }],
@@ -249,7 +252,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
-    // 🔹 Evaluate each MCQ
+    // 🔹 Evaluate MCQ answers
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -296,15 +299,13 @@ const evaluateSelectedMCQ = async (req, res) => {
       { where: { id: courseDetail.id } }
     );
 
-    // 🔹 Update MCQ total score in SelectedQuestionModel
-    // We'll store total correct MCQs in mcqresult field (one-time update for domain)
-   await SelectedQuestionModel.update(
-  { mcqresult: correctCount },
-  { where: { selectedDomainId, userId } } // ✅ only update that user's records
-);
+    // 🔹 Save user’s MCQ result (per user + domain)
+    await SelectedQuestionModel.update(
+      { mcqresult: correctCount },
+      { where: { selectedDomainId, userId } } // ✅ per-user domain update
+    );
 
-
-    // 🔹 Send response
+    // 🔹 Response
     return ReS(
       res,
       {
@@ -328,10 +329,9 @@ const evaluateSelectedMCQ = async (req, res) => {
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
-// ===============================
-// Evaluate Case Study
-// ===============================
-
+// ===========================================
+// ✅ Evaluate Case Study
+// ===========================================
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
     const { selectedDomainId, questionId } = req.params;
@@ -358,7 +358,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const results = [];
     let totalPercentage = 0;
 
-    // 🔹 Evaluate user answers
+    // 🔹 Evaluate each answer
     for (let ans of answers) {
       if (String(ans.questionId) !== String(questionId)) continue;
 
@@ -375,16 +375,14 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         100
       ).toFixed(2);
 
-      // 🔹 If >20%, treat as 100% (auto pass)
+      // ✅ If >20%, treat as 100%
       if (parseFloat(matchPercentage) > 20) {
         matchPercentage = 100;
       }
 
       const passed = parseFloat(matchPercentage) >= 20;
-
       totalPercentage += parseFloat(matchPercentage);
 
-      // 🔹 Save result
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -409,39 +407,31 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const caseStudyPercentage =
       total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
-    // 🔹 Get MCQ score from SelectedQuestionModel (updated earlier)
+    // 🔹 Get MCQ score for that user/domain
     const mcqRecord = await SelectedQuestionModel.findOne({
-      where: {
-        selectedDomainId,
-        userId, // ✅ filter by userId too
-      },
+      where: { selectedDomainId, userId },
       attributes: ["mcqresult"],
     });
 
-    const mcqScore = mcqRecord ? mcqRecord.mcqresult : null;
-    const totalMCQs = 10; // optional fallback if not tracked elsewhere
+    const mcqScore = mcqRecord ? mcqRecord.mcqresult : 0;
+    const totalMCQs = 10; // fallback
     const mcqPercentage =
-      mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : null;
+      mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : 0;
 
-    // 🔹 Determine pass/fail
-    const passedMCQs = mcqPercentage !== null && mcqPercentage >= 50; // ✅ ≥50% = pass
-    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 20;
+    // ✅ Normalize & calculate final results
+    const csPercent = parseFloat(caseStudyPercentage) || 0;
+    const mcqPercent = parseFloat(mcqPercentage) || 0;
 
-    // 🔹 Calculate overall %
-    let overallPercentage;
-    if (mcqPercentage !== null) {
-      overallPercentage = (
-        (parseFloat(caseStudyPercentage) + mcqPercentage) / 2
-      ).toFixed(2);
-    } else {
-      overallPercentage = parseFloat(caseStudyPercentage);
-    }
+    const passedCaseStudy = csPercent >= 20;
+    const passedMCQs = mcqPercent >= 50;
+
+    const overallPercentage = ((csPercent + mcqPercent) / 2).toFixed(2);
 
     let overallStatus = "Incomplete";
     let overallResult = {};
 
-    if (passedMCQs && passedCaseStudy) {
-      // ✅ Passed both
+    // ✅ Final status logic
+    if (passedCaseStudy && passedMCQs) {
       const domain = await SelectionDomain.findOne({
         where: { id: selectedDomainId },
         attributes: ["name"],
@@ -456,24 +446,27 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       overallResult = {
         domain: domain?.name || null,
         overallPercentage: parseFloat(overallPercentage),
-        message: `User has successfully passed both MCQ and Case Study for ${domain?.name || "this domain"
-          }.`,
+        message: `User has successfully passed both MCQ and Case Study for ${
+          domain?.name || "this domain"
+        }.`,
       };
 
-      // 🎉 Send congratulatory mail
+      // 🎉 Send congratulatory email
       const user = await Users.findOne({
         where: { id: userId },
         attributes: ["email", "firstName"],
       });
 
       if (user?.email) {
-        const subject = `🎓 Congratulations on Passing the ${domain?.name || "Domain"
-          } Assessment!`;
+        const subject = `🎓 Congratulations on Passing the ${
+          domain?.name || "Domain"
+        } Assessment!`;
         const html = `
           <div style="font-family: Arial, sans-serif; color: #333;">
             <h2>Hi ${user.firstName || "Learner"},</h2>
-            <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${domain?.name
-          }</b>.</p>
+            <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${
+              domain?.name
+            }</b>.</p>
             <p>Your overall performance: <b>${overallPercentage}%</b></p>
             <p>Keep learning and achieving more milestones with <b>EduRoom</b>!</p>
             <br/>
@@ -482,16 +475,21 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         `;
         await sendMail(user.email, subject, html);
       }
-    } else if (!passedMCQs && passedCaseStudy) {
-      // 🟡 Case Study passed but MCQ not
+    } else if (passedCaseStudy && !passedMCQs) {
       overallStatus = "Partially Passed";
       overallResult = {
         domain: null,
         overallPercentage: parseFloat(overallPercentage),
         message: "Case Study passed, but MCQ not yet passed.",
       };
+    } else if (!passedCaseStudy && passedMCQs) {
+      overallStatus = "Partially Passed";
+      overallResult = {
+        domain: null,
+        overallPercentage: parseFloat(overallPercentage),
+        message: "MCQ passed, but Case Study not yet passed.",
+      };
     } else {
-      // ❌ None or partial failed
       overallStatus = "Incomplete";
       overallResult = {
         domain: null,
@@ -500,7 +498,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       };
     }
 
-    // 🔹 Send response
+    // ✅ Response
     return ReS(
       res,
       {
