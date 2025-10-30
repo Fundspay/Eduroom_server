@@ -15,4 +15,6 @@ router.get("/details/:selectedDomainId", selectedCourseDetailController.getSelec
 
 router.post("/evaluate/:selectedDomainId", selectedCourseDetailController.evaluateSelectedMCQ);
 
+router.post("/evaluate-case-study/:selectedDomainId/:questionId", selectedCourseDetailController.evaluateCaseStudyAnswer);
+
 module.exports = router;
