@@ -2,12 +2,8 @@
 const { Op } = require("sequelize");
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-<<<<<<< HEAD
-const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult,sequelize } = require("../models");
 const { sendMail } = require("../middleware/mailer.middleware");
-=======
 const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult, Users, sequelize } = require("../models");
->>>>>>> cac3b279addf22b29ee9744f8da7de5bdb342d9a
 
 
 // 🔹 Create or Update Selected Course Detail and its Questions
@@ -319,11 +315,10 @@ const evaluateSelectedMCQ = async (req, res) => {
 };
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
-<<<<<<< HEAD
-=======
 // ===============================
-// 🧠 Evaluate Case Study
+// Evaluate Case Study
 // ===============================
+
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
     const { selectedDomainId, questionId } = req.params;
@@ -420,12 +415,16 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       // ✅ Check if user passed both MCQs and Case Study
       const mcqProgress = progress[userId];
-      const passedMCQs = mcqProgress.correctMCQs === mcqProgress.totalMCQs;
+      const passedMCQs =
+        mcqProgress.correctMCQs &&
+        mcqProgress.totalMCQs &&
+        mcqProgress.correctMCQs === mcqProgress.totalMCQs;
+
       const passedCaseStudy = passedCount === total;
 
       if (passedMCQs && passedCaseStudy) {
         // 🔹 Fetch domain name
-        const domain = await SelectedDomains.findOne({
+        const domain = await SelectionDomain.findOne({
           where: { id: selectedDomainId },
           attributes: ["name"],
         });
@@ -435,6 +434,25 @@ const evaluateCaseStudyAnswer = async (req, res) => {
             { selected: domain.name },
             { where: { id: userId } }
           );
+
+          // 🔹 Fetch user info for email
+          const user = await Users.findOne({ where: { id: userId } });
+
+          if (user && user.email) {
+            const subject = "🎉 Congratulations! You Passed the Selection Test!";
+            const html = `
+              <div style="font-family: Arial, sans-serif; padding: 20px; background: #f9fafb; border-radius: 8px;">
+                <h2 style="color: #2c3e50;">Congratulations, ${user.firstName || "Student"}! 🎉</h2>
+                <p>We're thrilled to inform you that you've successfully <b>passed the EduRoom Selection Test</b> and are now <b>eligible for our internship program</b>.</p>
+                <p><b>Selected Domain:</b> ${domain.name}</p>
+                <p>Our team will contact you shortly with the next steps. Stay tuned!</p>
+                <br/>
+                <p style="color: #555;">Best regards,<br/><b>The EduRoom Team</b></p>
+              </div>
+            `;
+            await sendMail(user.email, subject, html);
+            console.log(`📧 Internship eligibility email sent to ${user.email}`);
+          }
         }
       }
     }
@@ -459,7 +477,4 @@ const evaluateCaseStudyAnswer = async (req, res) => {
   }
 };
 
-module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer
->>>>>>> cac3b279addf22b29ee9744f8da7de5bdb342d9a
-
-
+module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
