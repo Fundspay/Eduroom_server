@@ -238,7 +238,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
 
-    // 🔹 Fetch course + questions
+    // 🔹 Fetch course + MCQs
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
       include: [{ model: SelectedQuestionModel, required: false }],
@@ -252,7 +252,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
-    // 🔹 Evaluate MCQ answers
+    // 🔹 Evaluate answers
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -299,7 +299,8 @@ const evaluateSelectedMCQ = async (req, res) => {
       { where: { id: courseDetail.id } }
     );
 
-    // 🔹 Upsert MCQ result per user + domain
+    // 🔹 Store user’s MCQ result (per user + domain)
+    // If no record exists yet, insert; otherwise update existing.
     await SelectedQuestionModel.upsert({
       userId,
       selectedDomainId,
@@ -308,7 +309,7 @@ const evaluateSelectedMCQ = async (req, res) => {
       updatedAt: new Date(),
     });
 
-    // 🔹 Response
+    // ✅ Response
     return ReS(
       res,
       {
@@ -329,7 +330,9 @@ const evaluateSelectedMCQ = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
+
 // ===========================================
 // ✅ Evaluate Case Study
 // ===========================================
