@@ -764,6 +764,7 @@ const listAllUsers = async (req, res) => {
 
       response.push({
         statusId: statusRecord.id,
+        selected: user.selected ?? false,
         ...statusRecord.toJSON()
       });
     }
