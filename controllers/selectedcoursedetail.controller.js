@@ -282,15 +282,16 @@ const evaluateSelectedMCQ = async (req, res) => {
           : courseDetail.userProgress;
     }
 
-    // 🔹 Save new evaluation for this user
+    // 🔹 Overwrite existing evaluation for this user (not duplicate)
     progress[userId] = {
       correctMCQs: correctCount,
       totalMCQs: total,
       eligibleForCaseStudy: correctCount === total,
-      answers: results,
+      answers: results, // always replaced, not appended
+      updatedAt: new Date().toISOString(),
     };
 
-    // 🔹 Update course detail with progress
+    // 🔹 Update course detail with updated progress
     await SelectedCourseDetail.update(
       { userProgress: progress },
       { where: { id: courseDetail.id } }
