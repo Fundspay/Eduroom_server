@@ -21,6 +21,7 @@ module.exports = (sequelize, Sequelize) => {
             queryStatus: { type: Sequelize.STRING, allowNull: true },
             querycount: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
             registeredAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+            selected: { type: Sequelize.TEXT, allowNull: true},
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
