@@ -584,11 +584,22 @@ const loginWithEmailPassword = async (req, res) => {
 
     if (!email || !password) return ReE(res, "Missing email or password", 400);
 
+    // 🔹 Find User (and include TeamManager if assigned)
     let account = await model.User.findOne({
       where: { email, isDeleted: false },
+      include: [
+        {
+          model: model.TeamManager,
+          as: "teamManager",
+          attributes: ["id", "name", "email", "mobileNumber", "internshipStatus"],
+        },
+      ],
     });
-    let role = "user";
 
+    let role = "user";
+    let manager = null;
+
+    // 🔹 If not user, check if they are a Team Manager
     if (!account) {
       manager = await model.TeamManager.findOne({
         where: { email, isDeleted: false },
@@ -596,47 +607,67 @@ const loginWithEmailPassword = async (req, res) => {
       role = "manager";
     }
 
-    if (!account) return ReE(res, "Invalid credentials", 401);
+    // 🔹 If no user or manager found
+    if (!account && !manager) return ReE(res, "Invalid credentials", 401);
 
-    const isMatch = await bcrypt.compare(password, account.password);
+    const activeAccount = account || manager;
+
+    const isMatch = await bcrypt.compare(password, activeAccount.password);
     if (!isMatch) return ReE(res, "Invalid credentials", 401);
 
-    const isFirstLogin = !account.hasLoggedIn;
-    if (isFirstLogin) await account.update({ hasLoggedIn: true });
-    await account.update({ lastLoginAt: new Date() });
+    const isFirstLogin = !activeAccount.hasLoggedIn;
+    if (isFirstLogin) await activeAccount.update({ hasLoggedIn: true });
+    await activeAccount.update({ lastLoginAt: new Date() });
 
+    // 🔹 Build payload based on role
     let payload;
+
     if (role === "user") {
       payload = {
-        user_id: account.id,
-        firstName: account.firstName,
-        lastName: account.lastName,
-        fullName: account.fullName,
-        dateOfBirth: account.dateOfBirth,
-        gender: account.gender,
-        phoneNumber: account.phoneNumber,
-        alternatePhoneNumber: account.alternatePhoneNumber,
-        email: account.email,
-        residentialAddress: account.residentialAddress,
-        emergencyContactName: account.emergencyContactName,
-        emergencyContactNumber: account.emergencyContactNumber,
-        city: account.city,
-        state: account.state,
-        pinCode: account.pinCode,
-        internshipStatus: account.internshipStatus || null, // ✅ Added here
+        user_id: activeAccount.id,
+        firstName: activeAccount.firstName,
+        lastName: activeAccount.lastName,
+        fullName: activeAccount.fullName,
+        dateOfBirth: activeAccount.dateOfBirth,
+        gender: activeAccount.gender,
+        phoneNumber: activeAccount.phoneNumber,
+        alternatePhoneNumber: activeAccount.alternatePhoneNumber,
+        email: activeAccount.email,
+        residentialAddress: activeAccount.residentialAddress,
+        emergencyContactName: activeAccount.emergencyContactName,
+        emergencyContactNumber: activeAccount.emergencyContactNumber,
+        city: activeAccount.city,
+        state: activeAccount.state,
+        pinCode: activeAccount.pinCode,
+        internshipStatus: activeAccount.internshipStatus || null,
+        selected: activeAccount.selected || null,
       };
+
+      // ✅ Include Team Manager details if available
+      if (activeAccount.teamManager) {
+        payload.managerDetails = {
+          id: activeAccount.teamManager.id,
+          name: activeAccount.teamManager.name,
+          email: activeAccount.teamManager.email,
+          mobileNumber: activeAccount.teamManager.mobileNumber,
+          internshipStatus: activeAccount.teamManager.internshipStatus,
+        };
+      }
+
     } else {
+      // 🔹 Manager payload
       payload = {
-        managerId: manager.id,
-        name: manager.name,
-        email: manager.email,
-        mobileNumber: manager.mobileNumber,
-        department: manager.department,
-        position: manager.position,
-        internshipStatus: manager.internshipStatus || null, // ✅ Added here
+        managerId: activeAccount.id,
+        name: activeAccount.name,
+        email: activeAccount.email,
+        mobileNumber: activeAccount.mobileNumber,
+        department: activeAccount.department,
+        position: activeAccount.position,
+        internshipStatus: activeAccount.internshipStatus || null,
       };
     }
 
+    // 🔹 Generate token
     const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
       expiresIn: "365d",
     });
@@ -649,7 +680,6 @@ const loginWithEmailPassword = async (req, res) => {
           ...payload,
           isFirstLogin,
           token,
-          selected: account.selected || null,
           role,
         },
       },
@@ -662,6 +692,7 @@ const loginWithEmailPassword = async (req, res) => {
 };
 
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
+
 // ===================== LOGOUT =====================
 const logoutUser = async (req, res) => {
   try {
