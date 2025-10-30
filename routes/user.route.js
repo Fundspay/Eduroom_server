@@ -37,5 +37,6 @@ router.get("/profile/:id", userController.fetchSingleUserById);
 router.get("/:userId/referral-payment-status", userController.getReferralPaymentStatus);
 router.get("/:userId/internship-status", userController.getInternshipStatusByUser);
 router.get("/course-dates", userController.getUserCourseDates);
+router.get("/remaining-time/:userId", userController.getUserRemainingTime);
 
 module.exports = router;
