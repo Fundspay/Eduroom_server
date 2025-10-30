@@ -1,7 +1,7 @@
 "use strict";
 module.exports = (sequelize, Sequelize) => {
-    const SelectedDomain = sequelize.define(
-        "SelectedDomain",
+    const SelectedCourseDetail = sequelize.define(
+        "SelectedCourseDetail",
         {
             id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
 
@@ -9,9 +9,6 @@ module.exports = (sequelize, Sequelize) => {
             selectedDomainId: { type: Sequelize.BIGINT, allowNull: false },
 
             userId: { type: Sequelize.BIGINT, allowNull: true },
-            day: { type: Sequelize.INTEGER, allowNull: false }, // Day number
-            sessionNumber: { type: Sequelize.INTEGER, allowNull: false },
-            sessionDuration: { type: Sequelize.INTEGER, allowNull: true }, // Session duration in minutes
             title: { type: Sequelize.TEXT, allowNull: false },
             description: { type: Sequelize.TEXT, allowNull: true },
             duration: { type: Sequelize.INTEGER, allowNull: true },
@@ -24,20 +21,20 @@ module.exports = (sequelize, Sequelize) => {
         },
         { 
             timestamps: true,
-            tableName: "SelectedDomains" // ✅ Use pluralized, clear table name
+            tableName: "SelectedCourseDetails" // ✅ Use pluralized, clear table name
         }
     );
 
-    SelectedDomain.associate = function(models) {
+    SelectedCourseDetail.associate = function(models) {
         // ✅ Updated association for selectedDomainId
-        SelectedDomain.belongsTo(models.SelectedDomain, { 
+        SelectedCourseDetail.belongsTo(models.SelectionDomain, { 
             foreignKey: "selectedDomainId", 
             onDelete: "RESTRICT", 
             onUpdate: "RESTRICT" 
         });
 
-        SelectedDomain.belongsTo(models.User, { 
-            foreignKey: "userId", 
+        SelectedCourseDetail.belongsTo(models.User, { 
+            foreignKey: "userId",
             onDelete: "RESTRICT", 
             onUpdate: "RESTRICT" 
         });
@@ -45,5 +42,5 @@ module.exports = (sequelize, Sequelize) => {
         
     };
 
-    return SelectedDomain;
+    return SelectedCourseDetail;
 };

@@ -9,8 +9,6 @@ module.exports = (sequelize, Sequelize) => {
 
             // 🔹 Updated fields
             selectedDomainId: { type: Sequelize.BIGINT, allowNull: false }, 
-            day: { type: Sequelize.INTEGER, allowNull: false },
-            sessionNumber: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 1 },
             questionId: { type: Sequelize.BIGINT, allowNull: false },
             answer: { type: Sequelize.TEXT, allowNull: false },
             matchPercentage: { type: Sequelize.FLOAT, allowNull: false },
@@ -35,7 +33,7 @@ module.exports = (sequelize, Sequelize) => {
         });
 
         // Link to SelectedDomain (replaces course-related models)
-        SelectedCaseStudyResult.belongsTo(models.SelectedDomain, {
+        SelectedCaseStudyResult.belongsTo(models.SelectionDomain, {
             foreignKey: "selectedDomainId",
             onDelete: "CASCADE",
             onUpdate: "CASCADE"

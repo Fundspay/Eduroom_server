@@ -1,169 +1,118 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { SelectedCourseDetail, SelectedQuestionModel, sequelize } = require("../models");
+const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, sequelize } = require("../models");
 
-// 🔹 Add or update SelectedCourseDetail
+
+// 🔹 Create or Update Selected Course Detail and its Questions
 const addOrUpdateSelectedCourseDetail = async (req, res) => {
-  const { selectedCourseId, userId, days } = req.body;
+  const { selectedDomainId, userId, title, description, duration, heading, youtubeLink, questions } = req.body;
 
-  if (!selectedCourseId) return ReE(res, "selectedCourseId is required", 400);
-  if (!Array.isArray(days) || days.length === 0)
-    return ReE(res, "days are required", 400);
+  if (!selectedDomainId) return ReE(res, "selectedDomainId is required", 400);
+  if (!title) return ReE(res, "title is required", 400);
 
   const transaction = await sequelize.transaction();
+
   try {
-    const createdDays = [];
+    // 🔹 Check if course detail already exists
+    let courseDetail = await SelectedCourseDetail.findOne({
+      where: { selectedDomainId },
+      transaction,
+    });
 
-    for (const dayObj of days) {
-      const { day, sessions } = dayObj;
-
-      if (day === undefined || day === null)
-        throw new Error("day is required for each day object");
-
-      if (!Array.isArray(sessions) || sessions.length === 0)
-        throw new Error(`sessions are required for day ${day}`);
-
-      const updatedSessions = [];
-
-      for (const session of sessions) {
-        const {
-          sessionNumber,
-          title,
-          description,
-          youtubeLink,
-          duration,
-          sessionDuration,
-          heading,
-          questions,
-        } = session;
-
-        if (sessionNumber === undefined || sessionNumber === null)
-          throw new Error("sessionNumber is required for each session");
-
-        if (!title) throw new Error("title is required for each session");
-
-        // 🔹 Find or create session row
-        let currentSessionRow = await SelectedCourseDetail.findOne({
-          where: { selectedCourseId, day, sessionNumber },
-          transaction,
-        });
-
-        if (!currentSessionRow) {
-          currentSessionRow = await SelectedCourseDetail.create(
-            {
-              selectedCourseId,
-              userId: userId ?? null,
-              day,
-              sessionNumber,
-              title,
-              description: description ?? null,
-              youtubeLink: youtubeLink ?? null,
-              duration,
-              sessionDuration,
-              heading,
-            },
-            { transaction }
-          );
-        } else {
-          await currentSessionRow.update(
-            {
-              title,
-              description: description ?? null,
-              youtubeLink: youtubeLink ?? null,
-              duration,
-              sessionDuration,
-              heading,
-            },
-            { transaction }
-          );
-        }
-
-        // 🔹 Handle questions
-        if (Array.isArray(questions)) {
-          const existingQuestions = await SelectedQuestionModel.findAll({
-            where: { selectedCourseId, day, sessionNumber },
-            transaction,
-          });
-
-          const existingQuestionMap = {};
-          existingQuestions.forEach((q) => (existingQuestionMap[q.id] = q));
-          const incomingIds = [];
-
-          for (let index = 0; index < questions.length; index++) {
-            const q = questions[index];
-            const qId = Number(q.id);
-
-            if (qId && existingQuestionMap[qId]) {
-              await existingQuestionMap[qId].update(
-                {
-                  question: q.question,
-                  optionA: q.optionA,
-                  optionB: q.optionB,
-                  optionC: q.optionC,
-                  optionD: q.optionD,
-                  answer: q.answer,
-                  keywords: q.keywords ?? null,
-                  caseStudy: q.caseStudy ?? null,
-                  questionNumber: index + 1,
-                },
-                { transaction }
-              );
-              incomingIds.push(qId);
-            } else {
-              const newQ = await SelectedQuestionModel.create(
-                {
-                  selectedCourseId,
-                  userId,
-                  day,
-                  sessionNumber,
-                  question: q.question,
-                  optionA: q.optionA,
-                  optionB: q.optionB,
-                  optionC: q.optionC,
-                  optionD: q.optionD,
-                  answer: q.answer,
-                  keywords: q.keywords ?? null,
-                  caseStudy: q.caseStudy ?? null,
-                  questionNumber: index + 1,
-                },
-                { transaction }
-              );
-              incomingIds.push(newQ.id);
-            }
-          }
-
-          // 🔹 Delete removed questions
-          const toDelete = existingQuestions.filter(
-            (q) => !incomingIds.includes(q.id)
-          );
-
-          if (toDelete.length > 0) {
-            const deleteIds = toDelete.map((q) => q.id);
-            await SelectedQuestionModel.destroy({
-              where: { id: deleteIds },
-              transaction,
-            });
-          }
-        }
-
-        updatedSessions.push({
-          sessionNumber,
+    if (!courseDetail) {
+      // 🔹 Create new SelectedCourseDetail
+      courseDetail = await SelectedCourseDetail.create(
+        {
+          selectedDomainId,
+          userId: userId ?? null,
           title,
           description: description ?? null,
+          duration: duration ?? null,
+          heading: heading ?? null,
           youtubeLink: youtubeLink ?? null,
-          duration,
-          sessionDuration,
-          heading,
-          questions,
-        });
+        },
+        { transaction }
+      );
+    } else {
+      // 🔹 Update existing record
+      await courseDetail.update(
+        {
+          title,
+          description: description ?? null,
+          duration: duration ?? null,
+          heading: heading ?? null,
+          youtubeLink: youtubeLink ?? null,
+        },
+        { transaction }
+      );
+    }
+
+    // 🔹 Handle related questions (if any)
+    if (Array.isArray(questions)) {
+      const existingQuestions = await SelectedQuestionModel.findAll({
+        where: { selectedDomainId },
+        transaction,
+      });
+
+      const existingMap = {};
+      existingQuestions.forEach((q) => (existingMap[q.id] = q));
+      const incomingIds = [];
+
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const qId = Number(q.id);
+
+        if (qId && existingMap[qId]) {
+          // 🔹 Update existing question
+          await existingMap[qId].update(
+            {
+              question: q.question,
+              optionA: q.optionA,
+              optionB: q.optionB,
+              optionC: q.optionC,
+              optionD: q.optionD,
+              answer: q.answer,
+              keywords: q.keywords ?? null,
+              caseStudy: q.caseStudy ?? null,
+            },
+            { transaction }
+          );
+          incomingIds.push(qId);
+        } else {
+          // 🔹 Create new question
+          const newQ = await SelectedQuestionModel.create(
+            {
+              selectedDomainId,
+              userId,
+              question: q.question,
+              optionA: q.optionA,
+              optionB: q.optionB,
+              optionC: q.optionC,
+              optionD: q.optionD,
+              answer: q.answer,
+              keywords: q.keywords ?? null,
+              caseStudy: q.caseStudy ?? null,
+            },
+            { transaction }
+          );
+          incomingIds.push(newQ.id);
+        }
       }
 
-      createdDays.push({ day, sessions: updatedSessions });
+      // 🔹 Delete removed questions
+      const toDelete = existingQuestions.filter((q) => !incomingIds.includes(q.id));
+      if (toDelete.length > 0) {
+        const deleteIds = toDelete.map((q) => q.id);
+        await SelectedQuestionModel.destroy({
+          where: { id: deleteIds },
+          transaction,
+        });
+      }
     }
 
     await transaction.commit();
-    return ReS(res, { success: true, days: createdDays }, 201);
+    return ReS(res, { success: true, courseDetail }, 201);
   } catch (error) {
     await transaction.rollback();
     console.error("Add/Update SelectedCourseDetail Error:", error);
@@ -171,7 +120,7 @@ const addOrUpdateSelectedCourseDetail = async (req, res) => {
   }
 };
 
-module.exports.addOrUpdateSelectedCourseDetail = addOrUpdateSelectedCourseDetail;
+module.exports. addOrUpdateSelectedCourseDetail = addOrUpdateSelectedCourseDetail;
 
 // 🔹 Delete SelectedCourseDetail
 const deleteSelectedCourseDetail = async (req, res) => {

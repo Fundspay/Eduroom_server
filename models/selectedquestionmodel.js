@@ -6,8 +6,6 @@ module.exports = (sequelize, Sequelize) => {
       id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
       selectedDomainId: { type: Sequelize.BIGINT, allowNull: false },
       userId: { type: Sequelize.BIGINT, allowNull: true },
-      day: { type: Sequelize.INTEGER, allowNull: false },
-      sessionNumber: { type: Sequelize.INTEGER, allowNull: false },
       question: { type: Sequelize.TEXT, allowNull: false },
       optionA: { type: Sequelize.TEXT, allowNull: true },
       optionB: { type: Sequelize.TEXT, allowNull: true },
@@ -26,7 +24,7 @@ module.exports = (sequelize, Sequelize) => {
   );
 
   SelectedQuestionModel.associate = function (models) {
-    SelectedQuestionModel.belongsTo(models.SelectedDomain, {
+    SelectedQuestionModel.belongsTo(models.SelectionDomain, {
       foreignKey: "selectedDomainId",
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
