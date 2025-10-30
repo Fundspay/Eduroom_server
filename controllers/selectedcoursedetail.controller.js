@@ -238,7 +238,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     if (!userId) return ReE(res, "userId is required", 400);
     if (!Array.isArray(answers)) return ReE(res, "answers must be an array", 400);
 
-    // 🔹 Fetch course + MCQs
+    // 🔹 Fetch course + questions
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
       include: [{ model: SelectedQuestionModel, required: false }],
@@ -252,7 +252,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
-    // 🔹 Evaluate answers
+    // 🔹 Evaluate MCQ answers
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -276,7 +276,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     const score = `${correctCount}/${total}`;
     const eligibleForCaseStudy = correctCount === total;
 
-    // 🔹 Update user progress in SelectedCourseDetail
+    // 🔹 Update user progress inside SelectedCourseDetail
     let progress = {};
     if (courseDetail.userProgress) {
       progress =
@@ -299,15 +299,23 @@ const evaluateSelectedMCQ = async (req, res) => {
       { where: { id: courseDetail.id } }
     );
 
-    // 🔹 Store user’s MCQ result (per user + domain)
-    // If no record exists yet, insert; otherwise update existing.
-    await SelectedQuestionModel.upsert({
-      userId,
-      selectedDomainId,
-      mcqresult: correctCount,
-      totalMcqs: total,
-      updatedAt: new Date(),
-    });
+    // 🔹 Update user’s MCQ result (per user + domain)
+    const [affectedRows] = await SelectedQuestionModel.update(
+      { mcqresult: correctCount, totalMcqs: total },
+      { where: { selectedDomainId, userId } }
+    );
+
+    // 🩹 If no record was updated, insert a minimal placeholder safely
+    if (affectedRows === 0) {
+      await SelectedQuestionModel.create({
+        selectedDomainId,
+        userId,
+        question: "MCQ Result Placeholder",
+        answer: "N/A",
+        mcqresult: correctCount,
+        totalMcqs: total,
+      });
+    }
 
     // ✅ Response
     return ReS(
@@ -332,7 +340,7 @@ const evaluateSelectedMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
-
+ 
 // ===========================================
 // ✅ Evaluate Case Study
 // ===========================================
