@@ -124,45 +124,31 @@ module.exports. addOrUpdateSelectedCourseDetail = addOrUpdateSelectedCourseDetai
 
 // 🔹 Delete SelectedCourseDetail
 const deleteSelectedCourseDetail = async (req, res) => {
-  const { selectedCourseDetailId, selectedCourseId, day, sessionNumber } = req.params;
+  const { selectedCourseDetailId } = req.params;
 
-  if (!selectedCourseDetailId && (!selectedCourseId || !day || !sessionNumber)) {
-    return ReE(
-      res,
-      "Either selectedCourseDetailId OR (selectedCourseId, day, sessionNumber) is required",
-      400
-    );
+  if (!selectedCourseDetailId) {
+    return ReE(res, "selectedCourseDetailId is required", 400);
   }
 
   const transaction = await sequelize.transaction();
   try {
-    let selectedCourseDetail;
-
-    if (selectedCourseDetailId) {
-      // 🔹 Delete by primary key
-      selectedCourseDetail = await SelectedCourseDetail.findByPk(selectedCourseDetailId, {
-        transaction,
-      });
-    } else {
-      // 🔹 Delete by selectedCourseId + day + sessionNumber
-      selectedCourseDetail = await SelectedCourseDetail.findOne({
-        where: { selectedCourseId, day, sessionNumber },
-        transaction,
-      });
-    }
+    // 🔹 Find the SelectedCourseDetail by ID
+    const selectedCourseDetail = await SelectedCourseDetail.findByPk(selectedCourseDetailId, {
+      transaction,
+    });
 
     if (!selectedCourseDetail) {
       await transaction.rollback();
       return ReE(res, "SelectedCourseDetail not found", 404);
     }
 
-    // 🔹 Delete associated questions
+    // 🔹 Delete all questions linked to the same selectedDomainId
     await SelectedQuestionModel.destroy({
-      where: { selectedCourseId: selectedCourseDetail.selectedCourseId, day, sessionNumber },
+      where: { selectedDomainId: selectedCourseDetail.selectedDomainId },
       transaction,
     });
 
-    // 🔹 Hard delete the SelectedCourseDetail entry
+    // 🔹 Delete the SelectedCourseDetail record itself
     await selectedCourseDetail.destroy({ transaction });
 
     await transaction.commit();
@@ -176,7 +162,7 @@ const deleteSelectedCourseDetail = async (req, res) => {
     );
   } catch (error) {
     await transaction.rollback();
-    console.error("Delete SelectedCourseDetail Error:", error);
+    console.error("❌ Delete SelectedCourseDetail Error:", error);
     return ReE(res, error.message, 500);
   }
 };
