@@ -282,18 +282,25 @@ const evaluateSelectedMCQ = async (req, res) => {
           : courseDetail.userProgress;
     }
 
-    // 🔹 Save new evaluation for this user
+    // 🔹 Overwrite existing evaluation for this user (not duplicate)
     progress[userId] = {
       correctMCQs: correctCount,
       totalMCQs: total,
       eligibleForCaseStudy: correctCount === total,
-      answers: results,
+      answers: results, // always replaced, not appended
+      updatedAt: new Date().toISOString(),
     };
 
-    // 🔹 Update course detail with progress
+    // ✅ Ensure courseDetail.id is numeric before updating
+    const courseDetailId = Number(courseDetail.id);
+    if (isNaN(courseDetailId)) {
+      return ReE(res, "Invalid courseDetail ID", 400);
+    }
+
+    // 🔹 Update course detail with updated progress
     await SelectedCourseDetail.update(
       { userProgress: progress },
-      { where: { id: courseDetail.id } }
+      { where: { id: courseDetailId } }
     );
 
     return ReS(
@@ -319,3 +326,4 @@ const evaluateSelectedMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
+
