@@ -2,7 +2,7 @@
 const { Op } = require("sequelize");
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, sequelize } = require("../models");
+const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult,sequelize } = require("../models");
 
 
 // 🔹 Create or Update Selected Course Detail and its Questions
@@ -399,7 +399,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
     // 🔹 Update progress
-    const courseDetail = await SelectedCourseDetails.findOne({
+    const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
     });
 
@@ -424,7 +424,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         },
       };
 
-      await SelectedCourseDetails.update(
+      await SelectedCourseDetail.update(
         { userProgress: progress },
         { where: { id: courseDetail.id } }
       );
