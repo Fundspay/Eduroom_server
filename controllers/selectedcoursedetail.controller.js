@@ -339,7 +339,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     if (!Array.isArray(answers) || answers.length === 0)
       return ReE(res, "answers must be a non-empty array", 400);
 
-    // 🔹 Fetch course detail with all questions (like MCQs)
+    // 🔹 Fetch course detail with all questions
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
       include: [
@@ -358,8 +358,9 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       return ReE(res, "No questions found for this course", 404);
 
     const results = [];
+    let totalPercentage = 0;
 
-    // 🔹 Evaluate each answer for case study
+    // 🔹 Evaluate each case study answer
     for (let ans of answers) {
       const question = questions.find(
         (q) =>
@@ -377,11 +378,13 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         if (userAnswerLower.includes(kw.trim().toLowerCase())) matchedCount++;
       });
 
-      const matchPercentage = (matchedCount / (keywords.length || 1)) * 100;
-      const passed = matchPercentage >= 20; // ✅ same pass logic as reference
+      const matchPercentage = ((matchedCount / (keywords.length || 1)) * 100).toFixed(2);
+      const passed = matchPercentage >= 20; // ✅ pass threshold (20%)
 
-      // 🔹 Save or update (avoid duplicates for same user/question)
-      await SelectedCaseStudyResults.upsert({
+      totalPercentage += parseFloat(matchPercentage);
+
+      // 🔹 Update or insert the same record (avoid duplicates)
+      await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
         questionId: question.id,
@@ -394,21 +397,55 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         questionId: question.id,
         question: question.question,
         answer: ans.answer,
-        matchPercentage,
+        matchPercentage: parseFloat(matchPercentage),
         passed,
         keywords: question.keywords,
         caseStudy: question.caseStudy,
       });
     }
 
+    const total = results.length;
+    const passedCount = results.filter((r) => r.passed).length;
+    const failedCount = total - passedCount;
+    const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
+
+    // 🔹 Update userProgress JSON in course detail (like MCQ)
+    let progress = {};
+    if (courseDetail.userProgress) {
+      progress =
+        typeof courseDetail.userProgress === "string"
+          ? JSON.parse(courseDetail.userProgress)
+          : courseDetail.userProgress;
+    }
+
+    // ✅ Update existing or add new user progress
+    progress[userId] = {
+      ...(progress[userId] || {}),
+      caseStudy: {
+        total,
+        passed: passedCount,
+        failed: failedCount,
+        overallPercentage: parseFloat(overallPercentage),
+        results,
+        updatedAt: new Date().toISOString(),
+      },
+    };
+
+    // ✅ Update course detail with new progress
+    await SelectedCourseDetail.update(
+      { userProgress: progress },
+      { where: { id: courseDetail.id } }
+    );
+
     return ReS(
       res,
       {
         success: true,
         evaluation: {
-          total: results.length,
-          passed: results.filter((r) => r.passed).length,
-          failed: results.filter((r) => !r.passed).length,
+          total,
+          passed: passedCount,
+          failed: failedCount,
+          overallPercentage: parseFloat(overallPercentage),
           results,
         },
       },
