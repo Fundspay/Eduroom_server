@@ -732,6 +732,7 @@ const listAllUsers = async (req, res) => {
       const fieldsToUpdate = {
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
+        selected: user.selected || null,
         courses: courseDetails,
         internshipIssued,
         offerLetterSent,
@@ -754,7 +755,6 @@ const listAllUsers = async (req, res) => {
           email: user.email,
           phoneNumber: user.phoneNumber,
           collegeName: user.collegeName,
-          selected: user.selected || null,
           ...fieldsToUpdate,
           teamManager: teamManager ? teamManager.name : null,
           internshipStatus: teamManager ? teamManager.internshipStatus : null
@@ -765,7 +765,6 @@ const listAllUsers = async (req, res) => {
 
       response.push({
         statusId: statusRecord.id,
-       selected: user.selected || null,
         ...statusRecord.toJSON()
       });
     }
