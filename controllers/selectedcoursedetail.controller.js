@@ -2,6 +2,7 @@
 const { Op } = require("sequelize");
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
+const { sendMail } = require("../middleware/mailer.middleware");
 const { SelectedCourseDetail, SelectedQuestionModel, SelectionDomain, SelectedCaseStudyResult, Users, sequelize } = require("../models");
 
 
@@ -315,8 +316,9 @@ const evaluateSelectedMCQ = async (req, res) => {
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
 
 // ===============================
-// 🧠 Evaluate Case Study
+// Evaluate Case Study
 // ===============================
+
 const evaluateCaseStudyAnswer = async (req, res) => {
   try {
     const { selectedDomainId, questionId } = req.params;
@@ -482,4 +484,5 @@ const evaluateCaseStudyAnswer = async (req, res) => {
   }
 };
 
+module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
 module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
