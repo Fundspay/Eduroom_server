@@ -617,7 +617,7 @@ const loginWithEmailPassword = async (req, res) => {
     let payload = {};
     if (role === "user") {
       payload = {
-        userId: activeAccount.id,
+        user_id: activeAccount.id,
         firstName: activeAccount.firstName,
         lastName: activeAccount.lastName,
         email: activeAccount.email,
