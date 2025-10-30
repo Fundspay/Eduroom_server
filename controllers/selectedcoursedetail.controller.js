@@ -377,7 +377,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       totalPercentage += parseFloat(matchPercentage);
 
-      // 🔹 Save individual Case Study answers
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -399,8 +398,14 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const total = results.length;
     const passedCount = results.filter((r) => r.passed).length;
     const failedCount = total - passedCount;
-    const caseStudyPercentage =
+
+    let caseStudyPercentage =
       total > 0 ? (totalPercentage / total).toFixed(2) : 0;
+
+    // 🔹 ✅ NEW LOGIC: If case study percentage > 20, consider it 100
+    if (parseFloat(caseStudyPercentage) > 20) {
+      caseStudyPercentage = 100;
+    }
 
     let overallStatus = "Incomplete";
     let overallResult = null;
@@ -413,7 +418,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
     const mcqScore = mcqRecord ? mcqRecord.mcqresult : 0;
 
-    // Assume total MCQs can be derived or stored in progress (fallback = 10)
     const totalMCQs = mcqScore > 0 ? 10 : 0;
     const mcqPercentage =
       mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : null;
@@ -429,11 +433,9 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       overallPercentage = parseFloat(caseStudyPercentage);
     }
 
-    const passedMCQs =
-      mcqPercentage !== null && mcqPercentage >= 60; // Example pass mark
-    const passedCaseStudy = passedCount === total && total > 0;
+    const passedMCQs = mcqPercentage !== null && mcqPercentage >= 60;
+    const passedCaseStudy = parseFloat(caseStudyPercentage) === 100;
 
-    // 🔹 If passed both
     if (passedMCQs && passedCaseStudy) {
       const domain = await SelectionDomain.findOne({
         where: { id: selectedDomainId },
@@ -456,7 +458,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         }`,
       };
 
-      // 🔹 Update combined record
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -466,7 +467,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         passed: true,
       });
 
-      // 🔹 Send congratulatory mail
       const user = await Users.findOne({
         where: { id: userId },
         attributes: ["email", "firstName"],
@@ -499,7 +499,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       };
     }
 
-    // 🔹 Response
     return ReS(
       res,
       {
