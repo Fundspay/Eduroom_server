@@ -68,6 +68,7 @@ module.exports = (sequelize, Sequelize) => {
       subscriptionWallet: { type: Sequelize.BIGINT, allowNull: false, defaultValue: 0 },
       subscriptiondeductedWallet: { type: Sequelize.BIGINT, allowNull: false, defaultValue: 0 },
       subscriptionLeft: { type: Sequelize.BIGINT, allowNull: false, defaultValue: 0 },
+      selectedTimeLeft: { type: Sequelize.STRING, allowNull: true, defaultValue: "24:00:00" },
 
       // 🔹 Course Tracking
       courseDates: {
