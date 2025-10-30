@@ -11,6 +11,8 @@ const CONFIG = require("../config/config.js");
 const axios = require("axios");
 const moment = require("moment");
 const { FundsAudit } = require("../models");
+const { User } = require("../models");
+
 
 
 if (!admin.apps.length) {
@@ -1295,4 +1297,54 @@ const getUserCourseDates = async (req, res) => {
 };
 
 module.exports.getUserCourseDates = getUserCourseDates;
+
+const getUserRemainingTime = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const user = await User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Registration time
+    const registeredAt = moment(user.createdAt);
+    const now = moment();
+
+    // Calculate elapsed time since registration
+    const diffMs = now.diff(registeredAt);
+    const diffHours = diffMs / (1000 * 60 * 60);
+
+    // Handle 24-hour cycle logic
+    const hoursSinceLastCycle = diffHours % 24;
+    const remainingHours = 24 - hoursSinceLastCycle;
+
+    // Convert to H:M:S
+    const totalSeconds = Math.floor(remainingHours * 3600);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const formattedTime = `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+
+    // Save to DB
+    await user.update({ selectedTimeLeft: formattedTime });
+
+    return ReS(
+      res,
+      {
+        success: true,
+        userId,
+        selectedTimeLeft: formattedTime,
+        message: `Remaining time in current 24-hour cycle`,
+      },
+      200
+    );
+  } catch (err) {
+    console.error("Error in getUserRemainingTime:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getUserRemainingTime = getUserRemainingTime;
 
