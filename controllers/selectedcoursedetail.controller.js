@@ -276,7 +276,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     const score = `${correctCount}/${total}`;
     const eligibleForCaseStudy = correctCount === total;
 
-    // 🔹 Update user progress inside SelectedCourseDetail
+    // 🔹 Update user progress in SelectedCourseDetail
     let progress = {};
     if (courseDetail.userProgress) {
       progress =
@@ -299,12 +299,14 @@ const evaluateSelectedMCQ = async (req, res) => {
       { where: { id: courseDetail.id } }
     );
 
-    // 🔹 Save user’s MCQ result (per user + domain)
-    await SelectedQuestionModel.update(
-      { mcqresult: correctCount, totalMcqs: total },
-      { where: { selectedDomainId, userId } }
-    );
-
+    // 🔹 Upsert MCQ result per user + domain
+    await SelectedQuestionModel.upsert({
+      userId,
+      selectedDomainId,
+      mcqresult: correctCount,
+      totalMcqs: total,
+      updatedAt: new Date(),
+    });
 
     // 🔹 Response
     return ReS(
@@ -327,9 +329,7 @@ const evaluateSelectedMCQ = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
-
 // ===========================================
 // ✅ Evaluate Case Study
 // ===========================================
