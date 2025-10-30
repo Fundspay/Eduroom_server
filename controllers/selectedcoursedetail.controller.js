@@ -373,7 +373,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       totalPercentage += parseFloat(matchPercentage);
 
       // 🔹 Update or insert (no duplicates for same user + question)
-      await SelectedCaseStudyResult.upsert({
+      await SelectedCaseStudyResults.upsert({
         userId,
         selectedDomainId,
         questionId: question.id,
@@ -399,7 +399,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
     // 🔹 Update progress
-    const courseDetail = await SelectedCourseDetails.findOne({
+    const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
     });
 
@@ -424,7 +424,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         },
       };
 
-      await SelectedCourseDetails.update(
+      await SelectedCourseDetail.update(
         { userProgress: progress },
         { where: { id: courseDetail.id } }
       );
