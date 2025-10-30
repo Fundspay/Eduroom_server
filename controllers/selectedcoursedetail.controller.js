@@ -390,7 +390,6 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const caseStudyPercentage =
       total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
-    // 🔹 Fetch or update course progress
     const courseDetail = await SelectedCourseDetail.findOne({
       where: { selectedDomainId },
     });
@@ -425,17 +424,24 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         { where: { id: courseDetail.id } }
       );
 
-      // ✅ Combine MCQ + Case Study results
+      // ✅ Combine logic only if both exist
       const mcqProgress = progress[userId];
       const mcqPercentage =
         mcqProgress && mcqProgress.totalMCQs
           ? (mcqProgress.correctMCQs / mcqProgress.totalMCQs) * 100
-          : 0;
+          : null;
 
-      const overallPercentage = (
-        (parseFloat(caseStudyPercentage) + mcqPercentage) /
-        2
-      ).toFixed(2);
+      let overallPercentage;
+      if (mcqPercentage !== null) {
+        // both exist
+        overallPercentage = (
+          (parseFloat(caseStudyPercentage) + mcqPercentage) /
+          2
+        ).toFixed(2);
+      } else {
+        // only case study done
+        overallPercentage = parseFloat(caseStudyPercentage);
+      }
 
       const passedMCQs =
         mcqProgress.correctMCQs &&
@@ -444,7 +450,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       const passedCaseStudy = passedCount === total && total > 0;
 
-      // ✅ If both passed, update user + send mail
+      // ✅ If passed both, update user + send mail
       if (passedMCQs && passedCaseStudy) {
         const domain = await SelectionDomain.findOne({
           where: { id: selectedDomainId },
