@@ -330,7 +330,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     if (!Array.isArray(answers) || answers.length === 0)
       return ReE(res, "answers must be a non-empty array", 400);
 
-    // 🔹 Fetch the question directly
+    // 🔹 Fetch the case study question
     const question = await SelectedQuestionModel.findOne({
       where: {
         id: questionId,
@@ -345,7 +345,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const results = [];
     let totalPercentage = 0;
 
-    // 🔹 Evaluate only the specific question
+    // 🔹 Evaluate answer
     for (let ans of answers) {
       if (String(ans.questionId) !== String(questionId)) continue;
 
@@ -365,7 +365,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
       totalPercentage += parseFloat(matchPercentage);
 
-      // 🔹 Insert / update without duplicates
+      // 🔹 Upsert result
       await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
@@ -424,7 +424,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         { where: { id: courseDetail.id } }
       );
 
-      // ✅ Check if user passed both MCQs and Case Study
+      // ✅ Check if both MCQ and Case Study are completed
       const mcqProgress = progress[userId];
       const passedMCQs =
         mcqProgress.correctMCQs &&
@@ -432,9 +432,9 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         mcqProgress.correctMCQs === mcqProgress.totalMCQs;
       const passedCaseStudy = passedCount === total && total > 0;
 
-      // ✅ If both passed, update user’s “selected” field
+      // ✅ If passed both, update user + send mail
       if (passedMCQs && passedCaseStudy) {
-        const domain = await SelectedDomains.findOne({
+        const domain = await SelectionDomain.findOne({
           where: { id: selectedDomainId },
           attributes: ["name"],
         });
@@ -452,6 +452,27 @@ const evaluateCaseStudyAnswer = async (req, res) => {
           overallPercentage: parseFloat(overallPercentage),
           message: `User has successfully passed both MCQ and Case Study for ${domain?.name || "this domain"}`,
         };
+
+        // ✅ Fetch user email
+        const user = await Users.findOne({
+          where: { id: userId },
+          attributes: ["email", "firstName"],
+        });
+
+        if (user?.email) {
+          const subject = `🎓 Congratulations on Passing the ${domain?.name} Assessment!`;
+          const html = `
+            <div style="font-family: Arial, sans-serif; color: #333;">
+              <h2>Hi ${user.firstName || "Learner"},</h2>
+              <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${domain?.name}</b>.</p>
+              <p>Your overall performance: <b>${overallPercentage}%</b></p>
+              <p>Keep learning and achieving more milestones with <b>EduRoom</b>!</p>
+              <br/>
+              <p>Best regards,<br/>The EduRoom Team</p>
+            </div>
+          `;
+          await sendMail(user.email, subject, html);
+        }
       } else {
         overallStatus = "Incomplete";
         overallResult = {
@@ -484,5 +505,4 @@ const evaluateCaseStudyAnswer = async (req, res) => {
   }
 };
 
-module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
 module.exports.evaluateCaseStudyAnswer = evaluateCaseStudyAnswer;
