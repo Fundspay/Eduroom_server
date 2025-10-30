@@ -733,7 +733,7 @@ const listAllUsers = async (req, res) => {
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
         selected: user.selected || null,
-        referralCode: user.referralCode || null,
+        referralCode: user.referralCode || null,  
         courses: courseDetails,
         internshipIssued,
         offerLetterSent,
