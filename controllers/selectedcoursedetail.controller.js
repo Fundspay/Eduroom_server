@@ -399,7 +399,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const overallPercentage = total > 0 ? (totalPercentage / total).toFixed(2) : 0;
 
     // 🔹 Update progress
-    const courseDetail = await SelectedCourseDetail.findOne({
+    const courseDetail = await SelectedCourseDetails.findOne({
       where: { selectedDomainId },
     });
 
@@ -424,7 +424,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
         },
       };
 
-      await SelectedCourseDetail.update(
+      await SelectedCourseDetails.update(
         { userProgress: progress },
         { where: { id: courseDetail.id } }
       );
