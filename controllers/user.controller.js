@@ -590,7 +590,7 @@ const loginWithEmailPassword = async (req, res) => {
     let role = "user";
 
     if (!account) {
-      account = await model.TeamManager.findOne({
+      manager = await model.TeamManager.findOne({
         where: { email, isDeleted: false },
       });
       role = "manager";
@@ -627,13 +627,13 @@ const loginWithEmailPassword = async (req, res) => {
       };
     } else {
       payload = {
-        managerId: account.id,
-        name: account.name,
-        email: account.email,
-        mobileNumber: account.mobileNumber,
-        department: account.department,
-        position: account.position,
-        internshipStatus: account.internshipStatus || null, // ✅ Added here
+        managerId: manager.id,
+        name: manager.name,
+        email: manager.email,
+        mobileNumber: manager.mobileNumber,
+        department: manager.department,
+        position: manager.position,
+        internshipStatus: manager.internshipStatus || null, // ✅ Added here
       };
     }
 
@@ -807,45 +807,66 @@ const loginWithGoogle = async (req, res) => {
 
     let account = await model.User.findOne({
       where: { email: firebaseUser.email, isDeleted: false },
+      include: [
+        {
+          model: model.TeamManager,
+          as: "teamManager",
+          attributes: ["id", "name", "email", "mobileNumber", "internshipStatus"],
+        },
+      ],
     });
-    let role = "user";
 
+    let role = "user";
+    let manager = null;
+
+    // 🔹 If not found in User table, check TeamManager
     if (!account) {
-      account = await model.TeamManager.findOne({
+      manager = await model.TeamManager.findOne({
         where: { email: firebaseUser.email, isDeleted: false },
       });
       role = "manager";
     }
 
-    if (!account)
+    if (!account && !manager)
       return ReE(res, "Account not found. Please register first.", 404);
 
-    let isFirstLogin = !account.hasLoggedIn;
-    if (isFirstLogin) await account.update({ hasLoggedIn: true });
+    // 🔹 Pick the correct account info depending on role
+    const activeAccount = account || manager;
 
+    let isFirstLogin = !activeAccount.hasLoggedIn;
+    if (isFirstLogin) await activeAccount.update({ hasLoggedIn: true });
+
+    // 🔹 Basic payload
     const payload = {
-      user_id: account.id || null,
-      managerId: account.managerId || null,
-      firstName: account.firstName || null,
-      lastName: account.lastName || null,
+      user_id: activeAccount.id || null,
+      managerId: activeAccount.managerId || null,
+      firstName: activeAccount.firstName || null,
+      lastName: activeAccount.lastName || null,
       fullName:
-        account.fullName ||
-        account.name ||
-        `${account.firstName || ""} ${account.lastName || ""}`,
-      dateOfBirth: account.dateOfBirth || null,
-      gender: account.gender || null,
-      phoneNumber: account.phoneNumber || account.mobileNumber || null,
-      alternatePhoneNumber: account.alternatePhoneNumber || null,
-      email: account.email,
-      residentialAddress: account.residentialAddress || null,
-      emergencyContactName: account.emergencyContactName || null,
-      emergencyContactNumber: account.emergencyContactNumber || null,
-      city: account.city || null,
-      state: account.state || null,
-      pinCode: account.pinCode || null,
-      internshipStatus: account.internshipStatus || null,
-      selected: account.selected || null,
+        activeAccount.fullName ||
+        activeAccount.name ||
+        `${activeAccount.firstName || ""} ${activeAccount.lastName || ""}`,
+      dateOfBirth: activeAccount.dateOfBirth || null,
+      gender: activeAccount.gender || null,
+      phoneNumber: activeAccount.phoneNumber || activeAccount.mobileNumber || null,
+      email: activeAccount.email,
+      city: activeAccount.city || null,
+      state: activeAccount.state || null,
+      pinCode: activeAccount.pinCode || null,
+      internshipStatus: activeAccount.internshipStatus || null,
+      selected: activeAccount.selected || null,
     };
+
+    // 🔹 Add manager details if the role is "user"
+    if (role === "user" && account && account.teamManager) {
+      payload.managerDetails = {
+        id: account.teamManager.id,
+        name: account.teamManager.name,
+        email: account.teamManager.email,
+        mobileNumber: account.teamManager.mobileNumber,
+        internshipStatus: account.teamManager.internshipStatus,
+      };
+    }
 
     const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, {
       expiresIn: "365d",
@@ -860,6 +881,7 @@ const loginWithGoogle = async (req, res) => {
     return ReE(res, "Login failed", 500);
   }
 };
+
 module.exports.loginWithGoogle = loginWithGoogle;
 
 //  Fetch Single User Info by ID with profile completion and filtered fields
