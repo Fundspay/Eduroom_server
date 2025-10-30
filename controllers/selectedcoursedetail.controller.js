@@ -373,7 +373,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       totalPercentage += parseFloat(matchPercentage);
 
       // 🔹 Update or insert (no duplicates for same user + question)
-      await SelectedCaseStudyResults.upsert({
+      await SelectedCaseStudyResult.upsert({
         userId,
         selectedDomainId,
         questionId: question.id,
