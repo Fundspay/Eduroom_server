@@ -298,10 +298,11 @@ const evaluateSelectedMCQ = async (req, res) => {
 
     // 🔹 Update MCQ total score in SelectedQuestionModel
     // We'll store total correct MCQs in mcqresult field (one-time update for domain)
-    await SelectedQuestionModel.update(
-      { mcqresult: correctCount },
-      { where: { selectedDomainId } }
-    );
+   await SelectedQuestionModel.update(
+  { mcqresult: correctCount },
+  { where: { selectedDomainId, userId } } // ✅ only update that user's records
+);
+
 
     // 🔹 Send response
     return ReS(
@@ -410,7 +411,10 @@ const evaluateCaseStudyAnswer = async (req, res) => {
 
     // 🔹 Get MCQ score from SelectedQuestionModel (updated earlier)
     const mcqRecord = await SelectedQuestionModel.findOne({
-      where: { selectedDomainId },
+      where: {
+        selectedDomainId,
+        userId, // ✅ filter by userId too
+      },
       attributes: ["mcqresult"],
     });
 
@@ -452,9 +456,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       overallResult = {
         domain: domain?.name || null,
         overallPercentage: parseFloat(overallPercentage),
-        message: `User has successfully passed both MCQ and Case Study for ${
-          domain?.name || "this domain"
-        }.`,
+        message: `User has successfully passed both MCQ and Case Study for ${domain?.name || "this domain"
+          }.`,
       };
 
       // 🎉 Send congratulatory mail
@@ -464,15 +467,13 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       });
 
       if (user?.email) {
-        const subject = `🎓 Congratulations on Passing the ${
-          domain?.name || "Domain"
-        } Assessment!`;
+        const subject = `🎓 Congratulations on Passing the ${domain?.name || "Domain"
+          } Assessment!`;
         const html = `
           <div style="font-family: Arial, sans-serif; color: #333;">
             <h2>Hi ${user.firstName || "Learner"},</h2>
-            <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${
-              domain?.name
-            }</b>.</p>
+            <p>🎉 Congratulations! You’ve successfully passed both the <strong>MCQ</strong> and <strong>Case Study</strong> for <b>${domain?.name
+          }</b>.</p>
             <p>Your overall performance: <b>${overallPercentage}%</b></p>
             <p>Keep learning and achieving more milestones with <b>EduRoom</b>!</p>
             <br/>
