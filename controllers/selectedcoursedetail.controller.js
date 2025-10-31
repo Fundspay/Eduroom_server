@@ -301,22 +301,10 @@ const evaluateSelectedMCQ = async (req, res) => {
     );
 
     // 🔹 Update user’s MCQ result (per user + domain)
-    const [affectedRows] = await SelectedQuestionModel.update(
+    await SelectedQuestionModel.update(
       { mcqresult: correctCount, totalMcqs: total },
       { where: { selectedDomainId, userId } }
     );
-
-    // 🩹 If no record was updated, insert a minimal placeholder safely
-    if (affectedRows === 0) {
-      await SelectedQuestionModel.create({
-        selectedDomainId,
-        userId,
-        question: "MCQ Result Placeholder",
-        answer: "N/A",
-        mcqresult: correctCount,
-        totalMcqs: total,
-      });
-    }
 
     // ✅ Response
     return ReS(
@@ -341,6 +329,7 @@ const evaluateSelectedMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
+
  
 // ===========================================
 // ✅ Evaluate Case Study
@@ -389,8 +378,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       ).toFixed(2);
 
       // ✅ If >20%, consider it as 100%
-      if (parseFloat(matchPercentage) > 20) {
-        matchPercentage = 100;
+      if (parseFloat(matchPercentage) > 25) {
+        matchPercentage = matchPercentage;
       }
 
       const passed = parseFloat(matchPercentage) >= 20;
