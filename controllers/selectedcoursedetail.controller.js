@@ -307,16 +307,16 @@ const evaluateSelectedMCQ = async (req, res) => {
     );
 
     // 🩹 If no record was updated, insert a minimal placeholder safely
-    if (affectedRows === 0) {
-      await SelectedQuestionModel.create({
-        selectedDomainId,
-        userId,
-        question: "MCQ Result Placeholder",
-        answer: "N/A",
-        mcqresult: correctCount,
-        totalMcqs: total,
-      });
-    }
+    // if (affectedRows === 0) {
+    //   await SelectedQuestionModel.create({
+    //     selectedDomainId,
+    //     userId,
+    //     question: "MCQ Result Placeholder",
+    //     answer: "N/A",
+    //     mcqresult: correctCount,
+    //     totalMcqs: total,
+    //   });
+    // }
 
     // ✅ Response
     return ReS(
