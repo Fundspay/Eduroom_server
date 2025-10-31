@@ -301,10 +301,22 @@ const evaluateSelectedMCQ = async (req, res) => {
     );
 
     // 🔹 Update user’s MCQ result (per user + domain)
-    await SelectedQuestionModel.update(
+    const [affectedRows] = await SelectedQuestionModel.update(
       { mcqresult: correctCount, totalMcqs: total },
       { where: { selectedDomainId, userId } }
     );
+
+    // 🩹 If no record was updated, insert a minimal placeholder safely
+    if (affectedRows === 0) {
+      await SelectedQuestionModel.create({
+        selectedDomainId,
+        userId,
+        question: "MCQ Result Placeholder",
+        answer: "N/A",
+        mcqresult: correctCount,
+        totalMcqs: total,
+      });
+    }
 
     // ✅ Response
     return ReS(
@@ -329,7 +341,6 @@ const evaluateSelectedMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSelectedMCQ = evaluateSelectedMCQ;
-
  
 // ===========================================
 // ✅ Evaluate Case Study
@@ -378,11 +389,11 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       ).toFixed(2);
 
       // ✅ If >20%, consider it as 100%
-      // if (parseFloat(matchPercentage) > 25) {
-      //   matchPercentage = matchPercentage;
-      // }
+      if (parseFloat(matchPercentage) > 20) {
+        matchPercentage = 100;
+      }
 
-      const passed = parseFloat(matchPercentage) >= 25;
+      const passed = parseFloat(matchPercentage) >= 20;
       totalPercentage += parseFloat(matchPercentage);
 
       await SelectedCaseStudyResult.upsert({
@@ -421,8 +432,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : 0;
 
     // ✅ Passing criteria
-    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 25;
-    const passedMCQs = mcqPercentage == 100;
+    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 20;
+    const passedMCQs = mcqPercentage >= 50;
 
     // ✅ Combine percentages
     const overallPercentage = ((parseFloat(caseStudyPercentage) + mcqPercentage) / 2).toFixed(2);
