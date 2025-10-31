@@ -378,11 +378,11 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       ).toFixed(2);
 
       // ✅ If >20%, consider it as 100%
-      if (parseFloat(matchPercentage) > 25) {
-        matchPercentage = matchPercentage;
-      }
+      // if (parseFloat(matchPercentage) > 25) {
+      //   matchPercentage = matchPercentage;
+      // }
 
-      const passed = parseFloat(matchPercentage) >= 20;
+      const passed = parseFloat(matchPercentage) >= 25;
       totalPercentage += parseFloat(matchPercentage);
 
       await SelectedCaseStudyResult.upsert({
@@ -421,8 +421,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       mcqScore && totalMCQs > 0 ? (mcqScore / totalMCQs) * 100 : 0;
 
     // ✅ Passing criteria
-    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 20;
-    const passedMCQs = mcqPercentage >= 50;
+    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 25;
+    const passedMCQs = mcqPercentage == 100;
 
     // ✅ Combine percentages
     const overallPercentage = ((parseFloat(caseStudyPercentage) + mcqPercentage) / 2).toFixed(2);
