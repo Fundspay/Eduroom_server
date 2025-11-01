@@ -389,8 +389,8 @@ const evaluateCaseStudyAnswer = async (req, res) => {
       ).toFixed(2);
 
       // ✅ If >20%, consider it as 100%
-      if (parseFloat(matchPercentage) > 20) {
-        matchPercentage = 100;
+      if (parseFloat(matchPercentage) > 25) {
+        matchPercentage = matchPercentage;
       }
 
       const passed = parseFloat(matchPercentage) >= 20;
