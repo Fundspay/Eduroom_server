@@ -973,7 +973,6 @@ const getDailyStatusPerUser = async (req, res) => {
 
 module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
-// ✅ Get daily status and wallet info for all courses of a usercourse
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -1018,7 +1017,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
-      // ✅ Remove duplicate sessionNumbers per day
+      // Remove duplicate sessionNumbers per day
       const uniqueSessions = [];
       const seenKeys = new Set();
       for (const s of sessions) {
@@ -1102,17 +1101,19 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         };
       });
 
+      // Always calculate completion rate based on sessions, not wallet
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // ✅ Keep existing business target + 20% threshold logic
+      // Business target check
       const businessTarget = course.businessTarget || 0;
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
       const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
       const isBusinessTargetMet = subscriptionLeft >= businessTarget;
 
+      // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
@@ -1136,9 +1137,17 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         })
       ).then((results) => results.every(Boolean));
 
-      let overallStatus = "In Progress";
-      if (isBusinessTargetMet && allSessionsAboveThreshold) {
-        overallStatus = "Completed";
+      // ✅ Main fix: preserve previously completed courses permanently
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+      let overallStatus = existingStatuses[String(courseId)] === "Completed"
+        ? "Completed" // Preserve completed course permanently
+        : "In Progress";
+
+      // Only recalc if course is not already completed
+      if (overallStatus !== "Completed") {
+        if (isBusinessTargetMet && allSessionsAboveThreshold) {
+          overallStatus = "Completed";
+        }
       }
 
       const statusRecord = await model.Status.findOne({
@@ -1151,7 +1160,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
       }
 
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+      // ✅ Save final course status permanently
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
@@ -1177,6 +1186,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
