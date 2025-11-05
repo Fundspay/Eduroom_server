@@ -1151,12 +1151,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? "Completed" // Preserve completed course permanently
         : "In Progress";
 
-      // Only recalc if course is not already completed
-      if (overallStatus !== "Completed") {
-        if (isBusinessTargetMet && allSessionsAboveThreshold) {
-          overallStatus = "Completed";
-        }
+      if (
+        Number(overallCompletionRate) === 100 ||
+        (isBusinessTargetMet && allSessionsAboveThreshold)
+      ) {
+        overallStatus = "Completed";
       }
+
 
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
