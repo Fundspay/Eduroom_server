@@ -388,7 +388,7 @@ const evaluateCaseStudyAnswer = async (req, res) => {
     const mcqPercentage = (mcqScore / totalMCQs) * 100;
 
     // ✅ Passing criteria
-    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 15;
+    const passedCaseStudy = parseFloat(caseStudyPercentage) >= 10;
     const passedMCQs = mcqPercentage >= 50;
 
     // ✅ Overall percentage
