@@ -63,6 +63,8 @@ module.exports = (sequelize, Sequelize) => {
       studentDeclaration: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       consentAgreement: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       businessTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
+      specialScore: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
+      totalMCQsScore: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
 
       // 🔹 Subscription Wallet
       subscriptionWallet: { type: Sequelize.BIGINT, allowNull: false, defaultValue: 0 },
