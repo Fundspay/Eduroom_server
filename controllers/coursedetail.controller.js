@@ -1107,11 +1107,19 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         : 0;
 
       // Business target check
+      // const businessTarget = course.businessTarget || 0;
+      // const subscriptionWallet = user.subscriptionWallet || 0;
+      // const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
+      // const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
+      // const isBusinessTargetMet =
+      // (user.subscriptionWallet || 0) === (course.businessTarget || 0);    
       const businessTarget = course.businessTarget || 0;
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
-      const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
-      const isBusinessTargetMet = subscriptionLeft >= businessTarget;
+
+      const isBusinessTargetMet =
+        subscriptionWallet === businessTarget ||
+        subscriptiondeductedWallet >= businessTarget;
 
       // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
