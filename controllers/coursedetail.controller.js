@@ -1113,7 +1113,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       // const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
       // const isBusinessTargetMet =
       // (user.subscriptionWallet || 0) === (course.businessTarget || 0);    
-      const businessTarget = course.businessTarget || 0;
+      const businessTarget = user.businessTargets?.[courseId] || 0;
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
@@ -1177,7 +1177,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         courseId,
         courseName: course.name,
         domainName: course.Domain?.name || null,
-        businessTarget: course.businessTarget || 0,
+        businessTarget,
         coursePreviews: course.CoursePreviews || [],
         overallStatus,
         overallCompletionRate: Number(overallCompletionRate),
