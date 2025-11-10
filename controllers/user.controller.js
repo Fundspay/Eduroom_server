@@ -1382,3 +1382,25 @@ const getUserRemainingTime = async (req, res) => {
 
 module.exports.getUserRemainingTime = getUserRemainingTime;
 
+
+const updateCourseBusinessTarget = async (req, res) => {
+    const { userId } = req.params;
+    const { courseId, businessTarget, offerMessage } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).send("User not found");
+
+        // Update only the specified course
+        user.businessTargets[courseId] = businessTarget;
+        user.offermessage = offerMessage;
+
+        await user.save();
+        res.status(200).send({ message: "Updated successfully", user });
+    } catch (err) {
+        res.status(500).send({ error: err.message });
+    }
+};
+
+module.exports.updateCourseBusinessTarget = updateCourseBusinessTarget;
+
