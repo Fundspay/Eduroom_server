@@ -1385,27 +1385,27 @@ module.exports.getUserRemainingTime = getUserRemainingTime;
 
 const updateBusinessTarget = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { userId } = req.params; // from URL
     const { courseId, businessTarget, offerMessage } = req.body;
 
-    // Find user
-    const user = await model.User.findByPk(userId);
+    // ✅ Convert userId to integer because DB column is BIGINT
+    const id = parseInt(userId, 10);
+
+    // Find user by primary key
+    const user = await model.User.findByPk(id);
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // Parse existing businessTargets (Sequelize may store JSON as string)
+    // Get existing businessTargets JSON
     let businessTargets = user.businessTargets || {};
-    if (typeof businessTargets === "string") {
-      businessTargets = JSON.parse(businessTargets);
-    }
-
-    // Update the specific course's business target
+    
+    // Update only the specific course
     businessTargets[courseId] = businessTarget;
 
     // Update user record
     await user.update({
-      businessTargets: businessTargets,
-      offermessage: offerMessage
+      businessTargets,
+      offerMessage
     });
 
     return ReS(res, { success: true, message: "Updated successfully" }, 200);
