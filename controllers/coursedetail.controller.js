@@ -1119,9 +1119,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       const isBusinessTargetMet =
-        subscriptionWallet === businessTarget ||
-        subscriptiondeductedWallet >= businessTarget;
-
+        subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
       // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
@@ -1221,8 +1219,8 @@ const getBusinessTarget = async (req, res) => {
     if (!course) return ReE(res, "Course not found", 404);
 
     // 3️⃣ Business target: first check user.businessTargets, fallback to course
-    const businessTarget = parseInt(user.businessTargets?.[courseId], 10) 
-      || parseInt(course.businessTarget, 10) 
+    const businessTarget = parseInt(user.businessTargets?.[courseId], 10)
+      || parseInt(course.businessTarget, 10)
       || 0;
 
     // 5️⃣ Fetch referral count (UPDATED to match getBusinessUserTarget)
