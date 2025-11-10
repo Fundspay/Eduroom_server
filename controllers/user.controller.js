@@ -1383,26 +1383,24 @@ const getUserRemainingTime = async (req, res) => {
 module.exports.getUserRemainingTime = getUserRemainingTime;
 
 
+
 const updateBusinessTarget = async (req, res) => {
   try {
-    const { userId } = req.params; // from URL
+    const { userId } = req.params;
     const { courseId, businessTarget, offerMessage } = req.body;
 
-    // ✅ Convert userId to integer because DB column is BIGINT
+    // Validate userId
     const id = parseInt(userId, 10);
+    if (isNaN(id)) return ReE(res, "Invalid userId", 400);
 
-    // Find user by primary key
+    // Find user
     const user = await model.User.findByPk(id);
-
     if (!user) return ReE(res, "User not found", 404);
 
-    // Get existing businessTargets JSON
+    // Update businessTargets safely
     let businessTargets = user.businessTargets || {};
-    
-    // Update only the specific course
     businessTargets[courseId] = businessTarget;
 
-    // Update user record
     await user.update({
       businessTargets,
       offerMessage
@@ -1414,7 +1412,5 @@ const updateBusinessTarget = async (req, res) => {
     return ReE(res, err.message, 500);
   }
 };
-
 module.exports.updateBusinessTarget = updateBusinessTarget;
-
 
