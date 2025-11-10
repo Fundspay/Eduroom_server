@@ -1220,8 +1220,10 @@ const getBusinessTarget = async (req, res) => {
     const course = await model.Course.findByPk(courseId);
     if (!course) return ReE(res, "Course not found", 404);
 
-    // 3️⃣ Business target
-    const businessTarget = parseInt(course.businessTarget, 10) || 0;
+    // 3️⃣ Business target: first check user.businessTargets, fallback to course
+    const businessTarget = parseInt(user.businessTargets?.[courseId], 10) 
+      || parseInt(course.businessTarget, 10) 
+      || 0;
 
     // 5️⃣ Fetch referral count (UPDATED to match getBusinessUserTarget)
     let achievedCount = 0;
@@ -1245,6 +1247,7 @@ const getBusinessTarget = async (req, res) => {
     const subscriptionWallet = achievedCountNum;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
+    // ✅ Update user JSON with business target per course
     user.businessTargets = {
       ...user.businessTargets,
       [courseId]: businessTarget,
