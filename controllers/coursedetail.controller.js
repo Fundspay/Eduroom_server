@@ -987,6 +987,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
+      offerMessage: user.offerMessage || null,
       subscriptionWallet: user.subscriptionWallet,
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
       subscriptionLeft: Math.max(
@@ -1184,6 +1185,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
+        offerMessage: user.offerMessage || null
       });
     }
 
