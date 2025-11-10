@@ -1409,4 +1409,4 @@ const updateBusinessTarget = async (req, res) => {
     return ReE(res, err.message, 500);
   }
 };
-module.exports.updateBusinessTarget = updateBusinessTarget;
+module.exports.updateBusinessTarget = updateBusinessTarget;   
