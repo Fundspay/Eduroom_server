@@ -742,7 +742,8 @@ const listAllUsers = async (req, res) => {
         isQueryRaised: queryInfo.isQueryRaised,
         queryCount: queryInfo.queryCount,
         registeredAt: createdAtFormatted,
-        courseCompletionPercent: userCourseCompletionPercent // ✅ per-user percentages
+        courseCompletionPercent: userCourseCompletionPercent,
+        offerMessage: user.offerMessage || null
       };
 
       let statusRecord = await Status.findOne({ where: { userId: user.id } });
