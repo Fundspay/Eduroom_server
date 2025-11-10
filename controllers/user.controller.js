@@ -1395,11 +1395,13 @@ const updateBusinessTarget = async (req, res) => {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    let businessTargets = user.businessTargets || {};
-    businessTargets[courseId] = businessTarget;
+    const updatedBusinessTargets = {
+      ...user.businessTargets,
+      [courseId]: businessTarget
+    };
 
     await user.update({
-      businessTargets,
+      businessTargets: updatedBusinessTargets,
       offerMessage
     });
 
@@ -1409,4 +1411,5 @@ const updateBusinessTarget = async (req, res) => {
     return ReE(res, err.message, 500);
   }
 };
-module.exports.updateBusinessTarget = updateBusinessTarget;   
+
+module.exports.updateBusinessTarget = updateBusinessTarget;
