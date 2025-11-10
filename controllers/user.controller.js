@@ -1386,16 +1386,13 @@ module.exports.getUserRemainingTime = getUserRemainingTime;
 
 const updateBusinessTarget = async (req, res) => {
   try {
-    console.log("req.params:", req.params); // debug
-    const { userId } = req.params;
-
-    // Validate userId
-    const id = parseInt(userId, 10);
-    if (isNaN(id)) return ReE(res, "Invalid userId", 400);
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
     const { courseId, businessTarget, offerMessage } = req.body;
 
-    const user = await model.User.findByPk(id);
+    const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     let businessTargets = user.businessTargets || {};
