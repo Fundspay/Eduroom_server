@@ -1383,24 +1383,38 @@ const getUserRemainingTime = async (req, res) => {
 module.exports.getUserRemainingTime = getUserRemainingTime;
 
 
-const updateCourseBusinessTarget = async (req, res) => {
+const updateBusinessTarget = async (req, res) => {
+  try {
     const { userId } = req.params;
     const { courseId, businessTarget, offerMessage } = req.body;
 
-    try {
-        const user = await User.findById(userId);
-        if (!user) return res.status(404).send("User not found");
+    // Find user
+    const user = await model.User.findByPk(userId);
 
-        // Update only the specified course
-        user.businessTargets[courseId] = businessTarget;
-        user.offermessage = offerMessage;
+    if (!user) return ReE(res, "User not found", 404);
 
-        await user.save();
-        res.status(200).send({ message: "Updated successfully", user });
-    } catch (err) {
-        res.status(500).send({ error: err.message });
+    // Parse existing businessTargets (Sequelize may store JSON as string)
+    let businessTargets = user.businessTargets || {};
+    if (typeof businessTargets === "string") {
+      businessTargets = JSON.parse(businessTargets);
     }
+
+    // Update the specific course's business target
+    businessTargets[courseId] = businessTarget;
+
+    // Update user record
+    await user.update({
+      businessTargets: businessTargets,
+      offermessage: offerMessage
+    });
+
+    return ReS(res, { success: true, message: "Updated successfully" }, 200);
+  } catch (err) {
+    console.error("Update Business Target Error:", err);
+    return ReE(res, err.message, 500);
+  }
 };
 
-module.exports.updateCourseBusinessTarget = updateCourseBusinessTarget;
+module.exports.updateBusinessTarget = updateBusinessTarget;
+
 
