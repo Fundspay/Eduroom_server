@@ -1386,18 +1386,18 @@ module.exports.getUserRemainingTime = getUserRemainingTime;
 
 const updateBusinessTarget = async (req, res) => {
   try {
+    console.log("req.params:", req.params); // debug
     const { userId } = req.params;
-    const { courseId, businessTarget, offerMessage } = req.body;
 
     // Validate userId
     const id = parseInt(userId, 10);
     if (isNaN(id)) return ReE(res, "Invalid userId", 400);
 
-    // Find user
+    const { courseId, businessTarget, offerMessage } = req.body;
+
     const user = await model.User.findByPk(id);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Update businessTargets safely
     let businessTargets = user.businessTargets || {};
     businessTargets[courseId] = businessTarget;
 
@@ -1413,4 +1413,3 @@ const updateBusinessTarget = async (req, res) => {
   }
 };
 module.exports.updateBusinessTarget = updateBusinessTarget;
-

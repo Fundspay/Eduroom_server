@@ -38,5 +38,5 @@ router.get("/:userId/referral-payment-status", userController.getReferralPayment
 router.get("/:userId/internship-status", userController.getInternshipStatusByUser);
 router.get("/course-dates", userController.getUserCourseDates);
 router.get("/remaining-time/:userId", userController.getUserRemainingTime);
-router.put("/business-info/:id", userController.updateBusinessTarget);
+router.put("/user/business-info/:id", userController.updateBusinessTarget);
 module.exports = router;
