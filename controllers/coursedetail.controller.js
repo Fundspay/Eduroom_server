@@ -984,10 +984,23 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
+    // ✅ Normalize businessTargets for backward compatibility
+    const normalizedBusinessTargets = {};
+    if (user.businessTargets) {
+      for (const [courseId, val] of Object.entries(user.businessTargets)) {
+        if (typeof val === "number") {
+          // Old format: convert number to object
+          normalizedBusinessTargets[courseId] = { target: val, offerMessage: null };
+        } else {
+          // New format: already object
+          normalizedBusinessTargets[courseId] = val;
+        }
+      }
+    }
+
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      offerMessage: user.offerMessage,
       subscriptionWallet: user.subscriptionWallet,
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
       subscriptionLeft: Math.max(
@@ -1102,24 +1115,21 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         };
       });
 
-      // Always calculate completion rate based on sessions, not wallet
       const overallCompletionRate = totalSessions
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // Business target check
-      // const businessTarget = course.businessTarget || 0;
-      // const subscriptionWallet = user.subscriptionWallet || 0;
-      // const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
-      // const subscriptionLeft = subscriptionWallet - subscriptiondeductedWallet;
-      // const isBusinessTargetMet =
-      // (user.subscriptionWallet || 0) === (course.businessTarget || 0);    
-      const businessTarget = user.businessTargets?.[courseId] || 0;
+      // ✅ Use normalized businessTargets
+      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
+      const businessTarget = btEntry.target || 0;
+      const offerMessage = btEntry.offerMessage || null;
+
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       const isBusinessTargetMet =
         subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
+
       // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
@@ -1144,10 +1154,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         })
       ).then((results) => results.every(Boolean));
 
-      // ✅ Main fix: preserve previously completed courses permanently
+      // Preserve previously completed courses permanently
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       let overallStatus = existingStatuses[String(courseId)] === "Completed"
-        ? "Completed" // Preserve completed course permanently
+        ? "Completed"
         : "In Progress";
 
       if (
@@ -1156,7 +1166,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       ) {
         overallStatus = "Completed";
       }
-
 
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
@@ -1168,7 +1177,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
       }
 
-      // ✅ Save final course status permanently
+      // Save final course status permanently
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
@@ -1183,7 +1192,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
-        offerMessage: user.offerMessage || null
+        offerMessage, // ✅ now from businessTargets JSON
       });
     }
 
@@ -1196,12 +1205,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
-
 const getBusinessTarget = async (req, res) => {
   try {
     let { userId, courseId } = req.params;
-
-    console.log("Received params:", { userId, courseId });
 
     userId = parseInt(userId, 10);
     courseId = parseInt(courseId, 10);
@@ -1218,20 +1224,29 @@ const getBusinessTarget = async (req, res) => {
     const course = await model.Course.findByPk(courseId);
     if (!course) return ReE(res, "Course not found", 404);
 
-    // 3️⃣ Business target: first check user.businessTargets, fallback to course
-    const businessTarget = parseInt(user.businessTargets?.[courseId], 10)
-      || parseInt(course.businessTarget, 10)
-      || 0;
+    // 3️⃣ Normalize businessTargets for backward compatibility
+    const normalizedBusinessTargets = {};
+    if (user.businessTargets) {
+      for (const [cId, val] of Object.entries(user.businessTargets)) {
+        if (typeof val === "number") {
+          normalizedBusinessTargets[cId] = { target: val, offerMessage: null };
+        } else {
+          normalizedBusinessTargets[cId] = val;
+        }
+      }
+    }
 
-    // 5️⃣ Fetch referral count (UPDATED to match getBusinessUserTarget)
+    // 4️⃣ Determine businessTarget and offerMessage for this course
+    const btEntry = normalizedBusinessTargets[courseId] || { target: parseInt(course.businessTarget) || 0, offerMessage: null };
+    const businessTarget = btEntry.target || 0;
+    const offerMessage = btEntry.offerMessage || null;
+
+    // 5️⃣ Fetch referral count (same logic as before)
     let achievedCount = 0;
     if (user.referralCode) {
       try {
-        // ✅ New API call (same as reference)
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-
-        // ✅ Count only registered users who have paid
         const registeredUsers = apiResponse.data?.registered_users || [];
         achievedCount = registeredUsers.filter(u => u.has_paid).length;
       } catch (apiError) {
@@ -1245,11 +1260,9 @@ const getBusinessTarget = async (req, res) => {
     const subscriptionWallet = achievedCountNum;
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
-    // ✅ Update user JSON with business target per course
-    user.businessTargets = {
-      ...user.businessTargets,
-      [courseId]: businessTarget,
-    };
+    // 7️⃣ Update businessTargets JSON with target and offerMessage
+    normalizedBusinessTargets[courseId] = { target: businessTarget, offerMessage };
+    user.businessTargets = normalizedBusinessTargets;
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
 
@@ -1257,28 +1270,24 @@ const getBusinessTarget = async (req, res) => {
       fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
     });
 
-    console.log(`Updated user ${user.id} with business target info`);
-
-    // 7️⃣ Send response
-    return ReS(
-      res,
-      {
-        success: true,
-        data: {
-          userId: user.id,
-          courseId,
-          businessTarget,
-          achievedCount: subscriptionWallet,
-          totalDeducted: alreadyDeducted,
-          subscriptionWallet,
-          subscriptionLeft,
-          businessTargets: user.businessTargets,
-          startDate: user.courseDates?.[courseId]?.startDate || null,
-          endDate: user.courseDates?.[courseId]?.endDate || null,
-        },
+    // 8️⃣ Send response
+    return ReS(res, {
+      success: true,
+      data: {
+        userId: user.id,
+        courseId,
+        businessTarget,
+        offerMessage,
+        achievedCount: subscriptionWallet,
+        totalDeducted: alreadyDeducted,
+        subscriptionWallet,
+        subscriptionLeft,
+        businessTargets: user.businessTargets,
+        startDate: user.courseDates?.[courseId]?.startDate || null,
+        endDate: user.courseDates?.[courseId]?.endDate || null,
       },
-      200
-    );
+    }, 200);
+
   } catch (error) {
     console.error("Get Business Target Error:", error);
     return ReE(res, error.message, 500);
