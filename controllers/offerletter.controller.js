@@ -2,8 +2,8 @@
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 const { generateCertificate } = require("../utils/certificate.service.js");
 const { generateInternshipDetailsReport } = require("../utils/internshipreport2.service.js");
-const {generateSessionReport} = require("../utils/internshipreport3.service.js");
-const {generateMCQCaseStudyReport} = require("../utils/internshipreport4.service.js");
+const { generateSessionReport } = require("../utils/internshipreport3.service.js");
+const { generateMCQCaseStudyReport } = require("../utils/internshipreport4.service.js");
 const { sendMail } = require("../middleware/mailer.middleware.js");
 const model = require("../models/index.js");
 const { User, TeamManager, InternshipCertificate, OfferLetter, Course, Domain, RaiseQuery, Status } = require("../models/index.js");
@@ -672,12 +672,14 @@ const listAllUsers = async (req, res) => {
             courseId,
             courseName: course ? course.name : null,
             duration: course ? course.duration : null,
-            businessTarget: course ? course.businessTarget : null,
+            businessTarget: user.businessTargets?.[courseId]?.target || (course ? course.businessTarget : null),
+            offerMessage: user.businessTargets?.[courseId]?.offerMessage || null,
             domainName: course && course.Domain ? course.Domain.name : null,
             status,
             startDate: user.courseDates?.[courseId]?.startDate || null,
             endDate: user.courseDates?.[courseId]?.endDate || null
           });
+
 
           // update per-user counters
           userTotalCourses++;
@@ -702,10 +704,10 @@ const listAllUsers = async (req, res) => {
 
       const teamManager = user.teamManager
         ? {
-            id: user.teamManager.id,
-            name: user.teamManager.name,
-            internshipStatus: user.teamManager.internshipStatus
-          }
+          id: user.teamManager.id,
+          name: user.teamManager.name,
+          internshipStatus: user.teamManager.internshipStatus
+        }
         : null;
 
       const offerLetterSent =
@@ -733,7 +735,7 @@ const listAllUsers = async (req, res) => {
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
         selected: user.selected || null,
-        referralCode: user.referralCode || null,  
+        referralCode: user.referralCode || null,
         courses: courseDetails,
         internshipIssued,
         offerLetterSent,
@@ -743,7 +745,6 @@ const listAllUsers = async (req, res) => {
         queryCount: queryInfo.queryCount,
         registeredAt: createdAtFormatted,
         courseCompletionPercent: userCourseCompletionPercent,
-        offerMessage: user.offerMessage || null
       };
 
       let statusRecord = await Status.findOne({ where: { userId: user.id } });
