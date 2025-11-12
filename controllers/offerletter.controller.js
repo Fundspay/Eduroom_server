@@ -737,7 +737,6 @@ const listAllUsers = async (req, res) => {
         selected: user.selected || null,
         referralCode: user.referralCode || null,
         courses: courseDetails,
-        offerMessage,
         internshipIssued,
         offerLetterSent,
         offerLetterFile,

@@ -18,9 +18,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     if (!userId || !courseId) {
       await transaction.rollback();
-      return res
-        .status(400)
-        .json({ success: false, message: "userId and courseId are required" });
+      return res.status(400).json({ success: false, message: "userId and courseId are required" });
     }
 
     // 🔹 Fetch user
@@ -31,9 +29,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     });
     if (!user) {
       await transaction.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
 
     // 🔹 Fetch course
@@ -43,29 +39,19 @@ const createAndSendInternshipCertificate = async (req, res) => {
     });
     if (!course) {
       await transaction.rollback();
-      return res
-        .status(404)
-        .json({ success: false, message: "Course not found" });
+      return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    // 🔹 Get business target
-    const userTarget = user.businessTargets?.[courseId];
-    const rawTarget = parseInt(
-      userTarget !== undefined ? userTarget : course?.businessTarget || 0,
-      10
-    );
-    const businessTarget = Math.max(0, rawTarget);
+    // 🔹 Get business target from user JSON first, fallback to course
+    const userTargetObj = user.businessTargets?.[courseId];
+    const businessTarget = userTargetObj?.target !== undefined
+      ? parseInt(userTargetObj.target, 10)
+      : parseInt(course?.businessTarget || 0, 10);
 
     // 🔹 Wallet info
-    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10); // total earned
-    let newDeductedWallet = parseInt(
-      user.subscriptiondeductedWallet || 0,
-      10
-    );
-    let newSubscriptionLeft = Math.max(
-      0,
-      subscriptionWallet - newDeductedWallet
-    );
+    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
+    let newDeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+    let newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
 
     // 🔹 Check if certificate already exists
     let certificate = await model.InternshipCertificate.findOne({
@@ -79,8 +65,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
         await transaction.rollback();
         return res.status(400).json({
           success: false,
-          message:
-            "Insufficient subscription wallet, business target not met",
+          message: "Insufficient subscription wallet, business target not met",
           wallet: {
             totalSubscribed: subscriptionWallet,
             businessTarget,
@@ -102,11 +87,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 Always generate a fresh certificate
-    const certificateFile = await generateInternshipCertificate(
-      userId,
-      courseId
-    );
+    // 🔹 Generate certificate
+    const certificateFile = await generateInternshipCertificate(userId, courseId);
 
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
@@ -116,7 +98,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 If certificate exists, update it; else create new
+    // 🔹 Save or update certificate
     if (certificate) {
       certificate.certificateUrl = certificateFile.fileUrl;
       certificate.isIssued = true;
@@ -136,20 +118,20 @@ const createAndSendInternshipCertificate = async (req, res) => {
       );
     }
 
-    // 🔹 Send email to user (still inside transaction)
+    // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
       <p>Here is your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
       <p>Access it here:</p>
       <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
+      <p>Congratulations on your achievement!</p>
       <br/>
       <p>Best Regards,<br/>${course.name} Team</p>
     `;
-
     await sendMail(user.email, subject, html);
 
-    // 🔹 Commit everything only after successful email
+    // 🔹 Commit transaction
     await transaction.commit();
 
     return res.status(200).json({
@@ -163,17 +145,15 @@ const createAndSendInternshipCertificate = async (req, res) => {
         subscriptionLeft: newSubscriptionLeft,
       },
     });
+
   } catch (error) {
     await transaction.rollback();
     console.error("createAndSendInternshipCertificate error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Server error", error });
+    return res.status(500).json({ success: false, message: "Server error", error });
   }
 };
 
-module.exports.createAndSendInternshipCertificate =
-  createAndSendInternshipCertificate;
+module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
 
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
