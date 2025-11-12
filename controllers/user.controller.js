@@ -1391,12 +1391,13 @@ const updateBusinessTarget = async (req, res) => {
     if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
 
     const { courseId, businessTarget, offerMessage } = req.body;
+
     if (!courseId) return ReE(res, "courseId is required", 400);
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // Normalize existing businessTargets for backward compatibility
+    // ✅ Normalize existing businessTargets for backward compatibility
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [cId, val] of Object.entries(user.businessTargets)) {
@@ -1408,25 +1409,16 @@ const updateBusinessTarget = async (req, res) => {
       }
     }
 
-    // Update or add the course entry
+    // ✅ Update or add the course entry
     normalizedBusinessTargets[courseId] = {
-      target: businessTarget !== undefined
-        ? businessTarget
-        : (normalizedBusinessTargets[courseId]?.target || 0),
-      offerMessage: offerMessage !== undefined
-        ? offerMessage
-        : (normalizedBusinessTargets[courseId]?.offerMessage || null),
+      target: businessTarget !== undefined ? businessTarget : (normalizedBusinessTargets[courseId]?.target || 0),
+      offerMessage: offerMessage !== undefined ? offerMessage : (normalizedBusinessTargets[courseId]?.offerMessage || null),
     };
 
-    // ✅ Force Sequelize to detect change and save JSON properly
-    user.setDataValue("businessTargets", normalizedBusinessTargets);
-    await user.save({ fields: ["businessTargets"] });
+    // Save the updated JSON field
+    await user.update({ businessTargets: normalizedBusinessTargets });
 
-    return ReS(res, {
-      success: true,
-      message: "Business target updated successfully",
-      businessTargets: normalizedBusinessTargets
-    }, 200);
+    return ReS(res, { success: true, message: "Business target updated successfully", businessTargets: normalizedBusinessTargets }, 200);
 
   } catch (err) {
     console.error("Update Business Target Error:", err);
