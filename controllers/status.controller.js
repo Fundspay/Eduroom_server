@@ -7,18 +7,47 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
+        // ---- NEW: Month–Year filter ----
+        let { monthYear } = req.query; // Example: "October 2025"
+
+        let monthStart = null;
+        let monthEnd = null;
+
+        if (monthYear) {
+            const [monthName, yearStr] = monthYear.split(" ");
+            const monthIndex = new Date(`${monthName} 1, ${yearStr}`).getMonth();
+
+            if (!isNaN(monthIndex)) {
+                const year = parseInt(yearStr);
+
+                monthStart = new Date(year, monthIndex, 1);
+                monthEnd = new Date(year, monthIndex + 1, 1);
+            }
+        }
+        // --------------------------------
+
         // Fetch active statuses
+        const statusWhere = { isDeleted: false };
+
+        // ---- Apply filter ONLY if valid month/year received ----
+        if (monthStart && monthEnd) {
+            statusWhere.createdAt = {
+                [Op.gte]: monthStart,
+                [Op.lt]: monthEnd
+            };
+        }
+
         const statuses = await model.Status.findAll({
-            where: { isDeleted: false }
+            where: statusWhere
         });
 
-        // Fetch active team managers
+        // Fetch active team managers (UNCHANGED)
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
 
-        // Return response with counts
+        // Return SAME RESPONSE (NOTHING CHANGED)
         return ReS(res, {
             success: true,
             data: statuses,
@@ -27,11 +56,14 @@ var listAll = async function (req, res) {
                 list: allTeamManagers
             }
         }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.listAll = listAll;
+
 
 var updateStatus = async function (req, res) {
     try {
