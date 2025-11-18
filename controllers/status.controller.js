@@ -30,7 +30,8 @@ var listAll = async function (req, res) {
         const statusWhere = { isDeleted: false };
 
         if (monthStart && monthEnd) {
-            statusWhere.registeredAt = {
+            // 🔥 UPDATED: filter by createdAt ONLY (your requirement)
+            statusWhere.createdAt = {
                 [Op.gte]: monthStart,
                 [Op.lt]: monthEnd
             };
@@ -61,6 +62,7 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
+
 
 var updateStatus = async function (req, res) {
     try {
