@@ -3,6 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Status,TeamManager } = require("../models");
 const { sendMail } = require("../middleware/mailer.middleware");
+const { Op } = require("sequelize");
 
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
