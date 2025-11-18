@@ -7,31 +7,29 @@ const { sendMail } = require("../middleware/mailer.middleware");
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // ---- NEW: Month–Year filter ----
-        let { monthYear } = req.query; // Example: "October 2025"
+        let { monthYear } = req.query; // ex: "October 2025"
 
         let monthStart = null;
         let monthEnd = null;
 
         if (monthYear) {
             const [monthName, yearStr] = monthYear.split(" ");
-            const monthIndex = new Date(`${monthName} 1, ${yearStr}`).getMonth();
+            const tempDate = new Date(`${monthName} 1, ${yearStr}`);
 
-            if (!isNaN(monthIndex)) {
-                const year = parseInt(yearStr);
+            if (!isNaN(tempDate)) {
+                const year = tempDate.getUTCFullYear();
+                const monthIndex = tempDate.getUTCMonth();
 
-                monthStart = new Date(year, monthIndex, 1);
-                monthEnd = new Date(year, monthIndex + 1, 1);
+                // 🔥 FIX: Use UTC boundaries to avoid timezone shift
+                monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+                monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
             }
         }
-        // --------------------------------
 
-        // Fetch active statuses
         const statusWhere = { isDeleted: false };
 
-        // ---- Apply filter ONLY if valid month/year received ----
         if (monthStart && monthEnd) {
-            statusWhere.createdAt = {
+            statusWhere.registeredAt = {
                 [Op.gte]: monthStart,
                 [Op.lt]: monthEnd
             };
@@ -41,13 +39,12 @@ var listAll = async function (req, res) {
             where: statusWhere
         });
 
-        // Fetch active team managers (UNCHANGED)
+        // teamManagers unchanged
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
 
-        // Return SAME RESPONSE (NOTHING CHANGED)
         return ReS(res, {
             success: true,
             data: statuses,
@@ -63,7 +60,6 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
-
 
 var updateStatus = async function (req, res) {
     try {
