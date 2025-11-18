@@ -5,6 +5,12 @@ const { Status,TeamManager } = require("../models");
 const { sendMail } = require("../middleware/mailer.middleware");
 const { Op } = require("sequelize");
 
+// Map month names to JS month index
+const monthMap = {
+    January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+    July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
+};
+
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
@@ -15,13 +21,11 @@ var listAll = async function (req, res) {
 
         if (monthYear) {
             const [monthName, yearStr] = monthYear.split(" ");
-            const tempDate = new Date(`${monthName} 1, ${yearStr}`);
+            const monthIndex = monthMap[monthName];
+            const year = parseInt(yearStr);
 
-            if (!isNaN(tempDate)) {
-                const year = tempDate.getUTCFullYear();
-                const monthIndex = tempDate.getUTCMonth();
-
-                // 🔥 FIX: Use UTC boundaries to avoid timezone shift
+            if (!isNaN(monthIndex) && !isNaN(year)) {
+                // 🔥 Pure UTC — no timezone shift, no wrong month
                 monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
                 monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
             }
@@ -30,8 +34,7 @@ var listAll = async function (req, res) {
         const statusWhere = { isDeleted: false };
 
         if (monthStart && monthEnd) {
-            // 🔥 UPDATED: filter by createdAt ONLY (your requirement)
-            statusWhere.createdAt = {
+            statusWhere.registeredAt = {
                 [Op.gte]: monthStart,
                 [Op.lt]: monthEnd
             };
