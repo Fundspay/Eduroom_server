@@ -44,6 +44,11 @@ var listAll = async function (req, res) {
             where: statusWhere
         });
 
+        // 🔥 JUST ADDED — count of ALL students ever (NOT filtered)
+        const totalStudents = await model.Status.count({
+            where: { isDeleted: false }
+        });
+
         // teamManagers unchanged
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
@@ -53,6 +58,7 @@ var listAll = async function (req, res) {
         return ReS(res, {
             success: true,
             data: statuses,
+            totalStudents, // <— ONLY THIS LINE ADDED
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
