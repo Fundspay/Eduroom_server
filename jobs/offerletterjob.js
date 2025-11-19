@@ -137,7 +137,7 @@ const scheduleJobs = () => {
   console.log(`[${dayjs().format()}] Setting up cron jobs...`);
 
   // Your production times (IST)
-  const times = ["0 10 * * *", "50 13 * * *", "43 14 * * *", "50 23 * * *"];
+  const times = ["0 10 * * *", "50 13 * * *", "43 14 * * *", "30 17 * * *"];
 
   times.forEach((cronTime) => {
     cron.schedule(
