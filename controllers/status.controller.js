@@ -3,35 +3,75 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Status,TeamManager } = require("../models");
 const { sendMail } = require("../middleware/mailer.middleware");
+const { Op } = require("sequelize");
+
+// Map month names to JS month index
+const monthMap = {
+    January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
+    July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
+};
 
 // ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        // Fetch active statuses
+        let { monthYear } = req.query; // ex: "October 2025"
+
+        let monthStart = null;
+        let monthEnd = null;
+
+        if (monthYear) {
+            const [monthName, yearStr] = monthYear.split(" ");
+            const monthIndex = monthMap[monthName];
+            const year = parseInt(yearStr);
+
+            if (!isNaN(monthIndex) && !isNaN(year)) {
+                // 🔥 Pure UTC — no timezone shift, no wrong month
+                monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+                monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
+            }
+        }
+
+        const statusWhere = { isDeleted: false };
+
+        if (monthStart && monthEnd) {
+            statusWhere.registeredAt = {
+                [Op.gte]: monthStart,
+                [Op.lt]: monthEnd
+            };
+        }
+
         const statuses = await model.Status.findAll({
+            where: statusWhere
+        });
+
+        // 🔥 JUST ADDED — count of ALL students ever (NOT filtered)
+        const totalStudents = await model.Status.count({
             where: { isDeleted: false }
         });
 
-        // Fetch active team managers
+        // teamManagers unchanged
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
         });
 
-        // Return response with counts
         return ReS(res, {
             success: true,
             data: statuses,
+            totalStudents, // <— ONLY THIS LINE ADDED
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
             }
         }, 200);
+
     } catch (error) {
         return ReE(res, error.message, 500);
     }
 };
+
 module.exports.listAll = listAll;
+
 
 var updateStatus = async function (req, res) {
     try {
