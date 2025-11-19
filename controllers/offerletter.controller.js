@@ -798,3 +798,89 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
+
+
+const autoSendOfferLetters = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    // 1️⃣ Fetch users created today or yesterday
+    const users = await model.User.findAll({
+      where: {
+        createdAt: { [Op.between]: [yesterday, tomorrow] },
+        isDeleted: false,
+      },
+    });
+
+    if (!users.length) {
+      return res.status(200).json({
+        success: true,
+        message: "No users created today or yesterday",
+      });
+    }
+
+    let processed = [];
+
+    // 2️⃣ Loop users
+    for (let user of users) {
+      if (!user.courseDates) continue;
+
+      const subscriptionWallet = Number(user.subscriptionWallet);
+
+      // 3️⃣ Only users whose wallet == 1
+      if (subscriptionWallet !== 1) continue;
+
+      // 4️⃣ Loop all courses inside courseDates
+      for (let courseId of Object.keys(user.courseDates)) {
+        const courseInfo = user.courseDates[courseId];
+
+        // ✅ Generate Offer Letter PDF
+        const generatedLetter = await generateOfferLetter(user.id, courseId);
+
+        // ✅ Create OfferLetter record
+        await model.OfferLetter.create({
+          userId: user.id,
+          courseId: courseId,
+          position: courseInfo.courseName || "Intern",
+          startDate: new Date(),
+          location: "Work from Home",
+          fileUrl: generatedLetter.fileUrl,
+          issent: false,
+        });
+
+        processed.push({
+          userId: user.id,
+          email: user.email,
+          courseId,
+          courseName: courseInfo.courseName,
+          fileUrl: generatedLetter.fileUrl,
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Offer letters generated successfully",
+      processed,
+    });
+
+  } catch (error) {
+    console.error("autoSendOfferLetters Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error,
+    });
+  }
+};
+
+module.exports.autoSendOfferLetters = autoSendOfferLetters;
