@@ -43,9 +43,13 @@ const createResume = async (req, res) => {
       dateOfOnboarding: data.dateOfOnboarding ?? null,
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
+
+      //  NEW FIELDS
+      callStatus: data.callStatus ?? null,
+      alloted: data.alloted ?? null,
     }));
 
-    // ✅ Bulk insert (NO duplicate check, accept everything)
+    // ✅ Bulk insert
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {
@@ -55,7 +59,6 @@ const createResume = async (req, res) => {
       console.error("Bulk insert failed:", err.message);
     }
 
-    // ✅ Always respond 200, never throw 400/500
     return res.status(200).json({
       success: true,
       inserted: records.length,
@@ -64,8 +67,6 @@ const createResume = async (req, res) => {
 
   } catch (error) {
     console.error("StudentResume Create Error:", error);
-
-    // ✅ Still return 200 OK
     return res.status(200).json({
       success: false,
       inserted: 0,
@@ -78,7 +79,7 @@ const createResume = async (req, res) => {
 module.exports.createResume = createResume;
 
 
-// ✅ Update Resume Record
+//  Update Resume Record
 const updateResume = async (req, res) => {
   try {
     const record = await model.StudentResume.findByPk(req.params.id);
@@ -88,7 +89,11 @@ const updateResume = async (req, res) => {
     const allowedFields = [
       "sr", "resumeDate", "collegeName", "course", "internshipType",
       "followupBy", "studentName", "mobileNumber", "emailId",
-      "domain", "interviewDate", "teamManagerId", "dateOfOnboarding"
+      "domain", "interviewDate", "teamManagerId", "dateOfOnboarding",
+
+      //  NEW FIELDS ALLOWED FOR UPDATE
+      "callStatus",
+      "alloted"
     ];
 
     for (let f of allowedFields) {
@@ -111,7 +116,7 @@ const updateResume = async (req, res) => {
       }
     }
 
-    // ✅ Always ensure coSheetId matches teamManagerId (from updates or existing record)
+    // ✅ Ensure coSheetId matches teamManagerId
     const effectiveTeamManagerId = updates.teamManagerId ?? record.teamManagerId;
     if (effectiveTeamManagerId) {
       const coSheet = await model.CoSheet.findOne({ where: { teamManagerId: effectiveTeamManagerId } });
@@ -130,6 +135,7 @@ const updateResume = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.updateResume = updateResume;
 
 
@@ -171,6 +177,12 @@ const listResumes = async (req, res) => {
     // ---------------------------
     console.log("🔍 Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
+      attributes: {
+        include: [
+          "callStatus",  // 🔥 ADDED
+          "alloted"      // 🔥 ADDED
+        ]
+      },
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
@@ -209,14 +221,13 @@ const listResumes = async (req, res) => {
     console.log(`📄 Total resumes fetched: ${records.length}`);
 
     // ---------------------------
-    // 3️⃣ Store FundsAudit data per studentResume and user without duplicates
+    // 3️⃣ Store FundsAudit data per studentResume & user
     // ---------------------------
     for (const resume of records) {
       const user = resume.user;
       if (!user || !user.FundsAudits) continue;
 
       for (const fa of user.FundsAudits) {
-        // Check if record already exists
         const exists = await model.FundsAuditStudent.findOne({
           where: {
             studentResumeId: resume.id,
@@ -267,7 +278,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 
 // ✅ Delete resume by ID

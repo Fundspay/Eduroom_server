@@ -37,6 +37,10 @@ module.exports = (sequelize, Sequelize) => {
       finalSelectionStatus: { type: Sequelize.STRING, allowNull: true },
       comment: { type: Sequelize.TEXT, allowNull: true },
 
+      // NEW FIELDS ADDED (as requested)
+      callStatus: { type: Sequelize.STRING, allowNull: true }, // answered / not answered / switch off
+      alloted: { type: Sequelize.STRING, allowNull: true },    // registered users
+
       // 🔹 Foreign keys
       coSheetId: { type: Sequelize.BIGINT, allowNull: true },
       teamManagerId: { type: Sequelize.BIGINT, allowNull: true },
@@ -56,24 +60,21 @@ module.exports = (sequelize, Sequelize) => {
 
   // 🔹 Associations
   StudentResume.associate = function (models) {
-    // Link to CoSheet
     StudentResume.belongsTo(models.CoSheet, {
       foreignKey: "coSheetId",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
     });
 
-    // Link to TeamManager
     StudentResume.belongsTo(models.TeamManager, {
       foreignKey: "teamManagerId",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
     });
 
-    // 🔹 Link to User via mobileNumber → phoneNumber
     StudentResume.belongsTo(models.User, {
-      foreignKey: "mobileNumber", // column in StudentResume
-      targetKey: "phoneNumber",   // column in User
+      foreignKey: "mobileNumber",
+      targetKey: "phoneNumber",
       as: "user",
       constraints: false,
     });
