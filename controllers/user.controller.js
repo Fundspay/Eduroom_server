@@ -679,12 +679,12 @@ const logoutUser = async (req, res) => {
   try {
     const { id } = req.body;
 
-    // Check if id exists and is a number
-    if (!id || isNaN(Number(id))) {
+    // Only check if id exists (NO number conversion now)
+    if (!id) {
       return ReE(res, "Invalid or missing id", 400);
     }
 
-    const numericId = Number(id);
+    const numericId = id; // <-- KEEP AS STRING
 
     let account = await model.User.findOne({ 
       where: { id: numericId, isDeleted: false } 
@@ -714,6 +714,7 @@ const logoutUser = async (req, res) => {
   }
 };
 module.exports.logoutUser = logoutUser;
+
 
 // ===================== REQUEST PASSWORD RESET =====================
 const requestPasswordReset = async (req, res) => {
