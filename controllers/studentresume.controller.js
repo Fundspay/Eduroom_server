@@ -707,8 +707,6 @@ const listResumesByUserId = async (req, res) => {
 module.exports.listResumesByUserId = listResumesByUserId;
 
 
-
-
 const getUserTargetAnalysis = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -1079,6 +1077,14 @@ const listResumesByUserIdfuture = async (req, res) => {
     });
 
     // ---------------------------
+    // Fetch all registered managers  ⭐ ADDED AS REQUESTED
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
+    // ---------------------------
     // Return response
     // ---------------------------
     return ReS(res, {
@@ -1087,6 +1093,7 @@ const listResumesByUserIdfuture = async (req, res) => {
       followUpBy: fullName,
       totalRecords: resumes.length,
       data: resumes,
+      managers,   // ⭐ ADDED HERE
     });
   } catch (error) {
     console.error("ListResumesByUserIdfuture Error:", error);
@@ -1095,3 +1102,4 @@ const listResumesByUserIdfuture = async (req, res) => {
 };
 
 module.exports.listResumesByUserIdfuture = listResumesByUserIdfuture;
+
