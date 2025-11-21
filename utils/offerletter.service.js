@@ -241,6 +241,197 @@
 // module.exports = { generateOfferLetter };
 
 
+// "use strict";
+// const AWS = require("aws-sdk");
+// const puppeteer = require("puppeteer");
+// const CONFIG = require("../config/config");
+// const model = require("../models");
+
+// const s3 = new AWS.S3({
+//   accessKeyId: CONFIG.awsAccessKeyId,
+//   secretAccessKey: CONFIG.awsSecretAccessKey,
+//   region: CONFIG.awsRegion
+// });
+
+// const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+// const normalizeDateToISO = (input) => {
+//   if (!input) return null;
+//   const d = new Date(input);
+//   if (isNaN(d)) return null;
+//   return d.toISOString().split("T")[0];
+// };
+
+// // ---------- REUSABLE BROWSER INSTANCE ----------
+// let browserInstance = null;
+// const getBrowser = async () => {
+//   if (!browserInstance) {
+//     browserInstance = await puppeteer.launch({
+//       headless: true,
+//       args: [
+//         "--no-sandbox",
+//         "--disable-setuid-sandbox",
+//         "--disable-dev-shm-usage",
+//         "--single-process",
+//         "--disable-gpu"
+//       ],
+//     });
+//   }
+//   return browserInstance;
+// };
+
+// // ---------- GENERATE OFFER LETTER ----------
+// const generateOfferLetter = async (userId, courseId = null) => {
+//   if (!userId) throw new Error("Missing userId");
+
+//   // 1. Load user
+//   const user = await model.User.findOne({
+//     where: { id: userId, isDeleted: false }
+//   });
+//   if (!user) throw new Error("User not found");
+
+//   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
+
+//   // 2. Determine course details
+//   let startDate = null;
+//   let courseName = null;
+
+//   if (user.courseDates && Object.keys(user.courseDates).length > 0) {
+//     let targetCourseId = null;
+
+//     if (courseId) {
+//       if (user.courseDates[courseId] && user.courseDates[courseId].startDate) {
+//         targetCourseId = courseId;
+//       }
+//     } else {
+//       let earliestStart = null;
+//       for (const [cid, courseObj] of Object.entries(user.courseDates)) {
+//         if (!courseObj.startDate) continue;
+//         const courseStartISO = normalizeDateToISO(courseObj.startDate);
+//         if (!courseStartISO) continue;
+//         if (!earliestStart || new Date(courseStartISO) < new Date(earliestStart)) {
+//           earliestStart = courseStartISO;
+//           targetCourseId = cid;
+//         }
+//       }
+//     }
+
+//     if (targetCourseId) {
+//       const courseObj = user.courseDates[targetCourseId];
+//       startDate = normalizeDateToISO(courseObj.startDate);
+
+//       const course = await model.Course.findOne({ where: { id: Number(targetCourseId) } });
+//       if (course && course.name) {
+//         courseName = course.name;
+//       }
+//     }
+//   }
+
+//   startDate = startDate
+//     ? new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })
+//     : "To Be Decided";
+
+//   const position = courseName || "Intern";
+//   const role = courseName || "Intern";
+//   const workLocation = "Work from Home";
+
+//   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+
+//   // 3. HTML content (unchanged)
+//   const html = `<!DOCTYPE html>
+// <html lang="en">
+
+// <head>
+//     <meta charset="UTF-8">
+//     <title>Offer Letter</title>
+//     <style>
+//         body { margin: 0; padding: 0; font-family: 'Times New Roman', serif; background: #f5f5f5; }
+//         .letter-container { width: 800px; margin: 20px auto; padding: 80px 100px;
+//             background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+//             background-size: cover; min-height: 1100px; box-sizing: border-box; position: relative; }
+//         .date, .title, .content { font-family: 'Times New Roman', serif; }
+//         .date { text-align: left; margin-top: 100px; margin-bottom: 87px; margin-left: -65px; font-size: 16px; }
+//         .title { text-align: center; font-weight: bold; margin-left: -65px; font-size: 20px; margin-bottom: 40px; text-transform: uppercase; }
+//         .content { font-size: 15.5px; margin-left: -65px; line-height: 1.6; text-align: justify; }
+//         .signature { margin-top: 60px; font-size: 16px; }
+//         .signature img { height: 60px; display: block; margin-top: 10px; }
+//         .footer { position: absolute; bottom: 30px; left: 100px; right: 100px; text-align: center; font-size: 14px; color: #333; }
+//     </style>
+// </head>
+
+// <body>
+//     <div class="letter-container">
+//         <div class="date">Date: <b>${today}</b></div>
+//         <div class="content">
+//             Dear <b>${candidateName}</b>,<br><br>
+//             Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.<br><br>
+//             <b>Starting Date:</b> ${startDate}<br>
+//             <b>Position:</b> ${position}<br>
+//             <b>Work Location:</b> ${workLocation}<br>
+//             <b>Benefits:</b> Certification of Internship and LOA (performance-based).<br><br>
+//             We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company's success.
+//         </div>
+//     </div>
+// </body>
+// </html>
+// `;
+
+//   // 4. Render PDF (reuse browser)
+//   let browser;
+// let page;
+
+// try {
+//   browser = await puppeteer.launch({
+//     headless: true,
+//     args: [
+//       "--no-sandbox",
+//       "--disable-setuid-sandbox",
+//       "--disable-dev-shm-usage",
+//       "--single-process",
+//       "--disable-gpu"
+//     ],
+//   });
+
+//   page = await browser.newPage();
+
+//   await page.setContent(html, { waitUntil: "networkidle2", timeout: 60000 });
+//   await page.evaluateHandle('document.fonts.ready');
+//   await new Promise(resolve => setTimeout(resolve, 500));
+
+//   pdfBuffer = await page.pdf({
+//     format: "A4",
+//     printBackground: true,
+//     margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" }
+//   });
+
+// } catch (err) {
+//   throw new Error("PDF generation failed: " + err.message);
+// } finally {
+//   if (page) await page.close().catch(() => {});
+//   if (browser) await browser.close().catch(() => {});
+// }
+
+
+//   // 5. Upload to S3
+//   const timestamp = Date.now();
+//   const fileName = `offerletter-${timestamp}.pdf`;
+//   const s3Key = `offerletters/${userId}/${fileName}`;
+
+//   await s3.putObject({
+//     Bucket: "fundsweb",
+//     Key: s3Key,
+//     Body: pdfBuffer,
+//     ContentType: "application/pdf",
+//   }).promise();
+
+//   return {
+//     fileName,
+//     fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+//   };
+// };
+
+// module.exports = { generateOfferLetter };
+
+
 "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
@@ -253,30 +444,11 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion
 });
 
-const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 const normalizeDateToISO = (input) => {
   if (!input) return null;
   const d = new Date(input);
   if (isNaN(d)) return null;
   return d.toISOString().split("T")[0];
-};
-
-// ---------- REUSABLE BROWSER INSTANCE ----------
-let browserInstance = null;
-const getBrowser = async () => {
-  if (!browserInstance) {
-    browserInstance = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--single-process",
-        "--disable-gpu"
-      ],
-    });
-  }
-  return browserInstance;
 };
 
 // ---------- GENERATE OFFER LETTER ----------
@@ -333,7 +505,6 @@ const generateOfferLetter = async (userId, courseId = null) => {
   const position = courseName || "Intern";
   const role = courseName || "Intern";
   const workLocation = "Work from Home";
-
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
   // 3. HTML content (unchanged)
@@ -375,27 +546,43 @@ const generateOfferLetter = async (userId, courseId = null) => {
 </html>
 `;
 
-  // 4. Render PDF (reuse browser)
-  let pdfBuffer;
+
+
+
+  // 4. PDF Rendering
+  let browser;
   let page;
+  let pdfBuffer;
+
   try {
-    const browser = await getBrowser();
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--single-process",
+        "--disable-gpu"
+      ],
+    });
+
     page = await browser.newPage();
 
     await page.setContent(html, { waitUntil: "networkidle2", timeout: 60000 });
     await page.evaluateHandle('document.fonts.ready');
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(res => setTimeout(res, 500));
 
     pdfBuffer = await page.pdf({
       format: "A4",
       printBackground: true,
-      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" },
+      margin: { top: "0px", right: "0px", bottom: "0px", left: "0px" }
     });
 
-    await page.close();
   } catch (err) {
-    if (page) await page.close();
     throw new Error("PDF generation failed: " + err.message);
+  } finally {
+    if (page) await page.close().catch(() => { });
+    if (browser) await browser.close().catch(() => { });
   }
 
   // 5. Upload to S3
