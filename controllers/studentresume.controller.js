@@ -630,28 +630,24 @@ module.exports.getRAnalysis = getRAnalysis;
 
 const listResumesByUserId = async (req, res) => {
   try {
-    const userId = req.query.userId || req.params.userId;
-    if (!userId) return ReE(res, "userId is required", 400);
+    const userId = req.query.id || req.params.id;
+    if (!userId) return ReE(res, "User id is required", 400);
 
-    // ------------------------------------
-    // STEP 1: Find manager linked to this user
-    // ------------------------------------
+    // ---------------------------
+    // 1. Find which manager is linked with this user
+    // ---------------------------
     const manager = await model.TeamManager.findOne({
       where: { managerId: userId, isDeleted: false },
-      attributes: ["id", "name", "email", "managerId"],
-      raw: true,
+      attributes: ["id", "name", "email"]
     });
 
-    if (!manager) return ReE(res, "Manager for this user not found", 404);
+    if (!manager) return ReE(res, "No manager linked with this user", 404);
 
-    // Manager name to be matched in followupBy column
-    const managerName = manager.name;
-
-    // ------------------------------------
-    // STEP 2: Fetch resumes where followupBy = manager.name
-    // ------------------------------------
+    // ---------------------------
+    // 2. Fetch resumes WHERE followupBy = manager.name
+    // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { followupBy: managerName },
+      where: { followupBy: manager.name },  // 🔥 UPDATED LINE
       include: [
         {
           model: model.FundsAuditStudent,
@@ -677,28 +673,25 @@ const listResumesByUserId = async (req, res) => {
       order: [["createdAt", "ASC"]],
     });
 
-    // ------------------------------------
-    // STEP 3: Fetch manager list
-    // ------------------------------------
+    // ---------------------------
+    // 3. Fetch all managers (unchanged)
+    // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
-
     const managerList = managers.map((m) => ({
       id: m.id,
       name: m.name,
       email: m.email,
     }));
 
-    // ------------------------------------
-    // STEP 4: Send response
-    // ------------------------------------
+    // ---------------------------
+    // 4. Return response (unchanged)
+    // ---------------------------
     return ReS(res, {
       success: true,
-      userId,
-      managerId: manager.id,
-      managerName: managerName,
+      linkedManager: manager,  // extra info for debugging
       totalRecords: resumes.length,
       data: resumes,
       managers: managerList,
