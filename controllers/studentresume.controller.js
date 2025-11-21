@@ -43,8 +43,6 @@ const createResume = async (req, res) => {
       dateOfOnboarding: data.dateOfOnboarding ?? null,
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
-
-      //  NEW FIELDS
       callStatus: data.callStatus ?? null,
       alloted: data.alloted ?? null,
     }));
@@ -89,11 +87,10 @@ const updateResume = async (req, res) => {
     const allowedFields = [
       "sr", "resumeDate", "collegeName", "course", "internshipType",
       "followupBy", "studentName", "mobileNumber", "emailId",
-      "domain", "interviewDate", "teamManagerId", "dateOfOnboarding",
-
-      //  NEW FIELDS ALLOWED FOR UPDATE
+      "domain", "interviewDate", "teamManagerId", "Dateofonboarding",
       "callStatus",
-      "alloted"
+      "alloted",
+      "knowledgeScore","approachScore","skillsScore","otherScore","totalAverageScore","finalSelectionStatus","comment"
     ];
 
     for (let f of allowedFields) {
@@ -143,6 +140,19 @@ module.exports.updateResume = updateResume;
 const listResumes = async (req, res) => {
   try {
     console.log("🚀 Starting StudentResume list sync...");
+
+    // ---------------------------
+    // Fetch all managers for dropdown/reference
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+    const managerList = managers.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+    }));
 
     // ---------------------------
     // 1️⃣ Sync Student Registrations
@@ -270,7 +280,8 @@ const listResumes = async (req, res) => {
     // 4️⃣ Return response
     // ---------------------------
     console.log("🏁 All processing done successfully!");
-    return ReS(res, { success: true, data: records }, 200);
+    return ReS(res, { success: true, data: records, managerList }, 200);
+
   } catch (error) {
     console.error("StudentResume List Error:", error);
     return ReE(res, error.message, 500);
@@ -278,6 +289,7 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
+
 
 
 // ✅ Delete resume by ID
