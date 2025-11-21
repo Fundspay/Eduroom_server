@@ -630,24 +630,26 @@ module.exports.getRAnalysis = getRAnalysis;
 
 const listResumesByUserId = async (req, res) => {
   try {
-    const userId = req.query.id || req.params.id;
-    if (!userId) return ReE(res, "User id is required", 400);
+    const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
+    if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
     // ---------------------------
-    // 1. Find which manager is linked with this user
+    // Fetch manager info
     // ---------------------------
     const manager = await model.TeamManager.findOne({
-      where: { managerId: userId, isDeleted: false },
-      attributes: ["id", "name", "email"]
+      where: { id: teamManagerId },
+      attributes: ["id", "name", "email"],
+      raw: true,
     });
+    if (!manager) return ReE(res, "Manager not found", 404);
 
-    if (!manager) return ReE(res, "No manager linked with this user", 404);
+    const managerName = manager.name;  // ⭐ we will match this with followupBy
 
     // ---------------------------
-    // 2. Fetch resumes WHERE followupBy = manager.name
+    // Fetch resumes WHERE followupBy == managerName
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { followupBy: manager.name },  // 🔥 UPDATED LINE
+      where: { followupBy: managerName },  // ⭐ UPDATED EXACTLY AS YOU ASKED
       include: [
         {
           model: model.FundsAuditStudent,
@@ -674,7 +676,7 @@ const listResumesByUserId = async (req, res) => {
     });
 
     // ---------------------------
-    // 3. Fetch all managers (unchanged)
+    // Fetch all managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
@@ -687,11 +689,11 @@ const listResumesByUserId = async (req, res) => {
     }));
 
     // ---------------------------
-    // 4. Return response (unchanged)
+    // Return response
     // ---------------------------
     return ReS(res, {
       success: true,
-      linkedManager: manager,  // extra info for debugging
+      teamManagerId,
       totalRecords: resumes.length,
       data: resumes,
       managers: managerList,
