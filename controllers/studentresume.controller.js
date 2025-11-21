@@ -647,7 +647,7 @@ const listResumesByUserId = async (req, res) => {
     // Fetch resumes WHERE manager is in collegeOnboarded
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { collegeOnboarded: teamManagerId },  // 🔥 UPDATED LINE
+      where: { followupBy: teamManagerId },  // 🔥 UPDATED LINE
       include: [
         {
           model: model.FundsAuditStudent,
