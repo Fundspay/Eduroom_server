@@ -630,24 +630,28 @@ module.exports.getRAnalysis = getRAnalysis;
 
 const listResumesByUserId = async (req, res) => {
   try {
-    const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
-    if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
+    const userId = req.query.userId || req.params.userId;
+    if (!userId) return ReE(res, "userId is required", 400);
 
-    // ---------------------------
-    // Fetch manager info
-    // ---------------------------
+    // ------------------------------------
+    // STEP 1: Find manager linked to this user
+    // ------------------------------------
     const manager = await model.TeamManager.findOne({
-      where: { id: teamManagerId },
-      attributes: ["id", "name", "email"],
+      where: { managerId: userId, isDeleted: false },
+      attributes: ["id", "name", "email", "managerId"],
       raw: true,
     });
-    if (!manager) return ReE(res, "Manager not found", 404);
 
-    // ---------------------------
-    // Fetch resumes WHERE manager is in collegeOnboarded
-    // ---------------------------
+    if (!manager) return ReE(res, "Manager for this user not found", 404);
+
+    // Manager name to be matched in followupBy column
+    const managerName = manager.name;
+
+    // ------------------------------------
+    // STEP 2: Fetch resumes where followupBy = manager.name
+    // ------------------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { followupBy: teamManagerId },  // 🔥 UPDATED LINE
+      where: { followupBy: managerName },
       include: [
         {
           model: model.FundsAuditStudent,
@@ -673,25 +677,28 @@ const listResumesByUserId = async (req, res) => {
       order: [["createdAt", "ASC"]],
     });
 
-    // ---------------------------
-    // Fetch all managers
-    // ---------------------------
+    // ------------------------------------
+    // STEP 3: Fetch manager list
+    // ------------------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
+
     const managerList = managers.map((m) => ({
       id: m.id,
       name: m.name,
       email: m.email,
     }));
 
-    // ---------------------------
-    // Return response
-    // ---------------------------
+    // ------------------------------------
+    // STEP 4: Send response
+    // ------------------------------------
     return ReS(res, {
       success: true,
-      teamManagerId,
+      userId,
+      managerId: manager.id,
+      managerName: managerName,
       totalRecords: resumes.length,
       data: resumes,
       managers: managerList,
@@ -703,6 +710,7 @@ const listResumesByUserId = async (req, res) => {
 };
 
 module.exports.listResumesByUserId = listResumesByUserId;
+
 
 
 
