@@ -644,13 +644,13 @@ const listResumesByUserId = async (req, res) => {
     if (!manager) return ReE(res, "Manager not found", 404);
 
     // ---------------------------
-    // Fetch resumes assigned to this manager
+    // Fetch resumes WHERE manager is in collegeOnboarded
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { teamManagerId },
+      where: { collegeOnboarded: teamManagerId },  // 🔥 UPDATED LINE
       include: [
         {
-          model: model.FundsAuditStudent, // Include associated FundsAuditStudent entries
+          model: model.FundsAuditStudent,
           attributes: [
             "id",
             "fundsAuditId",
@@ -674,7 +674,7 @@ const listResumesByUserId = async (req, res) => {
     });
 
     // ---------------------------
-    // Fetch all managers for dropdown/reference
+    // Fetch all managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
@@ -703,6 +703,7 @@ const listResumesByUserId = async (req, res) => {
 };
 
 module.exports.listResumesByUserId = listResumesByUserId;
+
 
 
 const getUserTargetAnalysis = async (req, res) => {
