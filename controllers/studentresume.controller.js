@@ -113,6 +113,32 @@ const updateResume = async (req, res) => {
       }
     }
 
+    // ⭐ NEW LOGIC ADDED (as requested)
+    const k = updates.knowledgeScore ?? record.knowledgeScore;
+    const a = updates.approachScore ?? record.approachScore;
+    const s = updates.skillsScore ?? record.skillsScore;
+    const o = updates.otherScore ?? record.otherScore;
+
+    const allEmpty =
+      (k === null || k === undefined || k === "") &&
+      (a === null || a === undefined || a === "") &&
+      (s === null || s === undefined || s === "") &&
+      (o === null || o === undefined || o === "");
+
+    if (!allEmpty) {
+      const numericValues = [k, a, s, o]
+        .map(v => Number(v))
+        .filter(v => !isNaN(v));
+
+      updates.totalAverageScore =
+        numericValues.length > 0
+          ? Number((numericValues.reduce((x, y) => x + y, 0) / numericValues.length).toFixed(2))
+          : null;
+    } else {
+      updates.totalAverageScore = null;
+    }
+    // ⭐ END OF NEW LOGIC
+
     // ✅ Ensure coSheetId matches teamManagerId
     const effectiveTeamManagerId = updates.teamManagerId ?? record.teamManagerId;
     if (effectiveTeamManagerId) {
@@ -136,6 +162,7 @@ const updateResume = async (req, res) => {
 module.exports.updateResume = updateResume;
 
 
+
 // ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
@@ -148,11 +175,6 @@ const listResumes = async (req, res) => {
       attributes: ["id", "name", "email"],
       raw: true,
     });
-    const managerList = managers.map((m) => ({
-      id: m.id,
-      name: m.name,
-      email: m.email,
-    }));
 
     // ---------------------------
     // 1️⃣ Sync Student Registrations
@@ -280,7 +302,7 @@ const listResumes = async (req, res) => {
     // 4️⃣ Return response
     // ---------------------------
     console.log("🏁 All processing done successfully!");
-    return ReS(res, { success: true, data: records, managerList }, 200);
+    return ReS(res, { success: true, data: records, managers }, 200);
 
   } catch (error) {
     console.error("StudentResume List Error:", error);
@@ -289,7 +311,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 
 // ✅ Delete resume by ID
