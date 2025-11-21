@@ -684,21 +684,24 @@ const logoutUser = async (req, res) => {
       return ReE(res, "Invalid or missing id", 400);
     }
 
-    const numericId = id; // <-- KEEP AS STRING
+    const numericId = id; // KEEP AS STRING
 
+    // 🔹 Try USER table
     let account = await model.User.findOne({ 
       where: { id: numericId, isDeleted: false } 
     });
 
     let role = "user";
 
+    // 🔹 If not found → Try TEAM MANAGER table
     if (!account) {
       account = await model.TeamManager.findOne({
-        where: { managerId: numericId, isDeleted: false },
+        where: { id: numericId, isDeleted: false }, // FIXED HERE
       });
       role = "manager";
     }
 
+    // 🔹 If still not found
     if (!account) return ReE(res, "Account not found", 404);
 
     await account.update({ lastLogoutAt: new Date() });
@@ -714,6 +717,7 @@ const logoutUser = async (req, res) => {
   }
 };
 module.exports.logoutUser = logoutUser;
+
 
 
 // ===================== REQUEST PASSWORD RESET =====================
