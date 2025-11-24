@@ -8,7 +8,7 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // AUTO-FILL businessTask
+    // ------- AUTO-FILL businessTask -------
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId }
     });
@@ -18,28 +18,27 @@ const upsertBdSheet = async (req, res) => {
         where: { phoneNumber: resume.mobileNumber }
       });
 
-      if (user && user.subscriptionWallet != null) {
-        if (req.body.businessTask === undefined || req.body.businessTask === null) {
-          req.body.businessTask = user.subscriptionWallet;
-        }
+      if (user && req.body.businessTask == null) {
+        req.body.businessTask = user.subscriptionWallet;
       }
     }
 
-    // 1️⃣ CLEAN req.body INCLUDING nested JSON
-    cleanObject(req.body);
-
-    // UPSERT
+    // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
       where: { studentResumeId }
     });
 
     if (sheet) {
-      await sheet.update(req.body);
+      // 🚀 Filter only fields which user actually sent
+      const updateFields = filterUpdateFields(req.body, sheet);
+
+      await sheet.update(updateFields);
       return ReS(res, { message: "BdSheet updated successfully", data: sheet });
-    } else {
-      const newSheet = await model.BdSheet.create(req.body);
-      return ReS(res, { message: "BdSheet created successfully", data: newSheet });
     }
+
+    // CREATE
+    const newSheet = await model.BdSheet.create(req.body);
+    return ReS(res, { message: "BdSheet created successfully", data: newSheet });
 
   } catch (error) {
     console.log("BD SHEET UPSERT ERROR:", error);
@@ -47,20 +46,34 @@ const upsertBdSheet = async (req, res) => {
   }
 };
 
-// Helper for nested cleaning
-function cleanObject(obj) {
-  Object.keys(obj).forEach(key => {
-    const value = obj[key];
+// Helper function
+function filterUpdateFields(reqBody, existingSheet) {
+  const allowed = {};
 
-    if (value === undefined || value === null) {
-      delete obj[key];
-    } else if (typeof value === "object" && !Array.isArray(value)) {
-      cleanObject(value);
-      if (Object.keys(value).length === 0) delete obj[key];
+  for (const key of Object.keys(reqBody)) {
+    const incoming = reqBody[key];
+
+    // Skip undefined/null
+    if (incoming == null) continue;
+
+    // Handle JSON day fields
+    if (["day1","day2","day3","day4","day5","day6","day7"].includes(key)) {
+      if (typeof incoming === "object" && !Array.isArray(incoming)) {
+        // Skip empty {}
+        if (Object.keys(incoming).length === 0) continue;
+      }
+
+      allowed[key] = {
+        ...existingSheet[key],
+        ...incoming
+      };
+      continue;
     }
-  });
 
-  return obj;
+    allowed[key] = incoming;
+  }
+
+  return allowed;
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
