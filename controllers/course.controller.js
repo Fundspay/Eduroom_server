@@ -181,8 +181,7 @@ var listCourses = async (req, res) => {
       where: { isDeleted: false }, // exclude deleted courses if you use soft-delete
       include: [
         {
-          model: model.Domain,
-          as: "domain",
+          model: model.Domain,  
           attributes: ["id", "name"]
         }
       ],
