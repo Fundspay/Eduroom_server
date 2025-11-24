@@ -111,7 +111,7 @@ var updateCourse = async (req, res) => {
   });
 };
 
-module.exports.updateCourse = updateCourse;
+module.exports.updateCourse = updateCourse;    
 // ✅ Fetch all Courses
 // const fetchAllCourses = async (req, res) => {
 //   try {
