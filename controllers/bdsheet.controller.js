@@ -19,7 +19,19 @@ const upsertBdSheet = async (req, res) => {
       });
 
       if (user && req.body.businessTask == null) {
-        req.body.businessTask = user.subscriptionWallet;
+        // Calculate total business target similar to getUserWalletDetails
+        let totalBusinessTarget = 0;
+
+        for (const courseId of Object.keys(user.courseStatuses || {})) {
+          const userTarget = user.businessTargets?.[courseId];
+          const rawTarget = parseInt(
+            userTarget !== undefined ? userTarget : 0,
+            10
+          );
+          totalBusinessTarget += rawTarget < 0 ? 0 : rawTarget;
+        }
+
+        req.body.businessTask = totalBusinessTarget;
       }
     }
 
@@ -77,6 +89,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 const getBdSheet = async (req, res) => {
