@@ -9,16 +9,22 @@ module.exports = (sequelize, Sequelize) => {
       studentResumeId: { type: Sequelize.BIGINT, allowNull: false },
 
       // -----------------------------
+      // NEW BUSINESS TASK COLUMN (ADDED BEFORE CALL STATUS)
+      // -----------------------------
+      businessTask: { type: Sequelize.STRING, allowNull: true },
+
+      // -----------------------------
       // DAY 0 FIELDS
       // -----------------------------
-      callStatus: { type: Sequelize.STRING, allowNull: true }, 
-      registration: { type: Sequelize.STRING, allowNull: true }, 
-      selectionTest: { type: Sequelize.STRING, allowNull: true }, 
-      whatsappGroup: { type: Sequelize.STRING, allowNull: true }, 
-      connectDate: { type: Sequelize.DATE, allowNull: true },       // ⭐ ADDED
+      callStatus: { type: Sequelize.STRING, allowNull: true },
+      registration: { type: Sequelize.STRING, allowNull: true },
+      selectionTest: { type: Sequelize.STRING, allowNull: true },
+      whatsappGroup: { type: Sequelize.STRING, allowNull: true },
+      connectDate: { type: Sequelize.DATE, allowNull: true },
 
       // -----------------------------
       // DAY 1 TO DAY 7 (JSON)
+      // businessTask removed from all
       // -----------------------------
       day1: { type: Sequelize.JSON, allowNull: true },
       day2: { type: Sequelize.JSON, allowNull: true },
@@ -31,26 +37,33 @@ module.exports = (sequelize, Sequelize) => {
       // -----------------------------
       // OTHER FIELDS
       // -----------------------------
-      category: { 
-        type: Sequelize.STRING, 
-        allowNull: true 
+      category: {
+        type: Sequelize.STRING,
+        allowNull: true,
       },
 
-      module2Status: { type: Sequelize.STRING, allowNull: true }, 
-      tlAllocated: { type: Sequelize.STRING, allowNull: true }, 
+      module2Status: { type: Sequelize.STRING, allowNull: true },
+      tlAllocated: { type: Sequelize.STRING, allowNull: true },
 
-      // ⭐ ADDED NEW FIELDS (NO OTHER EDITS)
+      // NEW ADDED FIELDS
       startDate: { type: Sequelize.DATE, allowNull: true },
       endDate: { type: Sequelize.DATE, allowNull: true },
 
-      createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
-      updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+      createdAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
+      updatedAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
     },
     { timestamps: true }
   );
 
   BdSheet.associate = function (models) {
-
     // ⭐ CORRECT BD→RESUME LINK
     BdSheet.belongsTo(models.StudentResume, {
       foreignKey: "studentResumeId",
@@ -58,7 +71,7 @@ module.exports = (sequelize, Sequelize) => {
       onUpdate: "CASCADE",
     });
 
-    // Existing association (NO CHANGES)
+    // Existing association (NO CHANGE)
     BdSheet.belongsTo(models.TeamManager, {
       foreignKey: "teamManagerId",
       onDelete: "SET NULL",
