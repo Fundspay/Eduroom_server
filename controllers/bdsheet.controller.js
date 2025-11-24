@@ -55,7 +55,7 @@ const getBdSheet = async (req, res) => {
 
     let whereCondition = {};
     if (resumeId) {
-      whereCondition.id = resumeId;  // ← MATCH StudentResume.id
+      whereCondition.id = resumeId;  // Match StudentResume.id
     }
 
     const data = await model.StudentResume.findAll({
@@ -71,8 +71,11 @@ const getBdSheet = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: false,                // ← LEFT JOIN
-          order: [["id", "DESC"]]         // latest BD entry
+          required: false,   // LEFT JOIN
+          attributes: {
+            include: ["businessTask"]   // ⭐ ADDED THIS
+          },
+          order: [["id", "DESC"]]
         }
       ],
       order: [["id", "DESC"]]
@@ -86,4 +89,5 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
