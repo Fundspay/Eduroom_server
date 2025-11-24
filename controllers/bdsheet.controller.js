@@ -8,9 +8,7 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // -------------------------------
     // AUTO-FILL businessTask
-    // -------------------------------
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId }
     });
@@ -27,18 +25,12 @@ const upsertBdSheet = async (req, res) => {
       }
     }
 
-    // -------------------------------
+    // 1️⃣ CLEAN req.body INCLUDING nested JSON
+    cleanObject(req.body);
+
     // UPSERT
-    // -------------------------------
     let sheet = await model.BdSheet.findOne({
       where: { studentResumeId }
-    });
-
-    //  Remove undefined AND null values from req.body
-    Object.keys(req.body).forEach((key) => {
-      if (req.body[key] === undefined || req.body[key] === null) {
-        delete req.body[key];
-      }
     });
 
     if (sheet) {
@@ -55,8 +47,23 @@ const upsertBdSheet = async (req, res) => {
   }
 };
 
-module.exports.upsertBdSheet = upsertBdSheet;
+// Helper for nested cleaning
+function cleanObject(obj) {
+  Object.keys(obj).forEach(key => {
+    const value = obj[key];
 
+    if (value === undefined || value === null) {
+      delete obj[key];
+    } else if (typeof value === "object" && !Array.isArray(value)) {
+      cleanObject(value);
+      if (Object.keys(value).length === 0) delete obj[key];
+    }
+  });
+
+  return obj;
+}
+
+module.exports.upsertBdSheet = upsertBdSheet;
 
 
 const getBdSheet = async (req, res) => {
