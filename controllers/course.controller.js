@@ -174,6 +174,29 @@ module.exports.updateCourse = updateCourse;
 
 // module.exports.fetchAllCourses = fetchAllCourses;
 
+var listCourses = async (req, res) => {
+  try {
+    // Optionally, you can include domain details with each course
+    const courses = await model.Course.findAll({
+      where: { isDeleted: false }, // exclude deleted courses if you use soft-delete
+      include: [
+        {
+          model: model.Domain,
+          as: "domain",
+          attributes: ["id", "name"]
+        }
+      ],
+      order: [["createdAt", "DESC"]]
+    });
+
+    return ReS(res, courses, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.listCourses = listCourses;
+
 
 const fetchAllCourses = async (req, res) => {
   try {

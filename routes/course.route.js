@@ -8,6 +8,7 @@ router.get("/courses", courseController.fetchAllCourses);
 router.get("/list/:id", courseController.fetchSingleCourse);
 router.put("/update/:id", courseController.updateCourse);
 router.delete("/delete/:id", courseController.deleteCourse);
+router.get("/fetch/all", courseController.listCourses);
 router.get("/course/:domainId", courseController.fetchCoursesByDomain);
 router.get("/status/:userId", courseController.getUserCourseStatus);
 router.get("/status", courseController.getAllUsersCourseStatus);
