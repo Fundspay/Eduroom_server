@@ -63,4 +63,4 @@ const getBdSheet = async (req, res) => {
     return ReE(res, err.message, 500);
   }
 };
-model.exports.getBdSheet = getBdSheet;
+module.exports.getBdSheet = getBdSheet;
