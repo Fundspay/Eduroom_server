@@ -81,11 +81,22 @@ module.exports.upsertBdSheet = upsertBdSheet;
 
 const getBdSheet = async (req, res) => {
   try {
-    const { resumeId } = req.query;
+    const { resumeId, managerId } = req.query;
 
     let whereCondition = {};
+
+    // ---------------------------
+    // Filter by resumeId
+    // ---------------------------
     if (resumeId) {
-      whereCondition.id = resumeId;  // Match StudentResume.id
+      whereCondition.id = resumeId;
+    }
+
+    // ---------------------------
+    // Filter by managerId → match StudentResume.alloted
+    // ---------------------------
+    if (managerId) {
+      whereCondition.alloted = managerId;
     }
 
     const data = await model.StudentResume.findAll({
@@ -101,9 +112,9 @@ const getBdSheet = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: false,   // LEFT JOIN
+          required: false,
           attributes: {
-            include: ["businessTask"]   // ⭐ ADDED THIS
+            include: ["businessTask"]
           },
           order: [["id", "DESC"]]
         }
@@ -119,5 +130,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 
