@@ -8,20 +8,20 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // 1️⃣ Fetch StudentResume to get email
+    // 1️⃣ Fetch StudentResume to get mobile number
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId }
     });
 
-    if (resume && resume.emailId) {
-      // 2️⃣ Fetch User using email to get subscriptionWallet (businessTask)
+    if (resume) {
+      // 2️⃣ Fetch User by mobileNumber (correct matching)
       const user = await model.User.findOne({
-        where: { phoneNumber: resume.mobileNumber } // because StudentResume is linked by mobileNumber
+        where: { phoneNumber: resume.mobileNumber }
       });
 
-      // 3️⃣ Auto-fill businessTask from subscriptionWallet
-      if (user && user.subscriptionWallet) {
-        req.body.businessTask = user.subscriptionWallet; 
+      // 3️⃣ Put subscriptionWallet → businessTask
+      if (user) {
+        req.body.businessTask = user.subscriptionWallet || 0;
       }
     }
 
@@ -48,6 +48,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 const getBdSheet = async (req, res) => {
   try {
