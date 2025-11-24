@@ -38,10 +38,10 @@ module.exports = (sequelize, Sequelize) => {
       comment: { type: Sequelize.TEXT, allowNull: true },
 
       // NEW FIELDS ADDED (as requested)
-      callStatus: { type: Sequelize.STRING, allowNull: true }, // answered / not answered / switch off
-      alloted: { type: Sequelize.STRING, allowNull: true },    // registered users
+      callStatus: { type: Sequelize.STRING, allowNull: true },
+      alloted: { type: Sequelize.STRING, allowNull: true },
 
-      // 🔹 Foreign keys
+      // Foreign keys
       coSheetId: { type: Sequelize.BIGINT, allowNull: true },
       teamManagerId: { type: Sequelize.BIGINT, allowNull: true },
 
@@ -85,12 +85,12 @@ module.exports = (sequelize, Sequelize) => {
       onUpdate: "CASCADE",
     });
 
-    StudentResume.associate = function (models) {
-  StudentResume.hasMany(models.BdSheet, {
-    foreignKey: "studentResumeId",
-  });
-};
-
+    // ⭐ FIXED: BdSheet association properly added here
+    StudentResume.hasMany(models.BdSheet, {
+      foreignKey: "studentResumeId",
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    });
   };
 
   return StudentResume;
