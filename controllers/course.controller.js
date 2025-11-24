@@ -67,8 +67,12 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
+      console.log("🟦 UPDATE COURSE REQUEST RECEIVED For Course ID:", req.params.id);
+
       // Store old businessTarget to compare later
       const oldBusinessTarget = course.businessTarget;
+      console.log("Old businessTarget:", oldBusinessTarget);
+      console.log("Incoming businessTarget:", req.body.businessTarget);
 
       // Update the course
       await course.update({
@@ -87,31 +91,55 @@ var updateCourse = async (req, res) => {
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition
       });
 
-      // ✅ If businessTarget changed, update all users who have this course
+      console.log("🟩 Course updated successfully!");
+
+      // -----------------------------------------------------
+      //  UPDATE Users.businessTargets IF businessTarget CHANGED
+      // -----------------------------------------------------
       if (req.body.businessTarget !== undefined && req.body.businessTarget !== oldBusinessTarget) {
+
+        console.log("🔄 BusinessTarget changed → Updating users…");
+
+        const newTarget = Number(req.body.businessTarget);
         const users = await model.User.findAll();
+
+        let updatedUsersCount = 0;
+
         for (const user of users) {
           if (!user.businessTargets) continue;
 
-          // Parse user.businessTargets JSON
           const bt = { ...user.businessTargets };
+
+          // If user has this course entry → update only TARGET
           if (bt[course.id]) {
-            bt[course.id].target = Number(req.body.businessTarget); // update the target
+
+            console.log(`➡ Updating User ID: ${user.id} for Course: ${course.id}`);
+            console.log("   Old target:", bt[course.id].target, "| New target:", newTarget);
+
+            bt[course.id].target = newTarget; // only update the target
             user.businessTargets = bt;
+
             await user.save({ fields: ["businessTargets"] });
+            updatedUsersCount++;
           }
         }
+
+        console.log(`🟢 Updated businessTargets for ${updatedUsersCount} users.`);
+      } else {
+        console.log("⚠ businessTarget not changed — skipping user updates.");
       }
 
       return ReS(res, course, 200);
+
     } catch (error) {
-      console.error("updateCourse error:", error);
+      console.error("❌ updateCourse error:", error);
       return ReE(res, error.message, 500);
     }
   });
 };
 
-module.exports.updateCourse = updateCourse;    
+module.exports.updateCourse = updateCourse;
+
 // ✅ Fetch all Courses
 // const fetchAllCourses = async (req, res) => {
 //   try {
