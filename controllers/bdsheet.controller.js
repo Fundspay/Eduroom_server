@@ -51,7 +51,8 @@ const getBdSheet = async (req, res) => {
             "mobileNumber",
             "emailId",
             "domain"
-          ]
+          ],
+          required: false   // ← VERY IMPORTANT (LEFT JOIN)
         }
       ],
       order: [["id", "DESC"]]
@@ -63,4 +64,5 @@ const getBdSheet = async (req, res) => {
     return ReE(res, err.message, 500);
   }
 };
+
 module.exports.getBdSheet = getBdSheet;
