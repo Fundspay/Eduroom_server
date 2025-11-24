@@ -85,18 +85,25 @@ const getBdSheet = async (req, res) => {
 
     let whereCondition = {};
 
-    // ---------------------------
     // Filter by resumeId
-    // ---------------------------
     if (resumeId) {
       whereCondition.id = resumeId;
     }
 
-    // ---------------------------
-    // Filter by managerId → match StudentResume.alloted
-    // ---------------------------
+    // Filter by managerId → match alloted with manager name
     if (managerId) {
-      whereCondition.alloted = managerId;
+      // 1️⃣ Fetch manager name
+      const manager = await model.TeamManager.findOne({
+        where: { id: managerId },
+        attributes: ["name"] // assuming TeamManager has 'name' column
+      });
+
+      if (manager && manager.name) {
+        whereCondition.alloted = manager.name;
+      } else {
+        // If managerId is invalid, no student should match
+        whereCondition.alloted = "__invalid__";
+      }
     }
 
     const data = await model.StudentResume.findAll({
