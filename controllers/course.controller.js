@@ -67,6 +67,10 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
+      // Store old businessTarget to compare later
+      const oldBusinessTarget = course.businessTarget;
+
+      // Update the course
       await course.update({
         name: req.body.name || course.name,
         domainId: req.body.domainId || course.domainId,
@@ -83,14 +87,31 @@ var updateCourse = async (req, res) => {
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition
       });
 
+      // ✅ If businessTarget changed, update all users who have this course
+      if (req.body.businessTarget !== undefined && req.body.businessTarget !== oldBusinessTarget) {
+        const users = await model.User.findAll();
+        for (const user of users) {
+          if (!user.businessTargets) continue;
+
+          // Parse user.businessTargets JSON
+          const bt = { ...user.businessTargets };
+          if (bt[course.id]) {
+            bt[course.id].target = Number(req.body.businessTarget); // update the target
+            user.businessTargets = bt;
+            await user.save({ fields: ["businessTargets"] });
+          }
+        }
+      }
+
       return ReS(res, course, 200);
     } catch (error) {
+      console.error("updateCourse error:", error);
       return ReE(res, error.message, 500);
     }
   });
 };
-module.exports.updateCourse = updateCourse;
 
+module.exports.updateCourse = updateCourse;
 // ✅ Fetch all Courses
 // const fetchAllCourses = async (req, res) => {
 //   try {

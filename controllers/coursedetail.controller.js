@@ -1119,21 +1119,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // Determine business target: course-level overrides user-level
-      let businessTarget = 0;
-      let offerMessage = null;
-
-      if (course.businessTarget !== undefined && course.businessTarget !== null) {
-        // Course has updated businessTarget → take this one
-        businessTarget = Number(course.businessTarget);
-        offerMessage = null; // or get from course if needed
-      } else {
-        // Fall back to user-specific business target
-        const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
-        businessTarget = btEntry.target || 0;
-        offerMessage = btEntry.offerMessage || null;
-      }
-
+      // ✅ Use normalized businessTargets
+      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
+      const businessTarget = btEntry.target || 0;
+      const offerMessage = btEntry.offerMessage || null;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
@@ -1247,20 +1236,10 @@ const getBusinessTarget = async (req, res) => {
       }
     }
 
-    // 4️⃣ Determine businessTarget and offerMessage: course-level overrides user-level
-    let businessTarget = 0;
-    let offerMessage = null;
-
-    if (course.businessTarget !== undefined && course.businessTarget !== null) {
-      // Use course-level businessTarget
-      businessTarget = Number(course.businessTarget);
-      offerMessage = null; // or get from course if needed
-    } else {
-      // Fall back to user-specific business target
-      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
-      businessTarget = btEntry.target || 0;
-      offerMessage = btEntry.offerMessage || null;
-    }
+    // 4️⃣ Determine businessTarget and offerMessage for this course
+    const btEntry = normalizedBusinessTargets[courseId] || { target: parseInt(course.businessTarget) || 0, offerMessage: null };
+    const businessTarget = btEntry.target || 0;
+    const offerMessage = btEntry.offerMessage || null;
 
     // 5️⃣ Fetch referral count (same logic as before)
     let achievedCount = 0;
@@ -1316,7 +1295,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
 
 
 // const getBusinessUserTarget = async (req, res) => {
