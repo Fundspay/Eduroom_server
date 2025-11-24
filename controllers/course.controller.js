@@ -119,6 +119,8 @@ var updateCourse = async (req, res) => {
             bt[course.id].target = newTarget; // only update the target
             user.businessTargets = bt;
 
+             user.changed("businessTargets", true);  
+
             await user.save({ fields: ["businessTargets"] });
             updatedUsersCount++;
           }
