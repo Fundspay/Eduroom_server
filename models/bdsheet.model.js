@@ -15,6 +15,7 @@ module.exports = (sequelize, Sequelize) => {
       registration: { type: Sequelize.STRING, allowNull: true }, 
       selectionTest: { type: Sequelize.STRING, allowNull: true }, 
       whatsappGroup: { type: Sequelize.STRING, allowNull: true }, 
+      connectDate: { type: Sequelize.DATE, allowNull: true },       // ⭐ ADDED
 
       // -----------------------------
       // DAY 1 TO DAY 7 (JSON)
@@ -37,6 +38,10 @@ module.exports = (sequelize, Sequelize) => {
 
       module2Status: { type: Sequelize.STRING, allowNull: true }, 
       tlAllocated: { type: Sequelize.STRING, allowNull: true }, 
+
+      // ⭐ ADDED NEW FIELDS (NO OTHER EDITS)
+      startDate: { type: Sequelize.DATE, allowNull: true },
+      endDate: { type: Sequelize.DATE, allowNull: true },
 
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
