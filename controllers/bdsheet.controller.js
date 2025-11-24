@@ -8,29 +8,36 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // 1️⃣ Fetch StudentResume to get mobile number
+    // -------------------------------
+    // AUTO-FILL businessTask
+    // -------------------------------
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId }
     });
 
     if (resume) {
-      // 2️⃣ Fetch User by mobileNumber (correct matching)
       const user = await model.User.findOne({
         where: { phoneNumber: resume.mobileNumber }
       });
 
-      // 3️⃣ Put subscriptionWallet → businessTask
-      if (user) {
-        req.body.businessTask = user.subscriptionWallet || 0;
+      if (user && user.subscriptionWallet != null) {
+        // Only auto-fill if frontend didn't send businessTask
+        if (req.body.businessTask === undefined) {
+          req.body.businessTask = user.subscriptionWallet;
+        }
       }
     }
 
-    // -------------------------
-    // EXISTING UPSERT LOGIC
-    // -------------------------
-
+    // -------------------------------
+    // UPSERT
+    // -------------------------------
     let sheet = await model.BdSheet.findOne({
       where: { studentResumeId }
+    });
+
+    //  Remove undefined keys so they don't overwrite DB values
+    Object.keys(req.body).forEach((key) => {
+      if (req.body[key] === undefined) delete req.body[key];
     });
 
     if (sheet) {
@@ -48,6 +55,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 const getBdSheet = async (req, res) => {
