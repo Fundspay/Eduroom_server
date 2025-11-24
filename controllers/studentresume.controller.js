@@ -43,8 +43,6 @@ const createResume = async (req, res) => {
       dateOfOnboarding: data.dateOfOnboarding ?? null,
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
-
-      //  NEW FIELDS
       callStatus: data.callStatus ?? null,
       alloted: data.alloted ?? null,
     }));
@@ -89,11 +87,10 @@ const updateResume = async (req, res) => {
     const allowedFields = [
       "sr", "resumeDate", "collegeName", "course", "internshipType",
       "followupBy", "studentName", "mobileNumber", "emailId",
-      "domain", "interviewDate", "teamManagerId", "dateOfOnboarding",
-
-      //  NEW FIELDS ALLOWED FOR UPDATE
+      "domain", "interviewDate", "teamManagerId", "Dateofonboarding",
       "callStatus",
-      "alloted"
+      "alloted",
+      "knowledgeScore","approachScore","skillsScore","otherScore","totalAverageScore","finalSelectionStatus","comment"
     ];
 
     for (let f of allowedFields) {
@@ -115,6 +112,32 @@ const updateResume = async (req, res) => {
         }
       }
     }
+
+    // ⭐ NEW LOGIC ADDED (as requested)
+    const k = updates.knowledgeScore ?? record.knowledgeScore;
+    const a = updates.approachScore ?? record.approachScore;
+    const s = updates.skillsScore ?? record.skillsScore;
+    const o = updates.otherScore ?? record.otherScore;
+
+    const allEmpty =
+      (k === null || k === undefined || k === "") &&
+      (a === null || a === undefined || a === "") &&
+      (s === null || s === undefined || s === "") &&
+      (o === null || o === undefined || o === "");
+
+    if (!allEmpty) {
+      const numericValues = [k, a, s, o]
+        .map(v => Number(v))
+        .filter(v => !isNaN(v));
+
+      updates.totalAverageScore =
+        numericValues.length > 0
+          ? Number((numericValues.reduce((x, y) => x + y, 0) / numericValues.length).toFixed(2))
+          : null;
+    } else {
+      updates.totalAverageScore = null;
+    }
+    // ⭐ END OF NEW LOGIC
 
     // ✅ Ensure coSheetId matches teamManagerId
     const effectiveTeamManagerId = updates.teamManagerId ?? record.teamManagerId;
@@ -139,10 +162,19 @@ const updateResume = async (req, res) => {
 module.exports.updateResume = updateResume;
 
 
+
 // ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
     console.log("🚀 Starting StudentResume list sync...");
+
+    // ---------------------------
+    // Fetch all managers for dropdown/reference
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
 
     // ---------------------------
     // 1️⃣ Sync Student Registrations
@@ -270,7 +302,8 @@ const listResumes = async (req, res) => {
     // 4️⃣ Return response
     // ---------------------------
     console.log("🏁 All processing done successfully!");
-    return ReS(res, { success: true, data: records }, 200);
+    return ReS(res, { success: true, data: records, managers }, 200);
+
   } catch (error) {
     console.error("StudentResume List Error:", error);
     return ReE(res, error.message, 500);
@@ -610,14 +643,16 @@ const listResumesByUserId = async (req, res) => {
     });
     if (!manager) return ReE(res, "Manager not found", 404);
 
+    const managerName = manager.name;  // ⭐ we will match this with followupBy
+
     // ---------------------------
-    // Fetch resumes assigned to this manager
+    // Fetch resumes WHERE followupBy == managerName
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { teamManagerId },
+      where: { followupBy: managerName },  // ⭐ UPDATED EXACTLY AS YOU ASKED
       include: [
         {
-          model: model.FundsAuditStudent, // Include associated FundsAuditStudent entries
+          model: model.FundsAuditStudent,
           attributes: [
             "id",
             "fundsAuditId",
@@ -641,7 +676,7 @@ const listResumesByUserId = async (req, res) => {
     });
 
     // ---------------------------
-    // Fetch all managers for dropdown/reference
+    // Fetch all managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
@@ -1042,6 +1077,14 @@ const listResumesByUserIdfuture = async (req, res) => {
     });
 
     // ---------------------------
+    // Fetch all registered managers  ⭐ ADDED AS REQUESTED
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
+    // ---------------------------
     // Return response
     // ---------------------------
     return ReS(res, {
@@ -1050,6 +1093,7 @@ const listResumesByUserIdfuture = async (req, res) => {
       followUpBy: fullName,
       totalRecords: resumes.length,
       data: resumes,
+      managers,   // ⭐ ADDED HERE
     });
   } catch (error) {
     console.error("ListResumesByUserIdfuture Error:", error);
@@ -1058,3 +1102,4 @@ const listResumesByUserIdfuture = async (req, res) => {
 };
 
 module.exports.listResumesByUserIdfuture = listResumesByUserIdfuture;
+

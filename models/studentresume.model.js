@@ -84,6 +84,13 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
+
+    StudentResume.associate = function (models) {
+  StudentResume.hasMany(models.BdSheet, {
+    foreignKey: "studentResumeId",
+  });
+};
+
   };
 
   return StudentResume;
