@@ -21,8 +21,7 @@ const upsertBdSheet = async (req, res) => {
       });
 
       if (user && user.subscriptionWallet != null) {
-        // Only auto-fill if frontend didn't send businessTask
-        if (req.body.businessTask === undefined) {
+        if (req.body.businessTask === undefined || req.body.businessTask === null) {
           req.body.businessTask = user.subscriptionWallet;
         }
       }
@@ -35,9 +34,11 @@ const upsertBdSheet = async (req, res) => {
       where: { studentResumeId }
     });
 
-    //  Remove undefined keys so they don't overwrite DB values
+    //  Remove undefined AND null values from req.body
     Object.keys(req.body).forEach((key) => {
-      if (req.body[key] === undefined) delete req.body[key];
+      if (req.body[key] === undefined || req.body[key] === null) {
+        delete req.body[key];
+      }
     });
 
     if (sheet) {
