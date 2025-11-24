@@ -11,10 +11,10 @@ module.exports = (sequelize, Sequelize) => {
       // -----------------------------
       // DAY 0 FIELDS
       // -----------------------------
-      callStatus: { type: Sequelize.STRING, allowNull: true }, // connected, not connected, not interested
-      registration: { type: Sequelize.STRING, allowNull: true }, // completed / not completed
-      selectionTest: { type: Sequelize.STRING, allowNull: true }, // % or not completed
-      whatsappGroup: { type: Sequelize.STRING, allowNull: true }, // joined / not joined
+      callStatus: { type: Sequelize.STRING, allowNull: true }, 
+      registration: { type: Sequelize.STRING, allowNull: true }, 
+      selectionTest: { type: Sequelize.STRING, allowNull: true }, 
+      whatsappGroup: { type: Sequelize.STRING, allowNull: true }, 
 
       // -----------------------------
       // DAY 1 TO DAY 7 (JSON)
@@ -27,25 +27,16 @@ module.exports = (sequelize, Sequelize) => {
       day6: { type: Sequelize.JSON, allowNull: true },
       day7: { type: Sequelize.JSON, allowNull: true },
 
-      // JSON FORMAT FOR EACH DAY:
-      // {
-      //   "date": "2025-01-01",
-      //   "sessionAttendance": "achieve | not achieve | not attended | left | terminated",
-      //   "businessTask": "text",
-      //   "domainTask": "text"
-      // }
-
       // -----------------------------
       // OTHER FIELDS
       // -----------------------------
       category: { 
         type: Sequelize.STRING, 
         allowNull: true 
-      }, // Not working, starter, basic, bronze, silver, gold, diamond, platinum
+      },
 
-      module2Status: { type: Sequelize.STRING, allowNull: true }, // selected / not selected
-
-      tlAllocated: { type: Sequelize.STRING, allowNull: true }, // TL name
+      module2Status: { type: Sequelize.STRING, allowNull: true }, 
+      tlAllocated: { type: Sequelize.STRING, allowNull: true }, 
 
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
@@ -54,13 +45,16 @@ module.exports = (sequelize, Sequelize) => {
   );
 
   BdSheet.associate = function (models) {
+
+    // ⭐ CORRECT BD→RESUME LINK
     BdSheet.belongsTo(models.StudentResume, {
       foreignKey: "studentResumeId",
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
 
-      BdSheet.belongsTo(models.TeamManager, {
+    // Existing association (NO CHANGES)
+    BdSheet.belongsTo(models.TeamManager, {
       foreignKey: "teamManagerId",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
