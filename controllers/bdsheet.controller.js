@@ -37,22 +37,24 @@ const getBdSheet = async (req, res) => {
 
     let whereCondition = {};
     if (resumeId) {
-      whereCondition.studentResumeId = resumeId;
+      whereCondition.id = resumeId;  // ← MATCH StudentResume.id
     }
 
-    const data = await model.BdSheet.findAll({
+    const data = await model.StudentResume.findAll({
       where: whereCondition,
+      attributes: [
+        "id",
+        "sr",
+        "studentName",
+        "mobileNumber",
+        "emailId",
+        "domain"
+      ],
       include: [
         {
-          model: model.StudentResume,
-          attributes: [
-            "id",
-            "studentName",
-            "mobileNumber",
-            "emailId",
-            "domain"
-          ],
-          required: false   // ← VERY IMPORTANT (LEFT JOIN)
+          model: model.BdSheet,
+          required: false,                // ← LEFT JOIN
+          order: [["id", "DESC"]]         // latest BD entry
         }
       ],
       order: [["id", "DESC"]]
@@ -66,3 +68,4 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
