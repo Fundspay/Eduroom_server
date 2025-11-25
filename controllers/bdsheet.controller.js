@@ -36,11 +36,11 @@ const upsertBdSheet = async (req, res) => {
     }
 
     // ---------------------------
-    // CATEGORY LOGIC ADDED HERE
+    // CATEGORY LOGIC (overwrite always)
     // ---------------------------
-    const bt = parseInt(req.body.businessTask || 0, 10);
+    const bt = parseInt(req.body.businessTask);
 
-    if (bt === 0 || bt === null) req.body.category = "not working";
+    if (!bt || bt === 0) req.body.category = "not working";
     else if (bt >= 1 && bt <= 5) req.body.category = "Starter";
     else if (bt >= 6 && bt <= 10) req.body.category = "Basic";
     else if (bt >= 11 && bt <= 15) req.body.category = "Bronze";
