@@ -8,23 +8,28 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
+    // ---- FETCH RESUME (this was missing - caused "resume is not defined") ----
+    const resume = await model.StudentResume.findOne({
+      where: { id: studentResumeId }
+    });
+
     // AUTO-FILL businessTask & registration
-if (resume) {
-  const user = await model.User.findOne({
-    where: { phoneNumber: resume.mobileNumber }
-  });
+    if (resume) {
+      const user = await model.User.findOne({
+        where: { phoneNumber: resume.mobileNumber }
+      });
 
-  if (user) {
-    if (req.body.businessTask === undefined || req.body.businessTask === null) {
-      req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
+      if (user) {
+        if (req.body.businessTask === undefined || req.body.businessTask === null) {
+          req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
+        }
+
+        // Write to registration instead of connectDate
+        req.body.registration = user.createdAt
+          ? new Date(user.createdAt)
+          : null;
+      }
     }
-
-    // Write to registration instead of connectDate
-    req.body.registration = user.createdAt
-      ? new Date(user.createdAt)
-      : null;
-  }
-}
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
@@ -32,7 +37,6 @@ if (resume) {
     });
 
     if (sheet) {
-      // 🚀 Filter only fields which user actually sent
       const updateFields = filterUpdateFields(req.body, sheet);
 
       await sheet.update(updateFields);
@@ -57,8 +61,7 @@ function filterUpdateFields(reqBody, existingSheet) {
     const incoming = reqBody[key];
 
     // allow date objects even if they look falsy
-if (incoming === undefined || incoming === null) continue;
-
+    if (incoming === undefined || incoming === null) continue;
 
     // Handle JSON day fields
     if (["day1","day2","day3","day4","day5","day6","day7"].includes(key)) {
@@ -81,7 +84,6 @@ if (incoming === undefined || incoming === null) continue;
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
-
 
 
 const getBdSheet = async (req, res) => {
