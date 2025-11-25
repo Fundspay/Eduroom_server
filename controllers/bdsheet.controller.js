@@ -202,13 +202,15 @@ const getBdSheetByCategory = async (req, res) => {
     const { managerId, category } = req.query;
 
     if (!category) {
-      return ReE(res, "Category is required", 400);
+      return ReE(res, "category is required", 400);
     }
 
-    // BdSheet filter only by category
-    let bdWhere = { category };
+    let whereCondition = {}; // for StudentResume
+    let bdWhere = { category }; // for BdSheet
 
-    // If managerId is given → filter by alloted manager name
+    // ---------------------------
+    // Manager filter (same as your getBdSheet)
+    // ---------------------------
     if (managerId) {
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
@@ -216,20 +218,17 @@ const getBdSheetByCategory = async (req, res) => {
       });
 
       if (manager && manager.name) {
-        bdWhere.alloted = manager.name;
+        whereCondition.alloted = manager.name; 
       } else {
-        bdWhere.alloted = "__invalid__"; // no matches
+        whereCondition.alloted = "__invalid__"; 
       }
     }
 
-    // Fetch all managers
-    const managers = await model.TeamManager.findAll({
-      attributes: ["id", "name", "email"],
-      raw: true,
-    });
-
-    // Fetch students with BdSheet filtered by category (+ manager if provided)
+    // ---------------------------
+    // Fetch student + BdSheet (with category filter)
+    // ---------------------------
     const data = await model.StudentResume.findAll({
+      where: whereCondition,
       attributes: [
         "id",
         "sr",
@@ -241,33 +240,44 @@ const getBdSheetByCategory = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          attributes: [
-            "id",
-            "category",
-            "alloted",
-            "businessTask",
-            "registration"
-          ],
-          required: true,      // only users having this category
+          required: true, // we must have category match
+          attributes: {
+            include: ["businessTask", "registration"],
+          },
           where: bdWhere,
+          order: [["id", "DESC"]],
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    // Format registration on top level
+    // Same formatting as original getBdSheet
     const formattedData = data.map((student) => {
       const s = student.toJSON();
-      if (s.BdSheet?.registration) {
+
+      if (s.BdSheet && s.BdSheet.registration) {
         s.registration = s.BdSheet.registration;
       }
+
+      if (s.BdSheet) {
+        delete s.BdSheet.registration;
+      }
+
       return s;
+    });
+
+    // ---------------------------
+    // Fetch managers list
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
     });
 
     return ReS(res, {
       count: formattedData.length,
-      managers,
       data: formattedData,
+      managers: managers,
     });
 
   } catch (err) {
@@ -277,6 +287,7 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
 
 
 
