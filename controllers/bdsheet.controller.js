@@ -218,9 +218,9 @@ const getBdSheetByCategory = async (req, res) => {
       });
 
       if (manager && manager.name) {
-        whereCondition.alloted = manager.name; 
+        whereCondition.alloted = manager.name;
       } else {
-        whereCondition.alloted = "__invalid__"; 
+        whereCondition.alloted = "__invalid__";
       }
     }
 
@@ -267,6 +267,45 @@ const getBdSheetByCategory = async (req, res) => {
     });
 
     // ---------------------------
+    // Counts Per Category (ADDED) — using same manager filter if present
+    // ---------------------------
+    const allCategories = [
+      "not working",
+      "Starter",
+      "Basic",
+      "Bronze",
+      "Silver",
+      "Gold",
+      "Diamond",
+      "Platinum",
+    ];
+
+    const categoryCounts = {};
+    const managerAlloted = whereCondition.alloted; // undefined if no manager filter
+
+    for (const cat of allCategories) {
+      if (managerAlloted) {
+        // count BdSheet rows for this category where the related StudentResume.alloted = managerName
+        categoryCounts[cat] = await model.BdSheet.count({
+          where: { category: cat },
+          include: [
+            {
+              model: model.StudentResume,
+              where: { alloted: managerAlloted },
+              attributes: [], // not needed
+              required: true,
+            },
+          ],
+        });
+      } else {
+        // no manager filter — count across all BdSheets
+        categoryCounts[cat] = await model.BdSheet.count({
+          where: { category: cat },
+        });
+      }
+    }
+
+    // ---------------------------
     // Fetch managers list
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -278,6 +317,7 @@ const getBdSheetByCategory = async (req, res) => {
       count: formattedData.length,
       data: formattedData,
       managers: managers,
+      categoryCounts, // <-- only addition
     });
 
   } catch (err) {
@@ -287,6 +327,7 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
 
 const getDashboardStats = async (req, res) => {
   try {
