@@ -62,8 +62,9 @@ function filterUpdateFields(reqBody, existingSheet) {
   for (const key of Object.keys(reqBody)) {
     const incoming = reqBody[key];
 
-    // Skip undefined/null
-    if (incoming == null) continue;
+    // allow date objects even if they look falsy
+if (incoming === undefined || incoming === null) continue;
+
 
     // Handle JSON day fields
     if (["day1","day2","day3","day4","day5","day6","day7"].includes(key)) {
