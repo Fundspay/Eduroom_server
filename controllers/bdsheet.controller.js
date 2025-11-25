@@ -277,7 +277,7 @@ const getBdSheetByCategory = async (req, res) => {
 
     let allWhere = {};
     if (managerName) {
-      allWhere.alloted = managerName;
+      allWhere.tlAllocated = managerName;
     }
 
     const allBdSheets = await model.BdSheet.findAll({
