@@ -9,25 +9,22 @@ const upsertBdSheet = async (req, res) => {
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
     // ------- AUTO-FILL businessTask -------
-    const resume = await model.StudentResume.findOne({
-      where: { id: studentResumeId }
-    });
+const resume = await model.StudentResume.findOne({
+  where: { id: studentResumeId }
+});
 
-    if (resume) {
-      const user = await model.User.findOne({
-        where: { phoneNumber: resume.mobileNumber }
-      });
+if (resume) {
+  // Fetch user by mobileNumber
+  const user = await model.User.findOne({
+    where: { phoneNumber: resume.mobileNumber }
+  });
 
-      if (user && req.body.businessTask == null) {
-        // Calculate subscriptionWalletTotal like getUserWalletDetails
-        const subscriptionWalletTotal = parseInt(user.subscriptionWallet || 0, 10);
-        const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-        const subscriptionLeft = Math.max(0, subscriptionWalletTotal - subscriptiondeductedWallet);
+  if (user && (req.body.businessTask === undefined || req.body.businessTask === null)) {
+    // Convert to integer to match getUserWalletDetails logic
+    req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
+  }
+}
 
-        // Store in businessTask
-        req.body.businessTask = subscriptionLeft;
-      }
-    }
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
