@@ -205,11 +205,10 @@ const getBdSheetByCategory = async (req, res) => {
       return ReE(res, "Category is required", 400);
     }
 
-    let bdWhere = { category }; // filter BdSheet by category ONLY
+    // BdSheet filter only by category
+    let bdWhere = { category };
 
-    // ---------------------------
-    // If managerId exists → filter by that manager
-    // ---------------------------
+    // If managerId is given → filter by alloted manager name
     if (managerId) {
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
@@ -219,22 +218,17 @@ const getBdSheetByCategory = async (req, res) => {
       if (manager && manager.name) {
         bdWhere.alloted = manager.name;
       } else {
-        // no match → force no results
-        bdWhere.alloted = "__invalid__";
+        bdWhere.alloted = "__invalid__"; // no matches
       }
     }
 
-    // ---------------------------
-    // Fetch all managers for dropdown/reference
-    // ---------------------------
+    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    // ---------------------------
-    // Fetch filtered students + BdSheet
-    // ---------------------------
+    // Fetch students with BdSheet filtered by category (+ manager if provided)
     const data = await model.StudentResume.findAll({
       attributes: [
         "id",
@@ -247,8 +241,6 @@ const getBdSheetByCategory = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: true,          // we need only users having this category
-          where: bdWhere,
           attributes: [
             "id",
             "category",
@@ -256,26 +248,25 @@ const getBdSheetByCategory = async (req, res) => {
             "businessTask",
             "registration"
           ],
-          order: [["id", "DESC"]],
+          required: true,      // only users having this category
+          where: bdWhere,
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    // Format registration same as previous logic
+    // Format registration on top level
     const formattedData = data.map((student) => {
       const s = student.toJSON();
-
-      if (s.BdSheet && s.BdSheet.registration) {
+      if (s.BdSheet?.registration) {
         s.registration = s.BdSheet.registration;
       }
-
       return s;
     });
 
     return ReS(res, {
       count: formattedData.length,
-      managers,  // ⬅️ added manager list
+      managers,
       data: formattedData,
     });
 
@@ -286,5 +277,6 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
 
 
