@@ -8,7 +8,7 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // ------- AUTO-FILL businessTask & registration -------
+    // ------- AUTO-FILL businessTask & connectDate -------
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId }
     });
@@ -25,10 +25,10 @@ const upsertBdSheet = async (req, res) => {
           req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
         }
 
-        // Auto-fill registration date from user's createdAt
-        if (req.body.registration === undefined || req.body.registration === null) {
-          req.body.registration = user.createdAt
-            ? user.createdAt.toISOString().split("T")[0] // format as YYYY-MM-DD
+        // Auto-fill connectDate from user's createdAt
+        if (req.body.connectDate === undefined || req.body.connectDate === null) {
+          req.body.connectDate = user.createdAt
+            ? new Date(user.createdAt) // same type as connectDate
             : null;
         }
       }
@@ -88,7 +88,6 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
-
 
 
 const getBdSheet = async (req, res) => {
