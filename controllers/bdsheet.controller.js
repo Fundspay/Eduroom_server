@@ -296,11 +296,15 @@ const getBdSheetByCategory = async (req, res) => {
               required: true,
             },
           ],
+          distinct: true, // ✅ ensures unique BdSheet rows
+          col: "id",      // ✅ count by BdSheet.id
         });
       } else {
         // no manager filter — count across all BdSheets
         categoryCounts[cat] = await model.BdSheet.count({
           where: { category: cat },
+          distinct: true, // ✅ ensures unique BdSheet rows
+          col: "id",      // ✅ count by BdSheet.id
         });
       }
     }
@@ -317,7 +321,7 @@ const getBdSheetByCategory = async (req, res) => {
       count: formattedData.length,
       data: formattedData,
       managers: managers,
-      categoryCounts, // <-- only addition
+      categoryCounts, // <-- only fixed counts
     });
 
   } catch (err) {
