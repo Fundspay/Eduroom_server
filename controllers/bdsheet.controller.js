@@ -25,12 +25,10 @@ const upsertBdSheet = async (req, res) => {
           req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
         }
 
-        // Auto-fill connectDate from user's createdAt
-        if (req.body.connectDate === undefined || req.body.connectDate === null) {
-          req.body.connectDate = user.createdAt
-            ? new Date(user.createdAt) // same type as connectDate
-            : null;
-        }
+        // --------- ALWAYS OVERRIDE connectDate from user's createdAt ---------
+        req.body.connectDate = user.createdAt
+          ? new Date(user.createdAt)
+          : null;
       }
     }
 
@@ -88,6 +86,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 const getBdSheet = async (req, res) => {
