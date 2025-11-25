@@ -218,9 +218,9 @@ const getBdSheetByCategory = async (req, res) => {
       });
 
       if (manager && manager.name) {
-        whereCondition.alloted = manager.name;
+        whereCondition.alloted = manager.name; 
       } else {
-        whereCondition.alloted = "__invalid__";
+        whereCondition.alloted = "__invalid__"; 
       }
     }
 
@@ -240,7 +240,7 @@ const getBdSheetByCategory = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: true,
+          required: true, // we must have category match
           attributes: {
             include: ["businessTask", "registration"],
           },
@@ -267,32 +267,6 @@ const getBdSheetByCategory = async (req, res) => {
     });
 
     // ---------------------------
-    // Counts Per Category (ADDED)
-    // ---------------------------
-
-    const allCategories = [
-      "not working",
-      "Starter",
-      "Basic",
-      "Bronze",
-      "Silver",
-      "Gold",
-      "Diamond",
-      "Platinum",
-    ];
-
-    const categoryCounts = {};
-
-    for (const cat of allCategories) {
-      categoryCounts[cat] = await model.BdSheet.count({
-        where: {
-          category: cat,
-          ...(managerId && { managerId }),
-        },
-      });
-    }
-
-    // ---------------------------
     // Fetch managers list
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -304,7 +278,6 @@ const getBdSheetByCategory = async (req, res) => {
       count: formattedData.length,
       data: formattedData,
       managers: managers,
-      categoryCounts, // <-- ADDED HERE
     });
 
   } catch (err) {
@@ -314,7 +287,6 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
-
 
 const getDashboardStats = async (req, res) => {
   try {
