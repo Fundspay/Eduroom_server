@@ -332,12 +332,14 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 const getDashboardStats = async (req, res) => {
   try {
-    const { startDate, endDate, managerId } = req.query;
+    // Normalize query params
+    const managerId = req.query.managerId || req.query.manegerid; // <-- accept both
+    const { startDate, endDate } = req.query;
 
     let dateFilter = {};
     if (startDate && endDate) {
       dateFilter = {
-        targetDate: {
+        createdAt: {
           [Op.between]: [new Date(startDate), new Date(endDate)],
         },
       };
@@ -349,7 +351,7 @@ const getDashboardStats = async (req, res) => {
     const managerFilter = managerId ? { teamManagerId: managerId } : {};
 
     // ----------------------------------------------
-    // Fetch BdTarget data
+    // 1️⃣ FROM BdTarget
     // ----------------------------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
@@ -359,7 +361,6 @@ const getDashboardStats = async (req, res) => {
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
 
-    // Sum the values
     let totalInternsAllocated = 0;
     let totalInternsActive = 0;
     let totalAccounts = 0;
@@ -371,7 +372,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ----------------------------------------------
-    // Response
+    // FINAL RESPONSE
     // ----------------------------------------------
     return ReS(res, {
       bdTarget: {
