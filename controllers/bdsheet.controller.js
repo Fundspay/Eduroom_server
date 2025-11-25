@@ -26,8 +26,8 @@ const upsertBdSheet = async (req, res) => {
 
         // Write to registration instead of connectDate
         req.body.registration = user.createdAt
-          ? new Date(user.createdAt).toISOString()
-          : null;
+          ? "completed"
+          : "not completed";
       }
     }
 
