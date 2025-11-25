@@ -292,8 +292,6 @@ const getDashboardStats = async (req, res) => {
   try {
     const { startDate, endDate, managerId } = req.query;
 
-    if (!managerId) return ReE(res, "managerId is required", 400);
-
     let dateFilter = {};
     if (startDate && endDate) {
       dateFilter = {
@@ -304,18 +302,19 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ----------------------------------------------
-    // 1️⃣ FROM BdTarget (internsAllocated, internsActive, accounts)
+    // Build manager filter ONLY if managerId is given
+    // ----------------------------------------------
+    const managerFilter = managerId ? { managerId } : {};
+
+    // ----------------------------------------------
+    // 1️⃣ FROM BdTarget
     // ----------------------------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
-        managerId,
+        ...managerFilter,
         ...dateFilter,
       },
-      attributes: [
-        "internsAllocated",
-        "internsActive",
-        "accounts"
-      ],
+      attributes: ["internsAllocated", "internsActive", "accounts"],
     });
 
     let totalInternsAllocated = 0;
@@ -329,17 +328,14 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ----------------------------------------------
-    // 2️⃣ FROM BdSheet (count, active interns, businessTask SUM)
+    // 2️⃣ FROM BdSheet
     // ----------------------------------------------
     const bdSheetData = await model.BdSheet.findAll({
       where: {
-        managerId,
+        ...managerFilter,
         ...dateFilter,
       },
-      attributes: [
-        "activeStatus",
-        "businessTask"
-      ],
+      attributes: ["activeStatus", "businessTask"],
     });
 
     const totalBdSheetEntries = bdSheetData.length;
@@ -368,10 +364,10 @@ const getDashboardStats = async (req, res) => {
         businessTaskSum,
       },
       appliedFilters: {
-        managerId,
+        managerId: managerId || "ALL",
         startDate,
-        endDate
-      }
+        endDate,
+      },
     });
   } catch (err) {
     return ReE(res, err.message, 500);
