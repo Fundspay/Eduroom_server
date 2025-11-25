@@ -197,3 +197,88 @@ const getBdSheet = async (req, res) => {
 
 module.exports.getBdSheet = getBdSheet;
 
+const getBdSheetByCategory = async (req, res) => {
+  try {
+    const { managerId, category } = req.query;
+
+    let whereCondition = {};
+
+    // ---------------------------
+    // CATEGORY FILTER
+    // ---------------------------
+    if (category) {
+      whereCondition.category = category; // Exact match
+    }
+
+    // ---------------------------
+    // MANAGER FILTER
+    // ---------------------------
+    if (managerId) {
+      const manager = await model.TeamManager.findOne({
+        where: { id: managerId },
+        attributes: ["name"],
+      });
+
+      if (manager && manager.name) {
+        whereCondition.alloted = manager.name;
+      } else {
+        whereCondition.alloted = "__invalid__"; // No match
+      }
+    }
+
+    // ---------------------------
+    // Fetch StudentResume + BdSheet
+    // ---------------------------
+    const data = await model.StudentResume.findAll({
+      where: whereCondition,
+      attributes: ["id", "sr", "studentName", "mobileNumber", "emailId", "domain"],
+      include: [
+        {
+          model: model.BdSheet,
+          required: false,
+          attributes: {
+            include: ["businessTask", "registration", "category"],
+          }
+        }
+      ],
+      order: [["id", "DESC"]],
+    });
+
+    // Format response and move registration from BdSheet → top
+    const formattedData = data.map((student) => {
+      const studentJSON = student.toJSON();
+
+      if (studentJSON.BdSheet) {
+        // Move registration up
+        if (studentJSON.BdSheet.registration) {
+          studentJSON.registration = studentJSON.BdSheet.registration;
+        }
+
+        // Keep category as it is (no movement needed)
+      }
+
+      return studentJSON;
+    });
+
+    // ---------------------------
+    // Fetch manager list
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
+    return ReS(res, {
+      count: formattedData.length,
+      data: formattedData,
+      managers: managers,
+    });
+
+  } catch (err) {
+    console.log("GET BD SHEET BY CATEGORY ERROR:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
