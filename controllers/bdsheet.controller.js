@@ -151,7 +151,7 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask", "registration"], // fetch registration too
+            include: ["businessTask", "registration", "activeStatus"], // fetch registration too
           },
           order: [["id", "DESC"]],
         },
@@ -288,6 +288,108 @@ const getBdSheetByCategory = async (req, res) => {
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
+const getBdAnalytics = async (req, res) => {
+  try {
+    let { startDate, endDate, managerId } = req.query;
+
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        createdAt: {
+          [Op.between]: [new Date(startDate), new Date(endDate)],
+        },
+      };
+    }
+
+    // ---------------------------
+    // ManagerId → convert to manager name (same as your logic)
+    // ---------------------------
+    let managerName = null;
+
+    if (managerId) {
+      const manager = await model.TeamManager.findOne({
+        where: { id: managerId },
+        attributes: ["name"],
+      });
+
+      managerName = manager?.name || "__invalid__";
+    }
+
+    // ---------------------------
+    // 1) BdTarget QUERIES
+    // ---------------------------
+
+    const allocatedWhere = { ...dateFilter };
+    const activeWhere = { ...dateFilter };
+    const accountsWhere = { ...dateFilter };
+
+    if (managerName) {
+      allocatedWhere.alloted = managerName;
+      activeWhere.alloted = managerName;
+      accountsWhere.alloted = managerName;
+    }
+
+    const internsAllocated = await model.BdTarget.count({
+      where: allocatedWhere,
+    });
+
+    const internsActive = await model.BdTarget.count({
+      where: { ...activeWhere, activeStatus: "active" },
+    });
+
+    const accounts = await model.BdTarget.count({
+      where: { ...accountsWhere, category: "account" },
+    });
+
+    // ---------------------------
+    // 2) BdSheet QUERIES
+    // ---------------------------
+
+    const sheetWhere = { ...dateFilter };
+    const activeSheetWhere = { ...dateFilter };
+    const accountSheetWhere = { ...dateFilter };
+
+    if (managerName) {
+      sheetWhere.alloted = managerName;
+      activeSheetWhere.alloted = managerName;
+      accountSheetWhere.alloted = managerName;
+    }
+
+    const totalStudents = await model.BdSheet.count({
+      where: sheetWhere,
+    });
+
+    const activeInternsSheet = await model.BdSheet.count({
+      where: { ...activeSheetWhere, activeStatus: "active" },
+    });
+
+    const totalAccountsSheet = await model.BdSheet.count({
+      where: { ...accountSheetWhere, category: "account" },
+    });
+
+    // ---------------------------
+    // RESPONSE
+    // ---------------------------
+    return ReS(res, {
+      bdTarget: {
+        internsAllocated,
+        internsActive,
+        accounts,
+      },
+      bdSheet: {
+        totalStudents,
+        totalActiveInterns: activeInternsSheet,
+        totalAccounts: totalAccountsSheet,
+      },
+    });
+
+  } catch (err) {
+    console.log("GET BD ANALYTICS ERROR:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getBdAnalytics = getBdAnalytics;
 
 
 

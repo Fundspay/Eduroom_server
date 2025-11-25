@@ -9,6 +9,7 @@ const bdsheetController = require("../controllers/bdsheet.controller");
 router.post("/upsert", bdsheetController.upsertBdSheet);
 router.get("/bdsheet", bdsheetController.getBdSheet);
 router.get("/category", bdsheetController.getBdSheetByCategory);
+router.get("/activestatus", bdsheetController.getBdAnalytics);
 
 
 module.exports = router;
