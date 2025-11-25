@@ -255,19 +255,19 @@ const getBdSheetByCategory = async (req, res) => {
     const formattedData = data.map((student) => {
       const s = student.toJSON();
 
-      if (s.BdSheet && s.BdSheet.registration) {
-        s.registration = s.BdSheet.registration;
+      if (s.BdSheets && s.BdSheets[0]?.registration) {
+        s.registration = s.BdSheets[0].registration;
       }
 
-      if (s.BdSheet) {
-        delete s.BdSheet.registration;
+      if (s.BdSheets) {
+        s.BdSheets.forEach((sheet) => delete sheet.registration);
       }
 
       return s;
     });
 
     // ---------------------------
-    // Counts Per Category (ADDED) — using same manager filter if present
+    // Counts Per Category (correctly filtered by manager)
     // ---------------------------
     const allCategories = [
       "not working",
@@ -281,28 +281,20 @@ const getBdSheetByCategory = async (req, res) => {
     ];
 
     const categoryCounts = {};
-    const managerAlloted = whereCondition.alloted; // undefined if no manager filter
 
     for (const cat of allCategories) {
-      if (managerAlloted) {
-        // count BdSheet rows for this category where the related StudentResume.alloted = managerName
-        categoryCounts[cat] = await model.BdSheet.count({
-          where: { category: cat },
-          include: [
-            {
-              model: model.StudentResume,
-              where: { alloted: managerAlloted },
-              attributes: [], // not needed
-              required: true,
-            },
-          ],
-        });
-      } else {
-        // no manager filter — count across all BdSheets
-        categoryCounts[cat] = await model.BdSheet.count({
-          where: { category: cat },
-        });
-      }
+      let count = 0;
+
+      // Count from formattedData so manager filter is already applied
+      formattedData.forEach((student) => {
+        if (student.BdSheets && student.BdSheets.length) {
+          student.BdSheets.forEach((sheet) => {
+            if (sheet.category === cat) count++;
+          });
+        }
+      });
+
+      categoryCounts[cat] = count;
     }
 
     // ---------------------------
@@ -327,7 +319,6 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
-
 
 
 const getDashboardStats = async (req, res) => {
