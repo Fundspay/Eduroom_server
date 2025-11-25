@@ -8,29 +8,23 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // ------- AUTO-FILL businessTask & connectDate -------
-    const resume = await model.StudentResume.findOne({
-      where: { id: studentResumeId }
-    });
+    // AUTO-FILL businessTask & registration
+if (resume) {
+  const user = await model.User.findOne({
+    where: { phoneNumber: resume.mobileNumber }
+  });
 
-    if (resume) {
-      // Fetch user by mobileNumber
-      const user = await model.User.findOne({
-        where: { phoneNumber: resume.mobileNumber }
-      });
-
-      if (user) {
-        // Auto-fill businessTask
-        if (req.body.businessTask === undefined || req.body.businessTask === null) {
-          req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
-        }
-
-        // --------- ALWAYS OVERRIDE connectDate from user's createdAt ---------
-        req.body.connectDate = user.createdAt
-          ? new Date(user.createdAt)
-          : null;
-      }
+  if (user) {
+    if (req.body.businessTask === undefined || req.body.businessTask === null) {
+      req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
     }
+
+    // Write to registration instead of connectDate
+    req.body.registration = user.createdAt
+      ? new Date(user.createdAt)
+      : null;
+  }
+}
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
