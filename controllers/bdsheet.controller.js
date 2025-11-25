@@ -8,23 +8,31 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // ------- AUTO-FILL businessTask -------
-const resume = await model.StudentResume.findOne({
-  where: { id: studentResumeId }
-});
+    // ------- AUTO-FILL businessTask & registration -------
+    const resume = await model.StudentResume.findOne({
+      where: { id: studentResumeId }
+    });
 
-if (resume) {
-  // Fetch user by mobileNumber
-  const user = await model.User.findOne({
-    where: { phoneNumber: resume.mobileNumber }
-  });
+    if (resume) {
+      // Fetch user by mobileNumber
+      const user = await model.User.findOne({
+        where: { phoneNumber: resume.mobileNumber }
+      });
 
-  if (user && (req.body.businessTask === undefined || req.body.businessTask === null)) {
-    // Convert to integer to match getUserWalletDetails logic
-    req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
-  }
-}
+      if (user) {
+        // Auto-fill businessTask
+        if (req.body.businessTask === undefined || req.body.businessTask === null) {
+          req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
+        }
 
+        // Auto-fill registration date from user's createdAt
+        if (req.body.registration === undefined || req.body.registration === null) {
+          req.body.registration = user.createdAt
+            ? user.createdAt.toISOString().split("T")[0] // format as YYYY-MM-DD
+            : null;
+        }
+      }
+    }
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
@@ -82,6 +90,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 module.exports.upsertBdSheet = upsertBdSheet;
 
 
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -124,7 +133,7 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask"]
+            include: ["businessTask", "registration"] // fetch registration too
           },
           order: [["id", "DESC"]]
         }
@@ -132,7 +141,23 @@ const getBdSheet = async (req, res) => {
       order: [["id", "DESC"]]
     });
 
-    return ReS(res, { count: data.length, data });
+    // Move registration out of BdSheet to top-level
+    const formattedData = data.map(student => {
+      const studentJSON = student.toJSON();
+
+      if (studentJSON.BdSheet && studentJSON.BdSheet.registration) {
+        studentJSON.registration = studentJSON.BdSheet.registration;
+      }
+
+      // Remove registration from BdSheet
+      if (studentJSON.BdSheet) {
+        delete studentJSON.BdSheet.registration;
+      }
+
+      return studentJSON;
+    });
+
+    return ReS(res, { count: formattedData.length, data: formattedData });
   } catch (err) {
     console.log("GET BD SHEET ERROR:", err);
     return ReE(res, err.message, 500);
@@ -140,6 +165,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 
 
