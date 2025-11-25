@@ -337,7 +337,7 @@ const getDashboardStats = async (req, res) => {
     let dateFilter = {};
     if (startDate && endDate) {
       dateFilter = {
-        createdAt: {
+        targetDate: {
           [Op.between]: [new Date(startDate), new Date(endDate)],
         },
       };
@@ -346,10 +346,10 @@ const getDashboardStats = async (req, res) => {
     // ----------------------------------------------
     // Build manager filter ONLY if managerId is given
     // ----------------------------------------------
-    const managerFilter = managerId ? { managerId } : {};
+    const managerFilter = managerId ? { teamManagerId: managerId } : {};
 
     // ----------------------------------------------
-    // 1️⃣ FROM BdTarget
+    // Fetch BdTarget data
     // ----------------------------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
@@ -359,6 +359,7 @@ const getDashboardStats = async (req, res) => {
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
 
+    // Sum the values
     let totalInternsAllocated = 0;
     let totalInternsActive = 0;
     let totalAccounts = 0;
@@ -370,40 +371,13 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ----------------------------------------------
-    // 2️⃣ FROM BdSheet
-    // ----------------------------------------------
-    const bdSheetData = await model.BdSheet.findAll({
-      where: {
-        ...managerFilter,
-        ...dateFilter,
-      },
-      attributes: ["activeStatus", "businessTask"],
-    });
-
-    const totalBdSheetEntries = bdSheetData.length;
-
-    const totalActiveInternsFromSheet = bdSheetData.filter(
-      (r) => r.activeStatus === "active"
-    ).length;
-
-    let businessTaskSum = 0;
-    bdSheetData.forEach((row) => {
-      businessTaskSum += row.businessTask || 0;
-    });
-
-    // ----------------------------------------------
-    // FINAL RESPONSE
+    // Response
     // ----------------------------------------------
     return ReS(res, {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
         totalAccounts,
-      },
-      bdSheet: {
-        totalEntries: totalBdSheetEntries,
-        activeInterns: totalActiveInternsFromSheet,
-        businessTaskSum,
       },
       appliedFilters: {
         managerId: managerId || "ALL",
@@ -417,6 +391,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
