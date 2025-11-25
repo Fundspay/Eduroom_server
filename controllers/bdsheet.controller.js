@@ -21,7 +21,7 @@ const upsertBdSheet = async (req, res) => {
 
       if (user) {
         if (req.body.businessTask === undefined || req.body.businessTask === null) {
-          req.body.businessTask = parseInt(user.subscriptionWallet || 0, 10);
+          req.body.businessTask = parseInt(user.subscriptionWalletTotal || 0, 10);
         }
 
         // Write to registration instead of connectDate
