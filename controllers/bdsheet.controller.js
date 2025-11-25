@@ -288,9 +288,11 @@ const getBdSheetByCategory = async (req, res) => {
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
-const getBdAnalytics = async (req, res) => {
+const getDashboardStats = async (req, res) => {
   try {
-    let { startDate, endDate, managerId } = req.query;
+    const { startDate, endDate, managerId } = req.query;
+
+    if (!managerId) return ReE(res, "managerId is required", 400);
 
     let dateFilter = {};
     if (startDate && endDate) {
@@ -301,95 +303,82 @@ const getBdAnalytics = async (req, res) => {
       };
     }
 
-    // ---------------------------
-    // ManagerId → convert to manager name (same as your logic)
-    // ---------------------------
-    let managerName = null;
-
-    if (managerId) {
-      const manager = await model.TeamManager.findOne({
-        where: { id: managerId },
-        attributes: ["name"],
-      });
-
-      managerName = manager?.name || "__invalid__";
-    }
-
-    // ---------------------------
-    // 1) BdTarget QUERIES
-    // ---------------------------
-
-    const allocatedWhere = { ...dateFilter };
-    const activeWhere = { ...dateFilter };
-    const accountsWhere = { ...dateFilter };
-
-    if (managerName) {
-      allocatedWhere.alloted = managerName;
-      activeWhere.alloted = managerName;
-      accountsWhere.alloted = managerName;
-    }
-
-    const internsAllocated = await model.BdTarget.count({
-      where: allocatedWhere,
+    // ----------------------------------------------
+    // 1️⃣ FROM BdTarget (internsAllocated, internsActive, accounts)
+    // ----------------------------------------------
+    const bdTargetData = await model.BdTarget.findAll({
+      where: {
+        managerId,
+        ...dateFilter,
+      },
+      attributes: [
+        "internsAllocated",
+        "internsActive",
+        "accounts"
+      ],
     });
 
-    const internsActive = await model.BdTarget.count({
-      where: { ...activeWhere, activeStatus: "active" },
+    let totalInternsAllocated = 0;
+    let totalInternsActive = 0;
+    let totalAccounts = 0;
+
+    bdTargetData.forEach((row) => {
+      totalInternsAllocated += row.internsAllocated;
+      totalInternsActive += row.internsActive;
+      totalAccounts += row.accounts;
     });
 
-    const accounts = await model.BdTarget.count({
-      where: { ...accountsWhere, category: "account" },
+    // ----------------------------------------------
+    // 2️⃣ FROM BdSheet (count, active interns, businessTask SUM)
+    // ----------------------------------------------
+    const bdSheetData = await model.BdSheet.findAll({
+      where: {
+        managerId,
+        ...dateFilter,
+      },
+      attributes: [
+        "activeStatus",
+        "businessTask"
+      ],
     });
 
-    // ---------------------------
-    // 2) BdSheet QUERIES
-    // ---------------------------
+    const totalBdSheetEntries = bdSheetData.length;
 
-    const sheetWhere = { ...dateFilter };
-    const activeSheetWhere = { ...dateFilter };
-    const accountSheetWhere = { ...dateFilter };
+    const totalActiveInternsFromSheet = bdSheetData.filter(
+      (r) => r.activeStatus === "active"
+    ).length;
 
-    if (managerName) {
-      sheetWhere.alloted = managerName;
-      activeSheetWhere.alloted = managerName;
-      accountSheetWhere.alloted = managerName;
-    }
-
-    const totalStudents = await model.BdSheet.count({
-      where: sheetWhere,
+    let businessTaskSum = 0;
+    bdSheetData.forEach((row) => {
+      businessTaskSum += row.businessTask || 0;
     });
 
-    const activeInternsSheet = await model.BdSheet.count({
-      where: { ...activeSheetWhere, activeStatus: "active" },
-    });
-
-    const totalAccountsSheet = await model.BdSheet.count({
-      where: { ...accountSheetWhere, category: "account" },
-    });
-
-    // ---------------------------
-    // RESPONSE
-    // ---------------------------
+    // ----------------------------------------------
+    // FINAL RESPONSE
+    // ----------------------------------------------
     return ReS(res, {
       bdTarget: {
-        internsAllocated,
-        internsActive,
-        accounts,
+        totalInternsAllocated,
+        totalInternsActive,
+        totalAccounts,
       },
       bdSheet: {
-        totalStudents,
-        totalActiveInterns: activeInternsSheet,
-        totalAccounts: totalAccountsSheet,
+        totalEntries: totalBdSheetEntries,
+        activeInterns: totalActiveInternsFromSheet,
+        businessTaskSum,
       },
+      appliedFilters: {
+        managerId,
+        startDate,
+        endDate
+      }
     });
-
   } catch (err) {
-    console.log("GET BD ANALYTICS ERROR:", err);
     return ReE(res, err.message, 500);
   }
 };
 
-module.exports.getBdAnalytics = getBdAnalytics;
+module.exports.getDashboardStats = getDashboardStats;
 
 
 
