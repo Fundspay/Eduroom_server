@@ -19,19 +19,13 @@ const upsertBdSheet = async (req, res) => {
       });
 
       if (user && req.body.businessTask == null) {
-        // Calculate total business target similar to getUserWalletDetails
-        let totalBusinessTarget = 0;
+        // Calculate subscriptionWalletTotal like getUserWalletDetails
+        const subscriptionWalletTotal = parseInt(user.subscriptionWallet || 0, 10);
+        const subscriptiondeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+        const subscriptionLeft = Math.max(0, subscriptionWalletTotal - subscriptiondeductedWallet);
 
-        for (const courseId of Object.keys(user.courseStatuses || {})) {
-          const userTarget = user.businessTargets?.[courseId];
-          const rawTarget = parseInt(
-            userTarget !== undefined ? userTarget : 0,
-            10
-          );
-          totalBusinessTarget += rawTarget < 0 ? 0 : rawTarget;
-        }
-
-        req.body.businessTask = totalBusinessTarget;
+        // Store in businessTask
+        req.body.businessTask = subscriptionLeft;
       }
     }
 
@@ -89,7 +83,6 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
-
 
 
 const getBdSheet = async (req, res) => {
