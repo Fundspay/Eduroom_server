@@ -329,15 +329,20 @@ const getBdSheetByCategory = async (req, res) => {
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 
-
 const getDashboardStats = async (req, res) => {
   try {
+    // ---------------------------
+    // Extract query params
+    // ---------------------------
     const managerId = req.query.managerId;
     const { startDate, endDate } = req.query;
 
-    let dateFilter = {};
+    // ---------------------------
+    // Filters for BdTarget
+    // ---------------------------
+    let targetDateFilter = {};
     if (startDate && endDate) {
-      dateFilter = {
+      targetDateFilter = {
         targetDate: {
           [Op.between]: [startDate, endDate],
         },
@@ -346,29 +351,74 @@ const getDashboardStats = async (req, res) => {
 
     const managerFilter = managerId ? { teamManagerId: parseInt(managerId) } : {};
 
+    // ---------------------------
+    // 1️⃣ BdTarget stats
+    // ---------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...managerFilter,
-        ...dateFilter,
+        ...targetDateFilter,
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
 
     let totalInternsAllocated = 0;
     let totalInternsActive = 0;
-    let totalAccounts = 0;
+    let totalAccountsTarget = 0;
 
     bdTargetData.forEach((row) => {
       totalInternsAllocated += row.internsAllocated;
       totalInternsActive += row.internsActive;
-      totalAccounts += row.accounts;
+      totalAccountsTarget += row.accounts;
     });
 
+    // ---------------------------
+    // 2️⃣ BdSheet stats
+    // ---------------------------
+    let sheetDateFilter = {};
+    if (startDate && endDate) {
+      sheetDateFilter = {
+        startDate: { [Op.gte]: startDate },
+        endDate: { [Op.lte]: endDate },
+      };
+    }
+
+    const bdSheetData = await model.BdSheet.findAll({
+      where: {
+        ...managerFilter,
+        ...sheetDateFilter,
+      },
+      attributes: ["businessTask", "activeStatus"],
+    });
+
+    let totalInterns = bdSheetData.length;
+    let totalAccountsSheet = 0;
+    let totalActiveInterns = 0;
+
+    bdSheetData.forEach((row) => {
+      // sum businessTask (convert string to number, ignore if invalid)
+      const taskNum = parseInt(row.businessTask);
+      if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
+
+      // count active interns
+      if (row.activeStatus && row.activeStatus.toLowerCase() === "active") {
+        totalActiveInterns += 1;
+      }
+    });
+
+    // ---------------------------
+    // FINAL RESPONSE
+    // ---------------------------
     return ReS(res, {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts,
+        totalAccounts: totalAccountsTarget,
+      },
+      bdSheet: {
+        totalInterns,
+        totalAccounts: totalAccountsSheet,
+        totalActiveInterns,
       },
       appliedFilters: {
         managerId: managerId || "ALL",
@@ -382,6 +432,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
