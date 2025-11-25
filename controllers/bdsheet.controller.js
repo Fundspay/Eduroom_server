@@ -205,8 +205,8 @@ const getBdSheetByCategory = async (req, res) => {
       return ReE(res, "category is required", 400);
     }
 
-    let whereCondition = {}; // For StudentResume
-    let bdWhere = { category }; // For BdSheet (filtered by category)
+    let whereCondition = {};
+    let bdWhere = { category };
 
     let managerName = null;
 
@@ -240,11 +240,8 @@ const getBdSheetByCategory = async (req, res) => {
         {
           model: model.BdSheet,
           required: true,
-          attributes: {
-            include: ["businessTask", "registration", "category"],
-          },
+          attributes: ["businessTask", "registration", "category"],
           where: bdWhere,
-          order: [["id", "DESC"]],
         },
       ],
       order: [["id", "DESC"]],
@@ -253,7 +250,7 @@ const getBdSheetByCategory = async (req, res) => {
     const formattedData = data.map((student) => {
       const s = student.toJSON();
 
-      if (s.BdSheet && s.BdSheet.registration) {
+      if (s.BdSheet?.registration) {
         s.registration = s.BdSheet.registration;
       }
 
@@ -265,39 +262,55 @@ const getBdSheetByCategory = async (req, res) => {
     });
 
     // ---------------------------
-    // NEW: Category wise count (ALL categories)
+    // NEW: Category-wise counts for ALL categories
     // ---------------------------
-    let allCategoriesWhere = {};
+    const CATEGORY_LIST = [
+      "not working",
+      "Starter",
+      "Basic",
+      "Bronze",
+      "Silver",
+      "Gold",
+      "Diamond",
+      "Platinum",
+    ];
+
+    let allWhere = {};
     if (managerName) {
-      allCategoriesWhere.alloted = managerName;
+      allWhere.alloted = managerName;
     }
 
     const allBdSheets = await model.BdSheet.findAll({
-      where: allCategoriesWhere,
+      where: allWhere,
       attributes: ["category"],
       raw: true,
     });
 
     const categoryCounts = {};
+
+    // initialize with all categories = 0
+    CATEGORY_LIST.forEach((cat) => {
+      categoryCounts[cat] = 0;
+    });
+
+    // count real data
     allBdSheets.forEach((row) => {
-      categoryCounts[row.category] =
-        (categoryCounts[row.category] || 0) + 1;
+      if (CATEGORY_LIST.includes(row.category)) {
+        categoryCounts[row.category] += 1;
+      }
     });
 
     // ---------------------------
-    // Fetch managers list
+    // Managers list
     // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    // ---------------------------
-    // RESPONSE
-    // ---------------------------
     return ReS(res, {
-      count: formattedData.length,     // count of requested category
-      categoryCounts,                 // NEW: counts of ALL categories
+      count: formattedData.length,   // only selected category count
+      categoryCounts,                // FULL category distribution
       data: formattedData,
       managers,
     });
