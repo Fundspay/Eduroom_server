@@ -175,7 +175,20 @@ const getBdSheet = async (req, res) => {
       return studentJSON;
     });
 
-    return ReS(res, { count: formattedData.length, data: formattedData });
+    // ---------------------------
+    // Fetch all managers (as you requested)
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
+    return ReS(res, { 
+      count: formattedData.length, 
+      data: formattedData,
+      managers: managers   // <-- added here
+    });
+
   } catch (err) {
     console.log("GET BD SHEET ERROR:", err);
     return ReE(res, err.message, 500);
@@ -183,3 +196,4 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
