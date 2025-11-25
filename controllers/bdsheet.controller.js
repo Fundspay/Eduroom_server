@@ -35,6 +35,21 @@ const upsertBdSheet = async (req, res) => {
       }
     }
 
+    // ---------------------------
+    // CATEGORY LOGIC ADDED HERE
+    // ---------------------------
+    const bt = parseInt(req.body.businessTask || 0, 10);
+
+    if (bt === 0 || bt === null) req.body.category = "not working";
+    else if (bt >= 1 && bt <= 5) req.body.category = "Starter";
+    else if (bt >= 6 && bt <= 10) req.body.category = "Basic";
+    else if (bt >= 11 && bt <= 15) req.body.category = "Bronze";
+    else if (bt >= 16 && bt <= 20) req.body.category = "Silver";
+    else if (bt >= 21 && bt <= 25) req.body.category = "Gold";
+    else if (bt >= 26 && bt <= 35) req.body.category = "Diamond";
+    else if (bt >= 36 && bt <= 70) req.body.category = "Platinum";
+    // ---------------------------
+
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
       where: { studentResumeId },
@@ -92,6 +107,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 const getBdSheet = async (req, res) => {
   try {
