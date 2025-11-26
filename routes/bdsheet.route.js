@@ -10,6 +10,7 @@ router.post("/upsert", bdsheetController.upsertBdSheet);
 router.get("/bdsheet", bdsheetController.getBdSheet);
 router.get("/category", bdsheetController.getBdSheetByCategory);
 router.get("/activestatus", bdsheetController.getDashboardStats);
+router.post("/amount", bdsheetController.upsertRangeAmounts);
 
 
 module.exports = router;

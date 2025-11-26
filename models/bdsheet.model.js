@@ -14,9 +14,9 @@ module.exports = (sequelize, Sequelize) => {
       businessTask: { type: Sequelize.STRING, allowNull: true },
 
       // ⭐ NEW ACTIVE STATUS COLUMN
-      activeStatus: { 
-        type: Sequelize.STRING, 
-        allowNull: true,  // values: "active" or "not active"
+      activeStatus: {
+        type: Sequelize.STRING,
+        allowNull: true, // values: "active" or "not active"
       },
 
       // -----------------------------
@@ -46,6 +46,12 @@ module.exports = (sequelize, Sequelize) => {
       // Dates
       startDate: { type: Sequelize.DATE, allowNull: true },
       endDate: { type: Sequelize.DATE, allowNull: true },
+
+      // ---------------------------------------
+      // NEW INCENTIVE & DEDUCTION AMOUNT RANGES
+      // ---------------------------------------
+      incentiveAmounts: { type: Sequelize.JSON, allowNull: true },
+      deductionAmounts: { type: Sequelize.JSON, allowNull: true },
 
       createdAt: {
         type: Sequelize.DATE,
