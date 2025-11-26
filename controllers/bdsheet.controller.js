@@ -554,3 +554,22 @@ function filterRangeAmounts(amountObject) {
 }
 
 module.exports.upsertRangeAmounts = upsertRangeAmounts;
+
+const getAllBdTargetRanges = async (req, res) => {
+  try {
+    // Fetch all target ranges
+    const targets = await model.BdTarget.findAll({
+      attributes: ["id", "range", "incentiveAmount", "deductionAmount"],
+      order: [["id", "ASC"]],
+    });
+
+    return ReS(res, {
+      message: "BD Target ranges fetched successfully",
+      data: targets,
+    });
+  } catch (error) {
+    console.log("GET BD TARGET RANGES ERROR:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+module.exports.getAllBdTargetRanges = getAllBdTargetRanges;
