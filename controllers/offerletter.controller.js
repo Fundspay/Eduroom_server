@@ -803,30 +803,11 @@ module.exports.listAllUsers = listAllUsers;
  * Automatically generate and send offer letters to latest 500 users with started courses.
  * @param {boolean} attachPDF - whether to attach the offer letter PDF in email
  */
-/**
- * Auto-send offer letters to users who haven't received them yet.
- * @param {boolean} attachPDF - whether to attach the PDF
- */
 const autoSendOfferLetters = async (attachPDF = true) => {
   try {
     console.log("🚀 Starting autoSendOfferLetters...");
 
-    // 1️⃣ Count and log pending users
-    const pendingCount = await model.User.count({
-      where: {
-        offerLetterSent: false,
-        isDeleted: false,
-        courseDates: { [Op.ne]: null },
-      },
-    });
-    console.log(`📊 Users pending offer letters: ${pendingCount}`);
-
-    if (pendingCount === 0) {
-      console.log("ℹ️ No users to send offer letters to. Exiting.");
-      return;
-    }
-
-    // 2️⃣ Fetch latest 500 pending users
+    // 1️⃣ Fetch latest 500 users with offerLetterSent = false
     const users = await model.User.findAll({
       where: {
         offerLetterSent: false,
@@ -837,9 +818,16 @@ const autoSendOfferLetters = async (attachPDF = true) => {
       limit: 500,
     });
 
+    console.log(`📊 Found ${users.length} latest users with offerLetterSent = false`);
+
+    if (!users.length) {
+      console.log("ℹ️ No users to send offer letters to. Exiting.");
+      return;
+    }
+
     const filteredUsers = [];
 
-    // Filter users whose courses have startDate and endDate
+    // 2️⃣ Filter users whose courses have startDate and endDate
     for (let user of users) {
       if (!user.courseDates) continue;
 
@@ -850,7 +838,7 @@ const autoSendOfferLetters = async (attachPDF = true) => {
       if (validCourses.length) filteredUsers.push({ user, validCourses });
     }
 
-    console.log(`✅ Found ${filteredUsers.length} users to process`);
+    console.log(`✅ Found ${filteredUsers.length} users to process (with valid courses)`);
 
     if (!filteredUsers.length) return;
 
@@ -860,13 +848,10 @@ const autoSendOfferLetters = async (attachPDF = true) => {
       const batch = filteredUsers.slice(i, i + batchSize);
 
       for (let { user, validCourses } of batch) {
-        // Process all courses of this user in parallel
         const emailPromises = validCourses.map(async ([courseId, courseInfo]) => {
           try {
-            // Generate offer letter PDF
             const generatedLetter = await generateOfferLetter(user.id, courseId);
 
-            // Create OfferLetter record
             await model.OfferLetter.create({
               userId: user.id,
               courseId,
@@ -877,7 +862,6 @@ const autoSendOfferLetters = async (attachPDF = true) => {
               issent: false,
             });
 
-            // Prepare email
             const mailSubject = `Your Offer Letter for ${courseInfo.courseName || "Intern"}`;
             const mailHtml = `
               <p>Dear ${user.fullName || user.firstName || "Candidate"},</p>
@@ -888,7 +872,6 @@ const autoSendOfferLetters = async (attachPDF = true) => {
               <p>Regards,<br/>EduRoom Team</p>
             `;
 
-            // Send email with optional attachment
             const emailResult = await sendMail(
               user.email,
               mailSubject,
@@ -903,7 +886,6 @@ const autoSendOfferLetters = async (attachPDF = true) => {
                 : []
             );
 
-            // Mark user as offerLetterSent only if email succeeds
             if (emailResult.success) {
               await model.User.update(
                 { offerLetterSent: true },
@@ -916,27 +898,15 @@ const autoSendOfferLetters = async (attachPDF = true) => {
           }
         });
 
-        // Wait for all courses of this user to finish
         await Promise.allSettled(emailPromises);
       }
 
       console.log(`✅ Batch ${i / batchSize + 1} processed`);
     }
 
-    // 4️⃣ Final count of pending users
-    const remainingPending = await model.User.count({
-      where: {
-        offerLetterSent: false,
-        isDeleted: false,
-        courseDates: { [Op.ne]: null },
-      },
-    });
-    console.log(`📊 Remaining users with offerLetterSent = false: ${remainingPending}`);
-
     console.log("🎉 All batches processed successfully!");
   } catch (error) {
     console.error("autoSendOfferLetters Error:", error);
   }
 };
-
 module.exports.autoSendOfferLetters = autoSendOfferLetters;
