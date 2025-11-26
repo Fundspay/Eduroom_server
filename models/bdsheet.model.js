@@ -9,9 +9,15 @@ module.exports = (sequelize, Sequelize) => {
       studentResumeId: { type: Sequelize.BIGINT, allowNull: false },
 
       // -----------------------------
-      // NEW BUSINESS TASK COLUMN (ADDED BEFORE CALL STATUS)
+      // NEW BUSINESS TASK COLUMN
       // -----------------------------
       businessTask: { type: Sequelize.STRING, allowNull: true },
+
+      // ⭐ NEW ACTIVE STATUS COLUMN
+      activeStatus: { 
+        type: Sequelize.STRING, 
+        allowNull: true,  // values: "active" or "not active"
+      },
 
       // -----------------------------
       // DAY 0 FIELDS
@@ -22,10 +28,7 @@ module.exports = (sequelize, Sequelize) => {
       whatsappGroup: { type: Sequelize.STRING, allowNull: true },
       connectDate: { type: Sequelize.DATE, allowNull: true },
 
-      // -----------------------------
-      // DAY 1 TO DAY 7 (JSON)
-      // businessTask removed from all
-      // -----------------------------
+      // DAY 1 - DAY 7
       day1: { type: Sequelize.JSON, allowNull: true },
       day2: { type: Sequelize.JSON, allowNull: true },
       day3: { type: Sequelize.JSON, allowNull: true },
@@ -34,18 +37,13 @@ module.exports = (sequelize, Sequelize) => {
       day6: { type: Sequelize.JSON, allowNull: true },
       day7: { type: Sequelize.JSON, allowNull: true },
 
-      // -----------------------------
-      // OTHER FIELDS
-      // -----------------------------
-      category: {
-        type: Sequelize.STRING,
-        allowNull: true,
-      },
+      // CATEGORY
+      category: { type: Sequelize.STRING, allowNull: true },
 
       module2Status: { type: Sequelize.STRING, allowNull: true },
       tlAllocated: { type: Sequelize.STRING, allowNull: true },
 
-      // NEW ADDED FIELDS
+      // Dates
       startDate: { type: Sequelize.DATE, allowNull: true },
       endDate: { type: Sequelize.DATE, allowNull: true },
 
@@ -64,14 +62,12 @@ module.exports = (sequelize, Sequelize) => {
   );
 
   BdSheet.associate = function (models) {
-    // ⭐ CORRECT BD→RESUME LINK
     BdSheet.belongsTo(models.StudentResume, {
       foreignKey: "studentResumeId",
       onDelete: "CASCADE",
       onUpdate: "CASCADE",
     });
 
-    // Existing association (NO CHANGE)
     BdSheet.belongsTo(models.TeamManager, {
       foreignKey: "teamManagerId",
       onDelete: "SET NULL",
