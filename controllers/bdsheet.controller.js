@@ -8,47 +8,21 @@ const upsertBdSheet = async (req, res) => {
     const { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
 
-    // ---- FETCH RESUME (this was missing - caused "resume is not defined") ----
+    // ---- FETCH RESUME ----
     const resume = await model.StudentResume.findOne({
       where: { id: studentResumeId },
     });
 
-    // AUTO-FILL businessTask & registration
+    // ONLY registration auto-fill remains
     if (resume) {
       const user = await model.User.findOne({
         where: { phoneNumber: resume.mobileNumber },
       });
 
       if (user) {
-        if (
-          req.body.businessTask === undefined ||
-          req.body.businessTask === null
-        ) {
-          const wallet = parseInt(user.subscriptionWallet || 0, 10);
-          const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
-
-          req.body.businessTask = wallet + deducted;
-        }
-
-        // Write to registration instead of connectDate
         req.body.registration = user.createdAt ? "completed" : "not completed";
       }
     }
-
-    // ---------------------------
-    // CATEGORY LOGIC (overwrite always)
-    // ---------------------------
-    const bt = parseInt(req.body.businessTask);
-
-    if (!bt || bt === 0) req.body.category = "not working";
-    else if (bt >= 1 && bt <= 5) req.body.category = "Starter";
-    else if (bt >= 6 && bt <= 10) req.body.category = "Basic";
-    else if (bt >= 11 && bt <= 15) req.body.category = "Bronze";
-    else if (bt >= 16 && bt <= 20) req.body.category = "Silver";
-    else if (bt >= 21 && bt <= 25) req.body.category = "Gold";
-    else if (bt >= 26 && bt <= 35) req.body.category = "Diamond";
-    else if (bt >= 36 && bt <= 70) req.body.category = "Platinum";
-    // ---------------------------
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
@@ -68,6 +42,7 @@ const upsertBdSheet = async (req, res) => {
       message: "BdSheet created successfully",
       data: newSheet,
     });
+
   } catch (error) {
     console.log("BD SHEET UPSERT ERROR:", error);
     return ReE(res, error.message, 500);
@@ -81,15 +56,12 @@ function filterUpdateFields(reqBody, existingSheet) {
   for (const key of Object.keys(reqBody)) {
     const incoming = reqBody[key];
 
-    // allow date objects even if they look falsy
     if (incoming === undefined || incoming === null) continue;
 
-    // Handle JSON day fields
     if (
       ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].includes(key)
     ) {
       if (typeof incoming === "object" && !Array.isArray(incoming)) {
-        // Skip empty {}
         if (Object.keys(incoming).length === 0) continue;
       }
 
@@ -109,6 +81,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 module.exports.upsertBdSheet = upsertBdSheet;
 
 
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -122,16 +95,14 @@ const getBdSheet = async (req, res) => {
 
     // Filter by managerId → match alloted with manager name
     if (managerId) {
-      // 1️⃣ Fetch manager name
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
-        attributes: ["name"], // assuming TeamManager has 'name' column
+        attributes: ["name"],
       });
 
       if (manager && manager.name) {
         whereCondition.alloted = manager.name;
       } else {
-        // If managerId is invalid, no student should match
         whereCondition.alloted = "__invalid__";
       }
     }
@@ -151,7 +122,7 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask", "registration", "activeStatus"], // fetch registration too
+            include: ["businessTask", "registration", "activeStatus"],
           },
           order: [["id", "DESC"]],
         },
@@ -159,25 +130,51 @@ const getBdSheet = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
-    // Move registration out of BdSheet to top-level
-    const formattedData = data.map((student) => {
-      const studentJSON = student.toJSON();
+    // Move registration out of BdSheet to top-level + add real-time businessTask + category
+    const formattedData = await Promise.all(
+      data.map(async (student) => {
+        const s = student.toJSON();
 
-      if (studentJSON.BdSheet && studentJSON.BdSheet.registration) {
-        studentJSON.registration = studentJSON.BdSheet.registration;
-      }
+        // Real-Time businessTask + category logic
+        if (s.mobileNumber) {
+          const user = await model.User.findOne({
+            where: { phoneNumber: s.mobileNumber },
+            attributes: ["subscriptionWallet", "subscriptiondeductedWallet"],
+          });
 
-      // Remove registration from BdSheet
-      if (studentJSON.BdSheet) {
-        delete studentJSON.BdSheet.registration;
-      }
+          if (user) {
+            const wallet = parseInt(user.subscriptionWallet || 0, 10);
+            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
 
-      return studentJSON;
-    });
+            const businessTask = wallet + deducted;
+            s.businessTask = businessTask;
 
-    // ---------------------------
-    // Fetch all managers (as you requested)
-    // ---------------------------
+            // Category calculation
+            if (!businessTask || businessTask === 0) s.category = "not working";
+            else if (businessTask >= 1 && businessTask <= 5) s.category = "Starter";
+            else if (businessTask >= 6 && businessTask <= 10) s.category = "Basic";
+            else if (businessTask >= 11 && businessTask <= 15) s.category = "Bronze";
+            else if (businessTask >= 16 && businessTask <= 20) s.category = "Silver";
+            else if (businessTask >= 21 && businessTask <= 25) s.category = "Gold";
+            else if (businessTask >= 26 && businessTask <= 35) s.category = "Diamond";
+            else if (businessTask >= 36 && businessTask <= 70) s.category = "Platinum";
+          }
+        }
+
+        // Move registration out of BdSheet
+        if (s.BdSheet && s.BdSheet.registration) {
+          s.registration = s.BdSheet.registration;
+        }
+
+        if (s.BdSheet) {
+          delete s.BdSheet.registration;
+        }
+
+        return s;
+      })
+    );
+
+    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
@@ -186,7 +183,7 @@ const getBdSheet = async (req, res) => {
     return ReS(res, { 
       count: formattedData.length, 
       data: formattedData,
-      managers: managers   // <-- added here
+      managers: managers
     });
 
   } catch (err) {
@@ -196,6 +193,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 const getBdSheetByCategory = async (req, res) => {
   try {
