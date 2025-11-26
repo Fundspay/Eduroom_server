@@ -42,7 +42,6 @@ const upsertBdSheet = async (req, res) => {
       message: "BdSheet created successfully",
       data: newSheet,
     });
-
   } catch (error) {
     console.log("BD SHEET UPSERT ERROR:", error);
     return ReE(res, error.message, 500);
@@ -79,8 +78,6 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
-
-
 
 const getBdSheet = async (req, res) => {
   try {
@@ -151,13 +148,20 @@ const getBdSheet = async (req, res) => {
 
             // Category calculation
             if (!businessTask || businessTask === 0) s.category = "not working";
-            else if (businessTask >= 1 && businessTask <= 5) s.category = "Starter";
-            else if (businessTask >= 6 && businessTask <= 10) s.category = "Basic";
-            else if (businessTask >= 11 && businessTask <= 15) s.category = "Bronze";
-            else if (businessTask >= 16 && businessTask <= 20) s.category = "Silver";
-            else if (businessTask >= 21 && businessTask <= 25) s.category = "Gold";
-            else if (businessTask >= 26 && businessTask <= 35) s.category = "Diamond";
-            else if (businessTask >= 36 && businessTask <= 70) s.category = "Platinum";
+            else if (businessTask >= 1 && businessTask <= 5)
+              s.category = "Starter";
+            else if (businessTask >= 6 && businessTask <= 10)
+              s.category = "Basic";
+            else if (businessTask >= 11 && businessTask <= 15)
+              s.category = "Bronze";
+            else if (businessTask >= 16 && businessTask <= 20)
+              s.category = "Silver";
+            else if (businessTask >= 21 && businessTask <= 25)
+              s.category = "Gold";
+            else if (businessTask >= 26 && businessTask <= 35)
+              s.category = "Diamond";
+            else if (businessTask >= 36 && businessTask <= 70)
+              s.category = "Platinum";
           }
         }
 
@@ -180,12 +184,11 @@ const getBdSheet = async (req, res) => {
       raw: true,
     });
 
-    return ReS(res, { 
-      count: formattedData.length, 
+    return ReS(res, {
+      count: formattedData.length,
       data: formattedData,
-      managers: managers
+      managers: managers,
     });
-
   } catch (err) {
     console.log("GET BD SHEET ERROR:", err);
     return ReE(res, err.message, 500);
@@ -193,7 +196,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
-
 
 const getBdSheetByCategory = async (req, res) => {
   try {
@@ -277,11 +279,15 @@ const getBdSheetByCategory = async (req, res) => {
         if (!businessTask || businessTask === 0) s.category = "not working";
         else if (businessTask >= 1 && businessTask <= 5) s.category = "Starter";
         else if (businessTask >= 6 && businessTask <= 10) s.category = "Basic";
-        else if (businessTask >= 11 && businessTask <= 15) s.category = "Bronze";
-        else if (businessTask >= 16 && businessTask <= 20) s.category = "Silver";
+        else if (businessTask >= 11 && businessTask <= 15)
+          s.category = "Bronze";
+        else if (businessTask >= 16 && businessTask <= 20)
+          s.category = "Silver";
         else if (businessTask >= 21 && businessTask <= 25) s.category = "Gold";
-        else if (businessTask >= 26 && businessTask <= 35) s.category = "Diamond";
-        else if (businessTask >= 36 && businessTask <= 70) s.category = "Platinum";
+        else if (businessTask >= 26 && businessTask <= 35)
+          s.category = "Diamond";
+        else if (businessTask >= 36 && businessTask <= 70)
+          s.category = "Platinum";
 
         // Move registration out of BdSheet
         if (s.BdSheet && s.BdSheet.registration) {
@@ -337,7 +343,6 @@ const getBdSheetByCategory = async (req, res) => {
       managers: managers,
       categoryCounts,
     });
-
   } catch (err) {
     console.log("GET BD SHEET CATEGORY ERROR:", err);
     return ReE(res, err.message, 500);
@@ -345,8 +350,6 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
-
-
 
 const getDashboardStats = async (req, res) => {
   try {
@@ -368,7 +371,9 @@ const getDashboardStats = async (req, res) => {
       };
     }
 
-    const managerFilter = managerId ? { teamManagerId: parseInt(managerId) } : {};
+    const managerFilter = managerId
+      ? { teamManagerId: parseInt(managerId) }
+      : {};
 
     // ---------------------------
     // 1️⃣ BdTarget stats
@@ -392,13 +397,23 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet stats
+    // 2️⃣ BdSheet stats (UPDATED DATE LOGIC)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
       sheetDateFilter = {
-        startDate: { [Op.gte]: startDate },
-        endDate: { [Op.lte]: endDate },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
       };
     }
 
@@ -415,11 +430,9 @@ const getDashboardStats = async (req, res) => {
     let totalActiveInterns = 0;
 
     bdSheetData.forEach((row) => {
-      // sum businessTask (convert string to number, ignore if invalid)
       const taskNum = parseInt(row.businessTask);
       if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
 
-      // count active interns
       if (row.activeStatus && row.activeStatus.toLowerCase() === "active") {
         totalActiveInterns += 1;
       }
@@ -451,8 +464,4 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
-
-
-
 
