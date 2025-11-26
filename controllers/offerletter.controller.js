@@ -805,65 +805,67 @@ const autoSendOfferLetters = async (req, res) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    yesterday.setHours(0, 0, 0, 0);
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(today.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
-    const tomorrow = new Date();
-    tomorrow.setDate(today.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    // 1️⃣ Fetch users created today or yesterday
+    // 1️⃣ Fetch users created in the last 7 days
     const users = await model.User.findAll({
       where: {
-        createdAt: { [Op.between]: [yesterday, tomorrow] },
+        createdAt: { [Op.between]: [sevenDaysAgo, today] },
         isDeleted: false,
       },
+      order: [["createdAt", "ASC"]],
     });
 
     if (!users.length) {
       return res.status(200).json({
         success: true,
-        message: "No users created today or yesterday",
+        message: "No users registered in the last 7 days",
       });
     }
 
     let processed = [];
 
-    // 2️⃣ Loop users
-    for (let user of users) {
-      if (!user.courseDates) continue;
+    // 2️⃣ Process users in batches of 20
+    const batchSize = 20;
+    for (let i = 0; i < users.length; i += batchSize) {
+      const batch = users.slice(i, i + batchSize);
 
-      const subscriptionWallet = Number(user.subscriptionWallet);
+      for (let user of batch) {
+        if (!user.courseDates) continue;
 
-      // 3️⃣ Only users whose wallet == 1
-      if (subscriptionWallet !== 1) continue;
+        const subscriptionWallet = Number(user.subscriptionWallet);
 
-      // 4️⃣ Loop all courses inside courseDates
-      for (let courseId of Object.keys(user.courseDates)) {
-        const courseInfo = user.courseDates[courseId];
+        // 3️⃣ Only users with wallet == 1
+        if (subscriptionWallet !== 1) continue;
 
-        // ✅ Generate Offer Letter PDF
-        const generatedLetter = await generateOfferLetter(user.id, courseId);
+        // 4️⃣ Loop all courses inside courseDates
+        for (let courseId of Object.keys(user.courseDates)) {
+          const courseInfo = user.courseDates[courseId];
 
-        // ✅ Create OfferLetter record
-        await model.OfferLetter.create({
-          userId: user.id,
-          courseId: courseId,
-          position: courseInfo.courseName || "Intern",
-          startDate: new Date(),
-          location: "Work from Home",
-          fileUrl: generatedLetter.fileUrl,
-          issent: false,
-        });
+          // ✅ Generate Offer Letter PDF
+          const generatedLetter = await generateOfferLetter(user.id, courseId);
 
-        processed.push({
-          userId: user.id,
-          email: user.email,
-          courseId,
-          courseName: courseInfo.courseName,
-          fileUrl: generatedLetter.fileUrl,
-        });
+          // ✅ Create OfferLetter record
+          await model.OfferLetter.create({
+            userId: user.id,
+            courseId: courseId,
+            position: courseInfo.courseName || "Intern",
+            startDate: new Date(),
+            location: "Work from Home",
+            fileUrl: generatedLetter.fileUrl,
+            issent: false,
+          });
+
+          processed.push({
+            userId: user.id,
+            email: user.email,
+            courseId,
+            courseName: courseInfo.courseName,
+            fileUrl: generatedLetter.fileUrl,
+          });
+        }
       }
     }
 
@@ -872,7 +874,6 @@ const autoSendOfferLetters = async (req, res) => {
       message: "Offer letters generated successfully",
       processed,
     });
-
   } catch (error) {
     console.error("autoSendOfferLetters Error:", error);
     return res.status(500).json({
