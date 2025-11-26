@@ -800,17 +800,28 @@ const listAllUsers = async (req, res) => {
 module.exports.listAllUsers = listAllUsers;
 
 
+
+/**
+ * Automatically generate and send offer letters to latest 500 users with started courses.
+ * @param {boolean} attachPDF - whether to attach the offer letter PDF in email
+ */
 const autoSendOfferLetters = async (attachPDF = true) => {
   try {
-    // Fetch latest 500 users
+    console.log("🚀 Starting autoSendOfferLetters...");
+
+    // 1️⃣ Fetch latest 500 users with courseDates
     const users = await model.User.findAll({
-      where: { courseDates: { [Op.ne]: null }, isDeleted: false },
+      where: {
+        courseDates: { [Op.ne]: null },
+        isDeleted: false,
+      },
       order: [["createdAt", "DESC"]],
       limit: 500,
     });
 
     const filteredUsers = [];
 
+    // 2️⃣ Filter users whose courses have startDate and endDate
     for (let user of users) {
       if (!user.courseDates) continue;
 
@@ -823,58 +834,75 @@ const autoSendOfferLetters = async (attachPDF = true) => {
 
     console.log(`✅ Found ${filteredUsers.length} users with started courses`);
 
-    // Process in batches of 20
-    const batchSize = 10;
+    // 3️⃣ Process users in batches
+    const batchSize = 20;
     for (let i = 0; i < filteredUsers.length; i += batchSize) {
       const batch = filteredUsers.slice(i, i + batchSize);
 
       for (let { user, validCourses } of batch) {
-        for (let [courseId, courseInfo] of validCourses) {
-          // Generate offer letter
-          const generatedLetter = await generateOfferLetter(user.id, courseId);
+        // Process all courses of this user in parallel
+        const emailPromises = validCourses.map(async ([courseId, courseInfo]) => {
+          try {
+            // Generate offer letter PDF
+            const generatedLetter = await generateOfferLetter(user.id, courseId);
 
-          // Create OfferLetter record
-          await model.OfferLetter.create({
-            userId: user.id,
-            courseId,
-            position: courseInfo.courseName || "Intern",
-            startDate: courseInfo.startDate,
-            location: "Work from Home",
-            fileUrl: generatedLetter.fileUrl,
-            issent: false,
-          });
+            // Create OfferLetter record
+            await model.OfferLetter.create({
+              userId: user.id,
+              courseId,
+              position: courseInfo.courseName || "Intern",
+              startDate: courseInfo.startDate,
+              location: "Work from Home",
+              fileUrl: generatedLetter.fileUrl,
+              issent: false,
+            });
 
-          // Prepare email
-          const mailSubject = `Your Offer Letter for ${courseInfo.courseName || "Intern"}`;
-          const mailHtml = `
-            <p>Dear ${user.name || "Candidate"},</p>
-            <p>Congratulations! Please find attached your offer letter for the position of ${courseInfo.courseName || "Intern"}.</p>
-            <p>Start Date: ${new Date(courseInfo.startDate).toDateString()}</p>
-            <p>End Date: ${new Date(courseInfo.endDate).toDateString()}</p>
-            <p>Location: Work from Home</p>
-            <p>Regards,<br/>EduRoom Team</p>
-          `;
+            // Prepare email
+            const mailSubject = `Your Offer Letter for ${courseInfo.courseName || "Intern"}`;
+            const mailHtml = `
+              <p>Dear ${user.fullName || user.firstName || "Candidate"},</p>
+              <p>Congratulations! Please find attached your offer letter for the position of ${courseInfo.courseName || "Intern"}.</p>
+              <p>Start Date: ${new Date(courseInfo.startDate).toDateString()}</p>
+              <p>End Date: ${new Date(courseInfo.endDate).toDateString()}</p>
+              <p>Location: Work from Home</p>
+              <p>Regards,<br/>EduRoom Team</p>
+            `;
 
-          // Send email with optional attachment
-          await sendMail(
-            user.email,
-            mailSubject,
-            mailHtml,
-            attachPDF
-              ? [
-                  {
-                    filename: `${courseInfo.courseName || "OfferLetter"}.pdf`,
-                    path: generatedLetter.fileUrl,
-                  },
-                ]
-              : []
-          );
-        }
+            // Send email with optional attachment
+            const emailResult = await sendMail(
+              user.email,
+              mailSubject,
+              mailHtml,
+              attachPDF
+                ? [
+                    {
+                      filename: `${courseInfo.courseName || "OfferLetter"}.pdf`,
+                      path: generatedLetter.fileUrl,
+                    },
+                  ]
+                : []
+            );
+
+            // If email sent successfully, mark user as offerLetterSent
+            if (emailResult.success) {
+              await model.User.update(
+                { offerLetterSent: true },
+                { where: { id: user.id } }
+              );
+            }
+          } catch (err) {
+            console.error(`❌ Error processing user ${user.id}, course ${courseId}:`, err);
+          }
+        });
+
+        // Wait for all courses of this user to finish
+        await Promise.allSettled(emailPromises);
       }
-      console.log(`✅ Processed batch ${i / batchSize + 1}`);
+
+      console.log(`✅ Batch ${i / batchSize + 1} processed`);
     }
 
-    console.log("✅ All batches processed successfully");
+    console.log("🎉 All batches processed successfully!");
   } catch (error) {
     console.error("autoSendOfferLetters Error:", error);
   }
