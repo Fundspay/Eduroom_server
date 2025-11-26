@@ -203,12 +203,11 @@ const getBdSheetByCategory = async (req, res) => {
       return ReE(res, "category is required", 400);
     }
 
-    let whereCondition = {}; // for StudentResume
-    let bdWhere = { category }; // for BdSheet
+    // ---------------------------
+    // Base filters (same as getBdSheet)
+    // ---------------------------
+    let whereCondition = {};
 
-    // ---------------------------
-    // Manager filter (same as your getBdSheet)
-    // ---------------------------
     if (managerId) {
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
@@ -223,7 +222,7 @@ const getBdSheetByCategory = async (req, res) => {
     }
 
     // ---------------------------
-    // Fetch student + BdSheet (with category filter)
+    // Fetch all students + BdSheet
     // ---------------------------
     const data = await model.StudentResume.findAll({
       where: whereCondition,
@@ -238,34 +237,73 @@ const getBdSheetByCategory = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: true, // we must have category match
+          required: false,
           attributes: {
-            include: ["businessTask", "registration"],
+            include: ["businessTask", "registration", "activeStatus"],
           },
-          where: bdWhere,
           order: [["id", "DESC"]],
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    // Same formatting as original getBdSheet
-    const formattedData = data.map((student) => {
-      const s = student.toJSON();
+    // ---------------------------
+    // Map all students and fetch users in parallel
+    // ---------------------------
+    const formattedData = await Promise.all(
+      data.map(async (student) => {
+        const s = student.toJSON();
 
-      if (s.BdSheet && s.BdSheet.registration) {
-        s.registration = s.BdSheet.registration;
-      }
+        // Prepare dynamic businessTask + category
+        let businessTask = 0;
 
-      if (s.BdSheet) {
-        delete s.BdSheet.registration;
-      }
+        if (s.mobileNumber) {
+          // Fetch user in parallel
+          const user = await model.User.findOne({
+            where: { phoneNumber: s.mobileNumber },
+            attributes: ["subscriptionWallet", "subscriptiondeductedWallet"],
+          });
 
-      return s;
-    });
+          if (user) {
+            const wallet = parseInt(user.subscriptionWallet || 0, 10);
+            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
+            businessTask = wallet + deducted;
+          }
+        }
+
+        s.businessTask = businessTask;
+
+        // Dynamic category
+        if (!businessTask || businessTask === 0) s.category = "not working";
+        else if (businessTask >= 1 && businessTask <= 5) s.category = "Starter";
+        else if (businessTask >= 6 && businessTask <= 10) s.category = "Basic";
+        else if (businessTask >= 11 && businessTask <= 15) s.category = "Bronze";
+        else if (businessTask >= 16 && businessTask <= 20) s.category = "Silver";
+        else if (businessTask >= 21 && businessTask <= 25) s.category = "Gold";
+        else if (businessTask >= 26 && businessTask <= 35) s.category = "Diamond";
+        else if (businessTask >= 36 && businessTask <= 70) s.category = "Platinum";
+
+        // Move registration out of BdSheet
+        if (s.BdSheet && s.BdSheet.registration) {
+          s.registration = s.BdSheet.registration;
+        }
+        if (s.BdSheet) {
+          delete s.BdSheet.registration;
+        }
+
+        return s;
+      })
+    );
 
     // ---------------------------
-    // Counts Per Category (ADDED) — using same manager filter if present
+    // Filter by requested category in NodeJS
+    // ---------------------------
+    const filteredData = formattedData.filter(
+      (item) => item.category === category
+    );
+
+    // ---------------------------
+    // Calculate counts per category dynamically
     // ---------------------------
     const allCategories = [
       "not working",
@@ -279,32 +317,10 @@ const getBdSheetByCategory = async (req, res) => {
     ];
 
     const categoryCounts = {};
-    const managerAlloted = whereCondition.alloted; // undefined if no manager filter
-
     for (const cat of allCategories) {
-      if (managerAlloted) {
-        // count BdSheet rows for this category where the related StudentResume.alloted = managerName
-        categoryCounts[cat] = await model.BdSheet.count({
-          where: { category: cat },
-          include: [
-            {
-              model: model.StudentResume,
-              where: { alloted: managerAlloted },
-              attributes: [], // not needed
-              required: true,
-            },
-          ],
-          distinct: true, // ✅ ensures unique BdSheet rows
-          col: "id",      // ✅ count by BdSheet.id
-        });
-      } else {
-        // no manager filter — count across all BdSheets
-        categoryCounts[cat] = await model.BdSheet.count({
-          where: { category: cat },
-          distinct: true, // ✅ ensures unique BdSheet rows
-          col: "id",      // ✅ count by BdSheet.id
-        });
-      }
+      categoryCounts[cat] = formattedData.filter(
+        (item) => item.category === cat
+      ).length;
     }
 
     // ---------------------------
@@ -316,10 +332,10 @@ const getBdSheetByCategory = async (req, res) => {
     });
 
     return ReS(res, {
-      count: formattedData.length,
-      data: formattedData,
+      count: filteredData.length,
+      data: filteredData,
       managers: managers,
-      categoryCounts, // <-- only fixed counts
+      categoryCounts,
     });
 
   } catch (err) {
@@ -329,6 +345,7 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
 
 
 const getDashboardStats = async (req, res) => {
