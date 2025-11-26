@@ -15,12 +15,13 @@ const transporter = nodemailer.createTransport({
 });
 
 // Generic mail sender function
-const sendMail = async (to, subject, html) => {
+const sendMail = async (to, subject, html, attachments = []) => {
   const mailOptions = {
-    from: `"EduRoom" <${CONFIG.mailUser}>`,  // Display name + email
+    from: `"EduRoom" <${CONFIG.mailUser}>`,
     to,
     subject,
     html,
+    attachments: attachments.length ? attachments : undefined, // only include if provided
   };
 
   try {
@@ -28,13 +29,14 @@ const sendMail = async (to, subject, html) => {
     console.log("✅ Email sent:", info.messageId);
     return { success: true, info };
   } catch (error) {
-    console.error(" GoDaddy Mail Error:", error);
+    console.error("GoDaddy Mail Error:", error);
     if (error.response) console.error("SMTP Response:", error.response);
     return { success: false, error };
   }
 };
 
 module.exports = { sendMail };
+
 
 // const nodemailer = require("nodemailer");
 // // const CONFIG = require("../config/config");
