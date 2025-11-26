@@ -800,14 +800,11 @@ const listAllUsers = async (req, res) => {
 module.exports.listAllUsers = listAllUsers;
 
 
-const autoSendOfferLetters = async () => {
+const autoSendOfferLetters = async (attachPDF = true) => {
   try {
-    // 1️⃣ Fetch latest 500 users with courseDates
+    // Fetch latest 500 users
     const users = await model.User.findAll({
-      where: {
-        courseDates: { [Op.ne]: null },
-        isDeleted: false,
-      },
+      where: { courseDates: { [Op.ne]: null }, isDeleted: false },
       order: [["createdAt", "DESC"]],
       limit: 500,
     });
@@ -817,29 +814,26 @@ const autoSendOfferLetters = async () => {
     for (let user of users) {
       if (!user.courseDates) continue;
 
-      // Only courses with startDate and endDate
       const validCourses = Object.entries(user.courseDates).filter(
-        ([courseId, courseInfo]) => courseInfo.startDate && courseInfo.endDate
+        ([_, courseInfo]) => courseInfo.startDate && courseInfo.endDate
       );
 
-      if (validCourses.length) {
-        filteredUsers.push({ user, validCourses });
-      }
+      if (validCourses.length) filteredUsers.push({ user, validCourses });
     }
 
     console.log(`✅ Found ${filteredUsers.length} users with started courses`);
 
-    // 2️⃣ Process in batches of 20
-    const batchSize = 20;
+    // Process in batches of 20
+    const batchSize = 10;
     for (let i = 0; i < filteredUsers.length; i += batchSize) {
       const batch = filteredUsers.slice(i, i + batchSize);
 
       for (let { user, validCourses } of batch) {
         for (let [courseId, courseInfo] of validCourses) {
-          // 3️⃣ Generate offer letter
+          // Generate offer letter
           const generatedLetter = await generateOfferLetter(user.id, courseId);
 
-          // 4️⃣ Create OfferLetter record
+          // Create OfferLetter record
           await model.OfferLetter.create({
             userId: user.id,
             courseId,
@@ -850,7 +844,7 @@ const autoSendOfferLetters = async () => {
             issent: false,
           });
 
-          // 5️⃣ Send Email
+          // Prepare email
           const mailSubject = `Your Offer Letter for ${courseInfo.courseName || "Intern"}`;
           const mailHtml = `
             <p>Dear ${user.name || "Candidate"},</p>
@@ -861,18 +855,29 @@ const autoSendOfferLetters = async () => {
             <p>Regards,<br/>EduRoom Team</p>
           `;
 
-          await sendMail(user.email, mailSubject, mailHtml);
+          // Send email with optional attachment
+          await sendMail(
+            user.email,
+            mailSubject,
+            mailHtml,
+            attachPDF
+              ? [
+                  {
+                    filename: `${courseInfo.courseName || "OfferLetter"}.pdf`,
+                    path: generatedLetter.fileUrl,
+                  },
+                ]
+              : []
+          );
         }
       }
-
       console.log(`✅ Processed batch ${i / batchSize + 1}`);
     }
 
     console.log("✅ All batches processed successfully");
   } catch (error) {
-    console.error("sendOfferLettersToLatest500 Error:", error);
+    console.error("autoSendOfferLetters Error:", error);
   }
 };
-
 
 module.exports.autoSendOfferLetters = autoSendOfferLetters;
