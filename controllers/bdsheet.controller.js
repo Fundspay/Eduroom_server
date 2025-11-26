@@ -397,14 +397,23 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet stats
+    // 2️⃣ BdSheet stats (UPDATED DATE LOGIC)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
       sheetDateFilter = {
-        startDate: {
-          [Op.between]: [startDate, endDate],
-        },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
       };
     }
 
@@ -421,11 +430,9 @@ const getDashboardStats = async (req, res) => {
     let totalActiveInterns = 0;
 
     bdSheetData.forEach((row) => {
-      // sum businessTask (convert string to number, ignore if invalid)
       const taskNum = parseInt(row.businessTask);
       if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
 
-      // count active interns
       if (row.activeStatus && row.activeStatus.toLowerCase() === "active") {
         totalActiveInterns += 1;
       }
@@ -457,3 +464,4 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
