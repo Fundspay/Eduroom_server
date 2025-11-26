@@ -11,6 +11,7 @@ module.exports = (sequelize, Sequelize) => {
       fullName: { type: Sequelize.STRING, allowNull: true },
       dateOfBirth: { type: Sequelize.DATEONLY, allowNull: true },
       gender: { type: Sequelize.BIGINT, allowNull: true },
+      offerLetterSent: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
 
       // 🔹 Contact Info
       phoneNumber: { type: Sequelize.STRING, allowNull: true, unique: true },
