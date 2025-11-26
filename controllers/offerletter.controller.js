@@ -799,14 +799,6 @@ const listAllUsers = async (req, res) => {
 
 module.exports.listAllUsers = listAllUsers;
 
-
-"use strict";
-
-const { Op } = require("sequelize");
-const model = require("../models");
-const { generateOfferLetter } = require("../utils/offerletter.service");
-const { sendMail } = require("../utils/mailer");
-
 /**
  * Automatically generate and send offer letters to latest 500 users with started courses.
  * @param {boolean} attachPDF - whether to attach the offer letter PDF in email
