@@ -12,3 +12,5 @@ router.post("/certificate/send/:userId", offerletterController.sendCertificate);
 router.post("/send-offer-letters", offerletterController.autoSendOfferLetters);
 
 module.exports = router;
+
+

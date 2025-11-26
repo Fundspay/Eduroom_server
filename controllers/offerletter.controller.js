@@ -800,88 +800,79 @@ const listAllUsers = async (req, res) => {
 module.exports.listAllUsers = listAllUsers;
 
 
-const autoSendOfferLetters = async (req, res) => {
+const autoSendOfferLetters = async () => {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(today.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-
-    // 1️⃣ Fetch users created in the last 7 days
+    // 1️⃣ Fetch latest 500 users with courseDates
     const users = await model.User.findAll({
       where: {
-        createdAt: { [Op.between]: [sevenDaysAgo, today] },
+        courseDates: { [Op.ne]: null },
         isDeleted: false,
       },
-      order: [["createdAt", "ASC"]],
+      order: [["createdAt", "DESC"]],
+      limit: 500,
     });
 
-    if (!users.length) {
-      return res.status(200).json({
-        success: true,
-        message: "No users registered in the last 7 days",
-      });
+    const filteredUsers = [];
+
+    for (let user of users) {
+      if (!user.courseDates) continue;
+
+      // Only courses with startDate and endDate
+      const validCourses = Object.entries(user.courseDates).filter(
+        ([courseId, courseInfo]) => courseInfo.startDate && courseInfo.endDate
+      );
+
+      if (validCourses.length) {
+        filteredUsers.push({ user, validCourses });
+      }
     }
 
-    let processed = [];
+    console.log(`✅ Found ${filteredUsers.length} users with started courses`);
 
-    // 2️⃣ Process users in batches of 20
+    // 2️⃣ Process in batches of 20
     const batchSize = 20;
-    for (let i = 0; i < users.length; i += batchSize) {
-      const batch = users.slice(i, i + batchSize);
+    for (let i = 0; i < filteredUsers.length; i += batchSize) {
+      const batch = filteredUsers.slice(i, i + batchSize);
 
-      for (let user of batch) {
-        if (!user.courseDates) continue;
-
-        const subscriptionWallet = Number(user.subscriptionWallet);
-
-        // 3️⃣ Only users with wallet == 1
-        if (subscriptionWallet !== 1) continue;
-
-        // 4️⃣ Loop all courses inside courseDates
-        for (let courseId of Object.keys(user.courseDates)) {
-          const courseInfo = user.courseDates[courseId];
-
-          // ✅ Generate Offer Letter PDF
+      for (let { user, validCourses } of batch) {
+        for (let [courseId, courseInfo] of validCourses) {
+          // 3️⃣ Generate offer letter
           const generatedLetter = await generateOfferLetter(user.id, courseId);
 
-          // ✅ Create OfferLetter record
+          // 4️⃣ Create OfferLetter record
           await model.OfferLetter.create({
             userId: user.id,
-            courseId: courseId,
+            courseId,
             position: courseInfo.courseName || "Intern",
-            startDate: new Date(),
+            startDate: courseInfo.startDate,
             location: "Work from Home",
             fileUrl: generatedLetter.fileUrl,
             issent: false,
           });
 
-          processed.push({
-            userId: user.id,
-            email: user.email,
-            courseId,
-            courseName: courseInfo.courseName,
-            fileUrl: generatedLetter.fileUrl,
-          });
+          // 5️⃣ Send Email
+          const mailSubject = `Your Offer Letter for ${courseInfo.courseName || "Intern"}`;
+          const mailHtml = `
+            <p>Dear ${user.name || "Candidate"},</p>
+            <p>Congratulations! Please find attached your offer letter for the position of ${courseInfo.courseName || "Intern"}.</p>
+            <p>Start Date: ${new Date(courseInfo.startDate).toDateString()}</p>
+            <p>End Date: ${new Date(courseInfo.endDate).toDateString()}</p>
+            <p>Location: Work from Home</p>
+            <p>Regards,<br/>EduRoom Team</p>
+          `;
+
+          await sendMail(user.email, mailSubject, mailHtml);
         }
       }
+
+      console.log(`✅ Processed batch ${i / batchSize + 1}`);
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Offer letters generated successfully",
-      processed,
-    });
+    console.log("✅ All batches processed successfully");
   } catch (error) {
-    console.error("autoSendOfferLetters Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-      error,
-    });
+    console.error("sendOfferLettersToLatest500 Error:", error);
   }
 };
+
 
 module.exports.autoSendOfferLetters = autoSendOfferLetters;
