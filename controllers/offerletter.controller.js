@@ -799,8 +799,6 @@ const listAllUsers = async (req, res) => {
 
 module.exports.listAllUsers = listAllUsers;
 
-
-
 /**
  * Automatically generate and send offer letters to latest 500 users with started courses.
  * @param {boolean} attachPDF - whether to attach the offer letter PDF in email
