@@ -420,7 +420,7 @@ const getDashboardStats = async (req, res) => {
       if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
 
       // count active interns
-      if (row.activeStatus && row.activeStatus.toLowerCase() === "Active") {
+      if (row.activeStatus && row.activeStatus.toLowerCase() === "active") {
         totalActiveInterns += 1;
       }
     });
