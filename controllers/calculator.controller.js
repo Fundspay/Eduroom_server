@@ -17,7 +17,7 @@ const calculateIncentive = async (req, res) => {
     // ---------------------------
     // Fetch active interns count (case-insensitive)
     // ---------------------------
-    const activeInterns = await model.ManagerRanges.count({
+    const activeInterns = await model.bdsheet.count({
       where: {
         teamManagerId: managerId,
         activeStatus: { [Op.iLike]: "active" },
