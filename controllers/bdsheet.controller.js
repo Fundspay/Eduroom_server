@@ -557,39 +557,41 @@ module.exports.upsertRangeAmounts = upsertRangeAmounts;
 
 const getManagerRangeAmounts = async (req, res) => {
   try {
-    const managerId = req.query.managerId;
-    if (!managerId) return ReE(res, "managerId query param is required", 400);
+    const managerId = req.params.managerId || req.query.managerId;
 
-    // Find a BdSheet row for this manager that contains the amounts
-    const row = await model.BdSheet.findOne({
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    // Fetch the MOST RECENT BdSheet entry for this manager
+    const sheet = await model.BdSheet.findOne({
       where: { teamManagerId: managerId },
-      attributes: ["teamManagerId", "incentiveAmounts", "deductionAmounts"],
+      order: [["updatedAt", "DESC"]],   // IMPORTANT: takes updated row
+      attributes: ["incentiveAmounts", "deductionAmounts"],
     });
 
-    if (!row) {
+    if (!sheet) {
       return ReS(res, {
-        message: "No range amounts found for this manager",
+        message: "No data found for this manager",
         data: {
+          managerId,
           incentiveAmounts: {},
           deductionAmounts: {},
         },
       });
     }
 
-    const result = {
-      managerId: row.teamManagerId,
-      incentiveAmounts: row.incentiveAmounts || {},
-      deductionAmounts: row.deductionAmounts || {},
-    };
-
     return ReS(res, {
       message: "Manager range amounts fetched successfully",
-      data: result,
+      data: {
+        managerId,
+        incentiveAmounts: sheet.incentiveAmounts || {},
+        deductionAmounts: sheet.deductionAmounts || {},
+      },
     });
-  } catch (err) {
-    console.log("GET MANAGER RANGE AMOUNTS ERROR:", err);
-    return ReE(res, err.message, 500);
+  } catch (error) {
+    console.log("GET MANAGER RANGE AMOUNTS ERROR:", error);
+    return ReE(res, error.message, 500);
   }
 };
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
+
