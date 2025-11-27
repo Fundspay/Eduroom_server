@@ -15,24 +15,15 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch active interns count (with updated date logic)
+    // Fetch active interns count (simple date comparison)
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
         activeStatus: "active",
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            "<=",
-            endDate
-          ),
-        ],
+        startDate: {
+          [Op.between]: [new Date(startDate), new Date(endDate)],
+        },
       },
     });
 
@@ -51,7 +42,7 @@ const calculateIncentive = async (req, res) => {
     const incentiveSlabs = managerData.incentiveAmounts;
 
     // ----------------------------------------
-    // Hardcoded RANGE KEYS (MUST MATCH DB KEYS)
+    // Hardcoded RANGE KEYS
     // ----------------------------------------
     const SLABS = [
       { key: "1-10", min: 1, max: 10 },
@@ -66,7 +57,6 @@ const calculateIncentive = async (req, res) => {
     // Find correct slab based on count
     // ---------------------------
     let selectedSlab = null;
-
     for (const slab of SLABS) {
       if (activeInterns >= slab.min && activeInterns <= slab.max) {
         selectedSlab = slab.key;
@@ -78,10 +68,7 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "No matching slab found", 400);
     }
 
-    // Slab amount from DB
     const slabAmount = incentiveSlabs[selectedSlab] || 0;
-
-    // Final Calculation
     const totalIncentive = activeInterns * slabAmount;
 
     return ReS(res, {
