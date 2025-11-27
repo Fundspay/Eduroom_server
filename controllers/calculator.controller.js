@@ -20,7 +20,7 @@ const calculateIncentive = async (req, res) => {
     const activeInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
-        activeStatus: { [Op.iLike]: "active" },
+        module2Status: { [Op.iLike]: "Promoted" },
         [Op.and]: [
           Sequelize.where(
             Sequelize.fn("DATE", Sequelize.col("startDate")),
