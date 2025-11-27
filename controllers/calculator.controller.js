@@ -64,6 +64,7 @@ const calculateIncentive = async (req, res) => {
     console.log("INCENTIVE SLABS KEYS:", Object.keys(incentiveSlabs));
 
     const SLABS = [
+      { key: "0-0", min: 0, max: 0 },
       { key: "1-10", min: 1, max: 10 },
       { key: "11-20", min: 11, max: 20 },
       { key: "21-30", min: 21, max: 30 },
