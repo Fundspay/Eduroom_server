@@ -50,20 +50,15 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "No incentive slabs found for this manager", 404);
     }
 
-    // ---------------------------
-    // Convert all incentive amounts to numbers
-    // ---------------------------
     let incentiveSlabs = {};
+    // Strip extra spaces from keys
     for (const key in managerData.incentiveAmounts) {
       if (managerData.incentiveAmounts.hasOwnProperty(key)) {
-        const value = managerData.incentiveAmounts[key];
-        // Ensure number type
-        incentiveSlabs[key.trim()] = Number(value) || 0;
+        incentiveSlabs[key.trim()] = managerData.incentiveAmounts[key];
       }
     }
 
     console.log("INCENTIVE SLABS KEYS:", Object.keys(incentiveSlabs));
-    console.log("INCENTIVE SLABS VALUES:", Object.values(incentiveSlabs));
 
     // ----------------------------------------
     // Hardcoded RANGE KEYS (must match DB keys)
@@ -81,6 +76,7 @@ const calculateIncentive = async (req, res) => {
     // Find correct slab based on count
     // ---------------------------
     let selectedSlab = null;
+
     for (const slab of SLABS) {
       if (activeInterns >= slab.min && activeInterns <= slab.max) {
         selectedSlab = slab.key;
@@ -92,8 +88,8 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "No matching slab found", 400);
     }
 
-    // Slab amount from DB (now guaranteed number)
-    const slabAmount = incentiveSlabs[selectedSlab];
+    // Slab amount from DB
+    const slabAmount = incentiveSlabs[selectedSlab] || 0;
 
     // Final Calculation
     const totalIncentive = activeInterns * slabAmount;
@@ -117,4 +113,3 @@ const calculateIncentive = async (req, res) => {
 };
 
 module.exports.calculateIncentive = calculateIncentive;
-
