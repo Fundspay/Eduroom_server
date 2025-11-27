@@ -15,7 +15,7 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch active interns count from BdSheet (case-insensitive)
+    // Fetch active interns count
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
@@ -39,7 +39,7 @@ const calculateIncentive = async (req, res) => {
     console.log("ACTIVE INTERNS COUNT:", activeInterns);
 
     // ---------------------------
-    // Fetch manager's slab amounts from ManagerRanges
+    // Fetch manager's slab amounts
     // ---------------------------
     const managerData = await model.ManagerRanges.findOne({
       where: {
@@ -95,6 +95,8 @@ const calculateIncentive = async (req, res) => {
             slab: null,
             perInternAmount: 0,
             totalIncentive: 0,
+            allRanges: SLABS.map((s) => s.key),       // <<< ADDED
+            setAmounts: incentiveSlabs,               // <<< ADDED
           },
         });
       }
@@ -114,6 +116,10 @@ const calculateIncentive = async (req, res) => {
         slab: selectedSlab,
         perInternAmount: slabAmount,
         totalIncentive,
+
+        // 🔥 ADDED (based on your reference code)
+        allRanges: SLABS.map((s) => s.key),
+        setAmounts: incentiveSlabs,
       },
     });
   } catch (error) {
@@ -123,6 +129,7 @@ const calculateIncentive = async (req, res) => {
 };
 
 module.exports.calculateIncentive = calculateIncentive;
+
 
 const calculateDeduction = async (req, res) => {
   try {
