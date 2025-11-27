@@ -6,8 +6,6 @@ const { Op, Sequelize } = require("sequelize");
 // ---------------------------
 // Incentive Calculator
 // ---------------------------
-const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-45", "46+"];
-
 const calculateIncentive = async (req, res) => {
   try {
     const { managerId, startDate, endDate } = req.query;
@@ -17,32 +15,28 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch active interns count
+    // Fetch active interns count (case-insensitive)
     // ---------------------------
-    const sheetDateFilter = {
-      [Op.and]: [
-        Sequelize.where(
-          Sequelize.fn("DATE", Sequelize.col("startDate")),
-          ">=",
-          startDate
-        ),
-        Sequelize.where(
-          Sequelize.fn("DATE", Sequelize.col("startDate")),
-          "<=",
-          endDate
-        ),
-      ],
-    };
-
     const activeInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
-        activeStatus: "active",
-        ...sheetDateFilter,
+        activeStatus: { [Op.iLike]: "active" },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
       },
     });
 
-    console.log("Active Interns Count:", activeInterns);
+    console.log("ACTIVE INTERNS COUNT:", activeInterns);
 
     // ---------------------------
     // Fetch manager's slab amounts
@@ -57,18 +51,22 @@ const calculateIncentive = async (req, res) => {
     }
 
     // ---------------------------
-    // Ensure all slab amounts are numbers
+    // Convert all incentive amounts to numbers
     // ---------------------------
-    const incentiveSlabs = {};
-    for (const key of RANGE_KEYS) {
-      const val = managerData.incentiveAmounts[key];
-      incentiveSlabs[key] = Number(val) || 0;
+    let incentiveSlabs = {};
+    for (const key in managerData.incentiveAmounts) {
+      if (managerData.incentiveAmounts.hasOwnProperty(key)) {
+        const value = managerData.incentiveAmounts[key];
+        // Ensure number type
+        incentiveSlabs[key.trim()] = Number(value) || 0;
+      }
     }
 
-    console.log("Incentive Slabs:", incentiveSlabs);
+    console.log("INCENTIVE SLABS KEYS:", Object.keys(incentiveSlabs));
+    console.log("INCENTIVE SLABS VALUES:", Object.values(incentiveSlabs));
 
     // ----------------------------------------
-    // Hardcoded RANGE KEYS
+    // Hardcoded RANGE KEYS (must match DB keys)
     // ----------------------------------------
     const SLABS = [
       { key: "1-10", min: 1, max: 10 },
@@ -83,7 +81,6 @@ const calculateIncentive = async (req, res) => {
     // Find correct slab based on count
     // ---------------------------
     let selectedSlab = null;
-
     for (const slab of SLABS) {
       if (activeInterns >= slab.min && activeInterns <= slab.max) {
         selectedSlab = slab.key;
@@ -92,16 +89,14 @@ const calculateIncentive = async (req, res) => {
     }
 
     if (!selectedSlab) {
-      console.log("No matching slab for count:", activeInterns);
       return ReE(res, "No matching slab found", 400);
     }
 
+    // Slab amount from DB (now guaranteed number)
     const slabAmount = incentiveSlabs[selectedSlab];
 
     // Final Calculation
     const totalIncentive = activeInterns * slabAmount;
-
-    console.log("Selected Slab:", selectedSlab, "Per Intern Amount:", slabAmount, "Total Incentive:", totalIncentive);
 
     return ReS(res, {
       message: "Incentive calculated successfully",
@@ -122,3 +117,4 @@ const calculateIncentive = async (req, res) => {
 };
 
 module.exports.calculateIncentive = calculateIncentive;
+
