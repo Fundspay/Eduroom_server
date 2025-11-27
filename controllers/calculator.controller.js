@@ -19,7 +19,7 @@ const calculateIncentive = async (req, res) => {
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
-        teamManagerId: managerId,
+        teamManagerId: Number(managerId), // <-- FIX: Convert to number
         activeStatus: { [Op.iLike]: "active" },
         [Op.and]: [
           Sequelize.where(
@@ -42,7 +42,7 @@ const calculateIncentive = async (req, res) => {
     // Fetch manager's slab amounts
     // ---------------------------
     const managerData = await model.BdSheet.findOne({
-      where: { teamManagerId: managerId },
+      where: { teamManagerId: Number(managerId) }, // <-- FIX: Convert to number
       attributes: ["incentiveAmounts"],
     });
 
@@ -113,3 +113,4 @@ const calculateIncentive = async (req, res) => {
 };
 
 module.exports.calculateIncentive = calculateIncentive;
+
