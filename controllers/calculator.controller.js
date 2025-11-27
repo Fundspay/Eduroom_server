@@ -19,7 +19,7 @@ const calculateIncentive = async (req, res) => {
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
-        teamManagerId: Number(managerId), // <-- FIX: Convert to number
+        teamManagerId: managerId,
         activeStatus: { [Op.iLike]: "active" },
         [Op.and]: [
           Sequelize.where(
@@ -39,11 +39,15 @@ const calculateIncentive = async (req, res) => {
     console.log("ACTIVE INTERNS COUNT:", activeInterns);
 
     // ---------------------------
-    // Fetch manager's slab amounts
+    // Fetch manager's slab amounts (latest record that has slabs)
     // ---------------------------
     const managerData = await model.BdSheet.findOne({
-      where: { teamManagerId: Number(managerId) }, // <-- FIX: Convert to number
+      where: {
+        teamManagerId: Number(managerId),
+        incentiveAmounts: { [Op.ne]: null }, // ensure we get record with slabs
+      },
       attributes: ["incentiveAmounts"],
+      order: [["updatedAt", "DESC"]], // get the latest record
     });
 
     if (!managerData || !managerData.incentiveAmounts) {
