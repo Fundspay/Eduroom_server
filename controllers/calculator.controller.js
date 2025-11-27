@@ -1,7 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { Op } = require("sequelize");
+const { Op, Sequelize } = require("sequelize");
 
 // ---------------------------
 // Incentive Calculator
