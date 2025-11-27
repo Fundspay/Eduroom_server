@@ -555,21 +555,41 @@ function filterRangeAmounts(amountObject) {
 
 module.exports.upsertRangeAmounts = upsertRangeAmounts;
 
-const getAllBdTargetRanges = async (req, res) => {
+const getManagerRangeAmounts = async (req, res) => {
   try {
-    // Fetch all target ranges
-    const targets = await model.BdTarget.findAll({
-      attributes: ["id", "range", "incentiveAmount", "deductionAmount"],
-      order: [["id", "ASC"]],
+    const managerId = req.query.managerId;
+    if (!managerId) return ReE(res, "managerId query param is required", 400);
+
+    // Find a BdSheet row for this manager that contains the amounts
+    const row = await model.BdSheet.findOne({
+      where: { teamManagerId: managerId },
+      attributes: ["teamManagerId", "incentiveAmounts", "deductionAmounts"],
     });
 
+    if (!row) {
+      return ReS(res, {
+        message: "No range amounts found for this manager",
+        data: {
+          incentiveAmounts: {},
+          deductionAmounts: {},
+        },
+      });
+    }
+
+    const result = {
+      managerId: row.teamManagerId,
+      incentiveAmounts: row.incentiveAmounts || {},
+      deductionAmounts: row.deductionAmounts || {},
+    };
+
     return ReS(res, {
-      message: "BD Target ranges fetched successfully",
-      data: targets,
+      message: "Manager range amounts fetched successfully",
+      data: result,
     });
-  } catch (error) {
-    console.log("GET BD TARGET RANGES ERROR:", error);
-    return ReE(res, error.message, 500);
+  } catch (err) {
+    console.log("GET MANAGER RANGE AMOUNTS ERROR:", err);
+    return ReE(res, err.message, 500);
   }
 };
-module.exports.getAllBdTargetRanges = getAllBdTargetRanges;
+
+module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
