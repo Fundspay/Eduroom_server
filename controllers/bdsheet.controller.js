@@ -479,7 +479,7 @@ const upsertRangeAmounts = async (req, res) => {
     if (!managerId) return ReE(res, "managerId is required", 400);
 
     // ---- Fetch record by managerId ----
-    let target = await model.BdSheet.findOne({
+    let target = await model.ManagerRanges.findOne({
       where: { teamManagerId: managerId },
     });
 
@@ -520,7 +520,7 @@ const upsertRangeAmounts = async (req, res) => {
       deductionAmounts: cleanedDeductions,
     };
 
-    const newTarget = await model.BdSheet.create(newData);
+    const newTarget = await model.ManagerRanges.create(newData);
 
     return ReS(res, {
       message: "Range amounts created successfully",
@@ -556,14 +556,15 @@ function filterRangeAmounts(amountObject) {
 module.exports.upsertRangeAmounts = upsertRangeAmounts;
 
 
+
 const getManagerRangeAmounts = async (req, res) => {
   try {
     const managerId = req.params.managerId || req.query.managerId;
 
     if (!managerId) return ReE(res, "managerId is required", 400);
 
-    // Fetch the MOST RECENT BdSheet entry for this manager
-    const sheet = await model.BdSheet.findOne({
+    // Fetch the MOST RECENT ManagerRanges entry for this manager
+    const sheet = await model.ManagerRanges.findOne({
       where: { teamManagerId: managerId },
       order: [["updatedAt", "DESC"]], // IMPORTANT: takes updated row
       attributes: ["incentiveAmounts", "deductionAmounts"],
@@ -596,5 +597,6 @@ const getManagerRangeAmounts = async (req, res) => {
 };
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
+
 
 

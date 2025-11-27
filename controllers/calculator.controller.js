@@ -17,7 +17,7 @@ const calculateIncentive = async (req, res) => {
     // ---------------------------
     // Fetch active interns count (case-insensitive)
     // ---------------------------
-    const activeInterns = await model.BdSheet.count({
+    const activeInterns = await model.ManagerRanges.count({
       where: {
         teamManagerId: managerId,
         activeStatus: { [Op.iLike]: "active" },
@@ -41,7 +41,7 @@ const calculateIncentive = async (req, res) => {
     // ---------------------------
     // Fetch manager's slab amounts (latest record that has slabs)
     // ---------------------------
-    const managerData = await model.BdSheet.findOne({
+    const managerData = await model.ManagerRanges.findOne({
       where: {
         teamManagerId: Number(managerId),
         incentiveAmounts: { [Op.ne]: null }, // ensure we get record with slabs
@@ -117,4 +117,5 @@ const calculateIncentive = async (req, res) => {
 };
 
 module.exports.calculateIncentive = calculateIncentive;
+
 
