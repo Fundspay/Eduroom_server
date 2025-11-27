@@ -80,7 +80,24 @@ const calculateIncentive = async (req, res) => {
       }
     }
 
+    // ---------------------------
+    // If no matching slab
+    // ---------------------------
     if (!selectedSlab) {
+      if (activeInterns === 0) {
+        return ReS(res, {
+          message: "Manager has 0 active interns for this period",
+          data: {
+            managerId,
+            startDate,
+            endDate,
+            activeInterns: 0,
+            slab: null,
+            perInternAmount: 0,
+            totalIncentive: 0,
+          },
+        });
+      }
       return ReE(res, "No matching slab found", 400);
     }
 
