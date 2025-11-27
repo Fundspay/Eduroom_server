@@ -138,7 +138,7 @@ const calculateDeduction = async (req, res) => {
     const inactiveInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
-        activeStatus: { [Op.iLike]: { [Op.any]: ["not-active", "left", "terminated"] } },
+        activeStatus: { [Op.iLike]: { [Op.any]: ["Inactive", "left", "terminated"] } },
         [Op.and]: [
           Sequelize.where(
             Sequelize.fn("DATE", Sequelize.col("startDate")),
