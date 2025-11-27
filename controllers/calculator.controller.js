@@ -140,12 +140,14 @@ const calculateDeduction = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch count of not-active/left/terminated interns
+    // Fetch inactive interns count
     // ---------------------------
     const inactiveInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
-        activeStatus: { [Op.iLike]: { [Op.any]: ["Inactive", "left", "terminated"] } },
+        activeStatus: {
+          [Op.iLike]: { [Op.any]: ["Inactive", "left", "terminated"] }
+        },
         [Op.and]: [
           Sequelize.where(
             Sequelize.fn("DATE", Sequelize.col("startDate")),
@@ -164,7 +166,7 @@ const calculateDeduction = async (req, res) => {
     console.log("INACTIVE INTERNS COUNT:", inactiveInterns);
 
     // ---------------------------
-    // Fetch manager's deduction slabs from ManagerRanges
+    // Fetch manager deduction slabs
     // ---------------------------
     const managerData = await model.ManagerRanges.findOne({
       where: {
@@ -220,13 +222,17 @@ const calculateDeduction = async (req, res) => {
             slab: null,
             perInternAmount: 0,
             totalDeduction: 0,
+
+            // ADDED
+            allRanges: SLABS.map((s) => s.key),
+            setAmounts: deductionSlabs,
           },
         });
       }
       return ReE(res, "No matching slab found", 400);
     }
 
-    const slabAmount = -(deductionSlabs[selectedSlab] || 0); // negative
+    const slabAmount = -(deductionSlabs[selectedSlab] || 0); // convert to negative
     const totalDeduction = inactiveInterns * slabAmount;
 
     return ReS(res, {
@@ -239,6 +245,10 @@ const calculateDeduction = async (req, res) => {
         slab: selectedSlab,
         perInternAmount: slabAmount,
         totalDeduction,
+
+        // 🔥 ADDED EXACTLY LIKE INCENTIVE
+        allRanges: SLABS.map((s) => s.key),
+        setAmounts: deductionSlabs,
       },
     });
   } catch (error) {
@@ -248,6 +258,7 @@ const calculateDeduction = async (req, res) => {
 };
 
 module.exports.calculateDeduction = calculateDeduction;
+
 
 
 
