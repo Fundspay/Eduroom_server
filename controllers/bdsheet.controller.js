@@ -555,8 +555,6 @@ function filterRangeAmounts(amountObject) {
 
 module.exports.upsertRangeAmounts = upsertRangeAmounts;
 
-
-
 const getManagerRangeAmounts = async (req, res) => {
   try {
     const managerId = req.params.managerId || req.query.managerId;
@@ -582,6 +580,14 @@ const getManagerRangeAmounts = async (req, res) => {
     const incentiveAmounts = prepareRanges(sheet ? sheet.incentiveAmounts : {});
     const deductionAmounts = prepareRanges(sheet ? sheet.deductionAmounts : {});
 
+    // ----------------------------
+    //  FETCH ALL REGISTERED MANAGERS
+    // ----------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
     return ReS(res, {
       message: "Manager range amounts fetched successfully",
       data: {
@@ -589,6 +595,9 @@ const getManagerRangeAmounts = async (req, res) => {
         incentiveAmounts,
         deductionAmounts,
       },
+
+      // Only this line added
+      managers: managers,
     });
   } catch (error) {
     console.log("GET MANAGER RANGE AMOUNTS ERROR:", error);
@@ -597,6 +606,7 @@ const getManagerRangeAmounts = async (req, res) => {
 };
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
+
 
 
 

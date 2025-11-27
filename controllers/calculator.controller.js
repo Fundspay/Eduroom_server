@@ -146,7 +146,7 @@ const calculateDeduction = async (req, res) => {
       where: {
         teamManagerId: managerId,
         activeStatus: {
-          [Op.iLike]: { [Op.any]: ["Inactive", "left", "terminated"] }
+          [Op.iLike]: { [Op.any]: ["Inactive", "Left", "Terminated"] }
         },
         [Op.and]: [
           Sequelize.where(
