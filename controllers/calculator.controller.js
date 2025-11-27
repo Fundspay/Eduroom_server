@@ -15,17 +15,28 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch active interns count (simple date comparison)
+    // Fetch active interns count (case-insensitive)
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
-        activeStatus: "active",
-        startDate: {
-          [Op.between]: [new Date(startDate), new Date(endDate)],
-        },
+        activeStatus: { [Op.iLike]: "active" },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
       },
     });
+
+    console.log("ACTIVE INTERNS COUNT:", activeInterns);
 
     // ---------------------------
     // Fetch manager's slab amounts
@@ -39,10 +50,18 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "No incentive slabs found for this manager", 404);
     }
 
-    const incentiveSlabs = managerData.incentiveAmounts;
+    let incentiveSlabs = {};
+    // Strip extra spaces from keys
+    for (const key in managerData.incentiveAmounts) {
+      if (managerData.incentiveAmounts.hasOwnProperty(key)) {
+        incentiveSlabs[key.trim()] = managerData.incentiveAmounts[key];
+      }
+    }
+
+    console.log("INCENTIVE SLABS KEYS:", Object.keys(incentiveSlabs));
 
     // ----------------------------------------
-    // Hardcoded RANGE KEYS
+    // Hardcoded RANGE KEYS (must match DB keys)
     // ----------------------------------------
     const SLABS = [
       { key: "1-10", min: 1, max: 10 },
@@ -57,6 +76,7 @@ const calculateIncentive = async (req, res) => {
     // Find correct slab based on count
     // ---------------------------
     let selectedSlab = null;
+
     for (const slab of SLABS) {
       if (activeInterns >= slab.min && activeInterns <= slab.max) {
         selectedSlab = slab.key;
@@ -68,7 +88,10 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "No matching slab found", 400);
     }
 
+    // Slab amount from DB
     const slabAmount = incentiveSlabs[selectedSlab] || 0;
+
+    // Final Calculation
     const totalIncentive = activeInterns * slabAmount;
 
     return ReS(res, {
