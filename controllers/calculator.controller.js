@@ -15,13 +15,24 @@ const calculateIncentive = async (req, res) => {
       return ReE(res, "startDate and endDate are required", 400);
 
     // ---------------------------
-    // Fetch active interns count
+    // Fetch active interns count (with updated date logic)
     // ---------------------------
     const activeInterns = await model.BdSheet.count({
       where: {
         teamManagerId: managerId,
         activeStatus: "active",
-        startDate: { [Op.between]: [startDate, endDate] },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
       },
     });
 
