@@ -555,6 +555,7 @@ function filterRangeAmounts(amountObject) {
 
 module.exports.upsertRangeAmounts = upsertRangeAmounts;
 
+
 const getManagerRangeAmounts = async (req, res) => {
   try {
     const managerId = req.params.managerId || req.query.managerId;
@@ -564,27 +565,28 @@ const getManagerRangeAmounts = async (req, res) => {
     // Fetch the MOST RECENT BdSheet entry for this manager
     const sheet = await model.BdSheet.findOne({
       where: { teamManagerId: managerId },
-      order: [["updatedAt", "DESC"]],   // IMPORTANT: takes updated row
+      order: [["updatedAt", "DESC"]], // IMPORTANT: takes updated row
       attributes: ["incentiveAmounts", "deductionAmounts"],
     });
 
-    if (!sheet) {
-      return ReS(res, {
-        message: "No data found for this manager",
-        data: {
-          managerId,
-          incentiveAmounts: {},
-          deductionAmounts: {},
-        },
-      });
-    }
+    // Prepare incentive and deduction objects with all ranges
+    const prepareRanges = (amountObj) => {
+      const output = {};
+      for (const key of RANGE_KEYS) {
+        output[key] = amountObj && amountObj[key] !== undefined ? amountObj[key] : null;
+      }
+      return output;
+    };
+
+    const incentiveAmounts = prepareRanges(sheet ? sheet.incentiveAmounts : {});
+    const deductionAmounts = prepareRanges(sheet ? sheet.deductionAmounts : {});
 
     return ReS(res, {
       message: "Manager range amounts fetched successfully",
       data: {
         managerId,
-        incentiveAmounts: sheet.incentiveAmounts || {},
-        deductionAmounts: sheet.deductionAmounts || {},
+        incentiveAmounts,
+        deductionAmounts,
       },
     });
   } catch (error) {
@@ -594,4 +596,5 @@ const getManagerRangeAmounts = async (req, res) => {
 };
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
+
 
