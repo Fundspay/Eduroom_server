@@ -1432,3 +1432,59 @@ const updateBusinessTarget = async (req, res) => {
 };
 
 module.exports.updateBusinessTarget = updateBusinessTarget;
+
+const getReferralPaidCount = async (req, res) => {
+  try {
+   const { managerId, from, to } = req.query;
+
+    if (!managerId || !from || !to) {
+      return ReE(res, "managerId, from, to are required", 400);
+    }
+
+    // 🔥 ONLY CHANGE → use TeamManager instead of User
+    const manager = await model.TeamManager.findByPk(managerId);
+
+    if (!manager) {
+      return ReE(res, "Team Manager not found", 404);
+    }
+
+    // 🔥 ONLY CHANGE → TeamManager has mobileNumber
+    const phone = "+91" + manager.mobileNumber;
+    // Build AWS API URL
+    const url =
+      `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone` +
+      `?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+
+    // Call AWS API
+    const response = await axios.get(url);
+    const data = response.data;
+
+    if (!data || !data.data) {
+      return ReE(res, "Invalid API response from referral service", 500);
+    }
+
+    // Extract users array from response
+    const referredUsers = data.data;
+
+    // Unique PAID users
+    const uniquePaidUsers = new Set();
+
+    referredUsers.forEach((entry) => {
+      if (entry.status === "paid" && entry.user_id) {
+        uniquePaidUsers.add(entry.user_id);
+      }
+    });
+
+    return ReS(res, {
+      success: true,
+      totalPaidUsers: uniquePaidUsers.size,
+      paidUserIds: [...uniquePaidUsers]
+    });
+
+  } catch (err) {
+    console.error("Referral Count Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getReferralPaidCount = getReferralPaidCount;
