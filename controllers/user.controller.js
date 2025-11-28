@@ -1437,71 +1437,61 @@ const getReferralPaidCount = async (req, res) => {
   try {
     const { managerId, from, to } = req.query;
 
-    console.log("🔵 Incoming Query Params:", { managerId, from, to });
-
     if (!managerId || !from || !to) {
       return ReE(res, "managerId, from, to are required", 400);
     }
 
     // Fetch TeamManager
     const manager = await model.TeamManager.findByPk(managerId);
-    console.log("🟡 Fetched TeamManager:", manager ? manager.toJSON() : null);
-
-    if (!manager) {
-      return ReE(res, "Team Manager not found", 404);
-    }
+    if (!manager) return ReE(res, "Team Manager not found", 404);
 
     const phone = "+91" + manager.mobileNumber;
-    console.log("🟢 Constructed Phone:", phone);
 
-    const url =
-      `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone` +
-      `?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+    // Construct AWS API URL
+    const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
 
-    console.log("🔵 AWS Referral URL:", url);
+    // Call AWS API
+    const response = await axios.get(url);
+    const data = response.data;
 
-    let response;
-    try {
-      response = await axios.get(url);
-    } catch (apiErr) {
-      console.log("🔴 AWS API ERROR RAW:", apiErr.response?.data || apiErr.message);
-      return ReE(res, "AWS API failed: " + apiErr.message, 500);
-    }
-
-    console.log("🟣 AWS API RAW RESPONSE:", response.data);
-
-    const result = response.data.result;
-
-    if (!result || !result.referred_users) {
-      console.log("❌ Missing referred_users in response", response.data);
+    if (!data || !data.result || !data.result.referred_users) {
       return ReE(res, "Invalid API response from referral service", 500);
     }
 
-    const referredUsers = result.referred_users;
-    console.log("🟠 Referred Users Count:", referredUsers.length);
+    const referredUsers = data.result.referred_users;
 
-    // ✅ Count unique users with paid_count > 0
-    const uniquePaidUsers = new Set();
+    // Map to store unique users and their paid_count
+    const uniqueUsersMap = new Map();
 
     referredUsers.forEach((entry) => {
       const paidCount = parseInt(entry.paid_count);
-      console.log("🔹 Entry:", entry);
-
       if (paidCount > 0 && entry.user_id) {
-        uniquePaidUsers.add(entry.user_id);
+        // Keep the highest paid_count for duplicates
+        if (!uniqueUsersMap.has(entry.user_id)) {
+          uniqueUsersMap.set(entry.user_id, paidCount);
+        } else {
+          uniqueUsersMap.set(entry.user_id, Math.max(uniqueUsersMap.get(entry.user_id), paidCount));
+        }
       }
     });
 
-    console.log("🟢 Unique Paid Users:", [...uniquePaidUsers]);
+    // Total unique paid users
+    const totalPaidUsers = uniqueUsersMap.size;
+
+    // Sum of all paid counts
+    let totalPaidCount = 0;
+    for (let count of uniqueUsersMap.values()) {
+      totalPaidCount += count;
+    }
 
     return ReS(res, {
       success: true,
-      totalPaidUsers: uniquePaidUsers.size,
-      paidUserIds: [...uniquePaidUsers],
+      totalPaidUsers,
+      totalPaidCount,
+      paidUserIds: [...uniqueUsersMap.keys()],
     });
-
   } catch (err) {
-    console.error("💥 Referral Count Error:", err);
+    console.error("Referral Count Error:", err);
     return ReE(res, err.message, 500);
   }
 };
