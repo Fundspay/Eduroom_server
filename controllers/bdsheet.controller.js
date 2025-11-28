@@ -466,3 +466,147 @@ const getDashboardStats = async (req, res) => {
 
 module.exports.getDashboardStats = getDashboardStats;
 
+// HARD-CODED RANGES (not stored in DB)
+const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-45", "46+"];
+
+// -----------------------------
+// UPSERT RANGE AMOUNTS
+// -----------------------------
+const upsertRangeAmounts = async (req, res) => {
+  try {
+    const { managerId, incentiveAmounts, deductionAmounts } = req.body;
+
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    // ---- Fetch record by managerId ----
+    let target = await model.ManagerRanges.findOne({
+      where: { teamManagerId: managerId },
+    });
+
+    // ---- Prepare cleaned JSON objects ----
+    let cleanedIncentives = filterRangeAmounts(incentiveAmounts);
+    let cleanedDeductions = filterRangeAmounts(deductionAmounts);
+
+    // ---- UPDATE CASE ----
+    if (target) {
+      const updateData = {};
+
+      if (Object.keys(cleanedIncentives).length > 0) {
+        updateData.incentiveAmounts = {
+          ...(target.incentiveAmounts || {}),
+          ...cleanedIncentives,
+        };
+      }
+
+      if (Object.keys(cleanedDeductions).length > 0) {
+        updateData.deductionAmounts = {
+          ...(target.deductionAmounts || {}),
+          ...cleanedDeductions,
+        };
+      }
+
+      await target.update(updateData);
+
+      return ReS(res, {
+        message: "Range amounts updated successfully",
+        data: target,
+      });
+    }
+
+    // ---- CREATE CASE ----
+    const newData = {
+      teamManagerId: managerId,
+      incentiveAmounts: cleanedIncentives,
+      deductionAmounts: cleanedDeductions,
+    };
+
+    const newTarget = await model.ManagerRanges.create(newData);
+
+    return ReS(res, {
+      message: "Range amounts created successfully",
+      data: newTarget,
+    });
+  } catch (error) {
+    console.log("UPSERT RANGE AMOUNTS ERROR:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+// ---------------------------------------
+// Helper: Only accept valid range → amount
+// ---------------------------------------
+function filterRangeAmounts(amountObject) {
+  const output = {};
+
+  if (!amountObject || typeof amountObject !== "object") return output;
+
+  for (const range of RANGE_KEYS) {
+    if (
+      amountObject[range] !== undefined &&
+      amountObject[range] !== null &&
+      amountObject[range] !== ""
+    ) {
+      output[range] = Number(amountObject[range]);
+    }
+  }
+
+  return output;
+}
+
+module.exports.upsertRangeAmounts = upsertRangeAmounts;
+
+const getManagerRangeAmounts = async (req, res) => {
+  try {
+    const managerId = req.params.managerId || req.query.managerId;
+
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    // Fetch the MOST RECENT ManagerRanges entry for this manager
+    const sheet = await model.ManagerRanges.findOne({
+      where: { teamManagerId: managerId },
+      order: [["updatedAt", "DESC"]], // IMPORTANT: takes updated row
+      attributes: ["incentiveAmounts", "deductionAmounts"],
+    });
+
+    // Prepare incentive and deduction objects with all ranges
+    const prepareRanges = (amountObj) => {
+      const output = {};
+      for (const key of RANGE_KEYS) {
+        output[key] = amountObj && amountObj[key] !== undefined ? amountObj[key] : null;
+      }
+      return output;
+    };
+
+    const incentiveAmounts = prepareRanges(sheet ? sheet.incentiveAmounts : {});
+    const deductionAmounts = prepareRanges(sheet ? sheet.deductionAmounts : {});
+
+    // ----------------------------
+    //  FETCH ALL REGISTERED MANAGERS
+    // ----------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email"],
+      raw: true,
+    });
+
+    return ReS(res, {
+      message: "Manager range amounts fetched successfully",
+      data: {
+        managerId,
+        incentiveAmounts,
+        deductionAmounts,
+      },
+
+      // Only this line added
+      managers: managers,
+    });
+  } catch (error) {
+    console.log("GET MANAGER RANGE AMOUNTS ERROR:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
+
+
+
+

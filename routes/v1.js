@@ -28,6 +28,7 @@ const selectedcoursedetailRouter = require("./selectedcoursedetail.route");
 const selectiondomainRouter = require("./selectionDomain.route");
 const bdtargetRouter = require("./bdtarget.route");
 const bdsheetRouter = require("./bdsheet.route");
+const calculatorRouter = require("./calculator.route");
 
 
 
@@ -64,6 +65,7 @@ router.use("/selectedcoursedetail", selectedcoursedetailRouter);
 router.use("/selection-domain", selectiondomainRouter);
 router.use("/bdtarget", bdtargetRouter);
 router.use("/bdsheet", bdsheetRouter);
+router.use("/calculator", calculatorRouter);
 
 
 module.exports = router;
