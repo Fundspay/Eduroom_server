@@ -1433,7 +1433,6 @@ const updateBusinessTarget = async (req, res) => {
 
 module.exports.updateBusinessTarget = updateBusinessTarget;
 
-
 const getReferralPaidCount = async (req, res) => {
   try {
     const { managerId, from, to } = req.query;
@@ -1444,27 +1443,23 @@ const getReferralPaidCount = async (req, res) => {
       return ReE(res, "managerId, from, to are required", 400);
     }
 
-    // Fetch Team Manager
+    // Fetch TeamManager
     const manager = await model.TeamManager.findByPk(managerId);
-
     console.log("🟡 Fetched TeamManager:", manager ? manager.toJSON() : null);
 
     if (!manager) {
       return ReE(res, "Team Manager not found", 404);
     }
 
-    // Build phone
     const phone = "+91" + manager.mobileNumber;
     console.log("🟢 Constructed Phone:", phone);
 
-    // AWS URL
     const url =
       `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone` +
       `?phone_number=${phone}&from_date=${from}&to_date=${to}`;
 
     console.log("🔵 AWS Referral URL:", url);
 
-    // Call AWS API
     let response;
     try {
       response = await axios.get(url);
@@ -1475,29 +1470,24 @@ const getReferralPaidCount = async (req, res) => {
 
     console.log("🟣 AWS API RAW RESPONSE:", response.data);
 
-    const data = response.data;
+    const result = response.data.result;
 
-    if (!data || typeof data !== "object") {
-      console.log("❌ Invalid API response (data is null or not object)", data);
+    if (!result || !result.referred_users) {
+      console.log("❌ Missing referred_users in response", response.data);
       return ReE(res, "Invalid API response from referral service", 500);
     }
 
-    if (!data.data) {
-      console.log("❌ Missing data.data field in response", data);
-      return ReE(res, "Invalid API response from referral service", 500);
-    }
-
-    // Extract referred users
-    const referredUsers = data.data;
+    const referredUsers = result.referred_users;
     console.log("🟠 Referred Users Count:", referredUsers.length);
 
-    // Unique PAID users
+    // ✅ Count unique users with paid_count > 0
     const uniquePaidUsers = new Set();
 
     referredUsers.forEach((entry) => {
+      const paidCount = parseInt(entry.paid_count);
       console.log("🔹 Entry:", entry);
 
-      if (entry.status === "paid" && entry.user_id) {
+      if (paidCount > 0 && entry.user_id) {
         uniquePaidUsers.add(entry.user_id);
       }
     });
