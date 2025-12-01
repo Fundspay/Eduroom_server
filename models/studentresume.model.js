@@ -19,7 +19,8 @@ module.exports = (sequelize, Sequelize) => {
 
       // Student details
       studentName: { type: Sequelize.STRING, allowNull: true },
-      mobileNumber: { type: Sequelize.STRING, allowNull: true },
+      mobileNumber: { type: Sequelize.STRING, allowNull: true, unique: true },
+
       emailId: { type: Sequelize.STRING, allowNull: true },
       domain: { type: Sequelize.STRING, allowNull: true },
 

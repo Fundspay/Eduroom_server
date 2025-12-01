@@ -13,10 +13,10 @@ const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
 
-    // ✅ Resolve teamManagerId (if missing, accept null)
+    // Resolve teamManagerId (if missing, accept null)
     const teamManagerId = req.body.teamManagerId ?? req.user?.id ?? null;
 
-    // ✅ Find coSheetId (null if not found or no teamManagerId)
+    // Find coSheetId (null if not found or no teamManagerId)
     let coSheetId = null;
     if (teamManagerId) {
       try {
@@ -27,7 +27,7 @@ const createResume = async (req, res) => {
       }
     }
 
-    // ✅ Prepare payloads (accept whatever comes in)
+    // Prepare payloads
     const payloads = dataArray.map(data => ({
       sr: data.sr ?? null,
       resumeDate: data.resumeDate ?? null,
@@ -47,11 +47,12 @@ const createResume = async (req, res) => {
       alloted: data.alloted ?? null,
     }));
 
-    // ✅ Bulk insert
+    // Bulk insert with ignoreDuplicates to skip duplicate mobileNumbers
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {
         returning: true,
+        ignoreDuplicates: true, // ✅ This skips duplicates (assumes unique constraint on mobileNumber)
       });
     } catch (err) {
       console.error("Bulk insert failed:", err.message);
