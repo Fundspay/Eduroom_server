@@ -55,6 +55,12 @@ const createResume = async (req, res) => {
     // ❌ FILTER OUT ROWS WITH NULL/EMPTY MOBILE → prevents empty & invalid rows
     let payloads = rawPayloads.filter(p => p.mobileNumber);
 
+    // ❌ CONVERT MOBILE NUMBERS TO STRING
+    payloads = payloads.map(p => ({
+      ...p,
+      mobileNumber: String(p.mobileNumber).trim()
+    }));
+
     // ❌ REMOVE DUPLICATES WITHIN THE CURRENT BATCH
     const seenMobiles = new Set();
     payloads = payloads.filter(p => {
@@ -68,7 +74,7 @@ const createResume = async (req, res) => {
       where: { mobileNumber: payloads.map(p => p.mobileNumber) }
     });
 
-    const existingMobiles = new Set(existing.map(e => e.mobileNumber));
+    const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
 
     payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
 
@@ -101,6 +107,7 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
+
 
 //  Update Resume Record
 const updateResume = async (req, res) => {
