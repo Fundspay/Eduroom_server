@@ -167,7 +167,7 @@ module.exports.updateResume = updateResume;
 // ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
-    console.log("🚀 Starting StudentResume bulk sync...");
+    console.log("🚀 Starting StudentResume list sync...");
 
     // Fetch all managers
     const managers = await model.TeamManager.findAll({
@@ -175,55 +175,30 @@ const listResumes = async (req, res) => {
       raw: true,
     });
 
-    // 1️⃣ Fetch all resumes not registered
+    // 1️⃣ Sync Student Registrations
     const resumesToSync = await model.StudentResume.findAll({
       where: { isRegistered: false },
       attributes: ["id", "mobileNumber"],
-      raw: true,
     });
 
-    // 2️⃣ Fetch all users for the resumes in one query
-    const mobileNumbers = resumesToSync
-      .map(r => r.mobileNumber)
-      .filter(Boolean); // remove null/undefined
+    for (const resume of resumesToSync) {
+      const user = await model.User.findOne({
+        where: { phoneNumber: resume.mobileNumber },
+        attributes: ["id", "createdAt"],
+        raw: true,
+      });
 
-    const users = await model.User.findAll({
-      where: { phoneNumber: mobileNumbers },
-      attributes: ["id", "phoneNumber", "createdAt"],
-      raw: true,
-    });
-
-    // Map phoneNumber -> user for quick lookup
-    const userMap = new Map(users.map(u => [u.phoneNumber, u]));
-
-    // 3️⃣ Bulk update StudentResume registration status
-    const updatedResumes = resumesToSync.map(resume => {
-      const user = userMap.get(resume.mobileNumber);
       if (user) {
-        return {
-          id: resume.id,
+        await resume.update({
           isRegistered: true,
           dateOfRegistration: user.createdAt,
-        };
+        });
       }
-      return null;
-    }).filter(Boolean);
-
-    if (updatedResumes.length > 0) {
-      // Bulk update using individualHooks to trigger hooks if needed
-      await Promise.all(
-        updatedResumes.map(r =>
-          model.StudentResume.update(
-            { isRegistered: r.isRegistered, dateOfRegistration: r.dateOfRegistration },
-            { where: { id: r.id } }
-          )
-        )
-      );
     }
 
-    // 4️⃣ Fetch all resumes with associations in bulk
+    // 2️⃣ Fetch all resumes with associations
     const records = await model.StudentResume.findAll({
-      attributes: ["id", "callStatus", "alloted"],
+      attributes: ["callStatus", "alloted"],
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
@@ -257,45 +232,37 @@ const listResumes = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // 5️⃣ Prepare bulk insert data for FundsAuditStudent
-    const bulkFundsAuditStudent = [];
-
+    // 3️⃣ Store FundsAudit data per studentResume & user
     for (const resume of records) {
-      if (!resume.id || !resume.user || !resume.user.FundsAudits) continue;
-
       const user = resume.user;
-      const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
 
-      for (const fa of user.FundsAudits) {
-        bulkFundsAuditStudent.push({
-          studentResumeId: resume.id,
-          userId: user.id,
-          fundsAuditId: fa.id,
-          registeredUserId: fa.registeredUserId,
-          firstName: fa.firstName,
-          lastName: fa.lastName,
-          phoneNumber: fa.phoneNumber,
-          email: fa.email,
-          dateOfPayment: fa.dateOfPayment,
-          dateOfDownload: fa.dateOfDownload,
-          hasPaid: fa.hasPaid,
-          isDownloaded: fa.isDownloaded,
-          queryStatus: fa.queryStatus,
-          isQueryRaised: fa.isQueryRaised,
-          occupation: fa.occupation,
-          teamManager: teamManagerName,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
+      if (user && user.FundsAudits) {
+        for (const fa of user.FundsAudits) {
+          const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
+
+          await model.FundsAuditStudent.create({
+            studentResumeId: resume.id,
+            userId: user.id,
+            fundsAuditId: fa.id,
+            registeredUserId: fa.registeredUserId,
+            firstName: fa.firstName,
+            lastName: fa.lastName,
+            phoneNumber: fa.phoneNumber,
+            email: fa.email,
+            dateOfPayment: fa.dateOfPayment,
+            dateOfDownload: fa.dateOfDownload,
+            hasPaid: fa.hasPaid,
+            isDownloaded: fa.isDownloaded,
+            queryStatus: fa.queryStatus,
+            isQueryRaised: fa.isQueryRaised,
+            occupation: fa.occupation,
+            teamManager: teamManagerName,
+          });
+        }
       }
     }
 
-    // 6️⃣ Bulk insert (ignoring duplicates for speed)
-    if (bulkFundsAuditStudent.length > 0) {
-      await model.FundsAuditStudent.bulkCreate(bulkFundsAuditStudent, { ignoreDuplicates: true });
-    }
-
-    console.log("🏁 Bulk processing completed successfully!");
+    console.log("🏁 All processing done successfully!");
     return ReS(res, { success: true, data: records, managers }, 200);
 
   } catch (error) {
@@ -305,7 +272,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 
 // ✅ Delete resume by ID
