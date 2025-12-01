@@ -27,8 +27,13 @@ const createResume = async (req, res) => {
       }
     }
 
+    // ❌ FILTER EMPTY ROWS
+    const cleanedArray = dataArray.filter(d => 
+      d && Object.values(d).some(v => v !== null && v !== "" && v !== undefined)
+    );
+
     // Prepare payloads
-    const payloads = dataArray.map(data => ({
+    const rawPayloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
       resumeDate: data.resumeDate ?? null,
       collegeName: data.collegeName ?? null,
@@ -47,12 +52,32 @@ const createResume = async (req, res) => {
       alloted: data.alloted ?? null,
     }));
 
-    // Bulk insert with ignoreDuplicates to skip duplicate mobileNumbers
+    // ❌ FILTER OUT ROWS WITH NULL/EMPTY MOBILE → prevents empty & invalid rows
+    let payloads = rawPayloads.filter(p => p.mobileNumber);
+
+    // ❌ REMOVE DUPLICATES WITHIN THE CURRENT BATCH
+    const seenMobiles = new Set();
+    payloads = payloads.filter(p => {
+      if (seenMobiles.has(p.mobileNumber)) return false;
+      seenMobiles.add(p.mobileNumber);
+      return true;
+    });
+
+    // ❌ CHECK DATABASE TO AVOID STORING DUPLICATES
+    const existing = await model.StudentResume.findAll({
+      where: { mobileNumber: payloads.map(p => p.mobileNumber) }
+    });
+
+    const existingMobiles = new Set(existing.map(e => e.mobileNumber));
+
+    payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
+
+    // Bulk insert with ignoreDuplicates
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {
         returning: true,
-        ignoreDuplicates: true, // ✅ This skips duplicates (assumes unique constraint on mobileNumber)
+        ignoreDuplicates: true,
       });
     } catch (err) {
       console.error("Bulk insert failed:", err.message);
@@ -76,7 +101,6 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
-
 
 //  Update Resume Record
 const updateResume = async (req, res) => {
@@ -162,30 +186,22 @@ const updateResume = async (req, res) => {
 
 module.exports.updateResume = updateResume;
 
-
-
-// ✅ List all resumes
 const listResumes = async (req, res) => {
   try {
-    console.log("🚀 Starting StudentResume list sync...");
+    console.log("Starting StudentResume list sync...");
 
-    // ---------------------------
-    // Fetch all managers for dropdown/reference
-    // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    // ---------------------------
-    // 1️⃣ Sync Student Registrations
-    // ---------------------------
+    // 1️Sync Student Registrations
     const resumesToSync = await model.StudentResume.findAll({
       where: { isRegistered: false },
       attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
     });
 
-    console.log(`🟡 Found ${resumesToSync.length} resumes to sync registration status.`);
+    console.log(`Found ${resumesToSync.length} resumes to sync registration status.`);
 
     for (const resume of resumesToSync) {
       if (!resume.mobileNumber) continue;
@@ -201,19 +217,17 @@ const listResumes = async (req, res) => {
           isRegistered: true,
           dateOfRegistration: user.createdAt,
         });
-        console.log(`🔄 Updated registration for StudentResume ID ${resume.id}`);
+        console.log(`Updated registration for StudentResume ID ${resume.id}`);
       }
     }
 
-    // ---------------------------
-    // 2️⃣ Fetch all resumes with associations
-    // ---------------------------
-    console.log("🔍 Fetching all resumes with associations...");
+    // 2️Fetch all resumes (NO CHANGES)
+    console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       attributes: {
         include: [
-          "callStatus",  // 🔥 ADDED
-          "alloted"      // 🔥 ADDED
+          "callStatus",
+          "alloted"
         ]
       },
       include: [
@@ -251,57 +265,11 @@ const listResumes = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    console.log(`📄 Total resumes fetched: ${records.length}`);
+    console.log(`Total resumes fetched: ${records.length}`);
 
-    // ---------------------------
-    // 3️⃣ Store FundsAudit data per studentResume & user
-    // ---------------------------
-    for (const resume of records) {
-      const user = resume.user;
-      if (!user || !user.FundsAudits) continue;
+    // Removed ONLY the heavy insert loop
+    // FundsAudit -> FundsAuditStudent logic now runs through cron safely
 
-      for (const fa of user.FundsAudits) {
-        const exists = await model.FundsAuditStudent.findOne({
-          where: {
-            studentResumeId: resume.id,
-            userId: user.id,
-            fundsAuditId: fa.id,
-          },
-        });
-
-        if (exists) {
-          console.log(`⚠️ Skipping duplicate FundsAuditStudent for StudentResume ID ${resume.id}, FundsAudit ID ${fa.id}`);
-          continue;
-        }
-
-        const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
-
-        await model.FundsAuditStudent.create({
-          studentResumeId: resume.id,
-          userId: user.id,
-          fundsAuditId: fa.id,
-          registeredUserId: fa.registeredUserId,
-          firstName: fa.firstName,
-          lastName: fa.lastName,
-          phoneNumber: fa.phoneNumber,
-          email: fa.email,
-          dateOfPayment: fa.dateOfPayment,
-          dateOfDownload: fa.dateOfDownload,
-          hasPaid: fa.hasPaid,
-          isDownloaded: fa.isDownloaded,
-          queryStatus: fa.queryStatus,
-          isQueryRaised: fa.isQueryRaised,
-          occupation: fa.occupation,
-          teamManager: teamManagerName,
-        });
-
-        console.log(`✅ Inserted FundsAuditStudent for StudentResume ID ${resume.id}, FundsAudit ID ${fa.id}`);
-      }
-    }
-
-    // ---------------------------
-    // 4️⃣ Return response
-    // ---------------------------
     console.log("🏁 All processing done successfully!");
     return ReS(res, { success: true, data: records, managers }, 200);
 
@@ -312,6 +280,7 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
+
 
 
 
