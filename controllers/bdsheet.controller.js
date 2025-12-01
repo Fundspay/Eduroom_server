@@ -122,6 +122,7 @@ const getBdSheet = async (req, res) => {
           attributes: {
             include: ["businessTask", "registration", "activeStatus"],
           },
+          limit: 1,                    // 🔥 only the latest BdSheet
           order: [["id", "DESC"]],
         },
       ],
@@ -132,6 +133,11 @@ const getBdSheet = async (req, res) => {
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
+
+        // 🔥 Ensure BdSheet is a single object, not array
+        if (Array.isArray(s.BdSheet)) {
+          s.BdSheet = s.BdSheet[0] || null;
+        }
 
         // Real-Time businessTask + category logic
         if (s.mobileNumber) {
@@ -197,6 +203,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 const getBdSheetByCategory = async (req, res) => {
   try {
