@@ -168,27 +168,19 @@ const listResumes = async (req, res) => {
   try {
     console.log("🚀 Starting StudentResume list sync...");
 
-    // ---------------------------
-    // Fetch all managers for dropdown/reference
-    // ---------------------------
+    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    // ---------------------------
     // 1️⃣ Sync Student Registrations
-    // ---------------------------
     const resumesToSync = await model.StudentResume.findAll({
       where: { isRegistered: false },
-      attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
+      attributes: ["id", "mobileNumber"],
     });
 
-    console.log(`🟡 Found ${resumesToSync.length} resumes to sync registration status.`);
-
     for (const resume of resumesToSync) {
-      if (!resume.mobileNumber) continue;
-
       const user = await model.User.findOne({
         where: { phoneNumber: resume.mobileNumber },
         attributes: ["id", "createdAt"],
@@ -200,21 +192,12 @@ const listResumes = async (req, res) => {
           isRegistered: true,
           dateOfRegistration: user.createdAt,
         });
-        console.log(`🔄 Updated registration for StudentResume ID ${resume.id}`);
       }
     }
 
-    // ---------------------------
     // 2️⃣ Fetch all resumes with associations
-    // ---------------------------
-    console.log("🔍 Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
-      attributes: {
-        include: [
-          "callStatus",  // 🔥 ADDED
-          "alloted"      // 🔥 ADDED
-        ]
-      },
+      attributes: ["callStatus", "alloted"],
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
         {
@@ -239,8 +222,6 @@ const listResumes = async (req, res) => {
                 "isQueryRaised",
                 "occupation",
               ],
-              where: { hasPaid: true },
-              required: false,
               separate: true,
             },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
@@ -250,57 +231,36 @@ const listResumes = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    console.log(`📄 Total resumes fetched: ${records.length}`);
-
-    // ---------------------------
     // 3️⃣ Store FundsAudit data per studentResume & user
-    // ---------------------------
     for (const resume of records) {
       const user = resume.user;
-      if (!user || !user.FundsAudits) continue;
 
-      for (const fa of user.FundsAudits) {
-        const exists = await model.FundsAuditStudent.findOne({
-          where: {
+      if (user && user.FundsAudits) {
+        for (const fa of user.FundsAudits) {
+          const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
+
+          await model.FundsAuditStudent.create({
             studentResumeId: resume.id,
             userId: user.id,
             fundsAuditId: fa.id,
-          },
-        });
-
-        if (exists) {
-          console.log(`⚠️ Skipping duplicate FundsAuditStudent for StudentResume ID ${resume.id}, FundsAudit ID ${fa.id}`);
-          continue;
+            registeredUserId: fa.registeredUserId,
+            firstName: fa.firstName,
+            lastName: fa.lastName,
+            phoneNumber: fa.phoneNumber,
+            email: fa.email,
+            dateOfPayment: fa.dateOfPayment,
+            dateOfDownload: fa.dateOfDownload,
+            hasPaid: fa.hasPaid,
+            isDownloaded: fa.isDownloaded,
+            queryStatus: fa.queryStatus,
+            isQueryRaised: fa.isQueryRaised,
+            occupation: fa.occupation,
+            teamManager: teamManagerName,
+          });
         }
-
-        const teamManagerName = user.teamManager ? user.teamManager.name : resume.teamManagerId;
-
-        await model.FundsAuditStudent.create({
-          studentResumeId: resume.id,
-          userId: user.id,
-          fundsAuditId: fa.id,
-          registeredUserId: fa.registeredUserId,
-          firstName: fa.firstName,
-          lastName: fa.lastName,
-          phoneNumber: fa.phoneNumber,
-          email: fa.email,
-          dateOfPayment: fa.dateOfPayment,
-          dateOfDownload: fa.dateOfDownload,
-          hasPaid: fa.hasPaid,
-          isDownloaded: fa.isDownloaded,
-          queryStatus: fa.queryStatus,
-          isQueryRaised: fa.isQueryRaised,
-          occupation: fa.occupation,
-          teamManager: teamManagerName,
-        });
-
-        console.log(`✅ Inserted FundsAuditStudent for StudentResume ID ${resume.id}, FundsAudit ID ${fa.id}`);
       }
     }
 
-    // ---------------------------
-    // 4️⃣ Return response
-    // ---------------------------
     console.log("🏁 All processing done successfully!");
     return ReS(res, { success: true, data: records, managers }, 200);
 
@@ -311,6 +271,7 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
+
 
 
 // ✅ Delete resume by ID
