@@ -467,7 +467,7 @@ const getDashboardStats = async (req, res) => {
 module.exports.getDashboardStats = getDashboardStats;
 
 // HARD-CODED RANGES (not stored in DB)
-const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-45", "46+"];
+const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100","101-200","201-300","301-400","401-500","501-600","601+"];
 
 // -----------------------------
 // UPSERT RANGE AMOUNTS

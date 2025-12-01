@@ -68,8 +68,18 @@ const calculateIncentive = async (req, res) => {
       { key: "11-20", min: 11, max: 20 },
       { key: "21-30", min: 21, max: 30 },
       { key: "31-40", min: 31, max: 40 },
-      { key: "41-45", min: 41, max: 45 },
-      { key: "46+", min: 46, max: 9999 },
+      { key: "41-50", min: 41, max: 50 },
+      { key: "51-60", min: 51, max: 60 },
+      { key: "61-70", min: 61, max: 70 },
+      { key: "71-80", min: 71, max: 80 },
+      { key: "81-90", min: 81, max: 90 },
+      { key: "91-100", min: 91, max: 100 },
+      { key: "101-200", min: 101, max: 200 },
+      { key: "201-300", min: 201, max: 300 },
+      { key: "301-400", min: 301, max: 400 },
+      { key: "401-500", min: 401, max: 500 },
+      { key: "501-600", min: 501, max: 600 },
+      { key: "601+", min: 601, max: 9999 },
     ];
 
     let selectedSlab = null;
@@ -195,8 +205,18 @@ const calculateDeduction = async (req, res) => {
       { key: "11-20", min: 11, max: 20 },
       { key: "21-30", min: 21, max: 30 },
       { key: "31-40", min: 31, max: 40 },
-      { key: "41-45", min: 41, max: 45 },
-      { key: "46+", min: 46, max: 9999 },
+      { key: "41-50", min: 41, max: 50 },
+      { key: "51-60", min: 51, max: 60 },
+      { key: "61-70", min: 61, max: 70 },
+      { key: "71-80", min: 71, max: 80 },
+      { key: "81-90", min: 81, max: 90 },
+      { key: "91-100", min: 91, max: 100 },
+      { key: "101-200", min: 101, max: 200 },
+      { key: "201-300", min: 201, max: 300 },
+      { key: "301-400", min: 301, max: 400 },
+      { key: "401-500", min: 401, max: 500 },
+      { key: "501-600", min: 501, max: 600 },
+      { key: "601+", min: 601, max: 9999 },
     ];
 
     let selectedSlab = null;
@@ -311,8 +331,18 @@ const getFinalIncentiveDeductionSummary = async (req, res) => {
       { key: "11-20", min: 11, max: 20 },
       { key: "21-30", min: 21, max: 30 },
       { key: "31-40", min: 31, max: 40 },
-      { key: "41-45", min: 41, max: 45 },
-      { key: "46+", min: 46, max: 9999 },
+      { key: "41-50", min: 41, max: 50 },
+      { key: "51-60", min: 51, max: 60 },
+      { key: "61-70", min: 61, max: 70 },
+      { key: "71-80", min: 71, max: 80 },
+      { key: "81-90", min: 81, max: 90 },
+      { key: "91-100", min: 91, max: 100 },
+      { key: "101-200", min: 101, max: 200 },
+      { key: "201-300", min: 201, max: 300 },
+      { key: "301-400", min: 301, max: 400 },
+      { key: "401-500", min: 401, max: 500 },
+      { key: "501-600", min: 501, max: 600 },
+      { key: "601+", min: 601, max: 9999 },
     ];
 
     // Find incentive slab
