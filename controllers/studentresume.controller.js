@@ -202,7 +202,7 @@ const listResumes = async (req, res) => {
       raw: true,
     });
 
-    // 1️Sync Student Registrations
+    // 1️ Sync Student Registrations
     const resumesToSync = await model.StudentResume.findAll({
       where: { isRegistered: false },
       attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
@@ -228,7 +228,7 @@ const listResumes = async (req, res) => {
       }
     }
 
-    // 2️Fetch all resumes (NO CHANGES)
+    // 2️ Fetch all resumes (NO CHANGES)
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       attributes: {
@@ -274,8 +274,38 @@ const listResumes = async (req, res) => {
 
     console.log(`Total resumes fetched: ${records.length}`);
 
-    // Removed ONLY the heavy insert loop
-    // FundsAudit -> FundsAuditStudent logic now runs through cron safely
+    // ⭐⭐⭐ ADD userId PER RECORD (NEW — ONLY CHANGE YOU ASKED FOR)
+    for (const resume of records) {
+      let userId = null;
+
+      // 1) If User association is already present (best case)
+      if (resume.user && resume.user.id) {
+        userId = resume.user.id;
+      } else {
+        // 2) Try lookup using mobileNumber
+        if (resume.mobileNumber) {
+          const user = await model.User.findOne({
+            where: { phoneNumber: resume.mobileNumber },
+            attributes: ["id"],
+            raw: true,
+          });
+          if (user) userId = user.id;
+        }
+
+        // 3) Try lookup using email if mobile fails
+        if (!userId && resume.emailId) {
+          const user = await model.User.findOne({
+            where: { email: resume.emailId },
+            attributes: ["id"],
+            raw: true,
+          });
+          if (user) userId = user.id;
+        }
+      }
+
+      // Attach new field
+      resume.dataValues.userId = userId;
+    }
 
     console.log("🏁 All processing done successfully!");
     return ReS(res, { success: true, data: records, managers }, 200);
@@ -287,7 +317,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 
 
