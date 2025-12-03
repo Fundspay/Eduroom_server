@@ -86,12 +86,10 @@ const getBdSheet = async (req, res) => {
 
     let whereCondition = {};
 
-    // Filter by resumeId
     if (resumeId) {
       whereCondition.id = resumeId;
     }
 
-    // Filter by managerId → match alloted with manager name
     if (managerId) {
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
@@ -122,38 +120,47 @@ const getBdSheet = async (req, res) => {
           attributes: {
             include: ["businessTask", "registration", "activeStatus"],
           },
-          limit: 1,                    // 🔥 only the latest BdSheet
+          limit: 1,
           order: [["id", "DESC"]],
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    // Move registration out of BdSheet to top-level + add real-time businessTask + category
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // 🔥 Ensure BdSheet is a single object, not array
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet[0] || null;
         }
 
-        // Real-Time businessTask + category logic
+        // 🔥 Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
-            attributes: ["subscriptionWallet", "subscriptiondeductedWallet"],
+            attributes: [
+              "subscriptionWallet",
+              "subscriptiondeductedWallet",
+              "id",              // << added
+              "collegeName",     // << added
+            ],
           });
 
           if (user) {
             const wallet = parseInt(user.subscriptionWallet || 0, 10);
-            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
+            const deducted = parseInt(
+              user.subscriptiondeductedWallet || 0,
+              10
+            );
 
             const businessTask = wallet + deducted;
             s.businessTask = businessTask;
 
-            // Category calculation
+            // NEW FIELDS
+            s.userId = user.id;              // << added
+            s.collegeName = user.collegeName; // << added
+
             if (!businessTask || businessTask === 0) s.category = "not working";
             else if (businessTask >= 1 && businessTask <= 5)
               s.category = "Starter";
@@ -172,7 +179,6 @@ const getBdSheet = async (req, res) => {
           }
         }
 
-        // Move registration out of BdSheet
         if (s.BdSheet && s.BdSheet.registration) {
           s.registration = s.BdSheet.registration;
         }
@@ -185,7 +191,6 @@ const getBdSheet = async (req, res) => {
       })
     );
 
-    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
