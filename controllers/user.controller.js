@@ -1441,16 +1441,13 @@ const getReferralPaidCount = async (req, res) => {
       return ReE(res, "managerId, from, to are required", 400);
     }
 
-    // Fetch TeamManager
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
     const phone = "+91" + manager.mobileNumber;
 
-    // Construct AWS API URL
     const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
 
-    // Call AWS API
     const response = await axios.get(url);
     const data = response.data;
 
@@ -1460,36 +1457,55 @@ const getReferralPaidCount = async (req, res) => {
 
     const referredUsers = data.result.referred_users;
 
-    // Map to store unique users and their paid_count
+    // -----------------------
+    // UNIQUE USERS CALCULATION
+    // -----------------------
     const uniqueUsersMap = new Map();
 
     referredUsers.forEach((entry) => {
-      const paidCount = parseInt(entry.paid_count);
-      if (paidCount > 0 && entry.user_id) {
-        // Keep the highest paid_count for duplicates
-        if (!uniqueUsersMap.has(entry.user_id)) {
-          uniqueUsersMap.set(entry.user_id, paidCount);
-        } else {
-          uniqueUsersMap.set(entry.user_id, Math.max(uniqueUsersMap.get(entry.user_id), paidCount));
+      entry.daily_paid_counts.forEach((d) => {
+        const paidCount = parseInt(d.paid_count);
+        if (paidCount > 0 && entry.user_id) {
+          if (!uniqueUsersMap.has(entry.user_id)) {
+            uniqueUsersMap.set(entry.user_id, paidCount);
+          } else {
+            uniqueUsersMap.set(
+              entry.user_id,
+              Math.max(uniqueUsersMap.get(entry.user_id), paidCount)
+            );
+          }
         }
-      }
+      });
     });
 
-    // Total unique paid users
     const totalPaidUsers = uniqueUsersMap.size;
 
-    // Sum of all paid counts
     let totalPaidCount = 0;
-    for (let count of uniqueUsersMap.values()) {
-      totalPaidCount += count;
-    }
+    for (let count of uniqueUsersMap.values()) totalPaidCount += count;
+
+    // -----------------------
+    // DATE-WISE PAID COUNT
+    // -----------------------
+    const dateWisePaidCount = {}; // { "2025-11-26": X, "2025-11-27": Y }
+
+    referredUsers.forEach((user) => {
+      user.daily_paid_counts.forEach((d) => {
+        const date = d.date;
+        const paidCount = parseInt(d.paid_count);
+
+        if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
+        dateWisePaidCount[date] += paidCount;
+      });
+    });
 
     return ReS(res, {
       success: true,
       totalPaidUsers,
       totalPaidCount,
       paidUserIds: [...uniqueUsersMap.keys()],
+      dateWisePaidCount, // <-- NEW FIELD
     });
+
   } catch (err) {
     console.error("Referral Count Error:", err);
     return ReE(res, err.message, 500);
