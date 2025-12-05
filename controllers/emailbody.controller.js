@@ -14,16 +14,17 @@ var upsertJDTemplate = async (req, res) => {
       return ReE(res, "Body is required", 400);
     }
 
-    // sanitize internshipType (same as JD_MAP logic)
+    // sanitize internshipType
     const cleanType = internshipType.trim().toLowerCase().replace(/\s+/g, "");
 
-    // dynamic unique key per internship type
+    // dynamic unique key
     const key = `jd_email_template_${cleanType}`;
 
-    // Upsert template for this specific internshipType
+    // Upsert template with subject as NULL
     const [template] = await model.EmailTemplate.upsert(
       {
         key,
+        subject: null,   // 👈 IMPORTANT: Allow subject to be null
         body
       },
       { returning: true }
@@ -41,7 +42,6 @@ var upsertJDTemplate = async (req, res) => {
 };
 
 module.exports.upsertJDTemplate = upsertJDTemplate;
-
 
 
 // GET JD EMAIL TEMPLATE
