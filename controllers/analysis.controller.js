@@ -65,13 +65,11 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
+    // Updated: filter by connectedBy instead of teamManagerId
     const allRecords = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
-        [Op.or]: [
-          { dateOfConnect: { [Op.between]: [sDate, eDate] } },
-          { jdSentAt: { [Op.between]: [sDate, eDate] } }
-        ]
+        connectedBy: teamManagerId,
+        dateOfConnect: { [Op.between]: [sDate, eDate] }
       }
     });
 
@@ -86,22 +84,17 @@ const getDailyAnalysis = async (req, res) => {
         d.plannedCalls = target.calls;
       }
 
-      const dayRecords = allRecords.filter(r => {
-        const connectDate = r.dateOfConnect ? toISTDateString(r.dateOfConnect) : null;
-        const jdDate = r.jdSentAt ? toISTDateString(r.jdSentAt) : null;
-        return connectDate === d.date || jdDate === d.date;
-      });
+      // Use dateOfConnect and callResponse only
+      const dayRecords = allRecords.filter(r => toISTDateString(r.dateOfConnect) === d.date);
 
       dayRecords.forEach(r => {
-        if (r.dateOfConnect) {
-          const resp = (r.callResponse || "").trim().toLowerCase();
-          if (allowedCallResponses.includes(resp)) {
-            if (resp === "connected") d.connected++;
-            else if (resp === "not answered") d.notAnswered++;
-            else if (resp === "busy") d.busy++;
-            else if (resp === "switch off") d.switchOff++;
-            else if (resp === "invalid") d.invalid++;
-          }
+        const resp = (r.callResponse || "").trim().toLowerCase();
+        if (allowedCallResponses.includes(resp)) {
+          if (resp === "connected") d.connected++;
+          else if (resp === "not answered") d.notAnswered++;
+          else if (resp === "busy") d.busy++;
+          else if (resp === "switch off") d.switchOff++;
+          else if (resp === "invalid") d.invalid++;
         }
       });
 
@@ -157,6 +150,7 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 
 // Get all connected CoSheet records for a teamManager
