@@ -30,20 +30,11 @@ const getDailyAnalysis = async (req, res) => {
       eDate.setHours(23, 59, 59, 999);
     }
 
-    // Helper: Convert UTC DB date to IST string YYYY-MM-DD
-    const toISTDateString = (utcDate) => {
-      const date = new Date(utcDate);
-      const istOffset = 5.5 * 60 * 60 * 1000;
-      const istDate = new Date(date.getTime() + istOffset);
-      return istDate.toISOString().split("T")[0];
-    };
-
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
-      const istDateObj = new Date(d.getTime() + 5.5 * 60 * 60 * 1000); // shift to IST
       dateList.push({
-        date: istDateObj.toISOString().split("T")[0],
-        day: istDateObj.toLocaleDateString("en-IN", { weekday: "long" }),
+        date: d.toISOString().split("T")[0],
+        day: d.toLocaleDateString("en-IN", { weekday: "long" }),
         plannedJds: 0,
         plannedCalls: 0,
         connected: 0,
@@ -58,6 +49,7 @@ const getDailyAnalysis = async (req, res) => {
       });
     }
 
+    // Fetch ALL MyTargets for this teamManager in range
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -65,11 +57,14 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
-    // Updated: filter by connectedBy instead of teamManagerId
+    // Fetch ALL CoSheet records for this teamManager in range
     const allRecords = await model.CoSheet.findAll({
       where: {
-        connectedBy: teamManagerId,
-        dateOfConnect: { [Op.between]: [sDate, eDate] }
+        teamManagerId,
+        [Op.or]: [
+          { dateOfConnect: { [Op.between]: [sDate, eDate] } },
+          { jdSentAt: { [Op.between]: [sDate, eDate] } }
+        ]
       }
     });
 
@@ -77,24 +72,29 @@ const getDailyAnalysis = async (req, res) => {
 
     const merged = dateList.map(d => {
       const target = targets.find(
-        t => t.targetDate && toISTDateString(t.targetDate) === d.date
+        t => t.targetDate && new Date(t.targetDate).toISOString().split("T")[0] === d.date
       );
       if (target) {
         d.plannedJds = target.jds;
         d.plannedCalls = target.calls;
       }
 
-      // Use dateOfConnect and callResponse only
-      const dayRecords = allRecords.filter(r => toISTDateString(r.dateOfConnect) === d.date);
+      const dayRecords = allRecords.filter(r => {
+        const connectDate = r.dateOfConnect ? new Date(r.dateOfConnect).toISOString().split("T")[0] : null;
+        const jdDate = r.jdSentAt ? new Date(r.jdSentAt).toISOString().split("T")[0] : null;
+        return connectDate === d.date || jdDate === d.date;
+      });
 
       dayRecords.forEach(r => {
-        const resp = (r.callResponse || "").trim().toLowerCase();
-        if (allowedCallResponses.includes(resp)) {
-          if (resp === "connected") d.connected++;
-          else if (resp === "not answered") d.notAnswered++;
-          else if (resp === "busy") d.busy++;
-          else if (resp === "switch off") d.switchOff++;
-          else if (resp === "invalid") d.invalid++;
+        if (r.dateOfConnect) {
+          const resp = (r.callResponse || "").trim().toLowerCase();
+          if (allowedCallResponses.includes(resp)) {
+            if (resp === "connected") d.connected++;
+            else if (resp === "not answered") d.notAnswered++;
+            else if (resp === "busy") d.busy++;
+            else if (resp === "switch off") d.switchOff++;
+            else if (resp === "invalid") d.invalid++;
+          }
         }
       });
 
@@ -102,7 +102,7 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      const jdCount = dayRecords.filter(r => r.jdSentAt && toISTDateString(r.jdSentAt) === d.date).length;
+      const jdCount = dayRecords.filter(r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date).length;
       d.jdSent = jdCount;
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
@@ -148,7 +148,6 @@ const getDailyAnalysis = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getDailyAnalysis = getDailyAnalysis;
 
 
