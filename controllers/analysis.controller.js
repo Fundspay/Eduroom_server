@@ -33,15 +33,17 @@ const getDailyAnalysis = async (req, res) => {
     // Helper: Convert UTC DB date to IST string YYYY-MM-DD
     const toISTDateString = (utcDate) => {
       const date = new Date(utcDate);
-      const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+      const istOffset = 5.5 * 60 * 60 * 1000;
+      const istDate = new Date(date.getTime() + istOffset);
       return istDate.toISOString().split("T")[0];
     };
 
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+      const istDateObj = new Date(d.getTime() + 5.5 * 60 * 60 * 1000); // shift to IST
       dateList.push({
-        date: d.toISOString().split("T")[0],
-        day: d.toLocaleDateString("en-IN", { weekday: "long" }),
+        date: istDateObj.toISOString().split("T")[0],
+        day: istDateObj.toLocaleDateString("en-IN", { weekday: "long" }),
         plannedJds: 0,
         plannedCalls: 0,
         connected: 0,
@@ -155,7 +157,6 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
-
 
 
 // Get all connected CoSheet records for a teamManager
