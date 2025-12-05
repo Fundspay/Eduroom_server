@@ -30,15 +30,18 @@ const getDailyAnalysis = async (req, res) => {
       eDate.setHours(23, 59, 59, 999);
     }
 
-    // Helper to format date in IST
-    const formatDateIST = (date) =>
-      date.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+    // Helper: Convert UTC DB date to IST string YYYY-MM-DD
+    const toISTDateString = (utcDate) => {
+      const date = new Date(utcDate);
+      const istDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+      return istDate.toISOString().split("T")[0];
+    };
 
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       dateList.push({
-        date: formatDateIST(d),
-        day: d.toLocaleDateString("en-IN", { weekday: "long", timeZone: "Asia/Kolkata" }),
+        date: d.toISOString().split("T")[0],
+        day: d.toLocaleDateString("en-IN", { weekday: "long" }),
         plannedJds: 0,
         plannedCalls: 0,
         connected: 0,
@@ -53,7 +56,6 @@ const getDailyAnalysis = async (req, res) => {
       });
     }
 
-    // Fetch ALL MyTargets for this teamManager in range
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -61,7 +63,6 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
-    // Fetch ALL CoSheet records for this teamManager in range
     const allRecords = await model.CoSheet.findAll({
       where: {
         teamManagerId,
@@ -76,7 +77,7 @@ const getDailyAnalysis = async (req, res) => {
 
     const merged = dateList.map(d => {
       const target = targets.find(
-        t => t.targetDate && formatDateIST(new Date(t.targetDate)) === d.date
+        t => t.targetDate && toISTDateString(t.targetDate) === d.date
       );
       if (target) {
         d.plannedJds = target.jds;
@@ -84,8 +85,8 @@ const getDailyAnalysis = async (req, res) => {
       }
 
       const dayRecords = allRecords.filter(r => {
-        const connectDate = r.dateOfConnect ? formatDateIST(new Date(r.dateOfConnect)) : null;
-        const jdDate = r.jdSentAt ? formatDateIST(new Date(r.jdSentAt)) : null;
+        const connectDate = r.dateOfConnect ? toISTDateString(r.dateOfConnect) : null;
+        const jdDate = r.jdSentAt ? toISTDateString(r.jdSentAt) : null;
         return connectDate === d.date || jdDate === d.date;
       });
 
@@ -106,7 +107,7 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      const jdCount = dayRecords.filter(r => r.jdSentAt && formatDateIST(new Date(r.jdSentAt)) === d.date).length;
+      const jdCount = dayRecords.filter(r => r.jdSentAt && toISTDateString(r.jdSentAt) === d.date).length;
       d.jdSent = jdCount;
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
@@ -154,6 +155,7 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 
 // Get all connected CoSheet records for a teamManager
