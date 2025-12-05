@@ -238,8 +238,6 @@ const getCoSheetById = async (req, res) => {
 };
 module.exports.getCoSheetById = getCoSheetById;
 
-
-
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
@@ -265,76 +263,54 @@ const sendJDToCollege = async (req, res) => {
       others: "jds/others.pdf",
     };
 
-    const jdKeyType = record.internshipType
+    const cleanType = record.internshipType
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, '');
-    const jdKey = JD_MAP[jdKeyType];
+      .replace(/\s+/g, "");
+    const jdKey = JD_MAP[cleanType];
 
     if (!jdKey) {
-      return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
+      return ReE(res, `No JD mapped for internshipType: ${cleanType}`, 400);
     }
 
-    // fetch JD file from S3
+    // Fetch JD from S3
     const jdFile = await s3
       .getObject({ Bucket: "fundsroomhr", Key: jdKey })
       .promise();
 
-    const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
+    // FETCH TEMPLATE FROM DB
+    const templateKey = `jd_email_template_${cleanType}`;
+    const template = await model.EmailTemplate.findOne({
+      where: { key: templateKey }
+    });
 
-    // HTML email body like your proposal
+    if (!template) {
+      return ReE(
+        res,
+        `No email template found in CMS for internshipType: ${cleanType}`,
+        400
+      );
+    }
+
+    // HARDCODED SUBJECT (NO PLACEHOLDERS IN CMS)
+    const subject = `Collaboration Proposal for Internship – ${record.collegeName}`;
+
+    // HARDCODED GREETINGS + CMS BODY + HARDCODED FOOTER
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
 
-      <p>Warm greetings from FundsAudit!</p>
+      ${template.body}
 
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName ||
-      ""}, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
-
-      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
-
-      <h4>Collaboration Proposal:</h4>
-      <ul>
-        <li><b>Flexible Participation:</b> 2-hour/day commitment (1 hour training + 1 hour individual work)</li>
-        <li><b>Performance-Based Stipend:</b> INR 1,000 to INR 7,000 based on quality, innovation, and project delivery</li>
-        <li><b>Value-Added Certifications:</b> Specialized certificates + POWER-Bi & Financial/Marketing Modelling certificate; recognition for top performers</li>
-        <li><b>Open to:</b> MBA 1st & 2nd year students (Finance & Marketing)</li>
-      </ul>
-
-      <p>Next Steps: JD for the Internship is attached. If your institution is interested, we can formalize this collaboration by signing a Memorandum of Understanding (MoU). Upon signing, eligible students will be onboarded with orientation and training to commence the live project.</p>
-
-      <p>As discussed on the call, kindly share your response by <b>23rd August 2025, 11 AM</b>. Preplacement interviews will be conducted on the same day, with joining on <b>25th August 2025</b>.</p>
-
-      <p><b>Role:</b> Marketing Analyst & Financial Analyst<br/>
-      <b>Eligibility:</b> Management Students</p>
-
-      <p>Following the live project, students may also be considered for:</p>
-      <ul>
-        <li>Summer/Winter Internships</li>
-        <li>Pre-placement offers (PPOs)</li>
-        <li>Final placement opportunities</li>
-      </ul>
-
-      <p>Perks of the collaboration:</p>
-      <ul>
-        <li>Exposure to real-time fintech operations</li>
-        <li>Skill development aligned with industry expectations</li>
-        <li>Improved employability and practical insight alongside academics</li>
-        <li>Final placement opportunities</li>
-      </ul>
-
-      <p>Looking forward to a meaningful and mutually beneficial association.</p>
-
-      <p>Pooja M. Shedge<br/>
+      <p>Regards,<br/>
+      Pooja M. Shedge<br/>
       Branch Manager – Pune<br/>
       +91 7385234536 | +91 7420861507<br/>
       Pune, Maharashtra<br/>
-      <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
-      <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
+      <a href="https://www.fundsaudit.in/">www.fundsaudit.in</a>
       </p>
     `;
 
-    // send mail with attachment + cc/bcc
+    // Send email
     const mailResponse = await sendhrMail(
       record.emailId,
       subject,
@@ -353,12 +329,14 @@ const sendJDToCollege = async (req, res) => {
       return ReE(res, "Failed to send JD email", 500);
     }
 
-    await record.update({
-      jdSentAt: new Date()
-    });
+    await record.update({ jdSentAt: new Date() });
 
+    return ReS(
+      res,
+      { success: true, message: "JD sent successfully with CMS content" },
+      200
+    );
 
-    return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
   } catch (error) {
     console.error("Send JD Error:", error);
     return ReE(res, error.message, 500);
@@ -366,6 +344,7 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
+
 
 const getCallStatsByUserWithTarget = async (req, res) => {
   try {
