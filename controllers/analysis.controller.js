@@ -67,7 +67,6 @@ const getDailyAnalysis = async (req, res) => {
         ]
       }
     });
-
     const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
 
     const merged = dateList.map(d => {
