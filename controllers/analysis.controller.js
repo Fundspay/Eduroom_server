@@ -5,7 +5,6 @@ const { Op } = require("sequelize");
 
 // Daily Analysis for ALL CoSheet records by teamManagerId
 // Daily Analysis for ALL CoSheet records by teamManagerId
-// Daily Analysis for ALL CoSheet records by teamManagerId
 const getDailyAnalysis = async (req, res) => {
   try {
     const { teamManagerId, startDate, endDate, month } = req.query;
@@ -59,70 +58,52 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
-    // Fetch ALL CoSheet records for this teamManager in range (ONLY dateOfConnect)
+    // Fetch ALL CoSheet records for this teamManager in range
     const allRecords = await model.CoSheet.findAll({
       where: {
         teamManagerId,
-        dateOfConnect: { [Op.between]: [sDate, eDate] }
+        dateOfConnect: { [Op.between]: [sDate, eDate] }  // ONLY CHECK dateOfConnect
       }
     });
 
-    // COUNT ALL CALL RESPONSES
-    const allowedCallResponses = [
-      "connected",
-      "not answered",
-      "busy",
-      "switch off",
-      "invalid"
-    ];
+    const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
 
     const merged = dateList.map(d => {
       const target = targets.find(
         t => t.targetDate && new Date(t.targetDate).toISOString().split("T")[0] === d.date
       );
-
       if (target) {
         d.plannedJds = target.jds;
         d.plannedCalls = target.calls;
       }
 
       const dayRecords = allRecords.filter(r => {
-        const connectDate = r.dateOfConnect
-          ? new Date(r.dateOfConnect).toISOString().split("T")[0]
-          : null;
+        const connectDate = r.dateOfConnect ? new Date(r.dateOfConnect).toISOString().split("T")[0] : null;
         return connectDate === d.date;
       });
 
-      // COUNT CALL RESPONSES (ONLY USING dateOfConnect)
       dayRecords.forEach(r => {
-        const resp = (r.callResponse || "").trim().toLowerCase();
-
-        if (allowedCallResponses.includes(resp)) {
-          if (resp === "connected") d.connected++;
-          else if (resp === "not answered") d.notAnswered++;
-          else if (resp === "busy") d.busy++;
-          else if (resp === "switch off") d.switchOff++;
-          else if (resp === "invalid") d.invalid++;
+        if (r.dateOfConnect) {
+          const resp = (r.callResponse || "").trim().toLowerCase();
+          if (allowedCallResponses.includes(resp)) {
+            if (resp === "connected") d.connected++;
+            else if (resp === "not answered") d.notAnswered++;
+            else if (resp === "busy") d.busy++;
+            else if (resp === "switch off") d.switchOff++;
+            else if (resp === "invalid") d.invalid++;
+          }
         }
       });
 
-      d.achievedCalls =
-        d.connected + d.notAnswered + d.busy + d.switchOff + d.invalid;
-
+      d.achievedCalls = d.connected + d.notAnswered + d.busy + d.switchOff + d.invalid;
       d.achievementPercent =
-        d.plannedCalls > 0
-          ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2)
-          : 0;
+        d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      // JD SENT COUNT SHOULD STILL WORK (NO CHANGES)
       const jdCount = dayRecords.filter(
-        r =>
-          r.jdSentAt &&
-          new Date(r.jdSentAt).toISOString().split("T")[0] === d.date
+        r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date
       ).length;
 
       d.jdSent = jdCount;
-
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
 
@@ -142,33 +123,15 @@ const getDailyAnalysis = async (req, res) => {
         sum.jdSent += d.jdSent;
         return sum;
       },
-      {
-        plannedJds: 0,
-        plannedCalls: 0,
-        connected: 0,
-        notAnswered: 0,
-        busy: 0,
-        switchOff: 0,
-        invalid: 0,
-        achievedCalls: 0,
-        jdSent: 0
-      }
+      { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 }
     );
 
     totals.achievementPercent =
-      totals.plannedCalls > 0
-        ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2)
-        : 0;
-
+      totals.plannedCalls > 0 ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2) : 0;
     totals.jdAchievementPercent =
-      totals.plannedJds > 0
-        ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2)
-        : 0;
+      totals.plannedJds > 0 ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2) : 0;
 
-    const monthLabel = new Date(sDate).toLocaleString("en-IN", {
-      month: "long",
-      year: "numeric"
-    });
+    const monthLabel = new Date(sDate).toLocaleString("en-IN", { month: "long", year: "numeric" });
 
     return ReS(
       res,
@@ -185,8 +148,9 @@ const getDailyAnalysis = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
+
 
 
 // Get all connected CoSheet records for a teamManager
