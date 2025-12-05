@@ -8,7 +8,7 @@ module.exports = (sequelize, Sequelize) => {
       // unique key like "jd_email_template"
       key: { type: Sequelize.STRING, allowNull: false, unique: true },
 
-      subject: { type: Sequelize.TEXT, allowNull: false },
+      subject: { type: Sequelize.TEXT, allowNull: true },
 
       body: { type: Sequelize.TEXT("long"), allowNull: false },
 
