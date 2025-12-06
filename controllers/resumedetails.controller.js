@@ -479,41 +479,48 @@ const fetchCategoryData = async (req, res, category) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    // Exact count from DB
-    const totalRecords = await model.CoSheet.count({
-      where: {
-        teamManagerId,
-        followUpResponse: category,
-      },
-    });
-
-    // Still fetch rows normally (unchanged)
-    const rows = await model.CoSheet.findAll({
-      where: {
-        teamManagerId,
-        followUpResponse: category,
-      },
-      raw: true,
-    });
-
-    // Fetch only the manager matching the given ID
-    const managers = await model.TeamManager.findAll({
+    // Get manager name based on ID so we can match followUpBy
+    const manager = await model.TeamManager.findOne({
       attributes: ["id", "name", "email"],
       where: { id: teamManagerId },
       raw: true,
     });
 
-    const userList = managers.map((TeamManager) => ({
-      id: TeamManager.id,
-      name: TeamManager.name,
-      email: TeamManager.email,
-    }));
+    if (!manager) return ReE(res, "Invalid teamManagerId", 400);
+
+    const managerName = manager.name;  // this will match followUpBy
+
+    // Exact count from DB (updated to use followUpBy)
+    const totalRecords = await model.CoSheet.count({
+      where: {
+        followUpBy: managerName,
+        followUpResponse: category,
+      },
+    });
+
+    // Fetch rows normally (unchanged but updated filter)
+    const rows = await model.CoSheet.findAll({
+      where: {
+        followUpBy: managerName,
+        followUpResponse: category,
+      },
+      raw: true,
+    });
+
+    // Return only this manager (unchanged)
+    const userList = [
+      {
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+      },
+    ];
 
     return ReS(res, {
       success: true,
       teamManagerId,
       category,
-      totalRecords,   // 🔥 Accurate row count
+      totalRecords,
       data: rows,
       managers: userList,
     });
@@ -526,6 +533,7 @@ const fetchCategoryData = async (req, res, category) => {
 const getResumesReceived = (req, res) =>
   fetchCategoryData(req, res, "resumes received");
 module.exports.getResumesReceived = getResumesReceived;
+
 
 
 
