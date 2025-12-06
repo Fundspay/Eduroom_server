@@ -75,6 +75,9 @@ const getResumeAnalysis = async (req, res) => {
     const where = { teamManagerId };
     let targetWhere = { teamManagerId };
 
+    // ✔ FILTER BY FOLLOWUPBY (IMPORTANT)
+    where.followUpBy = teamManagerId;   // <<< THIS IS THE ONLY UPDATE YOU WANTED
+
     if (fromDate || toDate) {
       where.resumeDate = {};
       if (fromDate) where.resumeDate[Op.gte] = new Date(fromDate);
@@ -104,9 +107,9 @@ const getResumeAnalysis = async (req, res) => {
       where,
       attributes: [
         "teamManagerId",
-        "followUpBy",
+        "followUpBy",    
         "followUpResponse",
-        [fn("COUNT", col("id")), "rowCount"],   // ✔ UPDATED HERE
+        [fn("COUNT", col("id")), "rowCount"],
       ],
       group: ["teamManagerId", "followUpBy", "followUpResponse"],
       raw: true,
@@ -138,13 +141,13 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       if (d.followUpBy) {
         totalAchievedFollowUps += 1;
-        followUpBy = d.followUpBy;
+        followUpBy = d.followUpBy;  // keep same
       }
 
       const responseKey = d.followUpResponse?.toLowerCase();
       if (responseKey && categories.includes(responseKey)) {
-        breakdown[responseKey] += Number(d.rowCount || 0);   // ✔ UPDATED
-        totalAchievedResumes += Number(d.rowCount || 0);     // ✔ UPDATED
+        breakdown[responseKey] += Number(d.rowCount || 0);
+        totalAchievedResumes += Number(d.rowCount || 0);
       }
     });
 
@@ -185,6 +188,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
