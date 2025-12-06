@@ -70,13 +70,21 @@ const getResumeAnalysis = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // ✔ Get manager name using ID
+    const manager = await model.TeamManager.findOne({
+      attributes: ["id", "name", "email"],
+      where: { id: teamManagerId },
+      raw: true,
+    });
+
+    if (!manager) return ReE(res, "Invalid teamManagerId", 400);
+
+    const managerName = manager.name;  // ✔ this matches followUpBy
+
     const { fromDate, toDate } = req.query;
 
-    const where = { teamManagerId };
+    const where = { followUpBy: managerName };   // ✔ UPDATED (replaced teamManagerId)
     let targetWhere = { teamManagerId };
-
-    // ✔ FILTER BY FOLLOWUPBY (IMPORTANT)
-    where.followUpBy = teamManagerId;   // <<< THIS IS THE ONLY UPDATE YOU WANTED
 
     if (fromDate || toDate) {
       where.resumeDate = {};
@@ -107,7 +115,7 @@ const getResumeAnalysis = async (req, res) => {
       where,
       attributes: [
         "teamManagerId",
-        "followUpBy",    
+        "followUpBy",
         "followUpResponse",
         [fn("COUNT", col("id")), "rowCount"],
       ],
@@ -141,7 +149,7 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       if (d.followUpBy) {
         totalAchievedFollowUps += 1;
-        followUpBy = d.followUpBy;  // keep same
+        followUpBy = d.followUpBy;
       }
 
       const responseKey = d.followUpResponse?.toLowerCase();
