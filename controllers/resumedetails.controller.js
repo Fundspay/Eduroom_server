@@ -479,6 +479,15 @@ const fetchCategoryData = async (req, res, category) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // Exact count from DB
+    const totalRecords = await model.CoSheet.count({
+      where: {
+        teamManagerId,
+        followUpResponse: category,
+      },
+    });
+
+    // Still fetch rows normally (unchanged)
     const rows = await model.CoSheet.findAll({
       where: {
         teamManagerId,
@@ -487,8 +496,10 @@ const fetchCategoryData = async (req, res, category) => {
       raw: true,
     });
 
+    // Fetch only the manager matching the given ID
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
+      where: { id: teamManagerId },
       raw: true,
     });
 
@@ -502,7 +513,7 @@ const fetchCategoryData = async (req, res, category) => {
       success: true,
       teamManagerId,
       category,
-      totalRecords: rows.length,
+      totalRecords,   // 🔥 Accurate row count
       data: rows,
       managers: userList,
     });
@@ -515,6 +526,8 @@ const fetchCategoryData = async (req, res, category) => {
 const getResumesReceived = (req, res) =>
   fetchCategoryData(req, res, "resumes received");
 module.exports.getResumesReceived = getResumesReceived;
+
+
 
 const getSendingIn12Days = (req, res) =>
   fetchCategoryData(req, res, "sending in 1-2 days");
