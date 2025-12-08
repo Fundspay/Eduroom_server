@@ -27,9 +27,9 @@ const createResume = async (req, res) => {
       }
     }
 
-    // ❌ FILTER EMPTY ROWS
-    const cleanedArray = dataArray.filter(d => 
-      d && Object.values(d).some(v => v !== null && v !== "" && v !== undefined)
+    // ❌ FIX #1 — filter empty rows correctly (keep rows with only mobile number also)
+    const cleanedArray = dataArray.filter(d =>
+      d && Object.values(d).some(v => v !== null && v !== undefined && v !== "")
     );
 
     // Prepare payloads
@@ -52,16 +52,16 @@ const createResume = async (req, res) => {
       alloted: data.alloted ?? null,
     }));
 
-    // ❌ FILTER OUT ROWS WITH NULL/EMPTY MOBILE → prevents empty & invalid rows
+    // ❌ FIX #2 — keep rows only if mobile present
     let payloads = rawPayloads.filter(p => p.mobileNumber);
 
-    // ❌ CONVERT MOBILE NUMBERS TO STRING
+    // Convert to string
     payloads = payloads.map(p => ({
       ...p,
       mobileNumber: String(p.mobileNumber).trim()
     }));
 
-    // ❌ REMOVE DUPLICATES WITHIN THE CURRENT BATCH
+    // Remove duplicates inside the uploaded batch
     const seenMobiles = new Set();
     payloads = payloads.filter(p => {
       if (seenMobiles.has(p.mobileNumber)) return false;
@@ -69,16 +69,16 @@ const createResume = async (req, res) => {
       return true;
     });
 
-    // ❌ CHECK DATABASE TO AVOID STORING DUPLICATES
+    // ❌ FIX #3 — correct duplicate check using Op.in
     const existing = await model.StudentResume.findAll({
-      where: { mobileNumber: payloads.map(p => p.mobileNumber) }
+      where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } }
     });
 
     const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
 
     payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
 
-    // Bulk insert with ignoreDuplicates
+    // Bulk insert
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {
@@ -107,6 +107,7 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
+
 
 
 //  Update Resume Record
