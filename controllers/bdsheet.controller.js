@@ -351,31 +351,17 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 const getDashboardStats = async (req, res) => {
   try {
-    // ---------------------------
-    // Extract query params
-    // ---------------------------
     const managerId = req.query.managerId;
     const { startDate, endDate } = req.query;
 
-    // ---------------------------
-    // Filters for BdTarget (compare DATE(targetDate) to supplied YYYY-MM-DD)
+    // --------------------------- 
+    // FIXED DATE FILTER (BdTarget)
     // ---------------------------
     let targetDateFilter = {};
     if (startDate && endDate) {
-      targetDateFilter = {
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            "<=",
-            endDate
-          ),
-        ],
-      };
+      targetDateFilter = Sequelize.literal(`
+        DATE(targetDate) >= '${startDate}' AND DATE(targetDate) <= '${endDate}'
+      `);
     }
 
     const managerFilter = managerId
@@ -388,7 +374,8 @@ const getDashboardStats = async (req, res) => {
     const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...managerFilter,
-        ...targetDateFilter,
+        ...(startDate && endDate ? {} : {}),
+        ...(startDate && endDate ? { [Op.and]: targetDateFilter } : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
@@ -398,37 +385,26 @@ const getDashboardStats = async (req, res) => {
     let totalAccountsTarget = 0;
 
     bdTargetData.forEach((row) => {
-      // coerce to number and guard against null/undefined
       totalInternsAllocated += Number(row.internsAllocated) || 0;
       totalInternsActive += Number(row.internsActive) || 0;
       totalAccountsTarget += Number(row.accounts) || 0;
     });
 
-    // ---------------------------
-    // 2️⃣ BdSheet stats (UNCHANGED)
+    // --------------------------- 
+    // FIXED DATE FILTER (BdSheet)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
-      sheetDateFilter = {
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            "<=",
-            endDate
-          ),
-        ],
-      };
+      sheetDateFilter = Sequelize.literal(`
+        DATE(startDate) >= '${startDate}' AND DATE(startDate) <= '${endDate}'
+      `);
     }
 
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...managerFilter,
-        ...sheetDateFilter,
+        ...(startDate && endDate ? {} : {}),
+        ...(startDate && endDate ? { [Op.and]: sheetDateFilter } : {}),
       },
       attributes: ["businessTask", "activeStatus"],
     });
@@ -441,14 +417,11 @@ const getDashboardStats = async (req, res) => {
       const taskNum = parseInt(row.businessTask);
       if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
 
-      if (row.activeStatus && row.activeStatus.toLowerCase() === "active") {
+      if (row.activeStatus?.toLowerCase() === "active") {
         totalActiveInterns += 1;
       }
     });
 
-    // ---------------------------
-    // FINAL RESPONSE
-    // ---------------------------
     return ReS(res, {
       bdTarget: {
         totalInternsAllocated,
@@ -472,6 +445,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 // HARD-CODED RANGES (not stored in DB)
 const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100","101-200","201-300","301-400","401-500","501-600","601+"];
