@@ -358,19 +358,28 @@ const getDashboardStats = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // ---------------------------
-    // Filters for BdTarget
+    // Filters for BdTarget (compare DATE(targetDate) to supplied YYYY-MM-DD)
     // ---------------------------
     let targetDateFilter = {};
     if (startDate && endDate) {
       targetDateFilter = {
-        targetDate: {
-          [Op.between]: [startDate, endDate],
-        },
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            "<=",
+            endDate
+          ),
+        ],
       };
     }
 
     const managerFilter = managerId
-      ? { teamManagerId: parseInt(managerId) }
+      ? { teamManagerId: parseInt(managerId, 10) }
       : {};
 
     // ---------------------------
@@ -389,13 +398,14 @@ const getDashboardStats = async (req, res) => {
     let totalAccountsTarget = 0;
 
     bdTargetData.forEach((row) => {
-      totalInternsAllocated += row.internsAllocated;
-      totalInternsActive += row.internsActive;
-      totalAccountsTarget += row.accounts;
+      // coerce to number and guard against null/undefined
+      totalInternsAllocated += Number(row.internsAllocated) || 0;
+      totalInternsActive += Number(row.internsActive) || 0;
+      totalAccountsTarget += Number(row.accounts) || 0;
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet stats (UPDATED DATE LOGIC)
+    // 2️⃣ BdSheet stats (UNCHANGED)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
