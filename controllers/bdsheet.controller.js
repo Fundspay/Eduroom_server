@@ -354,13 +354,13 @@ const getDashboardStats = async (req, res) => {
     const managerId = req.query.managerId;
     const { startDate, endDate } = req.query;
 
-    // --------------------------- 
+    // ---------------------------
     // FIXED DATE FILTER (BdTarget)
     // ---------------------------
     let targetDateFilter = {};
     if (startDate && endDate) {
       targetDateFilter = Sequelize.literal(`
-        DATE(targetDate) >= '${startDate}' AND DATE(targetDate) <= '${endDate}'
+        "targetDate"::date >= '${startDate}' AND "targetDate"::date <= '${endDate}'
       `);
     }
 
@@ -374,7 +374,6 @@ const getDashboardStats = async (req, res) => {
     const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...managerFilter,
-        ...(startDate && endDate ? {} : {}),
         ...(startDate && endDate ? { [Op.and]: targetDateFilter } : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
@@ -390,20 +389,19 @@ const getDashboardStats = async (req, res) => {
       totalAccountsTarget += Number(row.accounts) || 0;
     });
 
-    // --------------------------- 
+    // ---------------------------
     // FIXED DATE FILTER (BdSheet)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
       sheetDateFilter = Sequelize.literal(`
-        DATE(startDate) >= '${startDate}' AND DATE(startDate) <= '${endDate}'
+        "startDate"::date >= '${startDate}' AND "startDate"::date <= '${endDate}'
       `);
     }
 
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...managerFilter,
-        ...(startDate && endDate ? {} : {}),
         ...(startDate && endDate ? { [Op.and]: sheetDateFilter } : {}),
       },
       attributes: ["businessTask", "activeStatus"],
@@ -445,6 +443,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 // HARD-CODED RANGES (not stored in DB)
