@@ -9,6 +9,13 @@ const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 const allowedInternshipTypes = ["fulltime", "parttime", "sip", "liveproject", "wip", "others"];
 const allowedCourses = ["mba", "pgdm", "mba+pgdm", "bba/bcom", "engineering", "other"];
 
+// ✅ Helper → convert to valid date or null
+const toDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
@@ -35,7 +42,7 @@ const createResume = async (req, res) => {
     // Prepare payloads
     const rawPayloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
-      resumeDate: data.resumeDate ?? null,
+      resumeDate: toDate(data.resumeDate),          // ✅ FIXED
       collegeName: data.collegeName ?? null,
       course: data.course ?? null,
       internshipType: data.internshipType ?? null,
@@ -44,8 +51,8 @@ const createResume = async (req, res) => {
       mobileNumber: data.mobileNumber ?? null,
       emailId: data.emailId ?? null,
       domain: data.domain ?? null,
-      interviewDate: data.interviewDate ?? null,
-      dateOfOnboarding: data.dateOfOnboarding ?? null,
+      interviewDate: toDate(data.interviewDate),    // ✅ FIXED
+      dateOfOnboarding: toDate(data.dateOfOnboarding), // ✅ FIXED
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
       callStatus: data.callStatus ?? null,
@@ -107,7 +114,6 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
-
 
 
 //  Update Resume Record
