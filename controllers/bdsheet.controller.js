@@ -359,9 +359,20 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     let targetDateFilter = {};
     if (startDate && endDate) {
-      targetDateFilter = Sequelize.literal(`
-        "targetDate"::date >= '${startDate}' AND "targetDate"::date <= '${endDate}'
-      `);
+      targetDateFilter = {
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            "<=",
+            endDate
+          ),
+        ],
+      };
     }
 
     const managerFilter = managerId
@@ -374,7 +385,7 @@ const getDashboardStats = async (req, res) => {
     const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...managerFilter,
-        ...(startDate && endDate ? { [Op.and]: targetDateFilter } : {}),
+        ...(startDate && endDate ? targetDateFilter : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
@@ -394,15 +405,26 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
-      sheetDateFilter = Sequelize.literal(`
-        "startDate"::date >= '${startDate}' AND "startDate"::date <= '${endDate}'
-      `);
+      sheetDateFilter = {
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
+      };
     }
 
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...managerFilter,
-        ...(startDate && endDate ? { [Op.and]: sheetDateFilter } : {}),
+        ...(startDate && endDate ? sheetDateFilter : {}),
       },
       attributes: ["businessTask", "activeStatus"],
     });
@@ -443,7 +465,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
 
 
 // HARD-CODED RANGES (not stored in DB)
