@@ -1433,6 +1433,7 @@ const updateBusinessTarget = async (req, res) => {
 
 module.exports.updateBusinessTarget = updateBusinessTarget;
 
+
 const getReferralPaidCount = async (req, res) => {
   try {
     const { managerId, from, to } = req.query;
@@ -1456,19 +1457,13 @@ const getReferralPaidCount = async (req, res) => {
 
     const referredUsers = data.result.referred_users;
 
-    // -----------------------
     // UNIQUE USERS (TOTAL)
-    // -----------------------
     const uniqueUsersMap = new Map();
 
-    // -----------------------
     // DATE-WISE PAID COUNT
-    // -----------------------
     const dateWisePaidCount = {};
 
-    // -----------------------
-    // DATE-WISE UNIQUE USERS
-    // -----------------------
+    // DATE-WISE UNIQUE USERS (using Set)
     const dateWiseUniqueUsers = {};
 
     referredUsers.forEach((user) => {
@@ -1504,35 +1499,36 @@ const getReferralPaidCount = async (req, res) => {
       });
     });
 
-    // Convert Set → number
-    const dateWiseUniquePaidUsers = {};
-    Object.keys(dateWiseUniqueUsers).forEach((date) => {
-      dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
-    });
-
-    // -------------------------------
-    // FILL ALL MISSING DATES in RANGE
-    // -------------------------------
+    // ----------------------------------------
+    // GENERATE DATE RANGE AND FILL MISSING DATES
+    // ----------------------------------------
     function getDateRange(from, to) {
-      const start = new Date(from);
-      const end = new Date(to);
-      const dates = [];
+      let start = new Date(from);
+      let end = new Date(to);
+      const result = [];
 
       while (start <= end) {
         const yyyy = start.getFullYear();
         const mm = String(start.getMonth() + 1).padStart(2, "0");
         const dd = String(start.getDate()).padStart(2, "0");
-        dates.push(`${yyyy}-${mm}-${dd}`);
+        result.push(`${yyyy}-${mm}-${dd}`);
         start.setDate(start.getDate() + 1);
       }
-      return dates;
+      return result;
     }
 
     const allDates = getDateRange(from, to);
 
-    allDates.forEach(date => {
+    // Initialize missing dates with 0 or empty set
+    allDates.forEach((date) => {
       if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
-      if (!dateWiseUniquePaidUsers[date]) dateWiseUniquePaidUsers[date] = 0;
+      if (!dateWiseUniqueUsers[date]) dateWiseUniqueUsers[date] = new Set();
+    });
+
+    // Convert Set → number AFTER filling missing dates
+    const dateWiseUniquePaidUsers = {};
+    allDates.forEach((date) => {
+      dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
     });
 
     // TOTAL PAID COUNT
@@ -1557,3 +1553,4 @@ const getReferralPaidCount = async (req, res) => {
 };
 
 module.exports.getReferralPaidCount = getReferralPaidCount;
+
