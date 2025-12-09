@@ -1462,12 +1462,12 @@ const getReferralPaidCount = async (req, res) => {
     const uniqueUsersMap = new Map();
 
     // -----------------------
-    // DATE-WISE PAID COUNT  (YOU ALREADY HAD THIS)
+    // DATE-WISE PAID COUNT
     // -----------------------
     const dateWisePaidCount = {};
 
     // -----------------------
-    // NEW → DATE-WISE UNIQUE USER COUNT
+    // NEW: DATE-WISE UNIQUE USERS (store sets first)
     // -----------------------
     const dateWiseUniqueUsers = {};
 
@@ -1477,7 +1477,7 @@ const getReferralPaidCount = async (req, res) => {
         const paidCount = parseInt(d.paid_count);
         const userId = user.user_id;
 
-        // ---- EXISTING TOTAL UNIQUE USER LOGIC (UNCHANGED) ----
+        // ----- TOTAL UNIQUE USERS (UNCHANGED) -----
         if (paidCount > 0 && userId) {
           if (!uniqueUsersMap.has(userId)) {
             uniqueUsersMap.set(userId, paidCount);
@@ -1489,27 +1489,31 @@ const getReferralPaidCount = async (req, res) => {
           }
         }
 
-        // ---- EXISTING DATE-WISE PAID COUNT (UNCHANGED) ----
+        // ----- DATE-WISE PAID COUNT -----
         if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
         dateWisePaidCount[date] += paidCount;
 
-        // ---- NEW DATE-WISE UNIQUE USER COUNT ----
+        // ----- DATE-WISE UNIQUE USERS -----
+        if (!dateWiseUniqueUsers[date]) {
+          dateWiseUniqueUsers[date] = new Set();
+        }
+
         if (paidCount > 0) {
-          if (!dateWiseUniqueUsers[date]) {
-            dateWiseUniqueUsers[date] = new Set();
-          }
           dateWiseUniqueUsers[date].add(userId);
         }
       });
     });
 
-    // Convert Set → number
+    // -----------------------
+    // ALWAYS INCLUDE ALL DATES (even if 0)
+    // -----------------------
     const dateWiseUniquePaidUsers = {};
-    Object.keys(dateWiseUniqueUsers).forEach((date) => {
-      dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
+    Object.keys(dateWisePaidCount).forEach((date) => {
+      dateWiseUniquePaidUsers[date] =
+        dateWiseUniqueUsers[date] ? dateWiseUniqueUsers[date].size : 0;
     });
 
-    // TOTAL PAID COUNT
+    // TOTAL COUNT
     let totalPaidCount = 0;
     for (let count of uniqueUsersMap.values()) totalPaidCount += count;
 
@@ -1521,7 +1525,7 @@ const getReferralPaidCount = async (req, res) => {
       totalPaidCount,
       paidUserIds: [...uniqueUsersMap.keys()],
       dateWisePaidCount,
-      dateWiseUniquePaidUsers, // <-- ONLY NEW FIELD ADDED
+      dateWiseUniquePaidUsers, // <-- NOW ALWAYS SHOWS ALL DATES
     });
 
   } catch (err) {
