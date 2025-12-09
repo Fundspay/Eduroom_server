@@ -1485,13 +1485,14 @@ const getReferralPaidCount = async (req, res) => {
       });
     });
 
-    // ----- GENERATE DATE RANGE -----
+    // ----- GENERATE FULL DATE RANGE -----
     function getDateRange(from, to) {
       const start = new Date(from);
       const end = new Date(to);
       const result = [];
 
-      let current = new Date(start);
+      let current = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
       while (current <= end) {
         const yyyy = current.getFullYear();
         const mm = String(current.getMonth() + 1).padStart(2, "0");
