@@ -1485,7 +1485,7 @@ const getReferralPaidCount = async (req, res) => {
       });
     });
 
-    // ----- FILL MISSING DATES -----
+    // ----- GENERATE DATE RANGE -----
     function getDateRange(from, to) {
       const start = new Date(from);
       const end = new Date(to);
@@ -1505,16 +1505,12 @@ const getReferralPaidCount = async (req, res) => {
 
     const allDates = getDateRange(from, to);
 
-    allDates.forEach(date => {
-      if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
-      if (!dateWiseUniqueUsers[date]) dateWiseUniqueUsers[date] = new Set();
-    });
-
-    // Convert unique user sets to counts
-    const dateWiseUniquePaidUsers = {};
-    allDates.forEach(date => {
-      dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
-    });
+    // ----- BUILD DATE-WISE ARRAY -----
+    const dateWiseArray = allDates.map(date => ({
+      date,
+      paidCount: dateWisePaidCount[date] || 0,
+      uniqueUsers: dateWiseUniqueUsers[date] ? dateWiseUniqueUsers[date].size : 0
+    }));
 
     // ----- TOTALS -----
     const totalPaidCount = Array.from(uniqueUsersMap.values()).reduce((a, b) => a + b, 0);
@@ -1525,8 +1521,7 @@ const getReferralPaidCount = async (req, res) => {
       totalPaidUsers,
       totalPaidCount,
       paidUserIds: [...uniqueUsersMap.keys()],
-      dateWisePaidCount,
-      dateWiseUniquePaidUsers
+      dateWise: dateWiseArray
     });
 
   } catch (err) {
