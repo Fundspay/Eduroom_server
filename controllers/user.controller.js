@@ -1451,90 +1451,73 @@ const getReferralPaidCount = async (req, res) => {
     const response = await axios.get(url);
     const data = response.data;
 
-    if (!data || !data.result || !data.result.referred_users) {
+    if (!data?.result?.referred_users) {
       return ReE(res, "Invalid API response from referral service", 500);
     }
 
     const referredUsers = data.result.referred_users;
 
-    // UNIQUE USERS (TOTAL)
+    // ----- TOTAL UNIQUE USERS -----
     const uniqueUsersMap = new Map();
 
-    // DATE-WISE PAID COUNT
+    // ----- DATE-WISE DATA -----
     const dateWisePaidCount = {};
-
-    // DATE-WISE UNIQUE USERS (using Set)
     const dateWiseUniqueUsers = {};
 
-    referredUsers.forEach((user) => {
-      user.daily_paid_counts.forEach((d) => {
+    referredUsers.forEach(user => {
+      user.daily_paid_counts.forEach(d => {
         const date = d.date;
         const paidCount = parseInt(d.paid_count);
         const userId = user.user_id;
 
-        // ----- TOTAL UNIQUE USERS -----
+        // Track total unique users
         if (paidCount > 0 && userId) {
-          if (!uniqueUsersMap.has(userId)) {
-            uniqueUsersMap.set(userId, paidCount);
-          } else {
-            uniqueUsersMap.set(
-              userId,
-              Math.max(uniqueUsersMap.get(userId), paidCount)
-            );
-          }
+          uniqueUsersMap.set(userId, Math.max(uniqueUsersMap.get(userId) || 0, paidCount));
         }
 
-        // ----- DATE-WISE PAID COUNT -----
+        // Track paid count per date
         if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
         dateWisePaidCount[date] += paidCount;
 
-        // ----- DATE-WISE UNIQUE USERS -----
-        if (!dateWiseUniqueUsers[date]) {
-          dateWiseUniqueUsers[date] = new Set();
-        }
-
-        if (paidCount > 0) {
-          dateWiseUniqueUsers[date].add(userId);
-        }
+        // Track unique users per date
+        if (!dateWiseUniqueUsers[date]) dateWiseUniqueUsers[date] = new Set();
+        if (paidCount > 0) dateWiseUniqueUsers[date].add(userId);
       });
     });
 
-    // ----------------------------------------
-    // GENERATE DATE RANGE AND FILL MISSING DATES
-    // ----------------------------------------
+    // ----- FILL MISSING DATES -----
     function getDateRange(from, to) {
-      let start = new Date(from);
-      let end = new Date(to);
+      const start = new Date(from);
+      const end = new Date(to);
       const result = [];
 
-      while (start <= end) {
-        const yyyy = start.getFullYear();
-        const mm = String(start.getMonth() + 1).padStart(2, "0");
-        const dd = String(start.getDate()).padStart(2, "0");
+      let current = new Date(start);
+      while (current <= end) {
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, "0");
+        const dd = String(current.getDate()).padStart(2, "0");
         result.push(`${yyyy}-${mm}-${dd}`);
-        start.setDate(start.getDate() + 1);
+        current.setDate(current.getDate() + 1);
       }
+
       return result;
     }
 
     const allDates = getDateRange(from, to);
 
-    // Initialize missing dates with 0 or empty set
-    allDates.forEach((date) => {
+    allDates.forEach(date => {
       if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
       if (!dateWiseUniqueUsers[date]) dateWiseUniqueUsers[date] = new Set();
     });
 
-    // Convert Set → number AFTER filling missing dates
+    // Convert unique user sets to counts
     const dateWiseUniquePaidUsers = {};
-    allDates.forEach((date) => {
+    allDates.forEach(date => {
       dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
     });
 
-    // TOTAL PAID COUNT
-    let totalPaidCount = 0;
-    for (let count of uniqueUsersMap.values()) totalPaidCount += count;
-
+    // ----- TOTALS -----
+    const totalPaidCount = Array.from(uniqueUsersMap.values()).reduce((a, b) => a + b, 0);
     const totalPaidUsers = uniqueUsersMap.size;
 
     return ReS(res, {
