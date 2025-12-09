@@ -689,4 +689,3 @@ const getCoSheetsWithJDSent = async (req, res) => {
 };
 
 module.exports.getCoSheetsWithJDSent = getCoSheetsWithJDSent;
-

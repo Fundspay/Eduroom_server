@@ -9,6 +9,13 @@ const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 const allowedInternshipTypes = ["fulltime", "parttime", "sip", "liveproject", "wip", "others"];
 const allowedCourses = ["mba", "pgdm", "mba+pgdm", "bba/bcom", "engineering", "other"];
 
+// ✅ Helper → convert to valid date or null
+const toDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
@@ -27,15 +34,15 @@ const createResume = async (req, res) => {
       }
     }
 
-    // ❌ FILTER EMPTY ROWS
-    const cleanedArray = dataArray.filter(d => 
-      d && Object.values(d).some(v => v !== null && v !== "" && v !== undefined)
+    // ❌ FIX #1 — filter empty rows correctly (keep rows with only mobile number also)
+    const cleanedArray = dataArray.filter(d =>
+      d && Object.values(d).some(v => v !== null && v !== undefined && v !== "")
     );
 
     // Prepare payloads
     const rawPayloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
-      resumeDate: data.resumeDate ?? null,
+      resumeDate: toDate(data.resumeDate),          // ✅ FIXED
       collegeName: data.collegeName ?? null,
       course: data.course ?? null,
       internshipType: data.internshipType ?? null,
@@ -44,24 +51,24 @@ const createResume = async (req, res) => {
       mobileNumber: data.mobileNumber ?? null,
       emailId: data.emailId ?? null,
       domain: data.domain ?? null,
-      interviewDate: data.interviewDate ?? null,
-      dateOfOnboarding: data.dateOfOnboarding ?? null,
+      interviewDate: toDate(data.interviewDate),    // ✅ FIXED
+      dateOfOnboarding: toDate(data.dateOfOnboarding), // ✅ FIXED
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
       callStatus: data.callStatus ?? null,
       alloted: data.alloted ?? null,
     }));
 
-    // ❌ FILTER OUT ROWS WITH NULL/EMPTY MOBILE → prevents empty & invalid rows
+    // ❌ FIX #2 — keep rows only if mobile present
     let payloads = rawPayloads.filter(p => p.mobileNumber);
 
-    // ❌ CONVERT MOBILE NUMBERS TO STRING
+    // Convert to string
     payloads = payloads.map(p => ({
       ...p,
       mobileNumber: String(p.mobileNumber).trim()
     }));
 
-    // ❌ REMOVE DUPLICATES WITHIN THE CURRENT BATCH
+    // Remove duplicates inside the uploaded batch
     const seenMobiles = new Set();
     payloads = payloads.filter(p => {
       if (seenMobiles.has(p.mobileNumber)) return false;
@@ -69,16 +76,16 @@ const createResume = async (req, res) => {
       return true;
     });
 
-    // ❌ CHECK DATABASE TO AVOID STORING DUPLICATES
+    // ❌ FIX #3 — correct duplicate check using Op.in
     const existing = await model.StudentResume.findAll({
-      where: { mobileNumber: payloads.map(p => p.mobileNumber) }
+      where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } }
     });
 
     const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
 
     payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
 
-    // Bulk insert with ignoreDuplicates
+    // Bulk insert
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {

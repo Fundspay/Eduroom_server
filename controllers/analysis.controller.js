@@ -4,6 +4,7 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { Op } = require("sequelize");
 
 // Daily Analysis for ALL CoSheet records by teamManagerId
+// Daily Analysis for ALL CoSheet records by teamManagerId
 const getDailyAnalysis = async (req, res) => {
   try {
     const { teamManagerId, startDate, endDate, month } = req.query;
@@ -61,10 +62,7 @@ const getDailyAnalysis = async (req, res) => {
     const allRecords = await model.CoSheet.findAll({
       where: {
         teamManagerId,
-        [Op.or]: [
-          { dateOfConnect: { [Op.between]: [sDate, eDate] } },
-          { jdSentAt: { [Op.between]: [sDate, eDate] } }
-        ]
+        dateOfConnect: { [Op.between]: [sDate, eDate] }  // ONLY CHECK dateOfConnect
       }
     });
 
@@ -81,8 +79,7 @@ const getDailyAnalysis = async (req, res) => {
 
       const dayRecords = allRecords.filter(r => {
         const connectDate = r.dateOfConnect ? new Date(r.dateOfConnect).toISOString().split("T")[0] : null;
-        const jdDate = r.jdSentAt ? new Date(r.jdSentAt).toISOString().split("T")[0] : null;
-        return connectDate === d.date || jdDate === d.date;
+        return connectDate === d.date;
       });
 
       dayRecords.forEach(r => {
@@ -102,7 +99,10 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      const jdCount = dayRecords.filter(r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date).length;
+      const jdCount = dayRecords.filter(
+        r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date
+      ).length;
+
       d.jdSent = jdCount;
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
@@ -149,6 +149,9 @@ const getDailyAnalysis = async (req, res) => {
   }
 };
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
+
+
 
 // Get all connected CoSheet records for a teamManager
 const getConnectedCoSheetsByManager = async (req, res) => {

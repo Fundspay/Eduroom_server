@@ -70,9 +70,20 @@ const getResumeAnalysis = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // ✔ Get manager name using ID
+    const manager = await model.TeamManager.findOne({
+      attributes: ["id", "name", "email"],
+      where: { id: teamManagerId },
+      raw: true,
+    });
+
+    if (!manager) return ReE(res, "Invalid teamManagerId", 400);
+
+    const managerName = manager.name;  // ✔ this matches followUpBy
+
     const { fromDate, toDate } = req.query;
 
-    const where = { teamManagerId };
+    const where = { followUpBy: managerName };   // ✔ UPDATED (replaced teamManagerId)
     let targetWhere = { teamManagerId };
 
     if (fromDate || toDate) {
@@ -106,7 +117,7 @@ const getResumeAnalysis = async (req, res) => {
         "teamManagerId",
         "followUpBy",
         "followUpResponse",
-        [fn("SUM", col("resumeCount")), "totalResumes"],
+        [fn("COUNT", col("id")), "rowCount"],
       ],
       group: ["teamManagerId", "followUpBy", "followUpResponse"],
       raw: true,
@@ -143,8 +154,8 @@ const getResumeAnalysis = async (req, res) => {
 
       const responseKey = d.followUpResponse?.toLowerCase();
       if (responseKey && categories.includes(responseKey)) {
-        breakdown[responseKey] += Number(d.totalResumes || 0);
-        totalAchievedResumes += Number(d.totalResumes || 0);
+        breakdown[responseKey] += Number(d.rowCount || 0);
+        totalAchievedResumes += Number(d.rowCount || 0);
       }
     });
 
@@ -185,6 +196,8 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
+
 
 const gettotalResumeAnalysis = async (req, res) => {
   try {
@@ -479,30 +492,48 @@ const fetchCategoryData = async (req, res, category) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // Get manager name based on ID so we can match followUpBy
+    const manager = await model.TeamManager.findOne({
+      attributes: ["id", "name", "email"],
+      where: { id: teamManagerId },
+      raw: true,
+    });
+
+    if (!manager) return ReE(res, "Invalid teamManagerId", 400);
+
+    const managerName = manager.name;  // this will match followUpBy
+
+    // Exact count from DB (updated to use followUpBy)
+    const totalRecords = await model.CoSheet.count({
+      where: {
+        followUpBy: managerName,
+        followUpResponse: category,
+      },
+    });
+
+    // Fetch rows normally (unchanged but updated filter)
     const rows = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
+        followUpBy: managerName,
         followUpResponse: category,
       },
       raw: true,
     });
 
-    const managers = await model.TeamManager.findAll({
-      attributes: ["id", "name", "email"],
-      raw: true,
-    });
-
-    const userList = managers.map((TeamManager) => ({
-      id: TeamManager.id,
-      name: TeamManager.name,
-      email: TeamManager.email,
-    }));
+    // Return only this manager (unchanged)
+    const userList = [
+      {
+        id: manager.id,
+        name: manager.name,
+        email: manager.email,
+      },
+    ];
 
     return ReS(res, {
       success: true,
       teamManagerId,
       category,
-      totalRecords: rows.length,
+      totalRecords,
       data: rows,
       managers: userList,
     });
@@ -515,6 +546,9 @@ const fetchCategoryData = async (req, res, category) => {
 const getResumesReceived = (req, res) =>
   fetchCategoryData(req, res, "resumes received");
 module.exports.getResumesReceived = getResumesReceived;
+
+
+
 
 const getSendingIn12Days = (req, res) =>
   fetchCategoryData(req, res, "sending in 1-2 days");
