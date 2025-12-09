@@ -1445,7 +1445,6 @@ const getReferralPaidCount = async (req, res) => {
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
     const phone = "+91" + manager.mobileNumber;
-
     const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
 
     const response = await axios.get(url);
@@ -1458,52 +1457,71 @@ const getReferralPaidCount = async (req, res) => {
     const referredUsers = data.result.referred_users;
 
     // -----------------------
-    // UNIQUE USERS CALCULATION
+    // UNIQUE USERS (TOTAL)
     // -----------------------
     const uniqueUsersMap = new Map();
 
-    referredUsers.forEach((entry) => {
-      entry.daily_paid_counts.forEach((d) => {
-        const paidCount = parseInt(d.paid_count);
-        if (paidCount > 0 && entry.user_id) {
-          if (!uniqueUsersMap.has(entry.user_id)) {
-            uniqueUsersMap.set(entry.user_id, paidCount);
-          } else {
-            uniqueUsersMap.set(
-              entry.user_id,
-              Math.max(uniqueUsersMap.get(entry.user_id), paidCount)
-            );
-          }
-        }
-      });
-    });
-
-    const totalPaidUsers = uniqueUsersMap.size;
-
-    let totalPaidCount = 0;
-    for (let count of uniqueUsersMap.values()) totalPaidCount += count;
+    // -----------------------
+    // DATE-WISE PAID COUNT  (YOU ALREADY HAD THIS)
+    // -----------------------
+    const dateWisePaidCount = {};
 
     // -----------------------
-    // DATE-WISE PAID COUNT
+    // NEW → DATE-WISE UNIQUE USER COUNT
     // -----------------------
-    const dateWisePaidCount = {}; // { "2025-11-26": X, "2025-11-27": Y }
+    const dateWiseUniqueUsers = {};
 
     referredUsers.forEach((user) => {
       user.daily_paid_counts.forEach((d) => {
         const date = d.date;
         const paidCount = parseInt(d.paid_count);
+        const userId = user.user_id;
 
+        // ---- EXISTING TOTAL UNIQUE USER LOGIC (UNCHANGED) ----
+        if (paidCount > 0 && userId) {
+          if (!uniqueUsersMap.has(userId)) {
+            uniqueUsersMap.set(userId, paidCount);
+          } else {
+            uniqueUsersMap.set(
+              userId,
+              Math.max(uniqueUsersMap.get(userId), paidCount)
+            );
+          }
+        }
+
+        // ---- EXISTING DATE-WISE PAID COUNT (UNCHANGED) ----
         if (!dateWisePaidCount[date]) dateWisePaidCount[date] = 0;
         dateWisePaidCount[date] += paidCount;
+
+        // ---- NEW DATE-WISE UNIQUE USER COUNT ----
+        if (paidCount > 0) {
+          if (!dateWiseUniqueUsers[date]) {
+            dateWiseUniqueUsers[date] = new Set();
+          }
+          dateWiseUniqueUsers[date].add(userId);
+        }
       });
     });
+
+    // Convert Set → number
+    const dateWiseUniquePaidUsers = {};
+    Object.keys(dateWiseUniqueUsers).forEach((date) => {
+      dateWiseUniquePaidUsers[date] = dateWiseUniqueUsers[date].size;
+    });
+
+    // TOTAL PAID COUNT
+    let totalPaidCount = 0;
+    for (let count of uniqueUsersMap.values()) totalPaidCount += count;
+
+    const totalPaidUsers = uniqueUsersMap.size;
 
     return ReS(res, {
       success: true,
       totalPaidUsers,
       totalPaidCount,
       paidUserIds: [...uniqueUsersMap.keys()],
-      dateWisePaidCount, // <-- NEW FIELD
+      dateWisePaidCount,
+      dateWiseUniquePaidUsers, // <-- ONLY NEW FIELD ADDED
     });
 
   } catch (err) {
