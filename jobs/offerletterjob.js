@@ -19,7 +19,7 @@ const chunkArray = (array, chunkSize) => {
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const randomDelay = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-// Trigger Offer Letter via backend API per user and course ID with retry
+// Trigger Offer Letter API
 const triggerOfferLetterForCourse = async (
   userId,
   courseId,
@@ -51,15 +51,23 @@ const triggerOfferLetterForCourse = async (
   return false;
 };
 
-// Process all users
 const processUsers = async () => {
   try {
     const today = dayjs().format("YYYY-MM-DD");
     console.log(`[${dayjs().format()}] Starting processUsers for date: ${today}`);
 
-    const users = await User.findAll();
+    // 🔥 Get only users who registered TODAY
+    const users = await User.findAll({
+      where: {
+        createdAt: {
+          $gte: `${today} 00:00:00`,
+          $lte: `${today} 23:59:59`
+        }
+      }
+    });
+
     if (!users.length) {
-      console.log(`[${dayjs().format()}] No users found`);
+      console.log(`[${dayjs().format()}] No users registered today.`);
       return;
     }
 
@@ -77,12 +85,13 @@ const processUsers = async () => {
         const courseDates = user.courseDates || {};
         const subscriptionWallet = parseInt(user.subscriptionWallet) || 0;
 
-        const upcomingCourseIds = Object.keys(courseDates).filter((courseId) => {
-          const courseStart = dayjs(courseDates[courseId].startDate);
-          return courseStart.isSame(today) || courseStart.isAfter(today);
+        // 🔥 Check only courses that have start date <= TODAY
+        const eligibleCourseIds = Object.keys(courseDates).filter((courseId) => {
+          const startDate = dayjs(courseDates[courseId].startDate).format("YYYY-MM-DD");
+          return startDate <= today;
         });
 
-        const sortedCourseIds = upcomingCourseIds.sort((a, b) => parseInt(a) - parseInt(b));
+        const sortedCourseIds = eligibleCourseIds.sort((a, b) => parseInt(a) - parseInt(b));
 
         for (const courseId of sortedCourseIds) {
           const course = courseDates[courseId];
@@ -132,25 +141,34 @@ const processUsers = async () => {
   }
 };
 
-// Schedule cron jobs for your Windows server
+// ✅ ADD THIS (you forgot earlier)
 const scheduleJobs = () => {
   console.log(`[${dayjs().format()}] Setting up cron jobs...`);
 
-  // Your production times (IST)
-  const times = ["0 10 * * *", "50 13 * * *", "43 14 * * *", "30 17 * * *"];
+  const times = [
+    "0 10 * * *",   // 10:00 AM
+    "0 12 * * *",   // 12:00 PM
+    "30 13 * * *",  // 1:30 PM
+    "30 14 * * *",  // 2:30 PM
+    "0 16 * * *",   // 4:00 PM
+    "30 17 * * *",  // 5:30 PM
+    "0 19 * * *",   // 7:00 PM
+    "30 20 * * *",  // 8:30 PM
+    "0 22 * * *",   // 10:00 PM
+  ];
 
   times.forEach((cronTime) => {
     cron.schedule(
       cronTime,
       async () => {
-        console.log(`[${dayjs().format()}] 🔔 Scheduled cron fired at ${cronTime}`);
+        console.log(`[${dayjs().format()}] 🔔 Cron fired at ${cronTime}`);
         await processUsers();
       },
       { timezone: "Asia/Kolkata" }
     );
   });
 
-  console.log(`[${dayjs().format()}] Cron jobs scheduled for: ${times.join(", ")}`);
+  console.log(`[${dayjs().format()}] Cron jobs scheduled.`);
 };
 
 module.exports = { scheduleJobs };
