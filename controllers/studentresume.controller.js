@@ -129,7 +129,7 @@ const updateResume = async (req, res) => {
       "domain", "interviewDate", "teamManagerId", "Dateofonboarding",
       "callStatus",
       "alloted",
-      "knowledgeScore","approachScore","skillsScore","otherScore","totalAverageScore","finalSelectionStatus","comment"
+      "knowledgeScore","approachScore","skillsScore","otherScore","totalAverageScore","finalSelectionStatus","comment","interviewedBy"
     ];
 
     for (let f of allowedFields) {
