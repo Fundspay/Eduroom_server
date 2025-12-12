@@ -11,45 +11,78 @@ const monthMap = {
     July: 6, August: 7, September: 8, October: 9, November: 10, December: 11
 };
 
-// ✅ Fetch all Statuses (active only, excluding soft-deleted)
 var listAll = async function (req, res) {
     try {
-        let { monthYear } = req.query; // ex: "October 2025"
+        let { monthYear, startDate, endDate } = req.query;
 
         let monthStart = null;
         let monthEnd = null;
+        let customStart = null;
+        let customEnd = null;
 
+        // ===============================================
+        // 1️⃣ MONTH FILTER (existing logic)
+        // ===============================================
         if (monthYear) {
             const [monthName, yearStr] = monthYear.split(" ");
             const monthIndex = monthMap[monthName];
             const year = parseInt(yearStr);
 
             if (!isNaN(monthIndex) && !isNaN(year)) {
-                // 🔥 Pure UTC — no timezone shift, no wrong month
                 monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
                 monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
             }
         }
 
+        // ===============================================
+        // 2️⃣ CUSTOM DATE RANGE FILTER (NEW)
+        // ===============================================
+        if (startDate && endDate) {
+            customStart = new Date(startDate);
+            customEnd = new Date(endDate);
+
+            // Make endDate inclusive
+            customEnd.setDate(customEnd.getDate() + 1);
+        }
+
+        // ===============================================
+        // 3️⃣ DEFAULT — CURRENT MONTH when NOTHING passed
+        // ===============================================
+        if (!monthYear && !startDate && !endDate) {
+            const now = new Date();
+            const year = now.getUTCFullYear();
+            const month = now.getUTCMonth(); // 0–11
+
+            monthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+            monthEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0));
+        }
+
+        // ===============================================
+        // WHERE CONDITION (priority: custom > month)
+        // ===============================================
         const statusWhere = { isDeleted: false };
 
-        if (monthStart && monthEnd) {
+        if (customStart && customEnd) {
+            statusWhere.registeredAt = {
+                [Op.gte]: customStart,
+                [Op.lt]: customEnd
+            };
+        } else if (monthStart && monthEnd) {
             statusWhere.registeredAt = {
                 [Op.gte]: monthStart,
                 [Op.lt]: monthEnd
             };
         }
 
+        // ===============================================
         const statuses = await model.Status.findAll({
             where: statusWhere
         });
 
-        // 🔥 JUST ADDED — count of ALL students ever (NOT filtered)
         const totalStudents = await model.Status.count({
             where: { isDeleted: false }
         });
 
-        // teamManagers unchanged
         const allTeamManagers = await model.TeamManager.findAll({
             where: { isDeleted: false },
             attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
@@ -58,7 +91,7 @@ var listAll = async function (req, res) {
         return ReS(res, {
             success: true,
             data: statuses,
-            totalStudents, // <— ONLY THIS LINE ADDED
+            totalStudents,
             teamManagers: {
                 total: allTeamManagers.length,
                 list: allTeamManagers
@@ -71,6 +104,7 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
+
 
 
 var updateStatus = async function (req, res) {
