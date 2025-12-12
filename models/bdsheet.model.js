@@ -27,6 +27,7 @@ module.exports = (sequelize, Sequelize) => {
       selectionTest: { type: Sequelize.STRING, allowNull: true },
       whatsappGroup: { type: Sequelize.STRING, allowNull: true },
       connectDate: { type: Sequelize.DATE, allowNull: true },
+      pushto: { type: Sequelize.STRING, allowNull: true },
 
       // DAY 1 - DAY 7
       day1: { type: Sequelize.JSON, allowNull: true },
