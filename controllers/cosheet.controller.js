@@ -668,9 +668,7 @@ const getCoSheetsWithJDSent = async (req, res) => {
   try {
     const records = await model.CoSheet.findAll({
       where: {
-        jdSentAt: {
-          [model.Sequelize.Op.ne]: null, // jdSentAt is not null
-        },
+        detailedResponse: "send JD", // ✔ UPDATED (replaced jdSentAt != null)
       },
       order: [["jdSentAt", "DESC"]],
     });
@@ -689,3 +687,4 @@ const getCoSheetsWithJDSent = async (req, res) => {
 };
 
 module.exports.getCoSheetsWithJDSent = getCoSheetsWithJDSent;
+
