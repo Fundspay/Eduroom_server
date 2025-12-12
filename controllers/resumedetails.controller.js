@@ -118,6 +118,7 @@ const getResumeAnalysis = async (req, res) => {
         "followUpBy",
         "followUpResponse",
         [fn("COUNT", col("id")), "rowCount"],
+        [fn("SUM", col("resumeCount")), "resumeCountSum"], // ✔ ADDED
       ],
       group: ["teamManagerId", "followUpBy", "followUpResponse"],
       raw: true,
@@ -154,8 +155,16 @@ const getResumeAnalysis = async (req, res) => {
 
       const responseKey = d.followUpResponse?.toLowerCase();
       if (responseKey && categories.includes(responseKey)) {
-        breakdown[responseKey] += Number(d.rowCount || 0);
-        totalAchievedResumes += Number(d.rowCount || 0);
+
+        // ✔ ONLY resumes received uses SUM(resumeCount)
+        if (responseKey === "resumes received") {
+          const sum = Number(d.resumeCountSum || 0);
+          breakdown[responseKey] += sum;
+          totalAchievedResumes += sum;
+        } else {
+          breakdown[responseKey] += Number(d.rowCount || 0);
+          totalAchievedResumes += Number(d.rowCount || 0);
+        }
       }
     });
 
@@ -196,6 +205,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 
