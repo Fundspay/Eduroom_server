@@ -668,7 +668,7 @@ const getCoSheetsWithJDSent = async (req, res) => {
   try {
     const records = await model.CoSheet.findAll({
       where: {
-        detailedResponse: "send JD", // ✔ UPDATED (replaced jdSentAt != null)
+        detailedResponse: "Send JD", // ✔ UPDATED (replaced jdSentAt != null)
       },
       order: [["jdSentAt", "DESC"]],
     });
