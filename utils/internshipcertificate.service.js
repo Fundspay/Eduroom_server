@@ -16,7 +16,7 @@ const normalizeDateToISO = (input) => {
   if (!input) return null;
   const d = new Date(input);
   if (isNaN(d)) return null;
-  return d.toISOString().split("T")[0]; // YYYY-MM-DD
+  return d.toISOString().split("T")[0];
 };
 
 const generateInternshipCertificate = async (userId, courseId) => {
@@ -31,13 +31,13 @@ const generateInternshipCertificate = async (userId, courseId) => {
 
   const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
 
-  // 2. Set pronouns
+  // 2. Pronouns
   const genderVal = String(user.gender);
   let pronouns = { subject: "They", object: "them", possessive: "their" };
   if (genderVal === "1") pronouns = { subject: "He", object: "him", possessive: "his" };
   if (genderVal === "2") pronouns = { subject: "She", object: "her", possessive: "her" };
 
-  // 3. Fetch course-specific start and end dates
+  // 3. Start + End Dates + Course details
   let startDate = "To Be Decided";
   let endDate = "To Be Decided";
   let courseName = "Intern";
@@ -56,7 +56,6 @@ const generateInternshipCertificate = async (userId, courseId) => {
       interpersonalSkills = course.interpersonalSkills ? course.interpersonalSkills.split(",").map(s => s.trim()) : [];
     }
 
-    // Format dates for certificate
     startDate = new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
     endDate = new Date(endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   }
@@ -64,11 +63,16 @@ const generateInternshipCertificate = async (userId, courseId) => {
   const role = courseName;
   const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-  // 5) HTML content (your CSS untouched, only background path fixed)
+  // ✅ CONDITIONAL BACKGROUND IMAGE
+  const backgroundImage =
+    Number(courseId) === 24
+      ? "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/10.png"
+      : "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/9.png";
+
+  // 5) HTML
   const html = `
  <!DOCTYPE html>
  <html lang="en">
-
  <head>
      <meta charset="UTF-8">
      <title>Internship Completion Certificate</title>
@@ -85,7 +89,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
              width: 800px;
              margin: 20px auto;
              padding: 80px 100px;
-             background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/9.png") no-repeat center top;
+             background: url("${backgroundImage}") no-repeat center top;
              background-size: cover;
              min-height: 1100px;
              box-sizing: border-box;
@@ -128,14 +132,13 @@ const generateInternshipCertificate = async (userId, courseId) => {
          }
      </style>
  </head>
-
  <body>
      <div class="letter-container">
          <div class="date">Date: <b>${today}</b></div>
 
          <div class="content">
     <b>To Whom so ever it may concern</b>,<br><br>
-    We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern  and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
+    We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
 
     During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
 
@@ -146,24 +149,21 @@ const generateInternshipCertificate = async (userId, courseId) => {
 
      </div>
  </body>
-
  </html>
  `;
 
-  // 5) Render PDF with Puppeteer
+  // 5) Render PDF
   let pdfBuffer;
   try {
     const browser = await puppeteer.launch({
       headless: true,
-       args: ["--no-sandbox", "--disable-setuid-sandbox" , "--disable-dev-shm-usage"],
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
     });
     const page = await browser.newPage();
-
     await page.setContent(html, { waitUntil: "networkidle0" });
 
-    // Wait until fonts are fully loaded
     await page.evaluateHandle('document.fonts.ready');
-    await new Promise(resolve => setTimeout(resolve, 500)); // compatible with all Puppeteer versions
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     pdfBuffer = await page.pdf({
       format: "A4",
@@ -176,7 +176,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // 6) Upload PDF to S3
+  // Upload to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
