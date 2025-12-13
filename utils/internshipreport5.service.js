@@ -61,7 +61,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES
+// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
@@ -164,25 +164,36 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     };
   });
 
+  const userTarget = user.businessTargets?.[courseId];
+  const rawTarget = parseInt(
+    userTarget !== undefined ? userTarget : course?.businessTarget || 0,
+    10
+  );
+  const businessTarget = Math.max(0, rawTarget);
+
+  const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
+  const deductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
+  const achievedTarget = Math.min(subscriptionWallet, deductedWallet);
+
   const filteredCaseStudySessions = mergedSessions.filter(
     (s) => s.caseStudyPercentage !== null
   );
+    // ✅ ONLY ADDITION: split case study rows
+  const CASE_STUDY_LAST_PAGE_ROWS = 15;
 
-  // ✅ ONLY NEW LOGIC (NOTHING ELSE TOUCHED)
-  const CASE_STUDY_PAGE_LIMIT = 15;
-
-  const caseStudyMainRows =
-    filteredCaseStudySessions.length > CASE_STUDY_PAGE_LIMIT
+  const caseStudyFirstPageRows =
+    filteredCaseStudySessions.length > CASE_STUDY_LAST_PAGE_ROWS
       ? filteredCaseStudySessions.slice(
           0,
-          filteredCaseStudySessions.length - CASE_STUDY_PAGE_LIMIT
+          filteredCaseStudySessions.length - CASE_STUDY_LAST_PAGE_ROWS
         )
       : filteredCaseStudySessions;
 
-  const caseStudyLastRows =
-    filteredCaseStudySessions.length > CASE_STUDY_PAGE_LIMIT
-      ? filteredCaseStudySessions.slice(-CASE_STUDY_PAGE_LIMIT)
+  const caseStudyLastPageRows =
+    filteredCaseStudySessions.length > CASE_STUDY_LAST_PAGE_ROWS
+      ? filteredCaseStudySessions.slice(-CASE_STUDY_LAST_PAGE_ROWS)
       : [];
+
 
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
@@ -200,7 +211,13 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
             <tr>
               <td>${i + 1}</td>
               <td style="text-align:left;">${escapeHtml(r.session)}</td>
-              <td>${r.caseStudyPercentage}%</td>
+              <td>${
+                type === "completion"
+                  ? r.completion
+                  : r.caseStudyPercentage !== null
+                  ? r.caseStudyPercentage + "%"
+                  : "Not Attempted"
+              }</td>
             </tr>`
           )
           .join("")}
@@ -208,31 +225,145 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  const html = `
+  const businessTargetTable = `
+    <table class="details-table">
+      <thead>
+        <tr>
+          <th>Business Target</th>
+          <th>Achieved Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${businessTarget}</td>
+          <td>${achievedTarget}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+    const html = `
   <!doctype html>
   <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Internship Report - ${fullName}</title>
+    <style>
+      body { margin:0; padding:0; font-family:'Times New Roman', serif; }
+      .page {
+        width:100%;
+        min-height:100vh;
+        background: url("${ASSET_BASE}/internshipbg.png") no-repeat center top;
+        background-size: cover;
+        display:flex;
+        flex-direction:column;
+        position:relative;
+        box-sizing:border-box;
+      }
+      .content {
+        background: rgba(255,255,255,0.85);
+        margin:130px 40px 60px 40px;
+        padding:30px 40px;
+        border-radius:8px;
+        box-sizing:border-box;
+      }
+      .main-title {
+        font-size:26px;
+        font-weight:bold;
+        text-align:center;
+        margin-bottom:20px;
+        text-transform: uppercase;
+      }
+      .details-table {
+        width:100%;
+        border-collapse: collapse;
+        margin: 0 auto;
+      }
+      .details-table th, .details-table td {
+        border:1px solid #000;
+        padding:8px 10px;
+        font-size:14px;
+        text-align:center;
+        vertical-align:middle;
+      }
+      .details-table th {
+        background-color:#f0f0f0;
+      }
+      .footer {
+        position:absolute;
+        bottom:10px;
+        width:100%;
+        text-align:center;
+        font-size:14px;
+        color:#444;
+      }
+      .page-break { page-break-after: always; }
+      .declaration {
+        margin-top: 30px;
+        font-size: 15px;
+        line-height: 1.6;
+        text-align: justify;
+      }
+      .stamp {
+        position: absolute;
+        left: 38%;
+        bottom: 200px;
+        width: 120px;
+        height: auto;
+      }
+      .signature {
+        position: absolute;
+        left: 15%;
+        bottom: 200px;
+        width: 120px;
+        height: auto;
+      }
+    </style>
+  </head>
   <body>
 
-    <!-- PAGE 2 -->
+    <!-- PAGE 1 (UNCHANGED) -->
+    <div class="page">
+      <div class="content">
+        <div class="main-title">Internship Completion Summary</div>
+        ${renderTable(mergedSessions, "completion")}
+        <br/>
+        ${businessTargetTable}
+      </div>
+      <div class="footer">© EduRoom Internship Report · ${today}</div>
+    </div>
+
+    <div class="page-break"></div>
+
+    <!-- PAGE 2 (CASE STUDY – ALL EXCEPT LAST 15 ROWS) -->
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(caseStudyMainRows, "caseStudy")}
+        ${renderTable(caseStudyFirstPageRows, "caseStudy")}
       </div>
+      <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
 
     ${
-      caseStudyLastRows.length
+      caseStudyLastPageRows.length
         ? `
-      <div class="page-break"></div>
+    <div class="page-break"></div>
 
-      <!-- PAGE 3 -->
-      <div class="page">
-        <div class="content">
-          <div class="main-title">Case Study Performance Summary (Continued)</div>
-          ${renderTable(caseStudyLastRows, "caseStudy")}
+    <!-- PAGE 3 (LAST 15 ROWS + DECLARATION) -->
+    <div class="page">
+      <div class="content">
+        <div class="main-title">Case Study Performance Summary</div>
+        ${renderTable(caseStudyLastPageRows, "caseStudy")}
+
+        <div class="declaration">
+          Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
         </div>
+
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png" class="signature" />
+        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />
       </div>
+      <div class="footer">© EduRoom Internship Report · ${today}</div>
+    </div>
     `
         : ""
     }
@@ -241,16 +372,20 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   </html>
   `;
 
+
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    args: ["--no-sandbox", "--disable-setuid-sandbox" , "--disable-dev-shm-usage"],
   });
-
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
+  await page.evaluateHandle("document.fonts.ready");
+  await new Promise((r) => setTimeout(r, 300));
+
   const pdfBuffer = await page.pdf({
     format: "A4",
     printBackground: true,
+    margin: { top: "0px", bottom: "0px", left: "0px", right: "0px" },
   });
 
   await browser.close();
