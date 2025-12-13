@@ -178,22 +178,6 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   const filteredCaseStudySessions = mergedSessions.filter(
     (s) => s.caseStudyPercentage !== null
   );
-    // ✅ ONLY ADDITION: split case study rows
-  const CASE_STUDY_LAST_PAGE_ROWS = 15;
-
-  const caseStudyFirstPageRows =
-    filteredCaseStudySessions.length > CASE_STUDY_LAST_PAGE_ROWS
-      ? filteredCaseStudySessions.slice(
-          0,
-          filteredCaseStudySessions.length - CASE_STUDY_LAST_PAGE_ROWS
-        )
-      : filteredCaseStudySessions;
-
-  const caseStudyLastPageRows =
-    filteredCaseStudySessions.length > CASE_STUDY_LAST_PAGE_ROWS
-      ? filteredCaseStudySessions.slice(-CASE_STUDY_LAST_PAGE_ROWS)
-      : [];
-
 
   const renderTable = (rows, type = "completion") => `
     <table class="details-table">
@@ -242,7 +226,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-    const html = `
+  const html = `
   <!doctype html>
   <html>
   <head>
@@ -321,8 +305,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </style>
   </head>
   <body>
-
-    <!-- PAGE 1 (UNCHANGED) -->
+    <!-- PAGE 1 -->
     <div class="page">
       <div class="content">
         <div class="main-title">Internship Completion Summary</div>
@@ -335,43 +318,22 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
 
     <div class="page-break"></div>
 
-    <!-- PAGE 2 (CASE STUDY – ALL EXCEPT LAST 15 ROWS) -->
+    <!-- PAGE 2 -->
     <div class="page">
       <div class="content">
         <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(caseStudyFirstPageRows, "caseStudy")}
-      </div>
-      <div class="footer">© EduRoom Internship Report · ${today}</div>
-    </div>
-
-    ${
-      caseStudyLastPageRows.length
-        ? `
-    <div class="page-break"></div>
-
-    <!-- PAGE 3 (LAST 15 ROWS + DECLARATION) -->
-    <div class="page">
-      <div class="content">
-        <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(caseStudyLastPageRows, "caseStudy")}
-
+        ${renderTable(filteredCaseStudySessions, "caseStudy")}
         <div class="declaration">
           Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
         </div>
-
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png" class="signature" />
         <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />
       </div>
       <div class="footer">© EduRoom Internship Report · ${today}</div>
     </div>
-    `
-        : ""
-    }
-
   </body>
   </html>
   `;
-
 
   const browser = await puppeteer.launch({
     headless: true,
