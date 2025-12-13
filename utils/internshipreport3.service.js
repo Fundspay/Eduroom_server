@@ -76,7 +76,7 @@ const generateSessionReport = async (sessionData = {}, options = {}) => {
   });
 
   // 🔹 Split sessions into pages (10 sessions per page)
-  const sessionsPerPage = 10;
+  const sessionsPerPage = 5;
   const pages = [];
   for (let i = 0; i < sessions.length; i += sessionsPerPage) {
     pages.push(sessions.slice(i, i + sessionsPerPage));
