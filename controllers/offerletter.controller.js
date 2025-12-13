@@ -114,7 +114,8 @@ module.exports = { sendOfferLetter };
 
 const sendInternshipReport = async (req, res) => {
   try {
-    const { userId, courseId } = req.params; // get both userId and courseId
+    const { userId, courseId } = req.params;
+
     if (!userId || !courseId) {
       return res.status(400).json({
         success: false,
@@ -126,47 +127,42 @@ const sendInternshipReport = async (req, res) => {
     const user = await model.User.findOne({
       where: { id: userId, isDeleted: false },
     });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
 
-    if (!user.email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "User has no email" });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     // Generate Internship Report
     const options = {
-      courseId,
+      courseId: Number(courseId),
+      userId: Number(userId),
       internName: user.fullName || user.firstName,
-      userId, // ✅ Pass the userId here so the report knows whose answers to fetch
     };
 
+    /**
+     * IMPORTANT:
+     * generateMCQCaseStudyReport MUST:
+     * 1. Generate PDF
+     * 2. Upload to S3
+     * 3. Return { fileUrl }
+     */
     const report = await generateMCQCaseStudyReport(options);
 
-    // Build email content
-    const subject = `Your Internship Report - Fundsroom InfoTech Pvt Ltd`;
-    const html = `
-      <p>Dear ${user.fullName || user.firstName},</p>
-      <p>Greetings from <b>Eduroom!</b></p>
+    if (!report || !report.fileUrl) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to generate report URL",
+      });
+    }
 
-      <p>
-        We are pleased to share your <b>Internship Completion Report</b>.
-        This report highlights your performance, learning outcomes, and the
-        value you’ve gained during the internship program with Eduroom.
-      </p>
-
-      <p>Please find your report attached.</p>
-    `;
-
-    // TODO: send email with report.fileUrl as attachment or link
-    // e.g., using AWS SES or any email service
-
+    // ✅ Direct Postman-friendly response
     return res.status(200).json({
       success: true,
       message: "Internship report generated successfully",
-      reportUrl: report.fileUrl,
+      reportUrl: report.fileUrl, // 🔥 S3 URL
     });
   } catch (error) {
     console.error("Error sending internship report:", error);
@@ -176,7 +172,9 @@ const sendInternshipReport = async (req, res) => {
     });
   }
 };
+
 module.exports.sendInternshipReport = sendInternshipReport;
+
 
 
 const sendCertificate = async (req, res) => {
