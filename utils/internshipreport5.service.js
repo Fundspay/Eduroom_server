@@ -61,7 +61,7 @@ const fetchSessionsWithMCQs = async (courseId) => {
 };
 
 // =======================
-// FETCH ALL CASE STUDIES PER SESSION FOR USER (UPDATED FINAL)
+// FETCH ALL CASE STUDIES PER SESSION FOR USER
 // =======================
 const fetchAllCaseStudies = async ({ courseId, userId }) => {
   if (!courseId || !userId) return [];
@@ -226,23 +226,55 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
-  // ======== Split mergedSessions into chunks of 15 ========
+  // ======== Split mergedSessions into chunks of 15 for completion ========
   const chunkSize = 15;
-  const sessionChunks = [];
+  const completionChunks = [];
   for (let i = 0; i < mergedSessions.length; i += chunkSize) {
-    sessionChunks.push(mergedSessions.slice(i, i + chunkSize));
+    completionChunks.push(mergedSessions.slice(i, i + chunkSize));
   }
 
   // ======== Build HTML for completion summary pages ========
-  const completionPagesHtml = sessionChunks
+  const completionPagesHtml = completionChunks
     .map((chunk, index) => {
-      const isLastPage = index === sessionChunks.length - 1;
+      const isLastPage = index === completionChunks.length - 1;
       return `
       <div class="page">
         <div class="content">
           <div class="main-title">Internship Completion Summary</div>
           ${renderTable(chunk, "completion")}
           ${isLastPage ? `<br/>${businessTargetTable}` : ""}
+        </div>
+        <div class="footer">© EduRoom Internship Report · ${today}</div>
+      </div>
+      ${isLastPage ? "" : '<div class="page-break"></div>'}
+      `;
+    })
+    .join("");
+
+  // ======== Split filteredCaseStudySessions into chunks of 15 ========
+  const caseStudyChunks = [];
+  for (let i = 0; i < filteredCaseStudySessions.length; i += chunkSize) {
+    caseStudyChunks.push(filteredCaseStudySessions.slice(i, i + chunkSize));
+  }
+
+  // ======== Build HTML for case study pages ========
+  const caseStudyPagesHtml = caseStudyChunks
+    .map((chunk, index) => {
+      const isLastPage = index === caseStudyChunks.length - 1;
+      return `
+      <div class="page">
+        <div class="content">
+          <div class="main-title">Case Study Performance Summary</div>
+          ${renderTable(chunk, "caseStudy")}
+          ${
+            isLastPage
+              ? `<div class="declaration">
+                  Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
+                </div>
+                <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png" class="signature" />
+                <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />`
+              : ""
+          }
         </div>
         <div class="footer">© EduRoom Internship Report · ${today}</div>
       </div>
@@ -331,29 +363,14 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
   </head>
   <body>
     ${completionPagesHtml}
-
-    <div class="page-break"></div>
-
-    <!-- PAGE 2 -->
-    <div class="page">
-      <div class="content">
-        <div class="main-title">Case Study Performance Summary</div>
-        ${renderTable(filteredCaseStudySessions, "caseStudy")}
-        <div class="declaration">
-          Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
-        </div>
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png" class="signature" />
-        <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />
-      </div>
-      <div class="footer">© EduRoom Internship Report · ${today}</div>
-    </div>
+    ${caseStudyPagesHtml}
   </body>
   </html>
   `;
 
   const browser = await puppeteer.launch({
     headless: true,
-    args: ["--no-sandbox", "--disable-setuid-sandbox" , "--disable-dev-shm-usage"],
+    args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
   const page = await browser.newPage();
   await page.setContent(html, { waitUntil: "networkidle0" });
