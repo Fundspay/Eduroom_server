@@ -271,8 +271,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
               ? `<div class="declaration">
                   Hereby, it is declared that the intern has successfully completed the Eduroom Internship and Live Project as part of the training program. The intern has actively participated in the sessions, completed the assigned MCQs and case studies, and demonstrated a practical understanding of the concepts and skills covered during the course. This report serves as an official record of the intern’s performance and progress throughout the program.
                 </div>
-                <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/signature.png" class="signature" />
-                <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/stamp.jpg" class="stamp" />`
+                <img src="https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/pooja+mam+signature.png" class="signature" />`
               : ""
           }
         </div>
