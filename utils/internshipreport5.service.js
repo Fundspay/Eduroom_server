@@ -226,6 +226,31 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </table>
   `;
 
+  // ======== Split mergedSessions into chunks of 15 ========
+  const chunkSize = 15;
+  const sessionChunks = [];
+  for (let i = 0; i < mergedSessions.length; i += chunkSize) {
+    sessionChunks.push(mergedSessions.slice(i, i + chunkSize));
+  }
+
+  // ======== Build HTML for completion summary pages ========
+  const completionPagesHtml = sessionChunks
+    .map((chunk, index) => {
+      const isLastPage = index === sessionChunks.length - 1;
+      return `
+      <div class="page">
+        <div class="content">
+          <div class="main-title">Internship Completion Summary</div>
+          ${renderTable(chunk, "completion")}
+          ${isLastPage ? `<br/>${businessTargetTable}` : ""}
+        </div>
+        <div class="footer">© EduRoom Internship Report · ${today}</div>
+      </div>
+      ${isLastPage ? "" : '<div class="page-break"></div>'}
+      `;
+    })
+    .join("");
+
   const html = `
   <!doctype html>
   <html>
@@ -305,16 +330,7 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     </style>
   </head>
   <body>
-    <!-- PAGE 1 -->
-    <div class="page">
-      <div class="content">
-        <div class="main-title">Internship Completion Summary</div>
-        ${renderTable(mergedSessions, "completion")}
-        <br/>
-        ${businessTargetTable}
-      </div>
-      <div class="footer">© EduRoom Internship Report · ${today}</div>
-    </div>
+    ${completionPagesHtml}
 
     <div class="page-break"></div>
 
