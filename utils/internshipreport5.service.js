@@ -356,8 +356,8 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
     bottom: 150px; /* distance from bottom */
     left: 50%;
     transform: translateX(-50%); /* center horizontally */
-    width: 500px; /* adjust width as needed */
-    height: 300px; /* maintain aspect ratio */
+    width: 700px; /* adjust width as needed */
+    height: 200px; /* maintain aspect ratio */
 }
 
 
