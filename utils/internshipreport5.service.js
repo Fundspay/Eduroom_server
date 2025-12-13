@@ -351,15 +351,14 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         width: 120px;
         height: auto;
       }
-      .signature {
+   .signature {
     position: absolute;
     bottom: 160px; /* distance from bottom */
-    left: 50%;
-    transform: translateX(-50%); /* center horizontally */
-    width: 800px; /* adjust width as needed */
-    height: 100px; /* maintain aspect ratio */
+    left: 55%; /* shift slightly right from center */
+    transform: translateX(-50%); /* still roughly centered but slightly right */
+    width: 800px; /* width of the signature */
+    height: 150px; /* maintain aspect ratio */
 }
-
 
     </style>
   </head>
