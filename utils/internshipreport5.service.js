@@ -352,12 +352,14 @@ const finalpageinternshipreport = async ({ courseId, userId }) => {
         height: auto;
       }
       .signature {
-        position: absolute;
-        left: 15%;
-        bottom: 200px;
-        width: 120px;
-        height: auto;
-      }
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
     </style>
   </head>
   <body>

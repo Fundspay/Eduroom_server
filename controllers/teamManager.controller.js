@@ -90,59 +90,37 @@ var getTeamManagers = async function (req, res) {
 module.exports.getTeamManagers = getTeamManagers;
 
 
-//  Fetch All Team Managers
-var getAllTeamManagers = async function (req, res) {
-    try {
-        // Fetch all managers
-        const managers = await model.TeamManager.findAll({
-            where: { isDeleted: false },
-            attributes: [
-                "managerId",
-                "name",
-                "email",
-                "mobileNumber",
-                "department",
-                "position",
-                "createdAt"
-            ],
-            order: [["createdAt", "DESC"]],
-        });
+// Fetch All Team Managers
+const getAllTeamManagers = async (req, res) => {
+  try {
+    // Fetch all managers from the DB (not deleted)
+    const managers = await model.TeamManager.findAll({
+      where: { isDeleted: false },
+      attributes: ["id", "name", "email", "mobileNumber", "department", "position", "createdAt"],
+      order: [["createdAt", "DESC"]],
+      raw: true,
+    });
 
-        // Map over each manager to calculate interns with more than 3 business targets
-        const managersWithInternCounts = await Promise.all(
-            managers.map(async (manager) => {
-                // Count interns under this manager with businessTargets count > 3
-                const interns = await model.User.findAll({
-                    where: {
-                        managerId: manager.managerId,
-                        isDeleted: false
-                    },
-                    attributes: ["businessTargets"]
-                });
+    // Map them into a simple list (optional, you can just return managers as-is)
+    const managerList = managers.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      mobileNumber: m.mobileNumber,
+      department: m.department,
+      position: m.position,
+      createdAt: m.createdAt,
+    }));
 
-                let internsWithMoreThanThree = 0;
-                interns.forEach((intern) => {
-                    const targets = intern.businessTargets || {};
-                    if (Object.keys(targets).length > 3) {
-                        internsWithMoreThanThree++;
-                    }
-                });
-
-                return {
-                    ...manager.get({ plain: true }),
-                    internsWithMoreThanThree
-                };
-            })
-        );
-
-        return ReS(res, { success: true, data: managersWithInternCounts }, 200);
-    } catch (error) {
-        console.error("Error fetching managers:", error);
-        return ReE(res, error.message, 500);
-    }
+    return ReS(res, { success: true, data: managerList }, 200);
+  } catch (error) {
+    console.error("Error fetching managers:", error);
+    return ReE(res, error.message, 500);
+  }
 };
 
 module.exports.getAllTeamManagers = getAllTeamManagers;
+
 
 // ✅ Update Team Manager
 var updateTeamManager = async function (req, res) {
