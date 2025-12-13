@@ -11,6 +11,14 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment");
 const { Op } = require("sequelize");
 const { CaseStudyResult, QuestionModel } = require("../models");
+const AWS = require("aws-sdk");
+const CONFIG = require("../config/config");
+
+const s3 = new AWS.S3({
+  accessKeyId: CONFIG.awsAccessKeyId,
+  secretAccessKey: CONFIG.awsSecretAccessKey,
+  region: CONFIG.awsRegion,
+});
 
 
 // Controller: Send Offer Letter to User Email
