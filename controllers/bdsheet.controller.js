@@ -623,52 +623,44 @@ const getBdSheetByDateRange = async (req, res) => {
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: cur.toISOString().split("T")[0],
+        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
       });
     }
 
-    // Base condition
-    const whereCondition = {
-      createdAt: { [Op.between]: [sDate, eDate] },
-    };
-
-    // Fetch students with BdSheets (plural alias)
-    const students = await model.StudentResume.findAll({
-      where: whereCondition,
-      include: [
-        {
-          model: model.BdSheet,
-          as: "BdSheets",          // use default plural alias
-          required: true,
-          where: { activeStatus: "active" },
-          attributes: ["activeStatus", "teamManagerId"],
-        },
-      ],
-      attributes: ["id", "createdAt"],
-    });
-
-    // Filter by manager if provided
-    let filteredStudents = students;
-    if (managerId) {
-      const managerIdNum = parseInt(managerId, 10);
-      filteredStudents = students.filter(
-        (s) => s.BdSheets.some((b) => b.teamManagerId === managerIdNum)
-      );
-    }
-
-    // Count daily interns
+    // Map for counting
     const dateMap = {};
     dateList.forEach((d) => (dateMap[d.date] = { ...d }));
 
-    filteredStudents.forEach((student) => {
-      const createdDate = student.createdAt.toISOString().split("T")[0];
-      if (dateMap[createdDate]) {
-        dateMap[createdDate].internsAllocated += 1;
-        dateMap[createdDate].internsActive += student.BdSheets.length ? 1 : 0;
-      }
+    // Build BdSheet filter
+    const whereBdSheet = { activeStatus: "active" };
+    if (managerId) whereBdSheet.teamManagerId = parseInt(managerId, 10);
+
+    // Fetch students with active BdSheets
+    const students = await model.StudentResume.findAll({
+      include: [
+        {
+          model: model.BdSheet,
+          as: "BdSheets", // default plural alias
+          required: true,
+          where: whereBdSheet,
+          attributes: ["activeStatus", "teamManagerId", "startDate"],
+        },
+      ],
+      attributes: ["id"],
+    });
+
+    // Count per day
+    students.forEach((student) => {
+      student.BdSheets.forEach((sheet) => {
+        const dateKey = new Date(sheet.startDate).toISOString().split("T")[0];
+        if (dateMap[dateKey]) {
+          dateMap[dateKey].internsAllocated += 1;
+          dateMap[dateKey].internsActive += 1;
+        }
+      });
     });
 
     const merged = Object.values(dateMap);
