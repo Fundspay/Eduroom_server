@@ -608,11 +608,6 @@ const getManagerRangeAmounts = async (req, res) => {
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
-
-const { Op } = require("sequelize");
-const model = require("../models/index");
-const { ReE, ReS } = require("../utils/util.service.js");
-
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
