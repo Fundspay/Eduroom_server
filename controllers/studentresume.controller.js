@@ -257,7 +257,7 @@ const listResumes = async (req, res) => {
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       where: {
-        createdAt: {
+        resumeDate: {
           [Op.between]: [startDate, endDate],
         },
       },
