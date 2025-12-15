@@ -608,6 +608,149 @@ const getManagerRangeAmounts = async (req, res) => {
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
+"use strict";
+const model = require("../models/index");
+const { ReE, ReS } = require("../utils/util.service.js");
+const { Op, Sequelize } = require("sequelize");
+
+const getBdSheetByDateRange = async (req, res) => {
+  try {
+    const { managerId, from, to } = req.query;
+
+    if (!from || !to) {
+      return ReE(res, "from and to dates are required", 400);
+    }
+
+    const whereCondition = {
+      createdAt: {
+        [Op.between]: [
+          new Date(from + " 00:00:00"),
+          new Date(to + " 23:59:59"),
+        ],
+      },
+    };
+
+    // If managerId is provided, filter by that manager
+    if (managerId) {
+      const manager = await model.TeamManager.findOne({
+        where: { id: managerId },
+        attributes: ["name"],
+      });
+
+      if (!manager) {
+        return ReE(res, "Invalid managerId", 400);
+      }
+
+      whereCondition.alloted = manager.name;
+    } else {
+      // No managerId → all allocated interns
+      whereCondition.alloted = { [Op.ne]: null };
+    }
+
+    const data = await model.StudentResume.findAll({
+      where: whereCondition,
+      attributes: [
+        "id",
+        "sr",
+        "studentName",
+        "mobileNumber",
+        "emailId",
+        "domain",
+        "alloted",
+        "createdAt",
+      ],
+      include: [
+        {
+          model: model.BdSheet,
+          required: true, // only interns having BdSheet
+          where: {
+            activeStatus: "active",
+          },
+          attributes: ["activeStatus", "registration"],
+        },
+      ],
+      order: [["id", "DESC"]],
+    });
+
+    const formattedData = await Promise.all(
+      data.map(async (student) => {
+        const s = student.toJSON();
+
+        let businessTask = 0;
+
+        if (s.mobileNumber) {
+          const user = await model.User.findOne({
+            where: { phoneNumber: s.mobileNumber },
+            attributes: [
+              "subscriptionWallet",
+              "subscriptiondeductedWallet",
+              "id",
+              "collegeName",
+            ],
+          });
+
+          if (user) {
+            const wallet = parseInt(user.subscriptionWallet || 0, 10);
+            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
+
+            businessTask = wallet + deducted;
+            s.userId = user.id;
+            s.collegeName = user.collegeName;
+          }
+        }
+
+        s.businessTask = businessTask;
+
+        // Category logic
+        if (!businessTask || businessTask === 0) s.category = "not working";
+        else if (businessTask <= 5) s.category = "Starter";
+        else if (businessTask <= 10) s.category = "Basic";
+        else if (businessTask <= 15) s.category = "Bronze";
+        else if (businessTask <= 20) s.category = "Silver";
+        else if (businessTask <= 25) s.category = "Gold";
+        else if (businessTask <= 35) s.category = "Diamond";
+        else s.category = "Platinum";
+
+        if (s.BdSheet?.registration) {
+          s.registration = s.BdSheet.registration;
+        }
+
+        delete s.BdSheet;
+
+        return s;
+      })
+    );
+
+    // ---- INTERN COUNTS ----
+    const totalInterns = formattedData.length;
+
+    // active interns (already filtered by BdSheet.activeStatus)
+    const activeInterns = formattedData.filter(
+      (item) => item.activeStatus === "active"
+    ).length;
+
+    // Manager-wise count
+    const managerWiseCount = {};
+    formattedData.forEach((item) => {
+      const managerName = item.alloted || "Unassigned";
+      managerWiseCount[managerName] = (managerWiseCount[managerName] || 0) + 1;
+    });
+
+    return ReS(res, {
+      totalInterns,
+      activeInterns,
+      managerWiseCount,
+      data: formattedData,
+    });
+  } catch (error) {
+    console.log("GET BD SHEET DATE RANGE ERROR:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
+
+
 
 
 
