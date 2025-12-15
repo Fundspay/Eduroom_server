@@ -12,6 +12,7 @@ router.get("/category", bdsheetController.getBdSheetByCategory);
 router.get("/activestatus", bdsheetController.getDashboardStats);
 router.post("/amount", bdsheetController.upsertRangeAmounts);
 router.get("/ranges", bdsheetController.getManagerRangeAmounts);
+router.get("/date-range", bdsheetController.getBdSheetByDateRange);
 
 
 module.exports = router;
