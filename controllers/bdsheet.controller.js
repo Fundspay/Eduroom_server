@@ -610,15 +610,17 @@ module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 const getBdSheetByDateRange = async (req, res) => {
   try {
-    let { managerId, from, to } = req.query;
+    let { teamManagerId, startDate, endDate } = req.query;
+    if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
+    if (!startDate || !endDate) return ReE(res, "startDate and endDate are required", 400);
 
-    if (!from || !to) return ReE(res, "from and to dates are required", 400);
+    teamManagerId = parseInt(teamManagerId, 10);
 
-    // Parse start and end dates (force start/end of day)
-    const sDate = new Date(from + "T00:00:00");
-    const eDate = new Date(to + "T23:59:59");
+    // Parse start and end dates
+    const sDate = new Date(startDate + "T00:00:00");
+    const eDate = new Date(endDate + "T23:59:59");
 
-    // Generate exact date list
+    // Generate date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
@@ -631,53 +633,27 @@ const getBdSheetByDateRange = async (req, res) => {
       });
     }
 
-    const dateMap = {};
-    dateList.forEach((d) => (dateMap[d.date] = { ...d }));
-
-    // Build where condition for BdSheet
-    const whereBdSheet = { activeStatus: "active" };
-    if (managerId) whereBdSheet.teamManagerId = parseInt(managerId, 10);
-
-    // Fetch students with BdSheets in range
-    const students = await model.StudentResume.findAll({
-      include: [
-        {
-          model: model.BdSheet,
-          as: "BdSheets",
-          required: true,
-          where: whereBdSheet,
-          attributes: ["startDate", "endDate", "businessTask"],
-        },
-      ],
-      attributes: ["id", "alloted", "teamManagerId"],
+    // Fetch existing targets
+    const existingTargets = await model.BdTarget.findAll({
+      where: {
+        teamManagerId,
+        targetDate: { [Op.between]: [sDate, eDate] },
+      },
     });
 
-    // Manager-wise count
-    const managerWiseCount = {};
-
-    students.forEach((student) => {
-      const managerKey = student.teamManagerId || "unassigned";
-
-      if (!managerWiseCount[managerKey]) managerWiseCount[managerKey] = 0;
-
-      student.BdSheets.forEach((sheet) => {
-        if (!sheet.startDate) return;
-
-        const sheetDate = sheet.startDate.toISOString().split("T")[0];
-        if (dateMap[sheetDate]) {
-          dateMap[sheetDate].internsAllocated += 1;
-          dateMap[sheetDate].internsActive += 1;
-
-          // Count accounts if businessTask exists
-          if (sheet.businessTask) dateMap[sheetDate].accounts += 1;
-
-          // Manager-wise increment
-          managerWiseCount[managerKey] += 1;
-        }
+    // Merge
+    const merged = dateList.map((d) => {
+      const found = existingTargets.find((t) => {
+        const tDate = t.targetDate.toISOString().split("T")[0];
+        return tDate === d.date;
       });
+      return {
+        ...d,
+        internsAllocated: found ? found.internsAllocated : d.internsAllocated,
+        internsActive: found ? found.internsActive : d.internsActive,
+        accounts: found ? found.accounts : d.accounts,
+      };
     });
-
-    const merged = Object.values(dateMap);
 
     // Totals
     const totals = {
@@ -686,15 +662,11 @@ const getBdSheetByDateRange = async (req, res) => {
       accounts: merged.reduce((sum, t) => sum + t.accounts, 0),
     };
 
-    return ReS(
-      res,
-      { success: true, dates: merged, totals, managerWiseCount },
-      200
-    );
-  } catch (err) {
-    console.error("GET BD SHEET DATE RANGE ERROR:", err);
-    return ReE(res, err.message, 500);
+    return ReS(res, { success: true, dates: merged, totals }, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
   }
 };
+
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
