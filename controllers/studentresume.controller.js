@@ -200,9 +200,27 @@ const updateResume = async (req, res) => {
 
 module.exports.updateResume = updateResume;
 
+
 const listResumes = async (req, res) => {
   try {
     console.log("Starting StudentResume list sync...");
+
+    //  DATE RANGE HANDLING (NEW)
+    let { startDate, endDate } = req.query;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (!startDate || !endDate) {
+      startDate = today;
+      endDate = new Date(today);
+    } else {
+      startDate = new Date(startDate);
+      endDate = new Date(endDate);
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
 
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
@@ -235,14 +253,16 @@ const listResumes = async (req, res) => {
       }
     }
 
-    // 2️ Fetch all resumes (NO CHANGES)
+    // 2️ Fetch all resumes (DATE FILTER ADDED — NOTHING ELSE CHANGED)
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
+      where: {
+        createdAt: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
       attributes: {
-        include: [
-          "callStatus",
-          "alloted"
-        ]
+        include: ["callStatus", "alloted"],
       },
       include: [
         { model: model.CoSheet, attributes: ["id", "collegeName"] },
@@ -281,15 +301,13 @@ const listResumes = async (req, res) => {
 
     console.log(`Total resumes fetched: ${records.length}`);
 
-    // ⭐⭐⭐ ADD userId PER RECORD (NEW — ONLY CHANGE YOU ASKED FOR)
+    // ⭐⭐⭐ ADD userId PER RECORD (AS IS — UNCHANGED)
     for (const resume of records) {
       let userId = null;
 
-      // 1) If User association is already present (best case)
       if (resume.user && resume.user.id) {
         userId = resume.user.id;
       } else {
-        // 2) Try lookup using mobileNumber
         if (resume.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: resume.mobileNumber },
@@ -299,7 +317,6 @@ const listResumes = async (req, res) => {
           if (user) userId = user.id;
         }
 
-        // 3) Try lookup using email if mobile fails
         if (!userId && resume.emailId) {
           const user = await model.User.findOne({
             where: { email: resume.emailId },
@@ -310,7 +327,6 @@ const listResumes = async (req, res) => {
         }
       }
 
-      // Attach new field
       resume.dataValues.userId = userId;
     }
 
