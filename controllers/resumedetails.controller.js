@@ -613,7 +613,7 @@ module.exports.getAllPendingFollowUps = getAllPendingFollowUps;
 const sendFollowUpEmail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc } = req.body;
+    const { cc, bcc, body } = req.body;
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
@@ -625,25 +625,13 @@ const sendFollowUpEmail = async (req, res) => {
     const subject = `Reconfirmation of Live Project Process – FundsAudit`;
 
     const html = `
-      <p>Respected ${record.coordinatorName || "Sir"},</p>
+      <p>Respected ${record.coordinatorName || "Sir/Mam"},</p>
 
       <p>Greetings from FundsAudit!</p>
 
       <p>I hope this message finds you well.</p>
 
-      <p>This is to reconfirm the points discussed during our recent call held on <b>22nd August 2025</b> regarding the Live Project process:</p>
-
-      <ul>
-        <li><b>Student Responses –</b> As discussed, the list of interested students will be shared by your end on <b>1st September 2025</b></li>
-        <li><b>Pre-Placement Talk –</b> The pre-placement talk will be successfully conducted on <b>1st September 2025</b>, during which all necessary roles, responsibilities, and expectations were clearly communicated.</li>
-        <li><b>Interview Schedule –</b> Interviews for the shortlisted students are scheduled immediately after the Pre-Placement Talk.</li>
-        <li><b>Internship Commencement –</b> The selected students will begin their internship from <b>2nd September 2025</b>, with sessions scheduled to start between <b>11 a.m to 5 p.m.</b></li>
-        <li><b>Student Commitment –</b> As agreed, the selected students are expected to actively participate and commit to the <b>1-hour session time</b> allotted by the college.</li>
-      </ul>
-
-      <p>We request you to kindly acknowledge this mail and confirm the same from your end, so we can proceed with the required arrangements accordingly.</p>
-
-      <p>As I have been unable to reach you regarding the further proceedings, I kindly request you to let us know the updates at your earliest convenience.</p>
+      ${body}
 
       <p>Looking forward to a fruitful collaboration.</p>
 
@@ -681,3 +669,4 @@ const sendFollowUpEmail = async (req, res) => {
 };
 
 module.exports.sendFollowUpEmail = sendFollowUpEmail;
+
