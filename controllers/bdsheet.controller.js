@@ -608,6 +608,7 @@ const getManagerRangeAmounts = async (req, res) => {
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
+
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
@@ -617,31 +618,31 @@ const getBdSheetByDateRange = async (req, res) => {
     const sDate = new Date(from + "T00:00:00");
     const eDate = new Date(to + "T23:59:59");
 
-    // Generate date list
+    // Generate daily list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
+        date: cur.toISOString().split("T")[0],
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
       });
     }
 
-    // Build base where condition
+    // Base condition
     const whereCondition = {
       createdAt: { [Op.between]: [sDate, eDate] },
     };
 
-    // Fetch students with BdSheet
+    // Fetch students with BdSheets (plural alias)
     const students = await model.StudentResume.findAll({
       where: whereCondition,
       include: [
         {
           model: model.BdSheet,
-          as: "BdSheet",          // matches hasOne alias
-          required: true,         // only include if BdSheet exists
+          as: "BdSheets",          // use default plural alias
+          required: true,
           where: { activeStatus: "active" },
           attributes: ["activeStatus", "teamManagerId"],
         },
@@ -649,15 +650,16 @@ const getBdSheetByDateRange = async (req, res) => {
       attributes: ["id", "createdAt"],
     });
 
-    // If managerId is provided, filter in-memory
+    // Filter by manager if provided
     let filteredStudents = students;
     if (managerId) {
+      const managerIdNum = parseInt(managerId, 10);
       filteredStudents = students.filter(
-        (s) => s.BdSheet && s.BdSheet.teamManagerId === parseInt(managerId, 10)
+        (s) => s.BdSheets.some((b) => b.teamManagerId === managerIdNum)
       );
     }
 
-    // Map daily counts
+    // Count daily interns
     const dateMap = {};
     dateList.forEach((d) => (dateMap[d.date] = { ...d }));
 
@@ -665,7 +667,7 @@ const getBdSheetByDateRange = async (req, res) => {
       const createdDate = student.createdAt.toISOString().split("T")[0];
       if (dateMap[createdDate]) {
         dateMap[createdDate].internsAllocated += 1;
-        dateMap[createdDate].internsActive += student.BdSheet ? 1 : 0;
+        dateMap[createdDate].internsActive += student.BdSheets.length ? 1 : 0;
       }
     });
 
@@ -685,6 +687,3 @@ const getBdSheetByDateRange = async (req, res) => {
 };
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
-
-
-
