@@ -9,11 +9,65 @@ const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 const allowedInternshipTypes = ["fulltime", "parttime", "sip", "liveproject", "wip", "others"];
 const allowedCourses = ["mba", "pgdm", "mba+pgdm", "bba/bcom", "engineering", "other"];
 
-// ✅ Helper → convert to valid date or null
+// ✅ Helper → accept ANY date format & convert safely
+// ✅ January starts from 1 (human-friendly)
 const toDate = (value) => {
   if (!value) return null;
-  const d = new Date(value);
-  return isNaN(d.getTime()) ? null : d;
+
+  // Already a valid Date
+  if (value instanceof Date && !isNaN(value)) return value;
+
+  // Timestamp (number or numeric string)
+  if (!isNaN(value)) {
+    const d = new Date(Number(value));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  if (typeof value === "string") {
+    const v = value.trim();
+
+    // 1️⃣ Handle formats like: 15 December 2025 / 15 Dec 2025
+    const wordMatch = v.match(/^(\d{1,2})\s([A-Za-z]+)\s(\d{4})$/);
+    if (wordMatch) {
+      const day = parseInt(wordMatch[1], 10);
+      const monthName = wordMatch[2].toLowerCase();
+      const year = parseInt(wordMatch[3], 10);
+
+      const months = {
+        january: 1, jan: 1,
+        february: 2, feb: 2,
+        march: 3, mar: 3,
+        april: 4, apr: 4,
+        may: 5,
+        june: 6, jun: 6,
+        july: 7, jul: 7,
+        august: 8, aug: 8,
+        september: 9, sep: 9,
+        october: 10, oct: 10,
+        november: 11, nov: 11,
+        december: 12, dec: 12,
+      };
+
+      if (months[monthName]) {
+        return new Date(year, months[monthName] - 1, day);
+      }
+    }
+
+    // 2️⃣ Handle numeric formats: DD/MM/YYYY or DD-MM-YYYY
+    const numMatch = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    if (numMatch) {
+      const day = parseInt(numMatch[1], 10);
+      const month = parseInt(numMatch[2], 10); // JAN = 1 ✅
+      const year = parseInt(numMatch[3], 10);
+      return new Date(year, month - 1, day);
+    }
+
+    // 3️⃣ ISO & browser-safe fallback
+    const d = new Date(v);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  return null;
 };
 
 const createResume = async (req, res) => {
@@ -42,7 +96,7 @@ const createResume = async (req, res) => {
     // Prepare payloads
     const rawPayloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
-      resumeDate: toDate(data.resumeDate),          // ✅ FIXED
+      resumeDate: toDate(data.resumeDate),
       collegeName: data.collegeName ?? null,
       course: data.course ?? null,
       internshipType: data.internshipType ?? null,
@@ -51,8 +105,8 @@ const createResume = async (req, res) => {
       mobileNumber: data.mobileNumber ?? null,
       emailId: data.emailId ?? null,
       domain: data.domain ?? null,
-      interviewDate: toDate(data.interviewDate),    // ✅ FIXED
-      dateOfOnboarding: toDate(data.dateOfOnboarding) ?? null, // ✅ FIXED
+      interviewDate: toDate(data.interviewDate),
+      dateOfOnboarding: toDate(data.dateOfOnboarding) ?? null,
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
       callStatus: data.callStatus ?? null,
@@ -114,6 +168,7 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
+
 
 
 //  Update Resume Record
