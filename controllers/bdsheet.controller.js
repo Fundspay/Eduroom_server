@@ -611,142 +611,81 @@ module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 const getBdSheetByDateRange = async (req, res) => {
   try {
-    const { managerId, from, to } = req.query;
+    let { managerId, from, to } = req.query;
 
-    if (!from || !to) {
-      return ReE(res, "from and to dates are required", 400);
+    if (!from || !to) return ReE(res, "from and to dates are required", 400);
+
+    const sDate = new Date(from);
+    const eDate = new Date(to);
+
+    // Generate date list
+    const dateList = [];
+    for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+      const cur = new Date(d);
+      dateList.push({
+        date: cur.toLocaleDateString("en-CA"),
+        day: cur.toLocaleDateString("en-US", { weekday: "long" }),
+        internsAllocated: 0,
+        internsActive: 0,
+      });
     }
 
-    const whereCondition = {
-      createdAt: {
-        [Op.between]: [
-          new Date(from + " 00:00:00"),
-          new Date(to + " 23:59:59"),
-        ],
-      },
-    };
-
-    // If managerId is provided, filter by that manager
+    // Build where condition
+    const whereCondition = {};
     if (managerId) {
       const manager = await model.TeamManager.findOne({
         where: { id: managerId },
         attributes: ["name"],
       });
 
-      if (!manager) {
-        return ReE(res, "Invalid managerId", 400);
-      }
+      if (!manager) return ReE(res, "Invalid managerId", 400);
 
       whereCondition.alloted = manager.name;
     } else {
-      // No managerId → all allocated interns
+      // all allocated interns
       whereCondition.alloted = { [Op.ne]: null };
     }
 
-    const data = await model.StudentResume.findAll({
+    // Fetch all relevant StudentResume with BdSheet
+    const students = await model.StudentResume.findAll({
       where: whereCondition,
-      attributes: [
-        "id",
-        "sr",
-        "studentName",
-        "mobileNumber",
-        "emailId",
-        "domain",
-        "alloted",
-        "createdAt",
-      ],
       include: [
         {
           model: model.BdSheet,
-          required: true, // only interns having BdSheet
-          where: {
-            activeStatus: "active",
-          },
-          attributes: ["activeStatus", "registration"],
+          required: true,
+          where: { activeStatus: "active" },
+          attributes: ["activeStatus"],
         },
       ],
-      order: [["id", "DESC"]],
+      attributes: ["id", "createdAt"],
     });
 
-    const formattedData = await Promise.all(
-      data.map(async (student) => {
-        const s = student.toJSON();
+    // Map daily counts
+    const dateMap = {};
+    dateList.forEach((d) => (dateMap[d.date] = { ...d }));
 
-        let businessTask = 0;
+    students.forEach((student) => {
+      const createdDate = new Date(student.createdAt).toLocaleDateString("en-CA");
 
-        if (s.mobileNumber) {
-          const user = await model.User.findOne({
-            where: { phoneNumber: s.mobileNumber },
-            attributes: [
-              "subscriptionWallet",
-              "subscriptiondeductedWallet",
-              "id",
-              "collegeName",
-            ],
-          });
-
-          if (user) {
-            const wallet = parseInt(user.subscriptionWallet || 0, 10);
-            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
-
-            businessTask = wallet + deducted;
-            s.userId = user.id;
-            s.collegeName = user.collegeName;
-          }
-        }
-
-        s.businessTask = businessTask;
-
-        // Category logic
-        if (!businessTask || businessTask === 0) s.category = "not working";
-        else if (businessTask <= 5) s.category = "Starter";
-        else if (businessTask <= 10) s.category = "Basic";
-        else if (businessTask <= 15) s.category = "Bronze";
-        else if (businessTask <= 20) s.category = "Silver";
-        else if (businessTask <= 25) s.category = "Gold";
-        else if (businessTask <= 35) s.category = "Diamond";
-        else s.category = "Platinum";
-
-        if (s.BdSheet?.registration) {
-          s.registration = s.BdSheet.registration;
-        }
-
-        delete s.BdSheet;
-
-        return s;
-      })
-    );
-
-    // ---- INTERN COUNTS ----
-    const totalInterns = formattedData.length;
-
-    // active interns (already filtered by BdSheet.activeStatus)
-    const activeInterns = formattedData.filter(
-      (item) => item.activeStatus === "active"
-    ).length;
-
-    // Manager-wise count
-    const managerWiseCount = {};
-    formattedData.forEach((item) => {
-      const managerName = item.alloted || "Unassigned";
-      managerWiseCount[managerName] = (managerWiseCount[managerName] || 0) + 1;
+      if (dateMap[createdDate]) {
+        dateMap[createdDate].internsAllocated += 1;
+        dateMap[createdDate].internsActive += student.BdSheets.length > 0 ? 1 : 0;
+      }
     });
 
-    return ReS(res, {
-      totalInterns,
-      activeInterns,
-      managerWiseCount,
-      data: formattedData,
-    });
-  } catch (error) {
-    console.log("GET BD SHEET DATE RANGE ERROR:", error);
-    return ReE(res, error.message, 500);
+    const merged = Object.values(dateMap);
+
+    // Totals
+    const totals = {
+      internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
+      internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
+    };
+
+    return ReS(res, { success: true, dates: merged, totals }, 200);
+  } catch (err) {
+    console.log("GET BD SHEET DATE RANGE ERROR:", err);
+    return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
-
-
-
-
-
