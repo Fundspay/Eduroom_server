@@ -243,7 +243,7 @@ module.exports.getCoSheetById = getCoSheetById;
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc } = req.body;
+    const { cc, bcc, body } = req.body;
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
@@ -293,35 +293,7 @@ const sendJDToCollege = async (req, res) => {
 
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
 
-      <h4>Collaboration Proposal:</h4>
-      <ul>
-        <li><b>Flexible Participation:</b> 2-hour/day commitment (1 hour training + 1 hour individual work)</li>
-        <li><b>Performance-Based Stipend:</b> INR 1,000 to INR 7,000 based on quality, innovation, and project delivery</li>
-        <li><b>Value-Added Certifications:</b> Specialized certificates + POWER-Bi & Financial/Marketing Modelling certificate; recognition for top performers</li>
-        <li><b>Open to:</b> MBA 1st & 2nd year students (Finance & Marketing)</li>
-      </ul>
-
-      <p>Next Steps: JD for the Internship is attached. If your institution is interested, we can formalize this collaboration by signing a Memorandum of Understanding (MoU). Upon signing, eligible students will be onboarded with orientation and training to commence the live project.</p>
-
-      <p>As discussed on the call, kindly share your response by <b>23rd August 2025, 11 AM</b>. Preplacement interviews will be conducted on the same day, with joining on <b>25th August 2025</b>.</p>
-
-      <p><b>Role:</b> Marketing Analyst & Financial Analyst<br/>
-      <b>Eligibility:</b> Management Students</p>
-
-      <p>Following the live project, students may also be considered for:</p>
-      <ul>
-        <li>Summer/Winter Internships</li>
-        <li>Pre-placement offers (PPOs)</li>
-        <li>Final placement opportunities</li>
-      </ul>
-
-      <p>Perks of the collaboration:</p>
-      <ul>
-        <li>Exposure to real-time fintech operations</li>
-        <li>Skill development aligned with industry expectations</li>
-        <li>Improved employability and practical insight alongside academics</li>
-        <li>Final placement opportunities</li>
-      </ul>
+      ${body}
 
       <p>Looking forward to a meaningful and mutually beneficial association.</p>
 
@@ -357,7 +329,6 @@ const sendJDToCollege = async (req, res) => {
       jdSentAt: new Date()
     });
 
-
     return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
   } catch (error) {
     console.error("Send JD Error:", error);
@@ -366,6 +337,7 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
+
 
 const getCallStatsByUserWithTarget = async (req, res) => {
   try {
