@@ -52,7 +52,7 @@ const createResume = async (req, res) => {
       emailId: data.emailId ?? null,
       domain: data.domain ?? null,
       interviewDate: toDate(data.interviewDate),    // ✅ FIXED
-      dateOfOnboarding: toDate(data.dateOfOnboarding), // ✅ FIXED
+      dateOfOnboarding: toDate(data.dateOfOnboarding) ?? null, // ✅ FIXED
       coSheetId: coSheetId,
       teamManagerId: teamManagerId,
       callStatus: data.callStatus ?? null,
