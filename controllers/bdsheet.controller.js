@@ -609,23 +609,30 @@ const getManagerRangeAmounts = async (req, res) => {
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 const getBdSheetByDateRange = async (req, res) => {
+
   try {
-    let { teamManagerId, startDate, endDate } = req.query;
+    let { teamManagerId, from, to } = req.query;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
-    if (!startDate || !endDate) return ReE(res, "startDate and endDate are required", 400);
 
     teamManagerId = parseInt(teamManagerId, 10);
 
-    // Parse start and end dates
-    const sDate = new Date(startDate + "T00:00:00");
-    const eDate = new Date(endDate + "T23:59:59");
+    const today = new Date();
+    let sDate, eDate;
+
+    if (from && to) {
+      sDate = new Date(from);
+      eDate = new Date(to);
+    } else {
+      sDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
 
     // Generate date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
+        date: cur.toLocaleDateString("en-CA"),
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
@@ -633,7 +640,7 @@ const getBdSheetByDateRange = async (req, res) => {
       });
     }
 
-    // Fetch existing targets
+    // Fetch existing
     const existingTargets = await model.BdTarget.findAll({
       where: {
         teamManagerId,
@@ -644,11 +651,7 @@ const getBdSheetByDateRange = async (req, res) => {
     // Merge
     const merged = dateList.map((d) => {
       const found = existingTargets.find((t) => {
-        // Convert targetDate to Date object if it's not already
-        const targetDate = t.targetDate instanceof Date 
-          ? t.targetDate 
-          : new Date(t.targetDate);
-        const tDate = targetDate.toISOString().split("T")[0];
+        const tDate = new Date(t.targetDate).toLocaleDateString("en-CA");
         return tDate === d.date;
       });
       return {
