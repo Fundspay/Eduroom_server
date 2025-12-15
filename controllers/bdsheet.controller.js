@@ -613,10 +613,8 @@ const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
 
-    if (!from || !to) return ReE(res, "from and to dates are required", 400);
-
-    const sDate = new Date(from);
-    const eDate = new Date(to);
+    const sDate = from ? new Date(from) : new Date();
+    const eDate = to ? new Date(to) : new Date();
 
     // Generate date list
     const dateList = [];
@@ -637,16 +635,13 @@ const getBdSheetByDateRange = async (req, res) => {
         where: { id: managerId },
         attributes: ["name"],
       });
-
       if (!manager) return ReE(res, "Invalid managerId", 400);
-
       whereCondition.alloted = manager.name;
     } else {
-      // all allocated interns
       whereCondition.alloted = { [Op.ne]: null };
     }
 
-    // Fetch all relevant StudentResume with BdSheet
+    // Fetch all active interns
     const students = await model.StudentResume.findAll({
       where: whereCondition,
       include: [
@@ -660,32 +655,28 @@ const getBdSheetByDateRange = async (req, res) => {
       attributes: ["id", "createdAt"],
     });
 
-    // Map daily counts
-    const dateMap = {};
-    dateList.forEach((d) => (dateMap[d.date] = { ...d }));
+    // Merge counts
+    const merged = dateList.map((d) => {
+      const internsForDay = students.filter((s) => {
+        const studentDate = new Date(s.createdAt).toLocaleDateString("en-CA");
+        return studentDate === d.date;
+      });
 
-    students.forEach((student) => {
-      const createdDate = new Date(student.createdAt).toLocaleDateString("en-CA");
-
-      if (dateMap[createdDate]) {
-        dateMap[createdDate].internsAllocated += 1;
-        dateMap[createdDate].internsActive += student.BdSheets.length > 0 ? 1 : 0;
-      }
+      return {
+        ...d,
+        internsAllocated: internsForDay.length,
+        internsActive: internsForDay.filter((s) => s.BdSheet).length,
+      };
     });
 
-    const merged = Object.values(dateMap);
-
-    // Totals
     const totals = {
       internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
       internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
     };
 
     return ReS(res, { success: true, dates: merged, totals }, 200);
-  } catch (err) {
-    console.log("GET BD SHEET DATE RANGE ERROR:", err);
-    return ReE(res, err.message, 500);
+  } catch (error) {
+    return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
