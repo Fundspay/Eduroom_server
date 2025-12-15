@@ -609,51 +609,44 @@ const getManagerRangeAmounts = async (req, res) => {
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 
-function formatDateLocal(d) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
 
     if (!from || !to) return ReE(res, "from and to dates are required", 400);
 
+    // Parse start and end dates (force local midnight / end-of-day)
     const sDate = new Date(from + "T00:00:00");
     const eDate = new Date(to + "T23:59:59");
 
-    // Generate daily list
+    // Generate exact date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: formatDateLocal(cur), // YYYY-MM-DD
+        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
       });
     }
 
-    // Map for counting
     const dateMap = {};
     dateList.forEach((d) => (dateMap[d.date] = { ...d }));
 
-    // Build BdSheet filter
+    // Build where condition for BdSheet
     const whereBdSheet = { activeStatus: "active" };
     if (managerId) whereBdSheet.teamManagerId = parseInt(managerId, 10);
 
-    // Fetch students with active BdSheets
+    // Fetch students with BdSheets in range
     const students = await model.StudentResume.findAll({
       include: [
         {
           model: model.BdSheet,
-          as: "BdSheets", // default plural alias
+          as: "BdSheets",
           required: true,
           where: whereBdSheet,
-          attributes: ["activeStatus", "teamManagerId", "startDate"],
+          attributes: ["startDate", "endDate"],
         },
       ],
       attributes: ["id"],
@@ -663,10 +656,12 @@ const getBdSheetByDateRange = async (req, res) => {
     students.forEach((student) => {
       student.BdSheets.forEach((sheet) => {
         if (!sheet.startDate) return;
-        const dateKey = formatDateLocal(new Date(sheet.startDate));
-        if (dateMap[dateKey]) {
-          dateMap[dateKey].internsAllocated += 1;
-          dateMap[dateKey].internsActive += 1;
+
+        // Consider only dates within requested range
+        const sheetDate = sheet.startDate.toISOString().split("T")[0];
+        if (dateMap[sheetDate]) {
+          dateMap[sheetDate].internsAllocated += 1;
+          dateMap[sheetDate].internsActive += 1;
         }
       });
     });
@@ -681,7 +676,7 @@ const getBdSheetByDateRange = async (req, res) => {
 
     return ReS(res, { success: true, dates: merged, totals }, 200);
   } catch (err) {
-    console.log("GET BD SHEET DATE RANGE ERROR:", err);
+    console.error("GET BD SHEET DATE RANGE ERROR:", err);
     return ReE(res, err.message, 500);
   }
 };
