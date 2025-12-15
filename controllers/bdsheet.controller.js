@@ -609,13 +609,21 @@ const getManagerRangeAmounts = async (req, res) => {
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 
+"use strict";
+
+const { Op } = require("sequelize");
+const model = require("../models"); // adjust path to your models
+
+// -----------------------------
+// GET BdSheet by date range (with manager-wise counts & accounts)
+// -----------------------------
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
 
     if (!from || !to) return ReE(res, "from and to dates are required", 400);
 
-    // Parse start and end dates (force local midnight / end-of-day)
+    // Parse start and end dates (force start/end of day)
     const sDate = new Date(from + "T00:00:00");
     const eDate = new Date(to + "T23:59:59");
 
@@ -628,6 +636,7 @@ const getBdSheetByDateRange = async (req, res) => {
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
+        accounts: 0,
       });
     }
 
@@ -646,22 +655,33 @@ const getBdSheetByDateRange = async (req, res) => {
           as: "BdSheets",
           required: true,
           where: whereBdSheet,
-          attributes: ["startDate", "endDate"],
+          attributes: ["startDate", "endDate", "businessTask"],
         },
       ],
-      attributes: ["id"],
+      attributes: ["id", "alloted", "teamManagerId"],
     });
 
-    // Count per day
+    // Manager-wise count
+    const managerWiseCount = {};
+
     students.forEach((student) => {
+      const managerKey = student.teamManagerId || "unassigned";
+
+      if (!managerWiseCount[managerKey]) managerWiseCount[managerKey] = 0;
+
       student.BdSheets.forEach((sheet) => {
         if (!sheet.startDate) return;
 
-        // Consider only dates within requested range
         const sheetDate = sheet.startDate.toISOString().split("T")[0];
         if (dateMap[sheetDate]) {
           dateMap[sheetDate].internsAllocated += 1;
           dateMap[sheetDate].internsActive += 1;
+
+          // Count accounts if businessTask exists
+          if (sheet.businessTask) dateMap[sheetDate].accounts += 1;
+
+          // Manager-wise increment
+          managerWiseCount[managerKey] += 1;
         }
       });
     });
@@ -672,9 +692,14 @@ const getBdSheetByDateRange = async (req, res) => {
     const totals = {
       internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
       internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
+      accounts: merged.reduce((sum, t) => sum + t.accounts, 0),
     };
 
-    return ReS(res, { success: true, dates: merged, totals }, 200);
+    return ReS(
+      res,
+      { success: true, dates: merged, totals, managerWiseCount },
+      200
+    );
   } catch (err) {
     console.error("GET BD SHEET DATE RANGE ERROR:", err);
     return ReE(res, err.message, 500);
