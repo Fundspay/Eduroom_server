@@ -10,14 +10,11 @@ const allowedInternshipTypes = ["fulltime", "parttime", "sip", "liveproject", "w
 const allowedCourses = ["mba", "pgdm", "mba+pgdm", "bba/bcom", "engineering", "other"];
 
 // ✅ Helper → accept ANY date format & convert safely
-// ✅ January starts from 1 (human-friendly)
 const toDate = (value) => {
   if (!value) return null;
 
-  // Already a valid Date
   if (value instanceof Date && !isNaN(value)) return value;
 
-  // Timestamp (number or numeric string)
   if (!isNaN(value)) {
     const d = new Date(Number(value));
     return isNaN(d.getTime()) ? null : d;
@@ -26,7 +23,6 @@ const toDate = (value) => {
   if (typeof value === "string") {
     const v = value.trim();
 
-    // 1️⃣ Handle formats like: 15 December 2025 / 15 Dec 2025
     const wordMatch = v.match(/^(\d{1,2})\s([A-Za-z]+)\s(\d{4})$/);
     if (wordMatch) {
       const day = parseInt(wordMatch[1], 10);
@@ -53,16 +49,14 @@ const toDate = (value) => {
       }
     }
 
-    // 2️⃣ Handle numeric formats: DD/MM/YYYY or DD-MM-YYYY
     const numMatch = v.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
     if (numMatch) {
       const day = parseInt(numMatch[1], 10);
-      const month = parseInt(numMatch[2], 10); // JAN = 1 ✅
+      const month = parseInt(numMatch[2], 10);
       const year = parseInt(numMatch[3], 10);
       return new Date(year, month - 1, day);
     }
 
-    // 3️⃣ ISO & browser-safe fallback
     const d = new Date(v);
     return isNaN(d.getTime()) ? null : d;
   }
@@ -73,27 +67,25 @@ const toDate = (value) => {
 const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
+    console.log("📥 Incoming rows:", dataArray.length);
 
-    // Resolve teamManagerId (if missing, accept null)
     const teamManagerId = req.body.teamManagerId ?? req.user?.id ?? null;
 
-    // Find coSheetId (null if not found or no teamManagerId)
     let coSheetId = null;
     if (teamManagerId) {
       try {
         const coSheet = await model.CoSheet.findOne({ where: { teamManagerId } });
         if (coSheet) coSheetId = coSheet.id;
       } catch (err) {
-        console.warn("CoSheet lookup failed:", err.message);
+        console.warn("⚠️ CoSheet lookup failed:", err.message);
       }
     }
 
-    // ❌ FIX #1 — filter empty rows correctly (keep rows with only mobile number also)
     const cleanedArray = dataArray.filter(d =>
       d && Object.values(d).some(v => v !== null && v !== undefined && v !== "")
     );
+    console.log("🧹 After empty-row cleanup:", cleanedArray.length);
 
-    // Prepare payloads
     const rawPayloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
       resumeDate: toDate(data.resumeDate),
@@ -107,47 +99,52 @@ const createResume = async (req, res) => {
       domain: data.domain ?? null,
       interviewDate: toDate(data.interviewDate),
       dateOfOnboarding: toDate(data.dateOfOnboarding) ?? null,
-      coSheetId: coSheetId,
-      teamManagerId: teamManagerId,
+      coSheetId,
+      teamManagerId,
       callStatus: data.callStatus ?? null,
       alloted: data.alloted ?? null,
     }));
 
-    // ❌ FIX #2 — keep rows only if mobile present
     let payloads = rawPayloads.filter(p => p.mobileNumber);
+    console.log("📱 After mobile filter:", payloads.length);
 
-    // Convert to string
     payloads = payloads.map(p => ({
       ...p,
       mobileNumber: String(p.mobileNumber).trim()
     }));
 
-    // Remove duplicates inside the uploaded batch
     const seenMobiles = new Set();
+    const beforeInternalDup = payloads.length;
     payloads = payloads.filter(p => {
       if (seenMobiles.has(p.mobileNumber)) return false;
       seenMobiles.add(p.mobileNumber);
       return true;
     });
+    console.log("♻️ Removed internal duplicates:", beforeInternalDup - payloads.length);
 
-    // ❌ FIX #3 — correct duplicate check using Op.in
     const existing = await model.StudentResume.findAll({
       where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } }
     });
 
     const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
+    console.log("🗃️ Existing DB mobiles found:", existingMobiles.size);
 
+    const beforeDBDup = payloads.length;
     payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
+    console.log("🚫 Removed DB duplicates:", beforeDBDup - payloads.length);
 
-    // Bulk insert
+    console.log("📦 Final payload count for insert:", payloads.length);
+    console.log("📦 Sample payload:", payloads[0]);
+
     let records = [];
     try {
       records = await model.StudentResume.bulkCreate(payloads, {
         returning: true,
         ignoreDuplicates: true,
       });
+      console.log("✅ Bulk insert success, inserted:", records.length);
     } catch (err) {
-      console.error("Bulk insert failed:", err.message);
+      console.error("❌ Bulk insert failed:", err);
     }
 
     return res.status(200).json({
@@ -157,7 +154,7 @@ const createResume = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("StudentResume Create Error:", error);
+    console.error("🔥 StudentResume Create Error:", error);
     return res.status(200).json({
       success: false,
       inserted: 0,
