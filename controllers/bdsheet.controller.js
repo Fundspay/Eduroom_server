@@ -644,7 +644,11 @@ const getBdSheetByDateRange = async (req, res) => {
     // Merge
     const merged = dateList.map((d) => {
       const found = existingTargets.find((t) => {
-        const tDate = t.targetDate.toISOString().split("T")[0];
+        // Convert targetDate to Date object if it's not already
+        const targetDate = t.targetDate instanceof Date 
+          ? t.targetDate 
+          : new Date(t.targetDate);
+        const tDate = targetDate.toISOString().split("T")[0];
         return tDate === d.date;
       });
       return {
@@ -667,6 +671,5 @@ const getBdSheetByDateRange = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
