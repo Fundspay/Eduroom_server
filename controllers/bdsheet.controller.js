@@ -609,74 +609,87 @@ const getManagerRangeAmounts = async (req, res) => {
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 
+const { Op } = require("sequelize");
+const model = require("../models/index");
+const { ReE, ReS } = require("../utils/util.service.js");
+
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
 
-    const sDate = from ? new Date(from) : new Date();
-    const eDate = to ? new Date(to) : new Date();
+    if (!from || !to) return ReE(res, "from and to dates are required", 400);
+
+    const sDate = new Date(from + "T00:00:00");
+    const eDate = new Date(to + "T23:59:59");
 
     // Generate date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: cur.toLocaleDateString("en-CA"),
+        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
       });
     }
 
-    // Build where condition
-    const whereCondition = {};
-    if (managerId) {
-      const manager = await model.TeamManager.findOne({
-        where: { id: managerId },
-        attributes: ["name"],
-      });
-      if (!manager) return ReE(res, "Invalid managerId", 400);
-      whereCondition.alloted = manager.name;
-    } else {
-      whereCondition.alloted = { [Op.ne]: null };
-    }
+    // Build base where condition
+    const whereCondition = {
+      createdAt: { [Op.between]: [sDate, eDate] },
+    };
 
-    // Fetch all active interns
+    // Fetch students with BdSheet
     const students = await model.StudentResume.findAll({
       where: whereCondition,
       include: [
         {
           model: model.BdSheet,
-          required: true,
+          as: "BdSheet",          // matches hasOne alias
+          required: true,         // only include if BdSheet exists
           where: { activeStatus: "active" },
-          attributes: ["activeStatus"],
+          attributes: ["activeStatus", "teamManagerId"],
         },
       ],
       attributes: ["id", "createdAt"],
     });
 
-    // Merge counts
-    const merged = dateList.map((d) => {
-      const internsForDay = students.filter((s) => {
-        const studentDate = new Date(s.createdAt).toLocaleDateString("en-CA");
-        return studentDate === d.date;
-      });
+    // If managerId is provided, filter in-memory
+    let filteredStudents = students;
+    if (managerId) {
+      filteredStudents = students.filter(
+        (s) => s.BdSheet && s.BdSheet.teamManagerId === parseInt(managerId, 10)
+      );
+    }
 
-      return {
-        ...d,
-        internsAllocated: internsForDay.length,
-        internsActive: internsForDay.filter((s) => s.BdSheet).length,
-      };
+    // Map daily counts
+    const dateMap = {};
+    dateList.forEach((d) => (dateMap[d.date] = { ...d }));
+
+    filteredStudents.forEach((student) => {
+      const createdDate = student.createdAt.toISOString().split("T")[0];
+      if (dateMap[createdDate]) {
+        dateMap[createdDate].internsAllocated += 1;
+        dateMap[createdDate].internsActive += student.BdSheet ? 1 : 0;
+      }
     });
 
+    const merged = Object.values(dateMap);
+
+    // Totals
     const totals = {
       internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
       internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
     };
 
     return ReS(res, { success: true, dates: merged, totals }, 200);
-  } catch (error) {
-    return ReE(res, error.message, 500);
+  } catch (err) {
+    console.log("GET BD SHEET DATE RANGE ERROR:", err);
+    return ReE(res, err.message, 500);
   }
 };
+
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
+
+
+
