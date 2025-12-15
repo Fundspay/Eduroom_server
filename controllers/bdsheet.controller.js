@@ -609,6 +609,13 @@ const getManagerRangeAmounts = async (req, res) => {
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
 
+function formatDateLocal(d) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
@@ -623,7 +630,7 @@ const getBdSheetByDateRange = async (req, res) => {
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const cur = new Date(d);
       dateList.push({
-        date: cur.toISOString().split("T")[0], // YYYY-MM-DD
+        date: formatDateLocal(cur), // YYYY-MM-DD
         day: cur.toLocaleDateString("en-US", { weekday: "long" }),
         internsAllocated: 0,
         internsActive: 0,
@@ -655,7 +662,8 @@ const getBdSheetByDateRange = async (req, res) => {
     // Count per day
     students.forEach((student) => {
       student.BdSheets.forEach((sheet) => {
-        const dateKey = new Date(sheet.startDate).toISOString().split("T")[0];
+        if (!sheet.startDate) return;
+        const dateKey = formatDateLocal(new Date(sheet.startDate));
         if (dateMap[dateKey]) {
           dateMap[dateKey].internsAllocated += 1;
           dateMap[dateKey].internsActive += 1;
