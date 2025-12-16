@@ -676,3 +676,300 @@ const getBdSheetByDateRange = async (req, res) => {
 };
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
+
+const getTargetVsAchieved = async (req, res) => {
+  try {
+    const { managerId, from, to } = req.query;
+
+    if (!managerId || !from || !to) {
+      return ReE(res, "managerId, from, to are required", 400);
+    }
+
+    const manager = await model.TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    // Fetch targets from database
+    const sDate = new Date(from);
+    const eDate = new Date(to);
+
+    const targets = await model.BdTarget.findAll({
+      where: {
+        teamManagerId: managerId,
+        targetDate: { [Op.between]: [sDate, eDate] },
+      },
+    });
+
+    // Fetch achieved counts from referral API
+    const phone = "+91" + manager.mobileNumber;
+    const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+
+    const response = await axios.get(url);
+    const data = response.data;
+
+    if (!data?.result?.referred_users) {
+      return ReE(res, "Invalid API response from referral service", 500);
+    }
+
+    const referredUsers = data.result.referred_users;
+
+    // ----- DATE-WISE ACHIEVED COUNT -----
+    const dateWiseAchieved = {};
+
+    referredUsers.forEach(user => {
+      user.daily_paid_counts.forEach(d => {
+        const date = d.date;
+        const paidCount = parseInt(d.paid_count);
+
+        if (!dateWiseAchieved[date]) dateWiseAchieved[date] = 0;
+        dateWiseAchieved[date] += paidCount;
+      });
+    });
+
+    // ----- GENERATE FULL DATE RANGE -----
+    function getDateRange(from, to) {
+      const start = new Date(from);
+      const end = new Date(to);
+      const result = [];
+
+      let current = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+
+      while (current <= end) {
+        const yyyy = current.getFullYear();
+        const mm = String(current.getMonth() + 1).padStart(2, "0");
+        const dd = String(current.getDate()).padStart(2, "0");
+        result.push(`${yyyy}-${mm}-${dd}`);
+        current.setDate(current.getDate() + 1);
+      }
+
+      return result;
+    }
+
+    const allDates = getDateRange(from, to);
+
+    // ----- BUILD DATE-WISE COMPARISON ARRAY -----
+    const dateWiseComparison = allDates.map(date => {
+      const target = targets.find(t => {
+        const tDate = new Date(t.targetDate).toLocaleDateString("en-CA");
+        return tDate === date;
+      });
+
+      const targetCount = target ? target.accounts : 0;
+      const achievedCount = dateWiseAchieved[date] || 0;
+
+      return {
+        date,
+        target: targetCount,
+        achieved: achievedCount,
+        difference: achievedCount - targetCount,
+        percentage: targetCount > 0 ? ((achievedCount / targetCount) * 100).toFixed(2) : 0
+      };
+    });
+
+    // ----- TOTALS -----
+    const totalTarget = dateWiseComparison.reduce((sum, d) => sum + d.target, 0);
+    const totalAchieved = dateWiseComparison.reduce((sum, d) => sum + d.achieved, 0);
+    const totalDifference = totalAchieved - totalTarget;
+    const totalPercentage = totalTarget > 0 ? ((totalAchieved / totalTarget) * 100).toFixed(2) : 0;
+
+    return ReS(res, {
+      success: true,
+      totals: {
+        target: totalTarget,
+        achieved: totalAchieved,
+        difference: totalDifference,
+        percentage: totalPercentage
+      },
+      dateWise: dateWiseComparison
+    });
+
+  } catch (err) {
+    console.error("Target vs Achieved Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getTargetVsAchieved = getTargetVsAchieved;
+
+
+const getBdTlLeaderboard = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+
+    if (!from || !to) {
+      return ReE(res, "from, to are required", 400);
+    }
+
+    // Fetch all team managers
+    const teamManagers = await model.TeamManager.findAll({
+      attributes: ['id', 'name', 'mobileNumber'],
+      where: {
+        // Add any conditions if needed, e.g., isActive: true
+      }
+    });
+
+    if (!teamManagers || teamManagers.length === 0) {
+      return ReE(res, "No team managers found", 404);
+    }
+
+    const sDate = new Date(from);
+    const eDate = new Date(to);
+
+    const leaderboardData = [];
+
+    // Process each team manager
+    for (const manager of teamManagers) {
+      try {
+        // Fetch targets from database
+        const targets = await model.BdTarget.findAll({
+          where: {
+            teamManagerId: manager.id,
+            targetDate: { [Op.between]: [sDate, eDate] },
+          },
+        });
+
+        // Calculate total team allocated and active
+        const totalTeamAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
+        const totalTeamActive = targets.reduce((sum, t) => sum + (t.internsActive || 0), 0);
+        const totalTeamTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
+
+        // Fetch achieved counts from referral API
+        const phone = "+91" + manager.mobileNumber;
+        const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+
+        const response = await axios.get(url);
+        const data = response.data;
+
+        let totalAchieved = 0;
+
+        if (data?.result?.referred_users) {
+          const referredUsers = data.result.referred_users;
+
+          // Calculate total achieved (paid count)
+          referredUsers.forEach(user => {
+            user.daily_paid_counts.forEach(d => {
+              totalAchieved += parseInt(d.paid_count) || 0;
+            });
+          });
+        }
+
+        // Calculate efficiency percentage
+        const efficiency = totalTeamTarget > 0 
+          ? ((totalAchieved / totalTeamTarget) * 100).toFixed(2) 
+          : 0;
+
+        leaderboardData.push({
+          tlName: manager.name,
+          mobileNumber: manager.mobileNumber,
+          totalTeamAllocated,
+          totalTeamActive,
+          accountTarget: totalTeamTarget,
+          accountAchieved: totalAchieved,
+          efficiency: parseFloat(efficiency)
+        });
+
+      } catch (error) {
+        console.error(`Error processing manager ${manager.id}:`, error.message);
+        // Continue with other managers even if one fails
+        leaderboardData.push({
+          tlName: manager.name,
+          mobileNumber: manager.mobileNumber,
+          totalTeamAllocated: 0,
+          totalTeamActive: 0,
+          accountTarget: 0,
+          accountAchieved: 0,
+          efficiency: 0,
+          error: "Data fetch failed"
+        });
+      }
+    }
+
+    // Sort by efficiency (descending) - Rank 1 = highest efficiency
+    leaderboardData.sort((a, b) => b.efficiency - a.efficiency);
+
+    // Add rank
+    const rankedData = leaderboardData.map((item, index) => ({
+      rank: index + 1,
+      ...item
+    }));
+
+    return ReS(res, {
+      success: true,
+      leaderboard: rankedData,
+      totalManagers: rankedData.length
+    });
+
+  } catch (err) {
+    console.error("BD TL Leaderboard Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
+const getAccountTargetVsAchieved = async (req, res) => {
+  try {
+    const { managerId, from, to } = req.query;
+
+    if (!managerId || !from || !to) {
+      return ReE(res, "managerId, from, to are required", 400);
+    }
+
+    const manager = await model.TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    // ----- FETCH TARGETS -----
+    const targets = await model.BdTarget.findAll({
+      where: {
+        teamManagerId: managerId,
+        targetDate: { [Op.between]: [from, to] }
+      }
+    });
+
+    // Convert targets to map
+    const targetMap = {};
+    targets.forEach(t => {
+      const date = new Date(t.targetDate).toISOString().slice(0, 10);
+      targetMap[date] = t.accounts || 0;
+    });
+
+    // ----- FETCH ACHIEVED -----
+    const phone = "+91" + manager.mobileNumber;
+    const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+
+    const response = await axios.get(url);
+    const referredUsers = response?.data?.result?.referred_users || [];
+
+    const achievedMap = {};
+
+    referredUsers.forEach(user => {
+      user.daily_paid_counts.forEach(d => {
+        achievedMap[d.date] = (achievedMap[d.date] || 0) + (parseInt(d.paid_count) || 0);
+      });
+    });
+
+    // ----- BUILD DATE RANGE -----
+    const dates = [];
+    let current = new Date(from);
+    const end = new Date(to);
+
+    while (current <= end) {
+      dates.push(current.toISOString().slice(0, 10));
+      current.setDate(current.getDate() + 1);
+    }
+
+    // ----- FINAL RESPONSE -----
+    const result = dates.map(date => ({
+      date,
+      target: targetMap[date] || 0,
+      achieved: achievedMap[date] || 0
+    }));
+
+    return ReS(res, { success: true, data: result });
+
+  } catch (err) {
+    console.error(err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
