@@ -1007,3 +1007,86 @@ const getAccountTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
+
+
+"use strict";
+
+const axios = require("axios");
+const { Op } = require("sequelize");
+const model = require("../models");
+
+const calculateTeamManagerAccounts = async (req, res) => {
+  try {
+    let { from, to } = req.query;
+
+    if (!from || !to) {
+      return res.status(400).json({ message: "from and to dates are required" });
+    }
+
+    // -----------------------------
+    // 1️⃣ Call external payment API
+    // -----------------------------
+    const paymentApiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getTotalPayments?from_date=${from}&to_date=${to}`;
+    const paymentResponse = await axios.get(paymentApiUrl);
+    const payments = paymentResponse.data.payments;
+
+    // -----------------------------
+    // 2️⃣ Get all team managers
+    // -----------------------------
+    const teamManagers = await model.TeamManager.findAll();
+
+    const result = [];
+
+    for (const manager of teamManagers) {
+      // -----------------------------
+      // 3️⃣ Get BdTarget data for this manager
+      // -----------------------------
+      const bdTargets = await model.BdTarget.findAll({
+        where: {
+          teamManagerId: manager.id,
+          targetDate: { [Op.between]: [from, to] },
+        },
+      });
+
+      // -----------------------------
+      // 4️⃣ Merge payments with targets
+      // -----------------------------
+      const merged = payments.map((p) => {
+        const target = bdTargets.find(
+          (t) => t.targetDate.toISOString().split("T")[0] === p.date
+        );
+
+        return {
+          date: p.date,
+          totalPayments: parseFloat(p.total_amount),
+          accountsTarget: target ? target.accounts : 0,
+          difference: parseFloat(p.total_amount) - (target ? target.accounts : 0),
+        };
+      });
+
+      // -----------------------------
+      // 5️⃣ Totals
+      // -----------------------------
+      const totals = {
+        totalPayments: merged.reduce((sum, m) => sum + m.totalPayments, 0),
+        totalAccountsTarget: merged.reduce((sum, m) => sum + m.accountsTarget, 0),
+        totalDifference: merged.reduce((sum, m) => sum + m.difference, 0),
+      };
+
+      result.push({
+        teamManagerId: manager.id,
+        teamManagerName: manager.name,
+        merged,
+        totals,
+      });
+    }
+
+    return res.status(200).json({ success: true, data: result, from, to });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports. calculateTeamManagerAccounts= calculateTeamManagerAccounts;
+

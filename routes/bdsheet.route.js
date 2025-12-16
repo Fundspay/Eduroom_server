@@ -16,6 +16,7 @@ router.get("/date-range", bdsheetController.getBdSheetByDateRange);
 router.get('/target-vs-achieved', bdsheetController.getTargetVsAchieved);
 router.get('/bd-tl-leaderboard', bdsheetController.getBdTlLeaderboard);
 router.get('/account-target-vs-achieved', bdsheetController.getAccountTargetVsAchieved);
+router.get("/payments-vs-target", bdsheetController.calculateTeamManagerAccounts);
 
 
 module.exports = router;
