@@ -1066,9 +1066,11 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         } else {
           totalMCQs = progress.totalMCQs || 0;
           correctMCQs = progress.correctMCQs || 0;
-          sessionCompletionPercentage = totalMCQs
-            ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
-            : 0;
+          if (totalMCQs > 0) {
+            sessionCompletionPercentage = (correctMCQs / totalMCQs) * 100;
+          } else if (attempted) {
+            sessionCompletionPercentage = 100; // Consider attempted session complete
+          }
         }
 
         if (!daysMap[session.day])
@@ -1123,34 +1125,28 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // Check if all sessions are above 20% threshold
-      const allSessionsAboveThreshold = await Promise.all(
-        sessions.map(async (session) => {
-          let sessionCompletionPercentage = 0;
+      // Check if all sessions are above 20% threshold or were attempted
+      const allSessionsAboveThreshold = sessions.every((session) => {
+        const progress = session.userProgress?.[userId] || {};
+        const latestCaseStudy = session.latestCaseStudy || null;
 
-          const latestCaseStudy = await model.CaseStudyResult.findOne({
-            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
-            order: [["createdAt", "DESC"]],
-          });
+        let sessionCompletionPercentage = 0;
 
-          if (latestCaseStudy) {
-            sessionCompletionPercentage = latestCaseStudy.matchPercentage;
-          } else {
-            const progress = session.userProgress?.[userId] || {};
-            if (progress.totalMCQs && progress.correctMCQs !== undefined) {
-              sessionCompletionPercentage =
-                (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
-            }
-          }
+        if (latestCaseStudy) {
+          sessionCompletionPercentage = latestCaseStudy.matchPercentage;
+        } else if (progress.totalMCQs && progress.correctMCQs !== undefined) {
+          sessionCompletionPercentage = (progress.correctMCQs / progress.totalMCQs) * 100;
+        } else if (progress && Object.keys(progress).length > 0) {
+          sessionCompletionPercentage = 100; // Consider attempted session complete
+        }
 
-          return sessionCompletionPercentage >= 20;
-        })
-      ).then((results) => results.every(Boolean));
+        return sessionCompletionPercentage >= 20;
+      });
 
       // Determine final course status
       let overallStatus = "In Progress";
 
-      // ✅ FIXED: check business target based on deductedWallet
+      // ✅ Business target check based on deductedWallet
       const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
 
       if (isBusinessTargetMet && allSessionsAboveThreshold) {
