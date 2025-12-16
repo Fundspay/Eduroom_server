@@ -100,7 +100,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: managerName,
-        finalSelectionStatus: "Selected",
+        finalSelectionStatus: "selected",
         interviewDate: { [Op.between]: [sDate, eDate] },
       },
     });
