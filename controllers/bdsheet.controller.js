@@ -722,29 +722,46 @@ const getTargetVsAchieved = async (req, res) => {
       return ReE(res, "managerId, from, and to are required", 400);
     }
 
-    // Find manager
+    // ✅ Find manager
     const manager = await TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
-    const teamManagerId = manager.managerId;
+    const teamManagerName = manager.name;
 
-    // ----- Fetch day-wise paid counts from internal endpoint -----
-    const baseUrl = "https://eduroom.in/api/v1/fundsaudit/count";
-    const response = await axios.get(baseUrl, {
-      params: {
-        teamManagerId: teamManagerId,
-        from,
-        to
-      }
+    // ✅ Get all users under this manager
+    const statuses = await Status.findAll({
+      where: { teamManager: teamManagerName },
+      attributes: ["userId"],
     });
+    const userIds = statuses.map(s => s.userId);
 
-    if (!response.data || !response.data.data) {
-      return ReE(res, "Failed to fetch paid counts", 500);
-    }
+    // If no users, return empty
+    if (!userIds.length) return ReS(res, {
+      success: true,
+      totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
+      dateWise: []
+    }, 200);
 
-    const dayWiseAchieved = response.data.data;
+    // ✅ Fetch day-wise achieved counts from FundsAudit
+    const achievedResults = await FundsAudit.sequelize.query(
+      `
+      SELECT DATE(f."createdAt") AS paid_date,
+             COUNT(DISTINCT f."userId") AS achieved
+      FROM "FundsAudits" f
+      WHERE f."userId" IN (:userIds)
+        AND f."hasPaid" = true
+        AND f."createdAt" BETWEEN :from AND :to
+      GROUP BY DATE(f."createdAt")
+      ORDER BY DATE(f."createdAt");
+      `,
+      { replacements: { userIds, from, to }, type: FundsAudit.sequelize.QueryTypes.SELECT }
+    );
 
-    // ----- Fetch targets from BdTarget -----
+    // Build achieved map
+    const dayWiseAchieved = {};
+    achievedResults.forEach(r => dayWiseAchieved[r.paid_date] = parseInt(r.achieved));
+
+    // ✅ Fetch targets from BdTarget
     const targets = await BdTarget.findAll({
       where: {
         teamManagerId: managerId,
@@ -752,13 +769,11 @@ const getTargetVsAchieved = async (req, res) => {
       },
     });
 
-    // ----- Generate full date range -----
+    // Generate full date range
     const getDateRange = (from, to) => {
-      const start = new Date(from);
-      const end = new Date(to);
       const result = [];
-      let current = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-
+      let current = new Date(from);
+      const end = new Date(to);
       while (current <= end) {
         const yyyy = current.getFullYear();
         const mm = String(current.getMonth() + 1).padStart(2, "0");
@@ -768,19 +783,13 @@ const getTargetVsAchieved = async (req, res) => {
       }
       return result;
     };
-
     const allDates = getDateRange(from, to);
 
-    // ----- Build date-wise comparison -----
+    // Build date-wise comparison
     const dateWiseComparison = allDates.map(date => {
-      const target = targets.find(t => {
-        const tDate = new Date(t.targetDate).toISOString().split("T")[0];
-        return tDate === date;
-      });
-
+      const target = targets.find(t => new Date(t.targetDate).toISOString().split("T")[0] === date);
       const targetCount = target ? target.accounts : 0;
       const achievedCount = dayWiseAchieved[date] || 0;
-
       return {
         date,
         target: targetCount,
@@ -790,7 +799,7 @@ const getTargetVsAchieved = async (req, res) => {
       };
     });
 
-    // ----- Totals -----
+    // Totals
     const totalTarget = dateWiseComparison.reduce((sum, d) => sum + d.target, 0);
     const totalAchieved = dateWiseComparison.reduce((sum, d) => sum + d.achieved, 0);
     const totalDifference = totalAchieved - totalTarget;
@@ -798,12 +807,7 @@ const getTargetVsAchieved = async (req, res) => {
 
     return ReS(res, {
       success: true,
-      totals: {
-        target: totalTarget,
-        achieved: totalAchieved,
-        difference: totalDifference,
-        percentage: totalPercentage
-      },
+      totals: { target: totalTarget, achieved: totalAchieved, difference: totalDifference, percentage: totalPercentage },
       dateWise: dateWiseComparison
     });
 
