@@ -195,7 +195,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
     const today = new Date();
     let sDate, eDate;
 
-    // Month handling or default to current month
     if (month) {
       const [year, mon] = month.split("-");
       sDate = new Date(year, mon - 1, 1);
@@ -208,24 +207,20 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // Normalize date range (remove time)
     sDate.setHours(0, 0, 0, 0);
     eDate.setHours(23, 59, 59, 999);
 
-    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "mobileNumber"],
       raw: true,
     });
 
-    // Prepare results per manager
     const managerData = [];
 
     for (const manager of managers) {
       const managerName = manager.name.trim();
       const managerId = manager.id;
 
-      // JD sent count
       const jdSentCount = await model.CoSheet.count({
         where: {
           teamManagerId: managerId,
@@ -234,7 +229,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
-      // Call response count
       const callResponseCount = await model.CoSheet.count({
         where: {
           teamManagerId: managerId,
@@ -243,7 +237,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
-      // Resume received sum
       const resumeData = await model.CoSheet.findAll({
         where: {
           teamManagerId: managerId,
@@ -255,7 +248,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       });
       const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
-      // ACTUAL COLLEGE COUNT
       const resumes = await model.StudentResume.findAll({
         where: {
           teamManagerId: managerId,
@@ -271,7 +263,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       });
       const collegesAchieved = collegeSet.size;
 
-      // FOLLOW-UPS COUNT (resumes received)
       const followUpsCount = await model.CoSheet.count({
         where: {
           teamManagerId: managerId,
@@ -280,7 +271,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
-      // RESUME SELECTED COUNT
       const resumeSelectedCount = await model.StudentResume.count({
         where: {
           interviewedBy: managerName,
@@ -289,7 +279,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
-      // Fetch target for this manager
       const targetData = await model.MyTarget.findAll({
         where: {
           teamManagerId: managerId,
@@ -317,16 +306,31 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
-      // Calculate percentages safely, rounded to 2 decimals
       const percentage = {
         jds: target.jds ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
         calls: target.calls ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
         followUps: target.followUps ? parseFloat(((followUpsCount / target.followUps) * 100).toFixed(2)) : 0,
         resumetarget: target.resumetarget ? parseFloat(((resumeReceivedSum / target.resumetarget) * 100).toFixed(2)) : 0,
         collegeTarget: target.collegeTarget ? parseFloat(((collegesAchieved / target.collegeTarget) * 100).toFixed(2)) : 0,
-        interviewsTarget: target.interviewsTarget ? parseFloat(((resumeSelectedCount / target.interviewsTarget) * 100).toFixed(2)) : 0,
-        resumesReceivedTarget: target.resumesReceivedTarget ? parseFloat(((followUpsCount / target.resumesReceivedTarget) * 100).toFixed(2)) : 0,
+        resumesReceivedTarget: target.resumesReceivedTarget
+          ? parseFloat(((followUpsCount / target.resumesReceivedTarget) * 100).toFixed(2))
+          : 0,
       };
+
+      // RANK SCORE CALCULATION (your formula)
+      const rankScore = parseFloat(
+        (
+          (
+            5 * percentage.jds +
+            6 * percentage.calls +
+            7 * percentage.followUps +
+            8 * percentage.resumetarget +
+            9 * percentage.collegeTarget +
+            10 * percentage.resumesReceivedTarget
+          ) / 6
+        * 100
+        ).toFixed(2)
+      );
 
       managerData.push({
         ...manager,
@@ -338,22 +342,35 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         collegesAchieved,
         target,
         percentage,
+        rankScore, 
       });
     }
 
-    return ReS(res, {
-      success: true,
-      managers: managerData,
-      startDate: sDate.toLocaleDateString("en-CA"),
-      endDate: eDate.toLocaleDateString("en-CA"),
-    }, 200);
+    // SORT & ASSIGN RANK
+    managerData.sort((a, b) => b.rankScore - a.rankScore);
 
+    managerData.forEach((m, index) => {
+      m.rank = index + 1;
+    });
+
+    return ReS(
+      res,
+      {
+        success: true,
+        managers: managerData,
+        startDate: sDate.toLocaleDateString("en-CA"),
+        endDate: eDate.toLocaleDateString("en-CA"),
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
-module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+module.exports.fetchMasterSheetTargetsForAllManagers =
+  fetchMasterSheetTargetsForAllManagers;
+
 
 
 
