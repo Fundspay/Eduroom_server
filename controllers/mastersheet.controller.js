@@ -91,7 +91,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     const followUpsCount = await model.CoSheet.count({
       where: {
         followUpBy: managerName,
-        followUpResponse: { [Op.ne]: null },
+        followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
