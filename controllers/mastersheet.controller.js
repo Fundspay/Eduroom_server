@@ -95,12 +95,21 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    //  RESUME SELECTED COUNT (USING interviewedBy)
+    // 🔹 NORMALIZE DATE RANGE (REMOVE TIME) FOR INTERVIEW DATE ONLY
+    const interviewStartDate = new Date(sDate);
+    interviewStartDate.setHours(0, 0, 0, 0);
+
+    const interviewEndDate = new Date(eDate);
+    interviewEndDate.setHours(23, 59, 59, 999);
+
+    // RESUME SELECTED COUNT (DATE ONLY, NO TIME)
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: managerName,
         finalSelectionStatus: "Selected",
-        interviewDate: { [Op.between]: [sDate, eDate] },
+        interviewDate: {
+          [Op.between]: [interviewStartDate, interviewEndDate],
+        },
       },
     });
 
