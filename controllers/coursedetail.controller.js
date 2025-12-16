@@ -1160,12 +1160,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? "Completed"
         : "In Progress";
 
-      if (
-        Number(overallCompletionRate) === 100 ||
-        (isBusinessTargetMet && allSessionsAboveThreshold)
-      ) {
+      if (isBusinessTargetMet && allSessionsAboveThreshold) {
         overallStatus = "Completed";
+      } else {
+        overallStatus = "In Progress";
       }
+
 
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
