@@ -610,6 +610,8 @@ const getManagerRangeAmounts = async (req, res) => {
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
+
+
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { teamManagerId, from, to } = req.query;
@@ -652,16 +654,16 @@ const getBdSheetByDateRange = async (req, res) => {
         });
       }
 
-      // Fetch existing targets
-      const existingTargets = await model.BdTarget.findAll({
+      // Fetch BdTarget data
+      const targets = await model.BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
           targetDate: { [Op.between]: [sDate, eDate] },
         },
       });
 
-      // Fetch sheet data
-      const sheetData = await model.BdSheet.findAll({
+      // Fetch BdSheet data
+      const sheets = await model.BdSheet.findAll({
         where: {
           teamManagerId: manager.id,
           startDate: { [Op.between]: [sDate, eDate] },
@@ -669,16 +671,13 @@ const getBdSheetByDateRange = async (req, res) => {
         attributes: ["startDate", "activeStatus", "businessTask"],
       });
 
-      // Calculate total interns exactly like getDashboardStats
-      const totalInterns = sheetData.length;
-
-      // Merge targets and sheet data per date
+      // Merge data per date
       const merged = dateList.map((d) => {
-        const target = existingTargets.find(
+        const target = targets.find(
           (t) => new Date(t.targetDate).toLocaleDateString("en-CA") === d.date
         );
 
-        const sheetsForDate = sheetData.filter(
+        const sheetsForDate = sheets.filter(
           (s) => new Date(s.startDate).toLocaleDateString("en-CA") === d.date
         );
 
@@ -700,9 +699,9 @@ const getBdSheetByDateRange = async (req, res) => {
         };
       });
 
-      // Totals
+      // Totals across all dates
       const totals = {
-        totalInterns, // NEW: total interns in sheetData
+        totalInterns: sheets.length, // total BdSheet rows
         internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
         internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
         activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),
@@ -724,8 +723,6 @@ const getBdSheetByDateRange = async (req, res) => {
 };
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
-
-
 
 const getTargetVsAchieved = async (req, res) => {
   try {
