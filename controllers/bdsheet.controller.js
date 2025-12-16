@@ -899,8 +899,16 @@ const getBdTlLeaderboard = async (req, res) => {
       });
     }
 
-    // Sort by efficiency
-    leaderboardData.sort((a, b) => b.efficiency - a.efficiency);
+    // Sort by efficiency (descending), then by accounts achieved (descending), then by totalInterns (descending)
+    leaderboardData.sort((a, b) => {
+      if (b.efficiency !== a.efficiency) {
+        return b.efficiency - a.efficiency;
+      }
+      if (b.accounts !== a.accounts) {
+        return b.accounts - a.accounts;
+      }
+      return parseInt(b.totalInterns) - parseInt(a.totalInterns);
+    });
     const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
 
     return ReS(res, {
@@ -916,7 +924,6 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
-
 
 const getAccountTargetVsAchieved = async (req, res) => {
   try {
