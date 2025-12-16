@@ -1,7 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { FundsAudit, User, Status,Sequelize } = require("../models");
+const { FundsAudit, User, Status,Sequelize, TeamManager } = require("../models");
 const { Op } = Sequelize;
 
 // ✅ Add a new FundsAudit record
