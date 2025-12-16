@@ -1075,7 +1075,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         daysMap[session.day].total++;
         totalSessions++;
 
-        if (attempted && sessionCompletionPercentage > 0) {
+        const COMPLETION_THRESHOLD = 33;
+
+        if (attempted && sessionCompletionPercentage >= COMPLETION_THRESHOLD) {
           completedSessions++;
           daysMap[session.day].completed++;
         }
