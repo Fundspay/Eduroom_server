@@ -289,6 +289,34 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
+      // Fetch target for this manager
+      const targetData = await model.MyTarget.findAll({
+        where: {
+          teamManagerId: managerId,
+          targetDate: { [Op.between]: [sDate, eDate] },
+        },
+        attributes: [
+          [fn("SUM", col("jds")), "jds"],
+          [fn("SUM", col("calls")), "calls"],
+          [fn("SUM", col("followUps")), "followUps"],
+          [fn("SUM", col("resumetarget")), "resumetarget"],
+          [fn("SUM", col("collegeTarget")), "collegeTarget"],
+          [fn("SUM", col("interviewsTarget")), "interviewsTarget"],
+          [fn("SUM", col("resumesReceivedTarget")), "resumesReceivedTarget"],
+        ],
+        raw: true,
+      });
+
+      const target = targetData[0] || {
+        jds: 0,
+        calls: 0,
+        followUps: 0,
+        resumetarget: 0,
+        collegeTarget: 0,
+        interviewsTarget: 0,
+        resumesReceivedTarget: 0,
+      };
+
       managerData.push({
         ...manager,
         jdSentCount,
@@ -297,6 +325,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         followUpsCount,
         resumeSelectedCount,
         collegesAchieved,
+        target, // <-- added target here
       });
     }
 
@@ -313,4 +342,5 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
