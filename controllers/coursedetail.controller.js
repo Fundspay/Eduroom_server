@@ -984,29 +984,28 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    // ✅ Normalize businessTargets for backward compatibility
+    // Normalize businessTargets for backward compatibility
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
         if (typeof val === "number") {
-          // Old format: convert number to object
           normalizedBusinessTargets[courseId] = { target: val, offerMessage: null };
         } else {
-          // New format: already object
           normalizedBusinessTargets[courseId] = val;
         }
       }
     }
 
+    const subscriptionWallet = Number(user.subscriptionWallet || 0);
+    const subscriptiondeductedWallet = Number(user.subscriptiondeductedWallet || 0);
+    const subscriptionLeft = Math.max(subscriptionWallet - subscriptiondeductedWallet, 0);
+
     const response = {
       userId: user.id,
       fullName: user.fullName || `${user.firstName} ${user.lastName}`,
-      subscriptionWallet: user.subscriptionWallet,
-      subscriptiondeductedWallet: user.subscriptiondeductedWallet,
-      subscriptionLeft: Math.max(
-        (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0),
-        0
-      ),
+      subscriptionWallet,
+      subscriptiondeductedWallet,
+      subscriptionLeft,
       courses: [],
     };
 
@@ -1119,16 +1118,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // ✅ Use normalized businessTargets
+      // Business targets
       const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
-
-      const subscriptionWallet = user.subscriptionWallet || 0;
-      const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
-
-      const isBusinessTargetMet =
-        subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
       // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
@@ -1154,19 +1147,15 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         })
       ).then((results) => results.every(Boolean));
 
-      // Preserve previously completed courses permanently
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
-      let overallStatus = existingStatuses[String(courseId)] === "Completed"
-        ? "Completed"
-        : "In Progress";
+      // Determine final course status
+      let overallStatus = "In Progress";
+      const isBusinessTargetMet = subscriptionLeft >= businessTarget;
 
-      if (
-        Number(overallCompletionRate) === 100 ||
-        (isBusinessTargetMet && allSessionsAboveThreshold)
-      ) {
+      if (isBusinessTargetMet && allSessionsAboveThreshold) {
         overallStatus = "Completed";
       }
 
+      // Internship status overrides
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
@@ -1178,6 +1167,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       }
 
       // Save final course status permanently
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
@@ -1192,7 +1182,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
-        offerMessage, // ✅ now from businessTargets JSON
+        offerMessage,
       });
     }
 
