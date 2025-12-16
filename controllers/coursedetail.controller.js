@@ -978,19 +978,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const { userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user
+    // Fetch user instance
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.reload();
 
-    // Normalize business targets
+    // Normalize businessTargets
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
-        normalizedBusinessTargets[courseId] = typeof val === "number" 
-          ? { target: val, offerMessage: null } 
-          : val;
+        normalizedBusinessTargets[courseId] =
+          typeof val === "number" ? { target: val, offerMessage: null } : val;
       }
     }
 
@@ -1042,7 +1041,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const daysMap = {};
       let totalSessions = 0;
       let completedSessions = 0;
-      const COMPLETION_THRESHOLD = 33; // ✅ uniform threshold
 
       for (const session of sessions) {
         const progress = session.userProgress?.[userId] || {};
@@ -1065,24 +1063,31 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           totalMCQs = progress.totalMCQs || 0;
           correctMCQs = progress.correctMCQs || 0;
           sessionCompletionPercentage = totalMCQs
-            ? ((correctMCQs / totalMCQs) * 100).toFixed(2)
+            ? ((correctMCQs / totalMCQs) * 100)
             : 0;
         }
 
-        if (!daysMap[session.day]) daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+        if (!daysMap[session.day])
+          daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
         daysMap[session.day].total++;
         totalSessions++;
+
+        const COMPLETION_THRESHOLD = 33;
 
         if (attempted && sessionCompletionPercentage >= COMPLETION_THRESHOLD) {
           completedSessions++;
           daysMap[session.day].completed++;
         }
 
-        const status = latestCaseStudy
-          ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
-          : sessionCompletionPercentage >= COMPLETION_THRESHOLD
-            ? "Completed"
-            : "In Progress";
+        // ✅ Set status based on course type
+        const status =
+          courseId === "9" // Mobile App Developer
+            ? latestCaseStudy
+              ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
+              : sessionCompletionPercentage >= COMPLETION_THRESHOLD
+                ? "Completed"
+                : "In Progress"
+            : `${Number(sessionCompletionPercentage).toFixed(2)}%`;
 
         daysMap[session.day].sessions.push({
           sessionNumber: session.sessionNumber,
@@ -1099,20 +1104,20 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+        const dayCompletionPercentage = ((d.completed / d.total) * 100);
         return {
           day: Number(dayKey),
           totalSessions: d.total,
           completedSessions: d.completed,
           fullyCompleted: d.completed === d.total,
-          dayCompletionPercentage: Number(dayCompletionPercentage),
+          dayCompletionPercentage: Number(dayCompletionPercentage.toFixed(2)),
           status: d.completed === d.total ? "Completed" : "In Progress",
           sessions: d.sessions,
         };
       });
 
       const overallCompletionRate = totalSessions
-        ? ((completedSessions / totalSessions) * 100).toFixed(2)
+        ? ((completedSessions / totalSessions) * 100)
         : 0;
 
       const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
@@ -1125,29 +1130,53 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const isBusinessTargetMet =
         subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
-      // Check if all sessions are above threshold
-      const allSessionsAboveThreshold = sessions.every(
-        (s) => (s.sessionCompletionPercentage || 0) >= COMPLETION_THRESHOLD
-      );
+      // Check if all sessions are above 20% threshold
+      const allSessionsAboveThreshold = await Promise.all(
+        sessions.map(async (session) => {
+          let sessionCompletionPercentage = 0;
+
+          const latestCaseStudy = await model.CaseStudyResult.findOne({
+            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
+            order: [["createdAt", "DESC"]],
+          });
+
+          if (latestCaseStudy) {
+            sessionCompletionPercentage = latestCaseStudy.matchPercentage;
+          } else {
+            const progress = session.userProgress?.[userId] || {};
+            if (progress.totalMCQs && progress.correctMCQs !== undefined) {
+              sessionCompletionPercentage =
+                (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
+            }
+          }
+
+          return sessionCompletionPercentage >= 20;
+        })
+      ).then((results) => results.every(Boolean));
 
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       let overallStatus = existingStatuses[String(courseId)] === "Completed"
         ? "Completed"
         : "In Progress";
 
-      if (Number(overallCompletionRate) === 100 || (isBusinessTargetMet && allSessionsAboveThreshold)) {
+      if (
+        Number(overallCompletionRate) === 100 ||
+        (isBusinessTargetMet && allSessionsAboveThreshold)
+      ) {
         overallStatus = "Completed";
       }
 
-      // Apply internship status overrides
-      const statusRecord = await model.Status.findOne({ where: { userId, isDeleted: false } });
-      if (statusRecord?.internshipStatus) {
+      const statusRecord = await model.Status.findOne({
+        where: { userId, isDeleted: false },
+      });
+
+      if (statusRecord && statusRecord.internshipStatus) {
         const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
         if (["terminated"].includes(normalized)) overallStatus = "Terminated";
         else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
       }
 
-      // ----- Special rule only for Mobile App Development -----
+      // Special rule for Mobile App Developer
       if (
         courseId === "9" &&
         overallStatus !== "Completed" &&
@@ -1173,7 +1202,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         coursePreviews: course.CoursePreviews || [],
         overallStatus,
-        overallCompletionRate: Number(overallCompletionRate),
+        overallCompletionRate: Number(overallCompletionRate.toFixed(2)),
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
