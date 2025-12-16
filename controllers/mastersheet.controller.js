@@ -54,7 +54,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     const resumeReceivedSum = await model.CoSheet.sum("resumeCount", {
       where: {
         teamManagerId: teamManagerId,
-        followUpResponse: "Resume Recieved",
+        followUpResponse: "Resumes Recieved",
         resumeDate: {
           [Op.between]: [sDate, eDate],
         },
