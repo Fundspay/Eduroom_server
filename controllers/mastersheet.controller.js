@@ -317,6 +317,17 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
+      // Calculate percentages safely
+      const percentage = {
+        jds: target.jds ? (jdSentCount / target.jds) * 100 : 0,
+        calls: target.calls ? (callResponseCount / target.calls) * 100 : 0,
+        followUps: target.followUps ? (followUpsCount / target.followUps) * 100 : 0,
+        resumetarget: target.resumetarget ? (resumeReceivedSum / target.resumetarget) * 100 : 0,
+        collegeTarget: target.collegeTarget ? (collegesAchieved / target.collegeTarget) * 100 : 0,
+        interviewsTarget: target.interviewsTarget ? (resumeSelectedCount / target.interviewsTarget) * 100 : 0,
+        resumesReceivedTarget: target.resumesReceivedTarget ? (followUpsCount / target.resumesReceivedTarget) * 100 : 0,
+      };
+
       managerData.push({
         ...manager,
         jdSentCount,
@@ -325,7 +336,8 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         followUpsCount,
         resumeSelectedCount,
         collegesAchieved,
-        target, // <-- added target here
+        target,
+        percentage, // <-- added percentages here
       });
     }
 
@@ -342,5 +354,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
