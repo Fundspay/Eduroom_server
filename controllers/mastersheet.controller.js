@@ -188,3 +188,129 @@ var fetchMasterSheetTargets = async function (req, res) {
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
 
+var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
+  try {
+    let { startDate, endDate, month } = req.query;
+
+    const today = new Date();
+    let sDate, eDate;
+
+    // Month handling or default to current month
+    if (month) {
+      const [year, mon] = month.split("-");
+      sDate = new Date(year, mon - 1, 1);
+      eDate = new Date(year, mon, 0);
+    } else if (startDate && endDate) {
+      sDate = new Date(startDate);
+      eDate = new Date(endDate);
+    } else {
+      sDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    }
+
+    // Normalize date range (remove time)
+    sDate.setHours(0, 0, 0, 0);
+    eDate.setHours(23, 59, 59, 999);
+
+    // Fetch all managers
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "mobileNumber"],
+      raw: true,
+    });
+
+    // Prepare results per manager
+    const managerData = [];
+
+    for (const manager of managers) {
+      const managerName = manager.name.trim();
+      const managerId = manager.id;
+
+      // JD sent count
+      const jdSentCount = await model.CoSheet.count({
+        where: {
+          teamManagerId: managerId,
+          detailedResponse: "Send JD",
+          dateOfConnect: { [Op.between]: [sDate, eDate] },
+        },
+      });
+
+      // Call response count
+      const callResponseCount = await model.CoSheet.count({
+        where: {
+          teamManagerId: managerId,
+          callResponse: { [Op.ne]: null },
+          dateOfConnect: { [Op.between]: [sDate, eDate] },
+        },
+      });
+
+      // Resume received sum
+      const resumeData = await model.CoSheet.findAll({
+        where: {
+          teamManagerId: managerId,
+          followUpResponse: "resumes received",
+          resumeDate: { [Op.between]: [sDate, eDate] },
+        },
+        attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
+        raw: true,
+      });
+      const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
+
+      // ACTUAL COLLEGE COUNT
+      const resumes = await model.StudentResume.findAll({
+        where: {
+          teamManagerId: managerId,
+          resumeDate: { [Op.between]: [sDate, eDate] },
+        },
+        attributes: ["collegeName"],
+        raw: true,
+      });
+
+      const collegeSet = new Set();
+      resumes.forEach((r) => {
+        if (r.collegeName) collegeSet.add(r.collegeName);
+      });
+      const collegesAchieved = collegeSet.size;
+
+      // FOLLOW-UPS COUNT (resumes received)
+      const followUpsCount = await model.CoSheet.count({
+        where: {
+          teamManagerId: managerId,
+          followUpResponse: "resumes received",
+          resumeDate: { [Op.between]: [sDate, eDate] },
+        },
+      });
+
+      // RESUME SELECTED COUNT
+      const resumeSelectedCount = await model.StudentResume.count({
+        where: {
+          interviewedBy: managerName,
+          finalSelectionStatus: "Selected",
+          interviewDate: { [Op.between]: [sDate, eDate] },
+        },
+      });
+
+      managerData.push({
+        ...manager,
+        jdSentCount,
+        callResponseCount,
+        resumeReceivedSum,
+        followUpsCount,
+        resumeSelectedCount,
+        collegesAchieved,
+      });
+    }
+
+    return ReS(res, {
+      success: true,
+      managers: managerData,
+      startDate: sDate.toLocaleDateString("en-CA"),
+      endDate: eDate.toLocaleDateString("en-CA"),
+    }, 200);
+
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
