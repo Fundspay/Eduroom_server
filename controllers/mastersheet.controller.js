@@ -27,31 +27,25 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // 🔹 Count "Send JD"
+    //  Count "Send JD"
     const jdSentCount = await model.CoSheet.count({
       where: {
-        teamManagerId: teamManagerId,
+        teamManagerId,
         detailedResponse: "Send JD",
-        dateOfConnect: {
-          [Op.between]: [sDate, eDate],
-        },
+        dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
     });
 
-    // 🔹 Count callResponse (NOT NULL)
+    //  Count callResponse (NOT NULL)
     const callResponseCount = await model.CoSheet.count({
       where: {
-        teamManagerId: teamManagerId,
-        callResponse: {
-          [Op.ne]: null,
-        },
-        dateOfConnect: {
-          [Op.between]: [sDate, eDate],
-        },
+        teamManagerId,
+        callResponse: { [Op.ne]: null },
+        dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
     });
 
-    // 🔹 GET MANAGER NAME (same as getResumeAnalysis)
+    //  GET MANAGER NAME
     const manager = await model.TeamManager.findOne({
       attributes: ["id", "name"],
       where: { id: teamManagerId },
@@ -60,22 +54,38 @@ var fetchMasterSheetTargets = async function (req, res) {
 
     if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
-    const managerName = manager.name;
+    const managerName = manager.name.trim();
 
-    // 🔹 Resume received count (EXACT SAME LOGIC AS REFERENCE)
+    //  Resume received sum
     const resumeData = await model.CoSheet.findAll({
       where: {
         followUpBy: managerName,
         followUpResponse: "resumes received",
-        resumeDate: {
-          [Op.between]: [sDate, eDate],
-        },
+        resumeDate: { [Op.between]: [sDate, eDate] },
       },
       attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
       raw: true,
     });
 
     const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
+
+    //  ACTUAL COLLEGE COUNT (SAME AS getUserTargetAnalysis)
+    const resumes = await model.StudentResume.findAll({
+      where: {
+        teamManagerId,
+        followupBy: { [Op.iLike]: managerName },
+        resumeDate: { [Op.between]: [sDate, eDate] },
+      },
+      attributes: ["collegeName"],
+      raw: true,
+    });
+
+    const collegeSet = new Set();
+    resumes.forEach((r) => {
+      if (r.collegeName) collegeSet.add(r.collegeName);
+    });
+
+    const collegesAchieved = collegeSet.size;
 
     // Generate date list
     const dateList = [];
@@ -144,6 +154,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         jdSentCount,
         callResponseCount,
         resumeReceivedSum,
+        collegesAchieved, // ACTUAL college count
         dates: merged,
         totals,
       },
@@ -155,6 +166,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
