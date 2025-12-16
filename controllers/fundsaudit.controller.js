@@ -483,11 +483,15 @@ const getPaidAccountsDayWise = async (req, res) => {
     });
 
     if (!managerRecord) {
-      return ReS(res, {
-        success: true,
-        data: {},
-        message: "Team Manager not found",
-      }, 200);
+      return ReS(
+        res,
+        {
+          success: true,
+          data: {},
+          message: "Team Manager not found",
+        },
+        200
+      );
     }
 
     const teamManagerName = managerRecord.name;
@@ -500,10 +504,14 @@ const getPaidAccountsDayWise = async (req, res) => {
 
     const userIds = statuses.map((s) => s.userId);
     if (!userIds.length)
-      return ReS(res, { success: true, data: {}, message: "No users under this manager" }, 200);
+      return ReS(res, {
+        success: true,
+        data: {},
+        message: "No users under this manager",
+      }, 200);
 
     // ✅ Fetch FundsAudit records where hasPaid = true, between from/to, counting DISTINCT users per day
-    const [results] = await FundsAudit.sequelize.query(
+    const results = await FundsAudit.sequelize.query(
       `
       SELECT DATE("createdAt") AS paid_date,
              COUNT(DISTINCT "userId") AS unique_paid_users
@@ -523,12 +531,16 @@ const getPaidAccountsDayWise = async (req, res) => {
       dayWiseCounts[row.paid_date] = parseInt(row.unique_paid_users);
     });
 
-    return ReS(res, {
-      success: true,
-      teamManager: teamManagerName,
-      managerId: managerRecord.managerId,
-      data: dayWiseCounts,
-    }, 200);
+    return ReS(
+      res,
+      {
+        success: true,
+        teamManager: teamManagerName,
+        managerId: managerRecord.managerId,
+        data: dayWiseCounts,
+      },
+      200
+    );
 
   } catch (err) {
     console.error("Error in getPaidAccountsDayWise:", err);
