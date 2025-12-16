@@ -1160,13 +1160,22 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       // ----- Special Rule for courseId 9 -----
       if (
         courseId === "9" &&
-        overallCompletionRate === 100 &&
-        subscriptiondeductedWallet === 1 &&
-        overallStatus !== "Completed"
+        overallStatus !== "Completed" &&
+        Number(overallCompletionRate) >= 99.99 && // handles numeric/string issues
+        subscriptiondeductedWallet === 1
       ) {
-        const courseStartDate = user.courseDates?.[courseId]?.startDate;
-        if (courseStartDate && new Date(courseStartDate) < new Date("2025-12-10")) {
+        const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
+        if (courseStartDateStr) {
+          const courseStartDate = new Date(courseStartDateStr);
+          const cutoffDate = new Date("2025-12-10");
+          if (courseStartDate < cutoffDate) {
+            overallStatus = "Completed";
+            console.log(`Special rule applied for user ${user.id}, course 9`);
+          }
+        } else {
+          // If startDate missing, still apply for safety
           overallStatus = "Completed";
+          console.log(`Special rule applied for user ${user.id}, course 9 (no startDate)`);
         }
       }
 
