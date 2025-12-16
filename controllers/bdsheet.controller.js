@@ -1010,6 +1010,10 @@ const getAccountTargetVsAchieved = async (req, res) => {
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
 
 
+const axios = require("axios");
+const { Op } = require("sequelize");
+const model = require("../models");
+
 const calculateTeamManagerAccounts = async (req, res) => {
   try {
     let { from, to } = req.query;
@@ -1057,30 +1061,30 @@ const calculateTeamManagerAccounts = async (req, res) => {
           .toISOString()
           .split("T")[0];
 
-        targetMap[dateKey] = t.accounts;
+        targetMap[dateKey] = Number(t.accounts) || 0;
       }
 
       // -----------------------------
-      // 5️⃣ Merge payments + targets
+      // 5️⃣ Merge COUNTS (not amount)
       // -----------------------------
       const merged = payments.map((p) => {
+        const achievedCount = Number(p.total_count) || 0;
         const accountsTarget = targetMap[p.date] || 0;
-        const totalPayments = parseFloat(p.total_amount) || 0;
 
         return {
           date: p.date,
-          totalPayments,
+          accountsAchieved: achievedCount,
           accountsTarget,
-          difference: totalPayments - accountsTarget,
+          difference: achievedCount - accountsTarget,
         };
       });
 
       // -----------------------------
-      // 6️⃣ Totals
+      // 6️⃣ Totals (COUNT BASED)
       // -----------------------------
       const totals = {
-        totalPayments: merged.reduce(
-          (sum, m) => sum + m.totalPayments,
+        totalAccountsAchieved: merged.reduce(
+          (sum, m) => sum + m.accountsAchieved,
           0
         ),
         totalAccountsTarget: merged.reduce(
@@ -1108,7 +1112,7 @@ const calculateTeamManagerAccounts = async (req, res) => {
       to,
     });
   } catch (error) {
-    console.error("Error calculating team manager accounts:", error);
+    console.error("Error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
