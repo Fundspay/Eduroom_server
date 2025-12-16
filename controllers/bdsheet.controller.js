@@ -617,18 +617,10 @@ const getBdSheetByDateRange = async (req, res) => {
     let { teamManagerId, from, to } = req.query;
 
     const today = new Date();
-    let sDate, eDate;
-
-    if (from && to) {
-      sDate = new Date(from);
-      eDate = new Date(to);
-    } else {
-      sDate = new Date(today.getFullYear(), today.getMonth(), 1);
-      eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    }
+    let sDate = from ? new Date(from) : new Date(today.getFullYear(), today.getMonth(), 1);
+    let eDate = to ? new Date(to) : new Date(today.getFullYear(), today.getMonth() + 1, 0);
 
     let teamManagers = [];
-
     if (teamManagerId) {
       teamManagerId = parseInt(teamManagerId, 10);
       teamManagers = await model.TeamManager.findAll({ where: { id: teamManagerId } });
@@ -640,21 +632,16 @@ const getBdSheetByDateRange = async (req, res) => {
     const result = [];
 
     for (const manager of teamManagers) {
-      // Generate date list
       const dateList = [];
       for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
         const cur = new Date(d);
         dateList.push({
           date: cur.toLocaleDateString("en-CA"),
           day: cur.toLocaleDateString("en-US", { weekday: "long" }),
-          internsAllocated: 0,
-          internsActive: 0,
-          activeInterns: 0,
-          accounts: 0,
         });
       }
 
-      // Fetch BdTarget data
+      // Fetch targets
       const targets = await model.BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
@@ -662,7 +649,7 @@ const getBdSheetByDateRange = async (req, res) => {
         },
       });
 
-      // Fetch BdSheet data
+      // Fetch sheet (achieved)
       const sheets = await model.BdSheet.findAll({
         where: {
           teamManagerId: manager.id,
@@ -671,21 +658,20 @@ const getBdSheetByDateRange = async (req, res) => {
         attributes: ["startDate", "activeStatus", "businessTask"],
       });
 
-      // Merge data per date
-      const merged = dateList.map((d) => {
+      const merged = dateList.map(d => {
         const target = targets.find(
-          (t) => new Date(t.targetDate).toLocaleDateString("en-CA") === d.date
+          t => new Date(t.targetDate).toLocaleDateString("en-CA") === d.date
         );
 
         const sheetsForDate = sheets.filter(
-          (s) => new Date(s.startDate).toLocaleDateString("en-CA") === d.date
+          s => new Date(s.startDate).toLocaleDateString("en-CA") === d.date
         );
 
-        const activeCount = sheetsForDate.filter(
-          (s) => s.activeStatus?.toLowerCase() === "active"
+        const achievedInterns = sheetsForDate.filter(
+          s => s.activeStatus?.toLowerCase() === "active"
         ).length;
 
-        const accountsCount = sheetsForDate.reduce(
+        const achievedAccounts = sheetsForDate.reduce(
           (sum, s) => sum + (parseInt(s.businessTask) || 0),
           0
         );
@@ -693,15 +679,14 @@ const getBdSheetByDateRange = async (req, res) => {
         return {
           ...d,
           internsAllocated: target ? target.internsAllocated : 0,
-          internsActive: target ? target.internsActive : 0,
-          activeInterns: activeCount,
-          accounts: target ? target.accounts : accountsCount,
+          internsActive: target ? target.accounts : 0,
+          activeInterns: achievedInterns,
+          accounts: achievedAccounts,
         };
       });
 
-      // Totals across all dates
       const totals = {
-        totalInterns: sheets.length, // total BdSheet rows
+        totalInterns: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
         internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
         internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
         activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),
@@ -721,6 +706,7 @@ const getBdSheetByDateRange = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
 
