@@ -1125,7 +1125,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // Check if all sessions are above 20% threshold or were attempted
+      // Check if all sessions are above threshold or were attempted
       const allSessionsAboveThreshold = sessions.every((session) => {
         const progress = session.userProgress?.[userId] || {};
         const latestCaseStudy = session.latestCaseStudy || null;
@@ -1143,14 +1143,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         return sessionCompletionPercentage >= 20;
       });
 
-      // Determine final course status
-      let overallStatus = "In Progress";
+      // Preserve previously completed courses
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+      let overallStatus = existingStatuses[String(courseId)] === "Completed"
+        ? "Completed"
+        : "In Progress";
 
-      // ✅ Business target check based on deductedWallet
-      const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
-
-      if (isBusinessTargetMet && allSessionsAboveThreshold) {
-        overallStatus = "Completed";
+      // Only mark Completed if not already Completed
+      if (overallStatus !== "Completed") {
+        const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
+        if (isBusinessTargetMet && allSessionsAboveThreshold) {
+          overallStatus = "Completed";
+        }
       }
 
       // Internship status overrides
@@ -1165,7 +1169,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       }
 
       // Save final course status permanently
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
