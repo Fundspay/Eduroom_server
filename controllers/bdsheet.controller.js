@@ -1008,13 +1008,6 @@ const getAccountTargetVsAchieved = async (req, res) => {
 
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
 
-
-"use strict";
-
-const axios = require("axios");
-const { Op } = require("sequelize");
-const model = require("../models");
-
 const calculateTeamManagerAccounts = async (req, res) => {
   try {
     let { from, to } = req.query;

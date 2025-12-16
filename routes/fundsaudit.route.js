@@ -11,6 +11,7 @@ router.delete("/delete/:id", fundsauditController.deleteFundsAudit);
 router.get("/list", fundsauditController.listAllFundsAudit);
 router.get ("/byname", fundsauditController.listAllFundsAuditByUser); 
 router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); 
+router.get ("/count", fundsauditController.getPaidAccountsDayWise); 
 
 
 

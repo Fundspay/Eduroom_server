@@ -458,3 +458,57 @@ const listAllFundsAuditByCollege = async (req, res) => {
 };
 
 module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
+
+
+// ✅ Get day-wise count of paid accounts for a Team Manager using managerId
+const getPaidAccountsDayWise = async (req, res) => {
+  try {
+    const { teamManagerId } = req.query;
+    if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
+
+    // ✅ Find the team manager's name from TeamManager table
+    const managerRecord = await TeamManager.findOne({
+      where: { managerId: teamManagerId },
+      attributes: ["name"]
+    });
+
+    if (!managerRecord) {
+      return ReS(res, { success: true, data: {}, message: "Team Manager not found" }, 200);
+    }
+
+    const teamManagerName = managerRecord.name;
+
+    // ✅ Find all users under this manager (using assignedTeamManager in User or Status table)
+    const statuses = await Status.findAll({
+      where: { teamManager: teamManagerName },
+      attributes: ["userId"]
+    });
+
+    const userIds = statuses.map(s => s.userId);
+    if (!userIds.length) return ReS(res, { success: true, data: {}, message: "No users under this manager" }, 200);
+
+    // ✅ Fetch FundsAudit records where hasPaid = true
+    const fundsAudits = await FundsAudit.findAll({
+      where: {
+        userId: { [Op.in]: userIds },
+        hasPaid: true
+      },
+      attributes: ["createdAt"]
+    });
+
+    // ✅ Build day-wise counts
+    const dayWiseCounts = {};
+    fundsAudits.forEach(f => {
+      const date = f.createdAt.toISOString().split("T")[0]; // YYYY-MM-DD
+      dayWiseCounts[date] = (dayWiseCounts[date] || 0) + 1;
+    });
+
+    return ReS(res, { success: true, teamManager: teamManagerName, data: dayWiseCounts }, 200);
+
+  } catch (err) {
+    console.error("Error in getPaidAccountsDayWise:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getPaidAccountsDayWise = getPaidAccountsDayWise;
