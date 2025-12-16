@@ -460,32 +460,51 @@ const listAllFundsAuditByCollege = async (req, res) => {
 module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
 
 
-// ✅ Get day-wise count of paid accounts for a Team Manager using managerId
 const getPaidAccountsDayWise = async (req, res) => {
   try {
-    const { teamManagerId } = req.query;
+    let { teamManagerId } = req.query;
+
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    // ✅ Find the team manager's name from TeamManager table
+    // Convert numeric string to number if possible
+    const numericId = Number(teamManagerId);
+    const isNumeric = !isNaN(numericId);
+
+    // ✅ Find manager by managerId (string) OR id (number)
     const managerRecord = await TeamManager.findOne({
-      where: { managerId: teamManagerId },
-      attributes: ["name"]
+      where: {
+        [Op.and]: [
+          { isDeleted: false, isActive: true }
+        ],
+        [Op.or]: isNumeric
+          ? [{ managerId: teamManagerId }, { id: numericId }]
+          : [{ managerId: teamManagerId }]
+      },
+      attributes: ["id", "managerId", "name"]
     });
 
     if (!managerRecord) {
-      return ReS(res, { success: true, data: {}, message: "Team Manager not found" }, 200);
+      return ReS(res, {
+        success: true,
+        data: {},
+        message: "Team Manager not found"
+      }, 200);
     }
 
     const teamManagerName = managerRecord.name;
 
-    // ✅ Find all users under this manager (using assignedTeamManager in User or Status table)
+    // ✅ Find all users under this manager (using assignedTeamManager in Status table)
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
       attributes: ["userId"]
     });
 
     const userIds = statuses.map(s => s.userId);
-    if (!userIds.length) return ReS(res, { success: true, data: {}, message: "No users under this manager" }, 200);
+    if (!userIds.length) return ReS(res, {
+      success: true,
+      data: {},
+      message: "No users under this manager"
+    }, 200);
 
     // ✅ Fetch FundsAudit records where hasPaid = true
     const fundsAudits = await FundsAudit.findAll({
@@ -503,7 +522,12 @@ const getPaidAccountsDayWise = async (req, res) => {
       dayWiseCounts[date] = (dayWiseCounts[date] || 0) + 1;
     });
 
-    return ReS(res, { success: true, teamManager: teamManagerName, data: dayWiseCounts }, 200);
+    return ReS(res, {
+      success: true,
+      teamManager: teamManagerName,
+      managerId: managerRecord.managerId,
+      data: dayWiseCounts
+    }, 200);
 
   } catch (err) {
     console.error("Error in getPaidAccountsDayWise:", err);
