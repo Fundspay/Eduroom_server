@@ -26,7 +26,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // 🔹 Count "Send JD" entries from CoSheet (date range applied)
+    // 🔹 Count "Send JD"
     const jdSentCount = await model.CoSheet.count({
       where: {
         teamManagerId: teamManagerId,
@@ -37,7 +37,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // 🔹 Count callResponse (NOT NULL) entries from CoSheet (date range applied)
+    // 🔹 Count callResponse (NOT NULL)
     const callResponseCount = await model.CoSheet.count({
       where: {
         teamManagerId: teamManagerId,
@@ -50,16 +50,31 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // 🔹 Sum resumeCount where followUpResponse = 'resume recieved'
-    const resumeReceivedSum = await model.CoSheet.sum("resumeCount", {
+    // 🔹 GET MANAGER NAME (same as getResumeAnalysis)
+    const manager = await model.TeamManager.findOne({
+      attributes: ["id", "name"],
+      where: { id: teamManagerId },
+      raw: true,
+    });
+
+    if (!manager) return ReE(res, "Invalid teamManagerId", 400);
+
+    const managerName = manager.name;
+
+    // 🔹 Resume received count (EXACT SAME LOGIC AS REFERENCE)
+    const resumeData = await model.CoSheet.findAll({
       where: {
-        teamManagerId: teamManagerId,
-        followUpResponse: "resumes recieved",
+        followUpBy: managerName,
+        followUpResponse: "resumes received",
         resumeDate: {
           [Op.between]: [sDate, eDate],
         },
       },
+      attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
+      raw: true,
     });
+
+    const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
     // Generate date list
     const dateList = [];
@@ -127,7 +142,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         success: true,
         jdSentCount,
         callResponseCount,
-        resumeReceivedSum: resumeReceivedSum || 0,
+        resumeReceivedSum,
         dates: merged,
         totals,
       },
@@ -139,6 +154,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
