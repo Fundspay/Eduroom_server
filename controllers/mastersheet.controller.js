@@ -1,7 +1,8 @@
 "use strict";
 const { ReE, ReS } = require("../utils/util.service.js");
 const model = require("../models");
-const { Op } = require("sequelize");
+const { Op, fn, col } = require("sequelize");
+
 
 var fetchMasterSheetTargets = async function (req, res) {
   try {
