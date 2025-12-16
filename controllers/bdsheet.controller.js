@@ -712,6 +712,8 @@ const getBdSheetByDateRange = async (req, res) => {
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
 
+
+
 const getTargetVsAchieved = async (req, res) => {
   try {
     const { managerId, from, to } = req.query;
@@ -720,10 +722,11 @@ const getTargetVsAchieved = async (req, res) => {
       return ReE(res, "managerId, from, to are required", 400);
     }
 
+    // 1️⃣ Validate manager
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
-    // Fetch targets from database
+    // 2️⃣ Fetch targets from database
     const sDate = new Date(from);
     const eDate = new Date(to);
 
@@ -734,40 +737,17 @@ const getTargetVsAchieved = async (req, res) => {
       },
     });
 
-    // Fetch achieved counts from referral API
-    const phone = "+91" + manager.mobileNumber;
-    const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
-
+    // 3️⃣ Fetch achieved data from internal endpoint
+    const url = `https://eduroom.in/api/v1/fundsaudit/count?teamManagerId=${managerId}`;
     const response = await axios.get(url);
-    const data = response.data;
+    const achievedData = response.data?.data || {};
 
-    if (!data?.result?.referred_users) {
-      return ReE(res, "Invalid API response from referral service", 500);
-    }
-
-    const referredUsers = data.result.referred_users;
-
-    // ----- DATE-WISE ACHIEVED COUNT -----
-    const dateWiseAchieved = {};
-
-    referredUsers.forEach(user => {
-      user.daily_paid_counts.forEach(d => {
-        const date = d.date;
-        const paidCount = parseInt(d.paid_count);
-
-        if (!dateWiseAchieved[date]) dateWiseAchieved[date] = 0;
-        dateWiseAchieved[date] += paidCount;
-      });
-    });
-
-    // ----- GENERATE FULL DATE RANGE -----
+    // 4️⃣ Generate full date range
     function getDateRange(from, to) {
       const start = new Date(from);
       const end = new Date(to);
       const result = [];
-
       let current = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-
       while (current <= end) {
         const yyyy = current.getFullYear();
         const mm = String(current.getMonth() + 1).padStart(2, "0");
@@ -775,21 +755,16 @@ const getTargetVsAchieved = async (req, res) => {
         result.push(`${yyyy}-${mm}-${dd}`);
         current.setDate(current.getDate() + 1);
       }
-
       return result;
     }
 
     const allDates = getDateRange(from, to);
 
-    // ----- BUILD DATE-WISE COMPARISON ARRAY -----
+    // 5️⃣ Build date-wise comparison
     const dateWiseComparison = allDates.map(date => {
-      const target = targets.find(t => {
-        const tDate = new Date(t.targetDate).toLocaleDateString("en-CA");
-        return tDate === date;
-      });
-
+      const target = targets.find(t => new Date(t.targetDate).toISOString().split("T")[0] === date);
       const targetCount = target ? target.accounts : 0;
-      const achievedCount = dateWiseAchieved[date] || 0;
+      const achievedCount = achievedData[date] || 0;
 
       return {
         date,
@@ -800,7 +775,7 @@ const getTargetVsAchieved = async (req, res) => {
       };
     });
 
-    // ----- TOTALS -----
+    // 6️⃣ Totals
     const totalTarget = dateWiseComparison.reduce((sum, d) => sum + d.target, 0);
     const totalAchieved = dateWiseComparison.reduce((sum, d) => sum + d.achieved, 0);
     const totalDifference = totalAchieved - totalTarget;
@@ -824,6 +799,7 @@ const getTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
+
 
 
 const getBdTlLeaderboard = async (req, res) => {
