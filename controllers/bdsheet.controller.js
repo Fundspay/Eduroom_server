@@ -837,10 +837,10 @@ const getBdTlLeaderboard = async (req, res) => {
       });
       const userIds = statuses.map(s => s.userId);
 
-      // Achieved counts
-      let totalAchieved = 0;
+      // Achieved interns count (distinct users with hasPaid = true)
+      let achievedInterns = 0;
       if (userIds.length) {
-        const results = await FundsAudit.sequelize.query(
+        const internsResult = await FundsAudit.sequelize.query(
           `
           SELECT COUNT(DISTINCT "userId") AS achieved
           FROM "FundsAudits"
@@ -853,31 +853,48 @@ const getBdTlLeaderboard = async (req, res) => {
             type: FundsAudit.sequelize.QueryTypes.SELECT,
           }
         );
-        totalAchieved = results[0]?.achieved || 0;
+        achievedInterns = internsResult[0]?.achieved || 0;
       }
 
-      // Targets
+      // Achieved accounts (sum of businessTask from BdSheet)
+      const sheets = await BdSheet.findAll({
+        where: {
+          teamManagerId: manager.id,
+          startDate: { [Op.between]: [from, to] },
+        },
+        attributes: ["businessTask"],
+      });
+
+      const achievedAccounts = sheets.reduce(
+        (sum, s) => sum + (parseInt(s.businessTask) || 0),
+        0
+      );
+
+      // Targets from BdTarget
       const targets = await BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
           targetDate: { [Op.between]: [from, to] },
         },
       });
-      const totalTeamTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
-      const totalTeamAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
-      const totalTeamActive = targets.reduce((sum, t) => sum + (t.internsActive || 0), 0);
 
-      const efficiency = totalTeamTarget > 0
-        ? ((totalAchieved / totalTeamTarget) * 100).toFixed(2)
+      const internsAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
+      const internsActive = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
+      const accountsTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
+
+      const efficiency = accountsTarget > 0
+        ? ((achievedAccounts / accountsTarget) * 100).toFixed(2)
         : 0;
 
       leaderboardData.push({
         tlName: manager.name,
         mobileNumber: manager.mobileNumber,
-        totalTeamAllocated,
-        totalTeamActive,
-        accountTarget: totalTeamTarget,
-        accountAchieved: totalAchieved,
+        internsAllocated,        // Target
+        totalInterns: achievedInterns,  // Achieved
+        internsActive,           // Target
+        activeInterns: achievedInterns, // Achieved
+        accounts: achievedAccounts,     // Achieved
+        accountsTarget,          // Target
         efficiency: parseFloat(efficiency),
       });
     }
