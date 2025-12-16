@@ -50,19 +50,11 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // 🔹 Get Team Manager name
-    const teamManager = await model.TeamManager.findOne({
-      where: { id: teamManagerId },
-      attributes: ["name"],
-    });
-
-    if (!teamManager) return ReE(res, "Team Manager not found", 404);
-
-    // 🔹 Sum resumeCount using followUpBy (manager name)
+    // 🔹 Sum resumeCount where followUpResponse = 'resume recieved'
     const resumeReceivedSum = await model.CoSheet.sum("resumeCount", {
       where: {
-        followUpBy: teamManager.name,
-        followUpResponse: "resume recieved",
+        teamManagerId: teamManagerId,
+        followUpResponse: "resumes recieved",
         resumeDate: {
           [Op.between]: [sDate, eDate],
         },
@@ -147,7 +139,6 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
-
 
 
 
