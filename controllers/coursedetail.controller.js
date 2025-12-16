@@ -1149,7 +1149,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       // Determine final course status
       let overallStatus = "In Progress";
-      const isBusinessTargetMet = subscriptionLeft >= businessTarget;
+
+      // ✅ FIXED: check business target based on deductedWallet
+      const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
 
       if (isBusinessTargetMet && allSessionsAboveThreshold) {
         overallStatus = "Completed";
@@ -1194,6 +1196,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
