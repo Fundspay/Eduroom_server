@@ -667,7 +667,11 @@ const getBdSheetByDateRange = async (req, res) => {
           s => new Date(s.startDate).toLocaleDateString("en-CA") === d.date
         );
 
-        const achievedInterns = sheetsForDate.filter(
+        // Total interns = all BdSheet entries for this date
+        const totalInternsForDay = sheetsForDate.length;
+
+        // Active interns = BdSheet entries with activeStatus = "active"
+        const activeInternsForDay = sheetsForDate.filter(
           s => s.activeStatus?.toLowerCase() === "active"
         ).length;
 
@@ -679,9 +683,9 @@ const getBdSheetByDateRange = async (req, res) => {
         return {
           ...d,
           internsAllocated: target ? target.internsAllocated : 0,  // Target
-          totalInterns: achievedInterns,                           // Achieved
+          totalInterns: totalInternsForDay,                        // Achieved (all BdSheet entries)
           internsActive: target ? target.accounts : 0,             // Target
-          activeInterns: achievedInterns,                          // Achieved
+          activeInterns: activeInternsForDay,                      // Achieved (active status only)
           accounts: achievedAccounts,                              // Achieved (businessTask sum)
         };
       });
@@ -689,10 +693,10 @@ const getBdSheetByDateRange = async (req, res) => {
       // ✅ Calculate totals as sum across all days in the date range
       const totals = {
         internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),  // Total target for period
-        totalInterns: merged.reduce((sum, t) => sum + t.totalInterns, 0),          // Total achieved for period
+        totalInterns: merged.reduce((sum, t) => sum + t.totalInterns, 0),          // Total BdSheet entries
         internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),        // Total target for period
-        activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),        // Total achieved for period
-        accounts: merged.reduce((sum, t) => sum + t.accounts, 0),                  // Total achieved for period
+        activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),        // Total active entries
+        accounts: merged.reduce((sum, t) => sum + t.accounts, 0),                  // Total achieved accounts
       };
 
       result.push({
