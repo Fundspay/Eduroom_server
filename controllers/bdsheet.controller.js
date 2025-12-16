@@ -113,6 +113,7 @@ const getBdSheet = async (req, res) => {
         "mobileNumber",
         "emailId",
         "domain",
+        "collegeName",
       ],
       include: [
         {
