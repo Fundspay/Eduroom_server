@@ -3,7 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
-const { TeamManager, BdTarget , Status,FundsAudit } = require("../models");
+const { TeamManager, BdTarget , Status,FundsAudit,BdSheet } = require("../models");
 
 const upsertBdSheet = async (req, res) => {
   try {
