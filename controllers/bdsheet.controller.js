@@ -854,41 +854,35 @@ const getBdTlLeaderboard = async (req, res) => {
     const leaderboardData = [];
 
     for (const manager of teamManagers) {
-      // Users under this manager
-      const statuses = await Status.findAll({
-        where: { teamManager: manager.name },
-        attributes: ["userId"],
-      });
-      const userIds = statuses.map(s => s.userId);
-
-      // Achieved interns count (distinct users with hasPaid = true)
-      let achievedInterns = 0;
-      if (userIds.length) {
-        const internsResult = await FundsAudit.sequelize.query(
-          `
-          SELECT COUNT(DISTINCT "userId") AS achieved
-          FROM "FundsAudits"
-          WHERE "userId" IN (:userIds)
-            AND "hasPaid" = true
-            AND "createdAt" BETWEEN :from AND :to
-          `,
-          {
-            replacements: { userIds, from, to },
-            type: FundsAudit.sequelize.QueryTypes.SELECT,
-          }
-        );
-        achievedInterns = internsResult[0]?.achieved || 0;
-      }
-
-      // Achieved accounts (sum of businessTask from BdSheet)
-      const sheets = await BdSheet.findAll({
+      // Fetch BdSheet entries (try both teamManagerId and tlAllocated)
+      let sheets = await BdSheet.findAll({
         where: {
           teamManagerId: manager.id,
           startDate: { [Op.between]: [from, to] },
         },
-        attributes: ["businessTask"],
+        attributes: ["startDate", "activeStatus", "businessTask"],
       });
 
+      // If no results with teamManagerId, try with tlAllocated (manager name)
+      if (sheets.length === 0) {
+        sheets = await BdSheet.findAll({
+          where: {
+            tlAllocated: manager.name,
+            startDate: { [Op.between]: [from, to] },
+          },
+          attributes: ["startDate", "activeStatus", "businessTask"],
+        });
+      }
+
+      // Total interns = all BdSheet entries
+      const totalInterns = sheets.length;
+
+      // Active interns = BdSheet entries with activeStatus = "active"
+      const activeInterns = sheets.filter(
+        s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
+      ).length;
+
+      // Achieved accounts (sum of businessTask from BdSheet)
       const achievedAccounts = sheets.reduce(
         (sum, s) => sum + (parseInt(s.businessTask) || 0),
         0
@@ -914,9 +908,9 @@ const getBdTlLeaderboard = async (req, res) => {
         tlName: manager.name,
         mobileNumber: manager.mobileNumber,
         internsAllocated,        // Target
-        totalInterns: achievedInterns,  // Achieved
+        totalInterns,            // Achieved (from BdSheet count)
         internsActive,           // Target
-        activeInterns: achievedInterns, // Achieved
+        activeInterns,           // Achieved (from BdSheet with activeStatus)
         accounts: achievedAccounts,     // Achieved
         accountsTarget,          // Target
         efficiency: parseFloat(efficiency),
@@ -931,7 +925,7 @@ const getBdTlLeaderboard = async (req, res) => {
       if (b.accounts !== a.accounts) {
         return b.accounts - a.accounts;
       }
-      return parseInt(b.totalInterns) - parseInt(a.totalInterns);
+      return b.totalInterns - a.totalInterns;
     });
     const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
 

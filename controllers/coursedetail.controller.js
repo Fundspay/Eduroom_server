@@ -1196,6 +1196,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         }
       }
 
+      // ✅ If status is "Completed", show 100% completion rate
+      let displayCompletionRate = overallCompletionRate;
+      if (overallStatus === "Completed") {
+        displayCompletionRate = 100;
+      }
+
       // Save final course status
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
@@ -1207,7 +1213,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         coursePreviews: course.CoursePreviews || [],
         overallStatus,
-        overallCompletionRate: Number(overallCompletionRate.toFixed(2)),
+        overallCompletionRate: Number(displayCompletionRate.toFixed(2)), // ✅ Use displayCompletionRate
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
