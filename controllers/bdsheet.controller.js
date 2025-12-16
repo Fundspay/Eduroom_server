@@ -1010,10 +1010,9 @@ const getAccountTargetVsAchieved = async (req, res) => {
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
 
 
-
-const calculateTeamManagerAccounts = async (req, res) => {
+const getAccountsCountWithTargetSummary = async (req, res) => {
   try {
-    let { from, to } = req.query;
+    const { from, to } = req.query;
 
     if (!from || !to) {
       return res.status(400).json({
@@ -1023,90 +1022,53 @@ const calculateTeamManagerAccounts = async (req, res) => {
     }
 
     // -----------------------------
-    // 1️⃣ Call external payment API
+    // 1️⃣ External API (ACHIEVED COUNT)
     // -----------------------------
     const paymentApiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getTotalPayments?from_date=${from}&to_date=${to}`;
-    const paymentResponse = await axios.get(paymentApiUrl);
-    const payments = paymentResponse.data.payments || [];
+    const response = await axios.get(paymentApiUrl);
+
+    const payments = response.data.payments || [];
+
+    const daily = payments.map((p) => ({
+      date: p.date,
+      accountsAchieved: Number(p.total_count) || 0,
+    }));
+
+    const totalAccountsAchieved = daily.reduce(
+      (sum, d) => sum + d.accountsAchieved,
+      0
+    );
 
     // -----------------------------
-    // 2️⃣ Get all team managers
+    // 2️⃣ BD TARGET (TOTAL ONLY)
     // -----------------------------
-    const teamManagers = await model.TeamManager.findAll();
-
-    const result = [];
-
-    for (const manager of teamManagers) {
-      // -----------------------------
-      // 3️⃣ Get BdTarget data
-      // -----------------------------
-      const bdTargets = await model.BdTarget.findAll({
-        where: {
-          teamManagerId: manager.id,
-          targetDate: {
-            [Op.between]: [from, to],
-          },
+    const bdTargets = await model.BdTarget.findAll({
+      where: {
+        targetDate: {
+          [Op.between]: [from, to],
         },
-      });
+      },
+      attributes: ["accounts"],
+    });
 
-      // -----------------------------
-      // 4️⃣ Index targets by date
-      // -----------------------------
-      const targetMap = {};
-      for (const t of bdTargets) {
-        const dateKey = new Date(t.targetDate)
-          .toISOString()
-          .split("T")[0];
+    const totalAccountsTarget = bdTargets.reduce(
+      (sum, t) => sum + (Number(t.accounts) || 0),
+      0
+    );
 
-        targetMap[dateKey] = Number(t.accounts) || 0;
-      }
-
-      // -----------------------------
-      // 5️⃣ Merge COUNTS (not amount)
-      // -----------------------------
-      const merged = payments.map((p) => {
-        const achievedCount = Number(p.total_count) || 0;
-        const accountsTarget = targetMap[p.date] || 0;
-
-        return {
-          date: p.date,
-          accountsAchieved: achievedCount,
-          accountsTarget,
-          difference: achievedCount - accountsTarget,
-        };
-      });
-
-      // -----------------------------
-      // 6️⃣ Totals (COUNT BASED)
-      // -----------------------------
-      const totals = {
-        totalAccountsAchieved: merged.reduce(
-          (sum, m) => sum + m.accountsAchieved,
-          0
-        ),
-        totalAccountsTarget: merged.reduce(
-          (sum, m) => sum + m.accountsTarget,
-          0
-        ),
-        totalDifference: merged.reduce(
-          (sum, m) => sum + m.difference,
-          0
-        ),
-      };
-
-      result.push({
-        teamManagerId: manager.id,
-        teamManagerName: manager.name,
-        merged,
-        totals,
-      });
-    }
-
+    // -----------------------------
+    // 3️⃣ Final Response
+    // -----------------------------
     return res.status(200).json({
       success: true,
-      data: result,
       from,
       to,
+      daily, // optional but useful
+      totals: {
+        totalAccountsAchieved,
+        totalAccountsTarget,
+        difference: totalAccountsAchieved - totalAccountsTarget,
+      },
     });
   } catch (error) {
     console.error("Error:", error);
@@ -1117,5 +1079,5 @@ const calculateTeamManagerAccounts = async (req, res) => {
   }
 };
 
-module.exports.calculateTeamManagerAccounts =
-  calculateTeamManagerAccounts;
+module.exports.getAccountsCountWithTargetSummary =
+  getAccountsCountWithTargetSummary;
