@@ -113,6 +113,7 @@ const getBdSheet = async (req, res) => {
         "mobileNumber",
         "emailId",
         "domain",
+        "collegeName",
       ],
       include: [
         {
@@ -1007,6 +1008,7 @@ const getAccountTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
+
 
 const calculateTeamManagerAccounts = async (req, res) => {
   try {

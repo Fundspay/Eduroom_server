@@ -30,6 +30,7 @@ const bdtargetRouter = require("./bdtarget.route");
 const bdsheetRouter = require("./bdsheet.route");
 const calculatorRouter = require("./calculator.route");
 const emailbodyRouter = require("./emailbody.route");
+const mastersheetRouter = require("./mastersheet.route");
 
 
 
@@ -68,6 +69,7 @@ router.use("/bdtarget", bdtargetRouter);
 router.use("/bdsheet", bdsheetRouter);
 router.use("/calculator", calculatorRouter);
 router.use("/emailbody", emailbodyRouter);
+router.use("/mastersheet", mastersheetRouter);
 
 
 module.exports = router;
