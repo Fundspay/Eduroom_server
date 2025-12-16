@@ -978,13 +978,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const { userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user instance
+    // Fetch user
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.reload();
 
-    // Normalize businessTargets for backward compatibility
+    // Normalize businessTargets
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
@@ -1071,7 +1071,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           if (totalMCQs > 0) {
             sessionCompletionPercentage = (correctMCQs / totalMCQs) * 100;
           } else if (attempted) {
-            sessionCompletionPercentage = 100; // Consider attempted session complete
+            sessionCompletionPercentage = 100; // Attempted session considered complete
           }
         }
 
@@ -1122,7 +1122,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // Business targets
       const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
@@ -1152,8 +1151,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         });
 
         const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
+
+        // Strict: mark completed only if business target is met
         if (isBusinessTargetMet && allSessionsAboveThreshold) {
           overallStatus = "Completed";
+        } else {
+          overallStatus = "In Progress";
         }
       }
 
@@ -1161,21 +1164,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       if (
         courseId === "9" &&
         overallStatus !== "Completed" &&
-        Number(overallCompletionRate) >= 99.99 && // handles numeric/string issues
-        subscriptiondeductedWallet === 1
+        Number(overallCompletionRate) >= 99.99 &&
+        subscriptiondeductedWallet >= 1
       ) {
         const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
-        if (courseStartDateStr) {
-          const courseStartDate = new Date(courseStartDateStr);
-          const cutoffDate = new Date("2025-12-10");
-          if (courseStartDate < cutoffDate) {
-            overallStatus = "Completed";
-            console.log(`Special rule applied for user ${user.id}, course 9`);
-          }
-        } else {
-          // If startDate missing, still apply for safety
+        if (!courseStartDateStr || new Date(courseStartDateStr) < new Date("2025-12-10")) {
           overallStatus = "Completed";
-          console.log(`Special rule applied for user ${user.id}, course 9 (no startDate)`);
+          console.log(`Special rule applied for user ${user.id}, course 9`);
         }
       }
 
