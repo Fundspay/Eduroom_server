@@ -882,11 +882,33 @@ const getBdTlLeaderboard = async (req, res) => {
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // Achieved accounts (sum of businessTask from BdSheet)
-      const achievedAccounts = sheets.reduce(
-        (sum, s) => sum + (parseInt(s.businessTask) || 0),
-        0
-      );
+      // Achieved accounts - use FundsAudit to count users who paid
+      const statuses = await Status.findAll({
+        where: { teamManager: manager.name },
+        attributes: ["userId"],
+      });
+      const userIds = statuses.map(s => s.userId);
+
+      console.log(`Manager ${manager.name}: Found ${userIds.length} users in Status table`);
+
+      let achievedAccounts = 0;
+      if (userIds.length) {
+        const accountsResult = await FundsAudit.sequelize.query(
+          `
+          SELECT COUNT(DISTINCT "userId") AS achieved
+          FROM "FundsAudits"
+          WHERE "userId" IN (:userIds)
+            AND "hasPaid" = true
+            AND "createdAt" BETWEEN :from AND :to
+          `,
+          {
+            replacements: { userIds, from, to },
+            type: FundsAudit.sequelize.QueryTypes.SELECT,
+          }
+        );
+        achievedAccounts = parseInt(accountsResult[0]?.achieved || 0);
+        console.log(`Manager ${manager.name}: Found ${achievedAccounts} accounts achieved from FundsAudit`);
+      }
 
       // Targets from BdTarget
       const targets = await BdTarget.findAll({
