@@ -96,10 +96,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    //  RESUME SELECTED COUNT (NEW – NOTHING ELSE TOUCHED)
+    //  RESUME SELECTED COUNT (USING interviewedBy)
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
-        teamManagerId,
+        interviewedBy: managerName,
         finalSelectionStatus: "Selected",
         interviewDate: { [Op.between]: [sDate, eDate] },
       },
@@ -173,7 +173,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         callResponseCount,
         resumeReceivedSum,
         followUpsCount,
-        resumeSelectedCount, // NEW FIELD
+        resumeSelectedCount, 
         collegesAchieved,
         dates: merged,
         totals,
