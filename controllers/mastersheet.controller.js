@@ -27,7 +27,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    //  Count "Send JD"
+    // Count "Send JD"
     const jdSentCount = await model.CoSheet.count({
       where: {
         teamManagerId,
@@ -36,7 +36,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    //  Count callResponse (NOT NULL)
+    // Count callResponse (NOT NULL)
     const callResponseCount = await model.CoSheet.count({
       where: {
         teamManagerId,
@@ -45,7 +45,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    //  GET MANAGER NAME
+    // GET MANAGER NAME
     const manager = await model.TeamManager.findOne({
       attributes: ["id", "name"],
       where: { id: teamManagerId },
@@ -56,7 +56,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 
     const managerName = manager.name.trim();
 
-    //  Resume received sum
+    // Resume received sum
     const resumeData = await model.CoSheet.findAll({
       where: {
         followUpBy: managerName,
@@ -69,7 +69,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 
     const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
-    //  ACTUAL COLLEGE COUNT (SAME AS getUserTargetAnalysis)
+    // ACTUAL COLLEGE COUNT
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
@@ -86,6 +86,15 @@ var fetchMasterSheetTargets = async function (req, res) {
     });
 
     const collegesAchieved = collegeSet.size;
+
+    // FOLLOW-UPS COUNT (SAME LOGIC AS fetchCategoryData + DATE RANGE)
+    const followUpsCount = await model.CoSheet.count({
+      where: {
+        followUpBy: managerName,
+        followUpResponse: { [Op.ne]: null },
+        resumeDate: { [Op.between]: [sDate, eDate] },
+      },
+    });
 
     // Generate date list
     const dateList = [];
@@ -154,7 +163,8 @@ var fetchMasterSheetTargets = async function (req, res) {
         jdSentCount,
         callResponseCount,
         resumeReceivedSum,
-        collegesAchieved, // ACTUAL college count
+        followUpsCount,
+        collegesAchieved,
         dates: merged,
         totals,
       },
@@ -166,6 +176,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
