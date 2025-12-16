@@ -50,6 +50,17 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
+    // 🔹 Sum resumeCount where followUpResponse = 'resume recieved'
+    const resumeReceivedSum = await model.CoSheet.sum("resumeCount", {
+      where: {
+        teamManagerId: teamManagerId,
+        followUpResponse: "resume recieved",
+        resumeDate: {
+          [Op.between]: [sDate, eDate],
+        },
+      },
+    });
+
     // Generate date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
@@ -116,6 +127,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         success: true,
         jdSentCount,
         callResponseCount,
+        resumeReceivedSum: resumeReceivedSum || 0,
         dates: merged,
         totals,
       },
@@ -127,5 +139,6 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
