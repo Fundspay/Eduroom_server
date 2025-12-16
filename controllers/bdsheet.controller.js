@@ -678,19 +678,21 @@ const getBdSheetByDateRange = async (req, res) => {
 
         return {
           ...d,
-          internsAllocated: target ? target.internsAllocated : 0,
-          internsActive: target ? target.accounts : 0,
-          activeInterns: achievedInterns,
-          accounts: achievedAccounts,
+          internsAllocated: target ? target.internsAllocated : 0,  // Target
+          totalInterns: achievedInterns,                           // Achieved
+          internsActive: target ? target.accounts : 0,             // Target
+          activeInterns: achievedInterns,                          // Achieved
+          accounts: achievedAccounts,                              // Achieved (businessTask sum)
         };
       });
 
+      // ✅ Calculate totals as sum across all days in the date range
       const totals = {
-        totalInterns: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
-        internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),
-        internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),
-        activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),
-        accounts: merged.reduce((sum, t) => sum + t.accounts, 0),
+        internsAllocated: merged.reduce((sum, t) => sum + t.internsAllocated, 0),  // Total target for period
+        totalInterns: merged.reduce((sum, t) => sum + t.totalInterns, 0),          // Total achieved for period
+        internsActive: merged.reduce((sum, t) => sum + t.internsActive, 0),        // Total target for period
+        activeInterns: merged.reduce((sum, t) => sum + t.activeInterns, 0),        // Total achieved for period
+        accounts: merged.reduce((sum, t) => sum + t.accounts, 0),                  // Total achieved for period
       };
 
       result.push({
@@ -706,7 +708,6 @@ const getBdSheetByDateRange = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
 
