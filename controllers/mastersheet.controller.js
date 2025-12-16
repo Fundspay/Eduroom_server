@@ -3,7 +3,6 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const model = require("../models");
 const { Op, fn, col } = require("sequelize");
 
-
 var fetchMasterSheetTargets = async function (req, res) {
   try {
     let { teamManagerId, startDate, endDate, month } = req.query;
@@ -100,7 +99,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: managerName,
-        finalSelectionStatus: "selected",
+        finalSelectionStatus: "Selected",
         interviewDate: { [Op.between]: [sDate, eDate] },
       },
     });
@@ -173,7 +172,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         callResponseCount,
         resumeReceivedSum,
         followUpsCount,
-        resumeSelectedCount, 
+        resumeSelectedCount,
         collegesAchieved,
         dates: merged,
         totals,
@@ -186,10 +185,3 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
-
-
-
-
-
-
-
