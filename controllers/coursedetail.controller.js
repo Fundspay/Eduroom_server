@@ -1009,7 +1009,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       courses: [],
     };
 
-    const courseIds = Object.keys(user.courseStatuses || {});
+    const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
+    const courseIds = Object.keys(existingStatuses);
+
     for (const courseId of courseIds) {
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
@@ -1125,32 +1127,30 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // Check if all sessions are above threshold or were attempted
-      const allSessionsAboveThreshold = sessions.every((session) => {
-        const progress = session.userProgress?.[userId] || {};
-        const latestCaseStudy = session.latestCaseStudy || null;
-
-        let sessionCompletionPercentage = 0;
-
-        if (latestCaseStudy) {
-          sessionCompletionPercentage = latestCaseStudy.matchPercentage;
-        } else if (progress.totalMCQs && progress.correctMCQs !== undefined) {
-          sessionCompletionPercentage = (progress.correctMCQs / progress.totalMCQs) * 100;
-        } else if (progress && Object.keys(progress).length > 0) {
-          sessionCompletionPercentage = 100; // Consider attempted session complete
-        }
-
-        return sessionCompletionPercentage >= 20;
-      });
-
       // Preserve previously completed courses
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       let overallStatus = existingStatuses[String(courseId)] === "Completed"
         ? "Completed"
         : "In Progress";
 
-      // Only mark Completed if not already Completed
+      // Only recalc if not already Completed
       if (overallStatus !== "Completed") {
+        const allSessionsAboveThreshold = sessions.every((session) => {
+          const progress = session.userProgress?.[userId] || {};
+          const latestCaseStudy = session.latestCaseStudy || null;
+
+          let sessionCompletionPercentage = 0;
+
+          if (latestCaseStudy) {
+            sessionCompletionPercentage = latestCaseStudy.matchPercentage;
+          } else if (progress.totalMCQs && progress.correctMCQs !== undefined) {
+            sessionCompletionPercentage = (progress.correctMCQs / progress.totalMCQs) * 100;
+          } else if (progress && Object.keys(progress).length > 0) {
+            sessionCompletionPercentage = 100; // Consider attempted session complete
+          }
+
+          return sessionCompletionPercentage >= 20;
+        });
+
         const isBusinessTargetMet = subscriptiondeductedWallet >= businessTarget;
         if (isBusinessTargetMet && allSessionsAboveThreshold) {
           overallStatus = "Completed";
