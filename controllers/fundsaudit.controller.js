@@ -462,9 +462,10 @@ module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
 
 const getPaidAccountsDayWise = async (req, res) => {
   try {
-    let { teamManagerId } = req.query;
+    let { teamManagerId, from, to } = req.query;
 
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
+    if (!from || !to) return ReE(res, "from and to dates are required", 400);
 
     // Convert numeric string to number if possible
     const numericId = Number(teamManagerId);
@@ -473,60 +474,60 @@ const getPaidAccountsDayWise = async (req, res) => {
     // ✅ Find manager by managerId (string) OR id (number)
     const managerRecord = await TeamManager.findOne({
       where: {
-        [Op.and]: [
-          { isDeleted: false, isActive: true }
-        ],
+        [Op.and]: [{ isDeleted: false, isActive: true }],
         [Op.or]: isNumeric
           ? [{ managerId: teamManagerId }, { id: numericId }]
-          : [{ managerId: teamManagerId }]
+          : [{ managerId: teamManagerId }],
       },
-      attributes: ["id", "managerId", "name"]
+      attributes: ["id", "managerId", "name", "createdAt"],
     });
 
     if (!managerRecord) {
       return ReS(res, {
         success: true,
         data: {},
-        message: "Team Manager not found"
+        message: "Team Manager not found",
       }, 200);
     }
 
     const teamManagerName = managerRecord.name;
 
-    // ✅ Find all users under this manager (using assignedTeamManager in Status table)
+    // ✅ Find all users under this manager (using Status table)
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
-      attributes: ["userId"]
+      attributes: ["userId"],
     });
 
-    const userIds = statuses.map(s => s.userId);
-    if (!userIds.length) return ReS(res, {
-      success: true,
-      data: {},
-      message: "No users under this manager"
-    }, 200);
+    const userIds = statuses.map((s) => s.userId);
+    if (!userIds.length)
+      return ReS(res, { success: true, data: {}, message: "No users under this manager" }, 200);
 
-    // ✅ Fetch FundsAudit records where hasPaid = true
-    const fundsAudits = await FundsAudit.findAll({
-      where: {
-        userId: { [Op.in]: userIds },
-        hasPaid: true
-      },
-      attributes: ["createdAt"]
-    });
+    // ✅ Fetch FundsAudit records where hasPaid = true, between from/to, counting DISTINCT users per day
+    const [results] = await FundsAudit.sequelize.query(
+      `
+      SELECT DATE("createdAt") AS paid_date,
+             COUNT(DISTINCT "userId") AS unique_paid_users
+      FROM "FundsAudits"
+      WHERE "userId" IN (:userIds)
+        AND "hasPaid" = true
+        AND "createdAt" BETWEEN :from AND :to
+      GROUP BY DATE("createdAt")
+      ORDER BY DATE("createdAt");
+      `,
+      { replacements: { userIds, from, to }, type: FundsAudit.sequelize.QueryTypes.SELECT }
+    );
 
-    // ✅ Build day-wise counts
+    // ✅ Build day-wise object
     const dayWiseCounts = {};
-    fundsAudits.forEach(f => {
-      const date = f.createdAt.toISOString().split("T")[0]; // YYYY-MM-DD
-      dayWiseCounts[date] = (dayWiseCounts[date] || 0) + 1;
+    results.forEach((row) => {
+      dayWiseCounts[row.paid_date] = parseInt(row.unique_paid_users);
     });
 
     return ReS(res, {
       success: true,
       teamManager: teamManagerName,
       managerId: managerRecord.managerId,
-      data: dayWiseCounts
+      data: dayWiseCounts,
     }, 200);
 
   } catch (err) {
