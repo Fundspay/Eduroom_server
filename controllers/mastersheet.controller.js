@@ -195,6 +195,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
     const today = new Date();
     let sDate, eDate;
 
+    // Month handling or default to current month
     if (month) {
       const [year, mon] = month.split("-");
       sDate = new Date(year, mon - 1, 1);
@@ -207,9 +208,11 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
+    // Normalize date range
     sDate.setHours(0, 0, 0, 0);
     eDate.setHours(23, 59, 59, 999);
 
+    // Fetch all managers
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "mobileNumber"],
       raw: true,
@@ -258,9 +261,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       });
 
       const collegeSet = new Set();
-      resumes.forEach((r) => {
-        if (r.collegeName) collegeSet.add(r.collegeName);
-      });
+      resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
       const collegesAchieved = collegeSet.size;
 
       const followUpsCount = await model.CoSheet.count({
@@ -306,18 +307,19 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
+      // ✅ FIXED percentage calculation
       const percentage = {
-        jds: target.jds ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
-        calls: target.calls ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
-        followUps: target.followUps ? parseFloat(((followUpsCount / target.followUps) * 100).toFixed(2)) : 0,
-        resumetarget: target.resumetarget ? parseFloat(((resumeReceivedSum / target.resumetarget) * 100).toFixed(2)) : 0,
-        collegeTarget: target.collegeTarget ? parseFloat(((collegesAchieved / target.collegeTarget) * 100).toFixed(2)) : 0,
-        resumesReceivedTarget: target.resumesReceivedTarget
+        jds: Number(target.jds) > 0 ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
+        calls: Number(target.calls) > 0 ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
+        followUps: Number(target.followUps) > 0 ? parseFloat(((followUpsCount / target.followUps) * 100).toFixed(2)) : 0,
+        resumetarget: Number(target.resumetarget) > 0 ? parseFloat(((resumeReceivedSum / target.resumetarget) * 100).toFixed(2)) : 0,
+        collegeTarget: Number(target.collegeTarget) > 0 ? parseFloat(((collegesAchieved / target.collegeTarget) * 100).toFixed(2)) : 0,
+        resumesReceivedTarget: Number(target.resumesReceivedTarget) > 0
           ? parseFloat(((followUpsCount / target.resumesReceivedTarget) * 100).toFixed(2))
           : 0,
       };
 
-      // RANK SCORE CALCULATION (your formula)
+      // ✅ FIXED rank score
       const rankScore = parseFloat(
         (
           (
@@ -327,10 +329,9 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
             8 * percentage.resumetarget +
             9 * percentage.collegeTarget +
             10 * percentage.resumesReceivedTarget
-          ) / 6
-        * 100
+          ) / 6 * 100
         ).toFixed(2)
-      );
+      ) || 0;
 
       managerData.push({
         ...manager,
@@ -342,34 +343,30 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         collegesAchieved,
         target,
         percentage,
-        rankScore, 
+        rankScore,
       });
     }
 
-    // SORT & ASSIGN RANK
+    // ✅ Ranking
     managerData.sort((a, b) => b.rankScore - a.rankScore);
-
-    managerData.forEach((m, index) => {
-      m.rank = index + 1;
+    managerData.forEach((m, i) => {
+      m.rank = i + 1;
     });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        managers: managerData,
-        startDate: sDate.toLocaleDateString("en-CA"),
-        endDate: eDate.toLocaleDateString("en-CA"),
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      managers: managerData,
+      startDate: sDate.toLocaleDateString("en-CA"),
+      endDate: eDate.toLocaleDateString("en-CA"),
+    }, 200);
+
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
-module.exports.fetchMasterSheetTargetsForAllManagers =
-  fetchMasterSheetTargetsForAllManagers;
+module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
 
