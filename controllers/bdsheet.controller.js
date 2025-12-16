@@ -649,14 +649,34 @@ const getBdSheetByDateRange = async (req, res) => {
         },
       });
 
-      // Fetch sheet (achieved)
-      const sheets = await model.BdSheet.findAll({
+      // Fetch sheet (achieved) - try both teamManagerId and tlAllocated
+      let sheets = await model.BdSheet.findAll({
         where: {
           teamManagerId: manager.id,
           startDate: { [Op.between]: [sDate, eDate] },
         },
         attributes: ["startDate", "activeStatus", "businessTask"],
       });
+
+      // If no results with teamManagerId, try with tlAllocated (manager name)
+      if (sheets.length === 0) {
+        sheets = await model.BdSheet.findAll({
+          where: {
+            tlAllocated: manager.name,
+            startDate: { [Op.between]: [sDate, eDate] },
+          },
+          attributes: ["startDate", "activeStatus", "businessTask"],
+        });
+      }
+
+      console.log(`Manager ${manager.name} (ID: ${manager.id}) has ${sheets.length} BdSheet entries between ${sDate} and ${eDate}`);
+      if (sheets.length > 0) {
+        console.log('Sample BdSheet entry:', {
+          startDate: sheets[0].startDate,
+          activeStatus: sheets[0].activeStatus,
+          businessTask: sheets[0].businessTask
+        });
+      }
 
       const merged = dateList.map(d => {
         const target = targets.find(
