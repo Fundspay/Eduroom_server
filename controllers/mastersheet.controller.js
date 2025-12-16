@@ -87,12 +87,21 @@ var fetchMasterSheetTargets = async function (req, res) {
 
     const collegesAchieved = collegeSet.size;
 
-    // FOLLOW-UPS COUNT (SAME LOGIC AS fetchCategoryData + DATE RANGE)
+    // FOLLOW-UPS COUNT
     const followUpsCount = await model.CoSheet.count({
       where: {
         followUpBy: managerName,
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
+      },
+    });
+
+    //  RESUME SELECTED COUNT (NEW – NOTHING ELSE TOUCHED)
+    const resumeSelectedCount = await model.StudentResume.count({
+      where: {
+        teamManagerId,
+        finalSelectionStatus: "Selected",
+        interviewDate: { [Op.between]: [sDate, eDate] },
       },
     });
 
@@ -164,6 +173,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         callResponseCount,
         resumeReceivedSum,
         followUpsCount,
+        resumeSelectedCount, // NEW FIELD
         collegesAchieved,
         dates: merged,
         totals,
@@ -176,6 +186,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
