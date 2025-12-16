@@ -822,108 +822,77 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
 const getBdTlLeaderboard = async (req, res) => {
   try {
     const { from, to } = req.query;
+    if (!from || !to) return ReE(res, "from, to are required", 400);
 
-    if (!from || !to) {
-      return ReE(res, "from, to are required", 400);
-    }
-
-    // Fetch all team managers
-    const teamManagers = await model.TeamManager.findAll({
-      attributes: ['id', 'name', 'mobileNumber'],
-      where: {
-        // Add any conditions if needed, e.g., isActive: true
-      }
+    const teamManagers = await TeamManager.findAll({
+      attributes: ["id", "name", "mobileNumber"],
     });
 
-    if (!teamManagers || teamManagers.length === 0) {
-      return ReE(res, "No team managers found", 404);
-    }
-
-    const sDate = new Date(from);
-    const eDate = new Date(to);
+    if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
     const leaderboardData = [];
 
-    // Process each team manager
     for (const manager of teamManagers) {
-      try {
-        // Fetch targets from database
-        const targets = await model.BdTarget.findAll({
-          where: {
-            teamManagerId: manager.id,
-            targetDate: { [Op.between]: [sDate, eDate] },
-          },
-        });
+      // Users under this manager
+      const statuses = await Status.findAll({
+        where: { teamManager: manager.name },
+        attributes: ["userId"],
+      });
+      const userIds = statuses.map(s => s.userId);
 
-        // Calculate total team allocated and active
-        const totalTeamAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
-        const totalTeamActive = targets.reduce((sum, t) => sum + (t.internsActive || 0), 0);
-        const totalTeamTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
-
-        // Fetch achieved counts from referral API
-        const phone = "+91" + manager.mobileNumber;
-        const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
-
-        const response = await axios.get(url);
-        const data = response.data;
-
-        let totalAchieved = 0;
-
-        if (data?.result?.referred_users) {
-          const referredUsers = data.result.referred_users;
-
-          // Calculate total achieved (paid count)
-          referredUsers.forEach(user => {
-            user.daily_paid_counts.forEach(d => {
-              totalAchieved += parseInt(d.paid_count) || 0;
-            });
-          });
-        }
-
-        // Calculate efficiency percentage
-        const efficiency = totalTeamTarget > 0 
-          ? ((totalAchieved / totalTeamTarget) * 100).toFixed(2) 
-          : 0;
-
-        leaderboardData.push({
-          tlName: manager.name,
-          mobileNumber: manager.mobileNumber,
-          totalTeamAllocated,
-          totalTeamActive,
-          accountTarget: totalTeamTarget,
-          accountAchieved: totalAchieved,
-          efficiency: parseFloat(efficiency)
-        });
-
-      } catch (error) {
-        console.error(`Error processing manager ${manager.id}:`, error.message);
-        // Continue with other managers even if one fails
-        leaderboardData.push({
-          tlName: manager.name,
-          mobileNumber: manager.mobileNumber,
-          totalTeamAllocated: 0,
-          totalTeamActive: 0,
-          accountTarget: 0,
-          accountAchieved: 0,
-          efficiency: 0,
-          error: "Data fetch failed"
-        });
+      // Achieved counts
+      let totalAchieved = 0;
+      if (userIds.length) {
+        const results = await FundsAudit.sequelize.query(
+          `
+          SELECT COUNT(DISTINCT "userId") AS achieved
+          FROM "FundsAudits"
+          WHERE "userId" IN (:userIds)
+            AND "hasPaid" = true
+            AND "createdAt" BETWEEN :from AND :to
+          `,
+          {
+            replacements: { userIds, from, to },
+            type: FundsAudit.sequelize.QueryTypes.SELECT,
+          }
+        );
+        totalAchieved = results[0]?.achieved || 0;
       }
+
+      // Targets
+      const targets = await BdTarget.findAll({
+        where: {
+          teamManagerId: manager.id,
+          targetDate: { [Op.between]: [from, to] },
+        },
+      });
+      const totalTeamTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
+      const totalTeamAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
+      const totalTeamActive = targets.reduce((sum, t) => sum + (t.internsActive || 0), 0);
+
+      const efficiency = totalTeamTarget > 0
+        ? ((totalAchieved / totalTeamTarget) * 100).toFixed(2)
+        : 0;
+
+      leaderboardData.push({
+        tlName: manager.name,
+        mobileNumber: manager.mobileNumber,
+        totalTeamAllocated,
+        totalTeamActive,
+        accountTarget: totalTeamTarget,
+        accountAchieved: totalAchieved,
+        efficiency: parseFloat(efficiency),
+      });
     }
 
-    // Sort by efficiency (descending) - Rank 1 = highest efficiency
+    // Sort by efficiency
     leaderboardData.sort((a, b) => b.efficiency - a.efficiency);
-
-    // Add rank
-    const rankedData = leaderboardData.map((item, index) => ({
-      rank: index + 1,
-      ...item
-    }));
+    const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
 
     return ReS(res, {
       success: true,
       leaderboard: rankedData,
-      totalManagers: rankedData.length
+      totalManagers: rankedData.length,
     });
 
   } catch (err) {
@@ -933,6 +902,7 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
 
 const getAccountTargetVsAchieved = async (req, res) => {
   try {
