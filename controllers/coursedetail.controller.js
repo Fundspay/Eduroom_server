@@ -978,21 +978,19 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
     const { userId } = req.params;
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch user instance
+    // Fetch user
     let user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
     await user.reload();
 
-    // ✅ Normalize businessTargets for backward compatibility
+    // Normalize business targets
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
-        if (typeof val === "number") {
-          normalizedBusinessTargets[courseId] = { target: val, offerMessage: null };
-        } else {
-          normalizedBusinessTargets[courseId] = val;
-        }
+        normalizedBusinessTargets[courseId] = typeof val === "number" 
+          ? { target: val, offerMessage: null } 
+          : val;
       }
     }
 
@@ -1044,6 +1042,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const daysMap = {};
       let totalSessions = 0;
       let completedSessions = 0;
+      const COMPLETION_THRESHOLD = 33; // ✅ uniform threshold
 
       for (const session of sessions) {
         const progress = session.userProgress?.[userId] || {};
@@ -1070,12 +1069,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
             : 0;
         }
 
-        if (!daysMap[session.day])
-          daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
+        if (!daysMap[session.day]) daysMap[session.day] = { total: 0, completed: 0, sessions: [] };
         daysMap[session.day].total++;
         totalSessions++;
-
-        const COMPLETION_THRESHOLD = 33;
 
         if (attempted && sessionCompletionPercentage >= COMPLETION_THRESHOLD) {
           completedSessions++;
@@ -1084,7 +1080,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
         const status = latestCaseStudy
           ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
-          : sessionCompletionPercentage >= 33
+          : sessionCompletionPercentage >= COMPLETION_THRESHOLD
             ? "Completed"
             : "In Progress";
 
@@ -1119,7 +1115,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? ((completedSessions / totalSessions) * 100).toFixed(2)
         : 0;
 
-      // ✅ Use normalized businessTargets
       const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
@@ -1130,54 +1125,29 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const isBusinessTargetMet =
         subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
-      // Check if all sessions are above 20% threshold
-      const allSessionsAboveThreshold = await Promise.all(
-        sessions.map(async (session) => {
-          let sessionCompletionPercentage = 0;
+      // Check if all sessions are above threshold
+      const allSessionsAboveThreshold = sessions.every(
+        (s) => (s.sessionCompletionPercentage || 0) >= COMPLETION_THRESHOLD
+      );
 
-          const latestCaseStudy = await model.CaseStudyResult.findOne({
-            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
-            order: [["createdAt", "DESC"]],
-          });
-
-          if (latestCaseStudy) {
-            sessionCompletionPercentage = latestCaseStudy.matchPercentage;
-          } else {
-            const progress = session.userProgress?.[userId] || {};
-            if (progress.totalMCQs && progress.correctMCQs !== undefined) {
-              sessionCompletionPercentage =
-                (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
-            }
-          }
-
-          return sessionCompletionPercentage >= 20;
-        })
-      ).then((results) => results.every(Boolean));
-
-      // Preserve previously completed courses permanently
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
       let overallStatus = existingStatuses[String(courseId)] === "Completed"
         ? "Completed"
         : "In Progress";
 
-      if (
-        Number(overallCompletionRate) === 100 ||
-        (isBusinessTargetMet && allSessionsAboveThreshold)
-      ) {
+      if (Number(overallCompletionRate) === 100 || (isBusinessTargetMet && allSessionsAboveThreshold)) {
         overallStatus = "Completed";
       }
 
-      const statusRecord = await model.Status.findOne({
-        where: { userId, isDeleted: false },
-      });
-
-      if (statusRecord && statusRecord.internshipStatus) {
+      // Apply internship status overrides
+      const statusRecord = await model.Status.findOne({ where: { userId, isDeleted: false } });
+      if (statusRecord?.internshipStatus) {
         const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
         if (["terminated"].includes(normalized)) overallStatus = "Terminated";
         else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
       }
 
-      // ----- Special rule for Mobile App Development (courseId 9) -----
+      // ----- Special rule only for Mobile App Development -----
       if (
         courseId === "9" &&
         overallStatus !== "Completed" &&
@@ -1192,7 +1162,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         }
       }
 
-      // Save final course status permanently
+      // Save final course status
       existingStatuses[String(courseId)] = overallStatus;
       await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
@@ -1207,7 +1177,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
-        offerMessage, // ✅ now from businessTargets JSON
+        offerMessage,
       });
     }
 
@@ -1219,6 +1189,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 const getBusinessTarget = async (req, res) => {
   try {
