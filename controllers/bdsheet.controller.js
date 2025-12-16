@@ -849,15 +849,6 @@ const getBdTlLeaderboard = async (req, res) => {
       attributes: ["id", "name", "mobileNumber"],
     });
 
-    if (!teamManagers.const getBdTlLeaderboard = async (req, res) => {
-  try {
-    const { from, to } = req.query;
-    if (!from || !to) return ReE(res, "from, to are required", 400);
-
-    const teamManagers = await TeamManager.findAll({
-      attributes: ["id", "name", "mobileNumber"],
-    });
-
     if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
     const leaderboardData = [];
@@ -898,8 +889,6 @@ const getBdTlLeaderboard = async (req, res) => {
       });
       const userIds = statuses.map(s => s.userId);
 
-      console.log(`Manager ${manager.name}: Found ${userIds.length} users in Status table`);
-
       let achievedAccounts = 0;
       if (userIds.length) {
         const accountsResult = await FundsAudit.sequelize.query(
@@ -920,7 +909,6 @@ const getBdTlLeaderboard = async (req, res) => {
         
         // Sum up all daily unique counts
         achievedAccounts = accountsResult.reduce((sum, row) => sum + parseInt(row.unique_paid_users || 0), 0);
-        console.log(`Manager ${manager.name}: Found ${achievedAccounts} accounts achieved from FundsAudit (sum of daily unique users)`);
       }
 
       // Targets from BdTarget
@@ -946,7 +934,7 @@ const getBdTlLeaderboard = async (req, res) => {
         totalInterns,            // Achieved (from BdSheet count)
         internsActive,           // Target
         activeInterns,           // Achieved (from BdSheet with activeStatus)
-        accounts: achievedAccounts,     // Achieved
+        accounts: achievedAccounts,     // Achieved (sum of daily unique users from FundsAudit)
         accountsTarget,          // Target
         efficiency: parseFloat(efficiency),
       });
