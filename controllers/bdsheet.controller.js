@@ -610,8 +610,6 @@ const getManagerRangeAmounts = async (req, res) => {
 
 module.exports.getManagerRangeAmounts = getManagerRangeAmounts;
 
-
-
 const getBdSheetByDateRange = async (req, res) => {
   try {
     let { teamManagerId, from, to } = req.query;
@@ -726,7 +724,6 @@ const getBdSheetByDateRange = async (req, res) => {
 };
 
 module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
-
 
 
 
