@@ -1157,6 +1157,19 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         }
       }
 
+      // ----- Special Rule for courseId 9 -----
+      if (
+        courseId === "9" &&
+        overallCompletionRate === 100 &&
+        subscriptiondeductedWallet === 1 &&
+        overallStatus !== "Completed"
+      ) {
+        const courseStartDate = user.courseDates?.[courseId]?.startDate;
+        if (courseStartDate && new Date(courseStartDate) < new Date("2025-12-10")) {
+          overallStatus = "Completed";
+        }
+      }
+
       // Internship status overrides
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
