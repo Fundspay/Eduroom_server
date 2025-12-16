@@ -1159,13 +1159,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? "Completed"
         : "In Progress";
 
-      if (
+      // Special rules for determining completion
+      if (courseId === "24") {
+        // For course 24, consider only business target completion
+        overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
+      } else if (
         Number(overallCompletionRate) === 100 ||
         (isBusinessTargetMet && allSessionsAboveThreshold)
       ) {
         overallStatus = "Completed";
       }
 
+      // Check internship status
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
@@ -1218,6 +1223,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+
 
 
 const getBusinessTarget = async (req, res) => {
