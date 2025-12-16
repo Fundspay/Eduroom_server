@@ -849,6 +849,15 @@ const getBdTlLeaderboard = async (req, res) => {
       attributes: ["id", "name", "mobileNumber"],
     });
 
+    if (!teamManagers.const getBdTlLeaderboard = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return ReE(res, "from, to are required", 400);
+
+    const teamManagers = await TeamManager.findAll({
+      attributes: ["id", "name", "mobileNumber"],
+    });
+
     if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
     const leaderboardData = [];
@@ -882,7 +891,7 @@ const getBdTlLeaderboard = async (req, res) => {
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // Achieved accounts - use FundsAudit to count users who paid
+      // Achieved accounts - use FundsAudit to count DISTINCT users per day, then sum
       const statuses = await Status.findAll({
         where: { teamManager: manager.name },
         attributes: ["userId"],
@@ -895,19 +904,23 @@ const getBdTlLeaderboard = async (req, res) => {
       if (userIds.length) {
         const accountsResult = await FundsAudit.sequelize.query(
           `
-          SELECT COUNT(DISTINCT "userId") AS achieved
+          SELECT DATE("createdAt") AS paid_date,
+                 COUNT(DISTINCT "userId") AS unique_paid_users
           FROM "FundsAudits"
           WHERE "userId" IN (:userIds)
             AND "hasPaid" = true
             AND "createdAt" BETWEEN :from AND :to
+          GROUP BY DATE("createdAt")
           `,
           {
             replacements: { userIds, from, to },
             type: FundsAudit.sequelize.QueryTypes.SELECT,
           }
         );
-        achievedAccounts = parseInt(accountsResult[0]?.achieved || 0);
-        console.log(`Manager ${manager.name}: Found ${achievedAccounts} accounts achieved from FundsAudit`);
+        
+        // Sum up all daily unique counts
+        achievedAccounts = accountsResult.reduce((sum, row) => sum + parseInt(row.unique_paid_users || 0), 0);
+        console.log(`Manager ${manager.name}: Found ${achievedAccounts} accounts achieved from FundsAudit (sum of daily unique users)`);
       }
 
       // Targets from BdTarget
