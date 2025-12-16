@@ -317,15 +317,15 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
-      // Calculate percentages safely
+      // Calculate percentages safely, rounded to 2 decimals
       const percentage = {
-        jds: target.jds ? (jdSentCount / target.jds) * 100 : 0,
-        calls: target.calls ? (callResponseCount / target.calls) * 100 : 0,
-        followUps: target.followUps ? (followUpsCount / target.followUps) * 100 : 0,
-        resumetarget: target.resumetarget ? (resumeReceivedSum / target.resumetarget) * 100 : 0,
-        collegeTarget: target.collegeTarget ? (collegesAchieved / target.collegeTarget) * 100 : 0,
-        interviewsTarget: target.interviewsTarget ? (resumeSelectedCount / target.interviewsTarget) * 100 : 0,
-        resumesReceivedTarget: target.resumesReceivedTarget ? (followUpsCount / target.resumesReceivedTarget) * 100 : 0,
+        jds: target.jds ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
+        calls: target.calls ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
+        followUps: target.followUps ? parseFloat(((followUpsCount / target.followUps) * 100).toFixed(2)) : 0,
+        resumetarget: target.resumetarget ? parseFloat(((resumeReceivedSum / target.resumetarget) * 100).toFixed(2)) : 0,
+        collegeTarget: target.collegeTarget ? parseFloat(((collegesAchieved / target.collegeTarget) * 100).toFixed(2)) : 0,
+        interviewsTarget: target.interviewsTarget ? parseFloat(((resumeSelectedCount / target.interviewsTarget) * 100).toFixed(2)) : 0,
+        resumesReceivedTarget: target.resumesReceivedTarget ? parseFloat(((followUpsCount / target.resumesReceivedTarget) * 100).toFixed(2)) : 0,
       };
 
       managerData.push({
@@ -337,7 +337,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumeSelectedCount,
         collegesAchieved,
         target,
-        percentage, // <-- added percentages here
+        percentage,
       });
     }
 
@@ -354,6 +354,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
 
