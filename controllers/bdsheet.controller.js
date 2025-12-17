@@ -1057,6 +1057,7 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
     const daily = payments.map((p) => ({
       date: p.date,
       accountsAchieved: Number(p.total_count) || 0,
+      accountsTarget: 0, // 👈 will be filled next
     }));
 
     const totalAccountsAchieved = daily.reduce(
@@ -1065,7 +1066,7 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
     );
 
     // -----------------------------
-    // 2️⃣ BD TARGET (TOTAL ONLY)
+    // 2️⃣ BD TARGET (DATE WISE – ALL MANAGERS)
     // -----------------------------
     const bdTargets = await model.BdTarget.findAll({
       where: {
@@ -1073,11 +1074,28 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
           [Op.between]: [from, to],
         },
       },
-      attributes: ["accounts"],
+      attributes: [
+        "targetDate",
+        [model.sequelize.fn("SUM", model.sequelize.col("accounts")), "accounts"],
+      ],
+      group: ["targetDate"],
+      raw: true,
     });
 
-    const totalAccountsTarget = bdTargets.reduce(
-      (sum, t) => sum + (Number(t.accounts) || 0),
+    // Create date -> target map
+    const targetByDate = {};
+    bdTargets.forEach((t) => {
+      const date = new Date(t.targetDate).toISOString().slice(0, 10);
+      targetByDate[date] = Number(t.accounts) || 0;
+    });
+
+    // Merge target into daily achieved
+    daily.forEach((d) => {
+      d.accountsTarget = targetByDate[d.date] || 0;
+    });
+
+    const totalAccountsTarget = Object.values(targetByDate).reduce(
+      (sum, v) => sum + v,
       0
     );
 
@@ -1088,7 +1106,7 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
       success: true,
       from,
       to,
-      daily, // optional but useful
+      daily,
       totals: {
         totalAccountsAchieved,
         totalAccountsTarget,
