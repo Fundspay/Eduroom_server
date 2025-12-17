@@ -243,7 +243,7 @@ module.exports.getCoSheetById = getCoSheetById;
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body } = req.body;
+    const { cc, bcc, body, attachment } = req.body;
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
@@ -268,17 +268,37 @@ const sendJDToCollege = async (req, res) => {
     const jdKeyType = record.internshipType
       .trim()
       .toLowerCase()
-      .replace(/\s+/g, '');
+      .replace(/\s+/g, "");
     const jdKey = JD_MAP[jdKeyType];
 
     if (!jdKey) {
       return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
     }
 
-    // fetch JD file from S3
-    const jdFile = await s3
-      .getObject({ Bucket: "fundsroomhr", Key: jdKey })
-      .promise();
+    let attachments = [];
+
+    //  If frontend sends attachment, use that
+    if (attachment && attachment.content && attachment.filename) {
+      attachments = [
+        {
+          filename: attachment.filename,
+          content: Buffer.from(attachment.content, "base64"),
+        },
+      ];
+    } 
+    //  Else fallback to S3 JD
+    else {
+      const jdFile = await s3
+        .getObject({ Bucket: "fundsroomhr", Key: jdKey })
+        .promise();
+
+      attachments = [
+        {
+          filename: `${record.internshipType}.pdf`,
+          content: jdFile.Body,
+        },
+      ];
+    }
 
     const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
 
@@ -288,8 +308,9 @@ const sendJDToCollege = async (req, res) => {
 
       <p>Warm greetings from FundsAudit!</p>
 
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName ||
-      ""}, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
+        record.collegeName || ""
+      }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
 
@@ -311,12 +332,7 @@ const sendJDToCollege = async (req, res) => {
       record.emailId,
       subject,
       html,
-      [
-        {
-          filename: `${record.internshipType}.pdf`,
-          content: jdFile.Body,
-        },
-      ],
+      attachments,
       cc,
       bcc
     );
@@ -326,10 +342,14 @@ const sendJDToCollege = async (req, res) => {
     }
 
     await record.update({
-      jdSentAt: new Date()
+      jdSentAt: new Date(),
     });
 
-    return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "JD sent successfully with proposal" },
+      200
+    );
   } catch (error) {
     console.error("Send JD Error:", error);
     return ReE(res, error.message, 500);
@@ -337,6 +357,7 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
+
 
 
 const getCallStatsByUserWithTarget = async (req, res) => {
