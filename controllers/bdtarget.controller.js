@@ -111,9 +111,15 @@ module.exports.handleBdTargets = handleBdTargets;
 var fetchBdTargets = async function (req, res) {
   try {
     let { teamManagerId, startDate, endDate, month } = req.query;
+
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
     teamManagerId = parseInt(teamManagerId, 10);
+
+    // 🔧 FIX: trim incoming query params
+    startDate = typeof startDate === "string" ? startDate.trim() : startDate;
+    endDate = typeof endDate === "string" ? endDate.trim() : endDate;
+    month = typeof month === "string" ? month.trim() : month;
 
     const today = new Date();
     let sDate, eDate;
@@ -122,10 +128,12 @@ var fetchBdTargets = async function (req, res) {
       const [year, mon] = month.split("-");
       sDate = new Date(year, mon - 1, 1);
       eDate = new Date(year, mon, 0);
-    } else if (startDate && endDate) {
+    } 
+    else if (startDate && endDate) {
       sDate = new Date(startDate);
       eDate = new Date(endDate);
-    } else {
+    } 
+    else {
       sDate = new Date(today.getFullYear(), today.getMonth(), 1);
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
@@ -179,3 +187,4 @@ var fetchBdTargets = async function (req, res) {
 };
 
 module.exports.fetchBdTargets = fetchBdTargets;
+
