@@ -12,6 +12,7 @@ const axios = require("axios");
 const moment = require("moment");
 const { FundsAudit } = require("../models");
 const { User } = require("../models");
+const { TeamManager } = require('../models');
 
 
 
@@ -1533,3 +1534,65 @@ const getReferralPaidCount = async (req, res) => {
 
 module.exports.getReferralPaidCount = getReferralPaidCount;
 
+const getReferralPaidUsersDateWise = async (req, res) => {
+  try {
+    const { managerId, from, to } = req.query;
+
+    if (!managerId || !from || !to) {
+      return ReE(res, "managerId, from, to are required", 400);
+    }
+
+    const manager = await TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    const phone = "+91" + manager.mobileNumber;
+    const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsoverPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
+
+    const response = await axios.get(url);
+    const data = response.data;
+
+    if (!data?.result?.first_level_users) {
+      return ReE(res, "Invalid API response from referral service", 500);
+    }
+
+    const firstLevelUsers = data.result.first_level_users;
+
+    // ----- DATE-WISE PAID USERS COUNT -----
+    const dateWiseCount = {};
+
+    firstLevelUsers.forEach(user => {
+      // assuming each user has a 'paid_user_ids' array
+      user.paid_user_ids.forEach(paidUserId => {
+        // map paid_user_id to a date — you may need actual daily info if available
+        // for now, counting all paid_user_ids under all dates between from and to
+        let current = new Date(from);
+        const end = new Date(to);
+
+        while (current <= end) {
+          const yyyy = current.getFullYear();
+          const mm = String(current.getMonth() + 1).padStart(2, "0");
+          const dd = String(current.getDate()).padStart(2, "0");
+          const dateStr = `${yyyy}-${mm}-${dd}`;
+
+          if (!dateWiseCount[dateStr]) dateWiseCount[dateStr] = 0;
+          dateWiseCount[dateStr] += 1;
+
+          current.setDate(current.getDate() + 1);
+        }
+      });
+    });
+
+    return ReS(res, {
+      success: true,
+      teamManager: manager.name,
+      managerId: manager.id,
+      data: dateWiseCount
+    });
+
+  } catch (err) {
+    console.error("Referral Paid Users Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getReferralPaidUsersDateWise = getReferralPaidUsersDateWise;
