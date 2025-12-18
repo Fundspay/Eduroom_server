@@ -763,17 +763,17 @@ const getTargetVsAchieved = async (req, res) => {
       dateWise: []
     }, 200);
 
-    // ✅ Fetch day-wise achieved counts from FundsAudit
+    // ✅ Fetch day-wise achieved counts from FundsAudit (using dateOfPayment)
     const achievedResults = await FundsAudit.sequelize.query(
       `
-      SELECT DATE(f."createdAt") AS paid_date,
+      SELECT DATE(f."dateOfPayment") AS paid_date,
              COUNT(DISTINCT f."userId") AS achieved
       FROM "FundsAudits" f
       WHERE f."userId" IN (:userIds)
         AND f."hasPaid" = true
-        AND f."createdAt" BETWEEN :from AND :to
-      GROUP BY DATE(f."createdAt")
-      ORDER BY DATE(f."createdAt");
+        AND f."dateOfPayment" BETWEEN :from AND :to
+      GROUP BY DATE(f."dateOfPayment")
+      ORDER BY DATE(f."dateOfPayment");
       `,
       { replacements: { userIds, from, to }, type: FundsAudit.sequelize.QueryTypes.SELECT }
     );
@@ -840,6 +840,7 @@ const getTargetVsAchieved = async (req, res) => {
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
+
 const getBdTlLeaderboard = async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -863,7 +864,6 @@ const getBdTlLeaderboard = async (req, res) => {
         attributes: ["startDate", "activeStatus", "businessTask"],
       });
 
-      // If no results with teamManagerId, try with tlAllocated (manager name)
       if (sheets.length === 0) {
         sheets = await BdSheet.findAll({
           where: {
@@ -874,41 +874,42 @@ const getBdTlLeaderboard = async (req, res) => {
         });
       }
 
-      // Total interns = all BdSheet entries
       const totalInterns = sheets.length;
-
-      // Active interns = BdSheet entries with activeStatus = "active"
       const activeInterns = sheets.filter(
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // Achieved accounts - use FundsAudit to count DISTINCT users per day, then sum
+      // Achieved accounts using dateOfPayment
       const statuses = await Status.findAll({
         where: { teamManager: manager.name },
         attributes: ["userId"],
       });
-      const userIds = statuses.map(s => s.userId);
 
+      const userIds = statuses.map(s => s.userId);
       let achievedAccounts = 0;
+
       if (userIds.length) {
         const accountsResult = await FundsAudit.sequelize.query(
           `
-          SELECT DATE("createdAt") AS paid_date,
+          SELECT DATE("dateOfPayment") AS paid_date,
                  COUNT(DISTINCT "userId") AS unique_paid_users
           FROM "FundsAudits"
           WHERE "userId" IN (:userIds)
             AND "hasPaid" = true
-            AND "createdAt" BETWEEN :from AND :to
-          GROUP BY DATE("createdAt")
+            AND "dateOfPayment" BETWEEN :from AND :to
+          GROUP BY DATE("dateOfPayment")
+          ORDER BY DATE("dateOfPayment");
           `,
           {
             replacements: { userIds, from, to },
             type: FundsAudit.sequelize.QueryTypes.SELECT,
           }
         );
-        
-        // Sum up all daily unique counts
-        achievedAccounts = accountsResult.reduce((sum, row) => sum + parseInt(row.unique_paid_users || 0), 0);
+
+        achievedAccounts = accountsResult.reduce(
+          (sum, row) => sum + parseInt(row.unique_paid_users || 0),
+          0
+        );
       }
 
       // Targets from BdTarget
@@ -930,26 +931,23 @@ const getBdTlLeaderboard = async (req, res) => {
       leaderboardData.push({
         tlName: manager.name,
         mobileNumber: manager.mobileNumber,
-        internsAllocated,        // Target
-        totalInterns,            // Achieved (from BdSheet count)
-        internsActive,           // Target
-        activeInterns,           // Achieved (from BdSheet with activeStatus)
-        accounts: achievedAccounts,     // Achieved (sum of daily unique users from FundsAudit)
-        accountsTarget,          // Target
+        internsAllocated,
+        totalInterns,
+        internsActive,
+        activeInterns,
+        accounts: achievedAccounts,
+        accountsTarget,
         efficiency: parseFloat(efficiency),
       });
     }
 
-    // Sort by efficiency (descending), then by accounts achieved (descending), then by totalInterns (descending)
+    // Sort leaderboard
     leaderboardData.sort((a, b) => {
-      if (b.efficiency !== a.efficiency) {
-        return b.efficiency - a.efficiency;
-      }
-      if (b.accounts !== a.accounts) {
-        return b.accounts - a.accounts;
-      }
+      if (b.efficiency !== a.efficiency) return b.efficiency - a.efficiency;
+      if (b.accounts !== a.accounts) return b.accounts - a.accounts;
       return b.totalInterns - a.totalInterns;
     });
+
     const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
 
     return ReS(res, {
@@ -965,6 +963,7 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
 
 const getAccountTargetVsAchieved = async (req, res) => {
   try {
