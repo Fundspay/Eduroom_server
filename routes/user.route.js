@@ -40,6 +40,7 @@ router.get("/course-dates", userController.getUserCourseDates);
 router.get("/remaining-time/:userId", userController.getUserRemainingTime);
 router.put("/user/business-info/:id", userController.updateBusinessTarget);
 router.get("/referral/paid-count", userController.getReferralPaidCount);
+router.get("/referral/count", userController.getReferralPaidUsersDateWise);
 
 
 module.exports = router;
