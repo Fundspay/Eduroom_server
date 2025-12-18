@@ -252,32 +252,9 @@ const sendJDToCollege = async (req, res) => {
       return ReE(res, "No email found for this college", 400);
     }
 
-    if (!record.internshipType) {
-      return ReE(res, "No internshipType set for this record", 400);
-    }
-
-    // JD mapping
-    const JD_MAP = {
-      fulltime: "jds/fulltime.pdf",
-      liveproject: "jds/liveproject.pdf",
-      sip: "jds/sip.pdf",
-      wip: "jds/wip.pdf",
-      others: "jds/others.pdf",
-    };
-
-    const jdKeyType = record.internshipType
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, "");
-    const jdKey = JD_MAP[jdKeyType];
-
-    if (!jdKey) {
-      return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
-    }
-
     let attachments = [];
 
-    //  If frontend sends attachment, use that
+    //  If frontend sends attachment → USE IT DIRECTLY
     if (attachment && attachment.content && attachment.filename) {
       attachments = [
         {
@@ -286,8 +263,31 @@ const sendJDToCollege = async (req, res) => {
         },
       ];
     } 
-    //  Else fallback to S3 JD
+    // ELSE → fallback to JD mapping + S3
     else {
+      if (!record.internshipType) {
+        return ReE(res, "No internshipType set for this record", 400);
+      }
+
+      // JD mapping
+      const JD_MAP = {
+        fulltime: "jds/fulltime.pdf",
+        liveproject: "jds/liveproject.pdf",
+        sip: "jds/sip.pdf",
+        wip: "jds/wip.pdf",
+        others: "jds/others.pdf",
+      };
+
+      const jdKeyType = record.internshipType
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      const jdKey = JD_MAP[jdKeyType];
+
+      if (!jdKey) {
+        return ReE(res, `No JD mapped for internshipType: ${jdKeyType}`, 400);
+      }
+
       const jdFile = await s3
         .getObject({ Bucket: "fundsroomhr", Key: jdKey })
         .promise();
@@ -302,7 +302,6 @@ const sendJDToCollege = async (req, res) => {
 
     const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
 
-    // HTML email body like your proposal
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
 
@@ -327,7 +326,6 @@ const sendJDToCollege = async (req, res) => {
       </p>
     `;
 
-    // send mail with attachment + cc/bcc
     const mailResponse = await sendhrMail(
       record.emailId,
       subject,
@@ -357,7 +355,6 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
-
 
 
 const getCallStatsByUserWithTarget = async (req, res) => {
