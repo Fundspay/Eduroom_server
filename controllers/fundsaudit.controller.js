@@ -460,6 +460,10 @@ const listAllFundsAuditByCollege = async (req, res) => {
 module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
 
 
+const { Op } = require("sequelize");
+const { TeamManager, Status, FundsAudit } = require("../models"); // Adjust path as needed
+const { ReS, ReE } = require("../utils/response"); // Your response helpers
+
 const getPaidAccountsDayWise = async (req, res) => {
   try {
     let { teamManagerId, from, to } = req.query;
@@ -471,7 +475,7 @@ const getPaidAccountsDayWise = async (req, res) => {
     const numericId = Number(teamManagerId);
     const isNumeric = !isNaN(numericId);
 
-    // ✅ Find manager by managerId (string) OR id (number)
+    // Find manager by managerId (string) OR id (number)
     const managerRecord = await TeamManager.findOne({
       where: {
         [Op.and]: [{ isDeleted: false, isActive: true }],
@@ -496,7 +500,7 @@ const getPaidAccountsDayWise = async (req, res) => {
 
     const teamManagerName = managerRecord.name;
 
-    // ✅ Find all users under this manager (using Status table)
+    // Find all users under this manager (using Status table)
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
       attributes: ["userId"],
@@ -510,22 +514,22 @@ const getPaidAccountsDayWise = async (req, res) => {
         message: "No users under this manager",
       }, 200);
 
-    // ✅ Fetch FundsAudit records where hasPaid = true, between from/to, counting DISTINCT users per day
+    // Fetch FundsAudit records where hasPaid = true, filter by dateOfPayment
     const results = await FundsAudit.sequelize.query(
       `
-      SELECT DATE("createdAt") AS paid_date,
+      SELECT DATE("dateOfPayment") AS paid_date,
              COUNT(DISTINCT "userId") AS unique_paid_users
       FROM "FundsAudits"
       WHERE "userId" IN (:userIds)
         AND "hasPaid" = true
-        AND "createdAt" BETWEEN :from AND :to
-      GROUP BY DATE("createdAt")
-      ORDER BY DATE("createdAt");
+        AND "dateOfPayment" BETWEEN :from AND :to
+      GROUP BY DATE("dateOfPayment")
+      ORDER BY DATE("dateOfPayment");
       `,
       { replacements: { userIds, from, to }, type: FundsAudit.sequelize.QueryTypes.SELECT }
     );
 
-    // ✅ Build day-wise object
+    // Build day-wise object
     const dayWiseCounts = {};
     results.forEach((row) => {
       dayWiseCounts[row.paid_date] = parseInt(row.unique_paid_users);
