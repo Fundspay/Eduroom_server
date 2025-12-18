@@ -243,7 +243,7 @@ module.exports.getCoSheetById = getCoSheetById;
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body } = req.body;
+    const { cc, bcc, body, attachment } = req.body;
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
@@ -252,44 +252,64 @@ const sendJDToCollege = async (req, res) => {
       return ReE(res, "No email found for this college", 400);
     }
 
-    if (!record.internshipType) {
-      return ReE(res, "No internshipType set for this record", 400);
+    let attachments = [];
+
+    //  If frontend sends attachment → USE IT DIRECTLY
+    if (attachment && attachment.content && attachment.filename) {
+      attachments = [
+        {
+          filename: attachment.filename,
+          content: Buffer.from(attachment.content, "base64"),
+        },
+      ];
+    } 
+    // ELSE → fallback to JD mapping + S3
+    else {
+      if (!record.internshipType) {
+        return ReE(res, "No internshipType set for this record", 400);
+      }
+
+      // JD mapping
+      const JD_MAP = {
+        fulltime: "jds/fulltime.pdf",
+        liveproject: "jds/liveproject.pdf",
+        sip: "jds/sip.pdf",
+        wip: "jds/wip.pdf",
+        others: "jds/others.pdf",
+      };
+
+      const jdKeyType = record.internshipType
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+      const jdKey = JD_MAP[jdKeyType];
+
+      if (!jdKey) {
+        return ReE(res, `No JD mapped for internshipType: ${jdKeyType}`, 400);
+      }
+
+      const jdFile = await s3
+        .getObject({ Bucket: "fundsroomhr", Key: jdKey })
+        .promise();
+
+      attachments = [
+        {
+          filename: `${record.internshipType}.pdf`,
+          content: jdFile.Body,
+        },
+      ];
     }
-
-    // JD mapping
-    const JD_MAP = {
-      fulltime: "jds/fulltime.pdf",
-      liveproject: "jds/liveproject.pdf",
-      sip: "jds/sip.pdf",
-      wip: "jds/wip.pdf",
-      others: "jds/others.pdf",
-    };
-
-    const jdKeyType = record.internshipType
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '');
-    const jdKey = JD_MAP[jdKeyType];
-
-    if (!jdKey) {
-      return ReE(res, `No JD mapped for internshipType: ${normalizedType}`, 400);
-    }
-
-    // fetch JD file from S3
-    const jdFile = await s3
-      .getObject({ Bucket: "fundsroomhr", Key: jdKey })
-      .promise();
 
     const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
 
-    // HTML email body like your proposal
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
 
       <p>Warm greetings from FundsAudit!</p>
 
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName ||
-      ""}, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
+        record.collegeName || ""
+      }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
 
@@ -306,17 +326,11 @@ const sendJDToCollege = async (req, res) => {
       </p>
     `;
 
-    // send mail with attachment + cc/bcc
     const mailResponse = await sendhrMail(
       record.emailId,
       subject,
       html,
-      [
-        {
-          filename: `${record.internshipType}.pdf`,
-          content: jdFile.Body,
-        },
-      ],
+      attachments,
       cc,
       bcc
     );
@@ -326,10 +340,14 @@ const sendJDToCollege = async (req, res) => {
     }
 
     await record.update({
-      jdSentAt: new Date()
+      jdSentAt: new Date(),
     });
 
-    return ReS(res, { success: true, message: "JD sent successfully with proposal" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "JD sent successfully with proposal" },
+      200
+    );
   } catch (error) {
     console.error("Send JD Error:", error);
     return ReE(res, error.message, 500);
