@@ -526,7 +526,6 @@ const updateUser = async (req, res) => {
       "city",
       "referralCode",
       "referralLink",
-      "password"
     ];
 
     const updatedFields = {};
