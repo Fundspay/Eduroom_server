@@ -253,21 +253,16 @@ const sendJDToCollege = async (req, res) => {
 
     let attachments = [];
 
-    // ✅ If frontend sends attachment ARRAY → USE IT
-    if (
-      Array.isArray(attachment) &&
-      attachment.length > 0 &&
-      attachment[0].content &&
-      attachment[0].filename
-    ) {
-      attachments = [
-        {
-          filename: attachment[0].filename,
-          content: Buffer.from(attachment[0].content, "base64"),
-        },
-      ];
+    // MULTIPLE ATTACHMENTS FROM FRONTEND
+    if (Array.isArray(attachment) && attachment.length > 0) {
+      attachments = attachment
+        .filter(a => a.content && a.filename)
+        .map(a => ({
+          filename: a.filename,
+          content: Buffer.from(a.content, "base64"),
+        }));
     }
-    // ❌ ELSE → fallback to JD mapping + S3 (UNCHANGED)
+    // FALLBACK → JD mapping + S3 (UNCHANGED)
     else {
       if (!record.internshipType) {
         return ReE(res, "No internshipType set for this record", 400);
@@ -303,7 +298,8 @@ const sendJDToCollege = async (req, res) => {
       ];
     }
 
-    const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
+    // SUBJECT UPDATED (NO JD / ATTACHMENT HINT)
+    const subject = `Collaboration Proposal – FundsAudit`;
 
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
