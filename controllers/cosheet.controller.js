@@ -239,7 +239,6 @@ const getCoSheetById = async (req, res) => {
 module.exports.getCoSheetById = getCoSheetById;
 
 
-
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
@@ -254,22 +253,21 @@ const sendJDToCollege = async (req, res) => {
 
     let attachments = [];
 
-    //  If frontend sends attachment → USE IT DIRECTLY
-    if (attachment && attachment.content && attachment.filename) {
-      attachments = [
-        {
-          filename: attachment.filename,
-          content: Buffer.from(attachment.content, "base64"),
-        },
-      ];
-    } 
-    // ELSE → fallback to JD mapping + S3
+    // MULTIPLE ATTACHMENTS FROM FRONTEND
+    if (Array.isArray(attachment) && attachment.length > 0) {
+      attachments = attachment
+        .filter(a => a.content && a.filename)
+        .map(a => ({
+          filename: a.filename,
+          content: Buffer.from(a.content, "base64"),
+        }));
+    }
+    // FALLBACK → JD mapping + S3 (UNCHANGED)
     else {
       if (!record.internshipType) {
         return ReE(res, "No internshipType set for this record", 400);
       }
 
-      // JD mapping
       const JD_MAP = {
         fulltime: "jds/fulltime.pdf",
         liveproject: "jds/liveproject.pdf",
@@ -300,7 +298,8 @@ const sendJDToCollege = async (req, res) => {
       ];
     }
 
-    const subject = `Collaboration Proposal for Live Projects, Internships & Placements – FundsAudit`;
+    // SUBJECT UPDATED (NO JD / ATTACHMENT HINT)
+    const subject = `Collaboration Proposal – FundsAudit`;
 
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
@@ -311,18 +310,19 @@ const sendJDToCollege = async (req, res) => {
         record.collegeName || ""
       }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
-      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE. As part of our commitment to bridging the gap between academic learning and practical application, we propose a Student Development Program (SDP) for your MBA students (1st & 2nd year) specializing in Finance and Marketing.</p>
+      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE.</p>
 
       ${body}
 
       <p>Looking forward to a meaningful and mutually beneficial association.</p>
 
-      <p>Pooja M. Shedge<br/>
-      Branch Manager – Pune<br/>
-      +91 7385234536 | +91 7420861507<br/>
-      Pune, Maharashtra<br/>
-      <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
-      <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
+      <p>
+        Pooja M. Shedge<br/>
+        Branch Manager – Pune<br/>
+        +91 7385234536 | +91 7420861507<br/>
+        Pune, Maharashtra<br/>
+        <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
+        <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
       </p>
     `;
 
@@ -355,6 +355,7 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
+
 
 
 const getCallStatsByUserWithTarget = async (req, res) => {

@@ -23,12 +23,13 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // Normalize date range (remove time)
+    // Normalize date range
     sDate.setHours(0, 0, 0, 0);
     eDate.setHours(23, 59, 59, 999);
 
-    let managerFilter = {};
     let managers = [];
+    let managerIdFilter = {};
+    let managerNameFilter = null;
 
     if (teamManagerId) {
       teamManagerId = parseInt(teamManagerId, 10);
@@ -41,8 +42,9 @@ var fetchMasterSheetTargets = async function (req, res) {
 
       if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
-      managerFilter = { id: teamManagerId };
       managers = [manager];
+      managerIdFilter = { teamManagerId };
+      managerNameFilter = manager.name.trim();
     } else {
       managers = await model.TeamManager.findAll({
         attributes: ["id", "name"],
@@ -53,7 +55,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     // JD sent count
     const jdSentCount = await model.CoSheet.count({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         detailedResponse: "Send JD",
         dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
@@ -62,7 +64,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     // Call response count
     const callResponseCount = await model.CoSheet.count({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         callResponse: { [Op.ne]: null },
         dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
@@ -71,7 +73,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     // Resume received sum
     const resumeData = await model.CoSheet.findAll({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
@@ -83,32 +85,30 @@ var fetchMasterSheetTargets = async function (req, res) {
     // ACTUAL COLLEGE COUNT
     const resumes = await model.StudentResume.findAll({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
-      attributes: ["collegeName", "followupBy"],
+      attributes: ["collegeName"],
       raw: true,
     });
 
     const collegeSet = new Set();
-    resumes.forEach((r) => {
-      if (r.collegeName) collegeSet.add(r.collegeName);
-    });
+    resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
     const collegesAchieved = collegeSet.size;
 
-    // FOLLOW-UPS COUNT (resumes received)
+    // FOLLOW-UPS COUNT
     const followUpsCount = await model.CoSheet.count({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
 
-    // RESUME SELECTED COUNT (filter by interviewDate, no time)
+    // RESUME SELECTED COUNT
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
-        ...managerFilter,
+        ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         finalSelectionStatus: "Selected",
         interviewDate: { [Op.between]: [sDate, eDate] },
       },
@@ -134,12 +134,12 @@ var fetchMasterSheetTargets = async function (req, res) {
     // Fetch existing targets
     const existingTargets = await model.MyTarget.findAll({
       where: {
-        ...managerFilter,
+        ...managerIdFilter,
         targetDate: { [Op.between]: [sDate, eDate] },
       },
     });
 
-    // Merge existing into date list
+    // Merge targets
     const merged = dateList.map((d) => {
       const found = existingTargets.find((t) => {
         const tDateStr = new Date(t.targetDate).toLocaleDateString("en-CA");
@@ -154,39 +154,49 @@ var fetchMasterSheetTargets = async function (req, res) {
         resumetarget: found ? found.resumetarget : d.resumetarget,
         collegeTarget: found ? found.collegeTarget : d.collegeTarget,
         interviewsTarget: found ? found.interviewsTarget : d.interviewsTarget,
-        resumesReceivedTarget: found ? found.resumesReceivedTarget : d.resumesReceivedTarget,
+        resumesReceivedTarget: found
+          ? found.resumesReceivedTarget
+          : d.resumesReceivedTarget,
       };
     });
 
     // Totals
     const totals = {
-      jds: merged.reduce((sum, t) => sum + t.jds, 0),
-      calls: merged.reduce((sum, t) => sum + t.calls, 0),
-      followUps: merged.reduce((sum, t) => sum + t.followUps, 0),
-      resumetarget: merged.reduce((sum, t) => sum + t.resumetarget, 0),
-      collegeTarget: merged.reduce((sum, t) => sum + t.collegeTarget, 0),
-      interviewsTarget: merged.reduce((sum, t) => sum + t.interviewsTarget, 0),
-      resumesReceivedTarget: merged.reduce((sum, t) => sum + t.resumesReceivedTarget, 0),
+      jds: merged.reduce((s, t) => s + t.jds, 0),
+      calls: merged.reduce((s, t) => s + t.calls, 0),
+      followUps: merged.reduce((s, t) => s + t.followUps, 0),
+      resumetarget: merged.reduce((s, t) => s + t.resumetarget, 0),
+      collegeTarget: merged.reduce((s, t) => s + t.collegeTarget, 0),
+      interviewsTarget: merged.reduce((s, t) => s + t.interviewsTarget, 0),
+      resumesReceivedTarget: merged.reduce(
+        (s, t) => s + t.resumesReceivedTarget,
+        0
+      ),
     };
 
-    return ReS(res, {
-      success: true,
-      jdSentCount,
-      callResponseCount,
-      resumeReceivedSum,
-      followUpsCount,
-      resumeSelectedCount,
-      collegesAchieved,
-      managers,
-      dates: merged,
-      totals,
-    }, 200);
+    return ReS(
+      res,
+      {
+        success: true,
+        jdSentCount,
+        callResponseCount,
+        resumeReceivedSum,
+        followUpsCount,
+        resumeSelectedCount,
+        collegesAchieved,
+        managers,
+        dates: merged,
+        totals,
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
   try {
