@@ -460,10 +460,6 @@ const listAllFundsAuditByCollege = async (req, res) => {
 module.exports.listAllFundsAuditByCollege = listAllFundsAuditByCollege;
 
 
-const { Op } = require("sequelize");
-const { TeamManager, Status, FundsAudit } = require("../models"); // Adjust path as needed
-const { ReS, ReE } = require("../utils/response"); // Your response helpers
-
 const getPaidAccountsDayWise = async (req, res) => {
   try {
     let { teamManagerId, from, to } = req.query;
