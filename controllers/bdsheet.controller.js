@@ -763,6 +763,11 @@ const getTargetVsAchieved = async (req, res) => {
       dateWise: []
     }, 200);
 
+    // ✅ Adjust dates: make 'to' cover the full day
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include full day
+
     // ✅ Fetch day-wise achieved counts from FundsAudit (using dateOfPayment)
     const achievedResults = await FundsAudit.sequelize.query(
       `
@@ -775,7 +780,7 @@ const getTargetVsAchieved = async (req, res) => {
       GROUP BY DATE(f."dateOfPayment")
       ORDER BY DATE(f."dateOfPayment");
       `,
-      { replacements: { userIds, from, to }, type: FundsAudit.sequelize.QueryTypes.SELECT }
+      { replacements: { userIds, from: fromDate, to: toDate }, type: FundsAudit.sequelize.QueryTypes.SELECT }
     );
 
     // Build achieved map
@@ -786,7 +791,7 @@ const getTargetVsAchieved = async (req, res) => {
     const targets = await BdTarget.findAll({
       where: {
         teamManagerId: managerId,
-        targetDate: { [Op.between]: [from, to] }
+        targetDate: { [Op.between]: [fromDate, toDate] }
       },
     });
 
@@ -804,7 +809,7 @@ const getTargetVsAchieved = async (req, res) => {
       }
       return result;
     };
-    const allDates = getDateRange(from, to);
+    const allDates = getDateRange(fromDate, toDate);
 
     // Build date-wise comparison
     const dateWiseComparison = allDates.map(date => {
@@ -840,7 +845,6 @@ const getTargetVsAchieved = async (req, res) => {
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
-
 const getBdTlLeaderboard = async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -852,6 +856,11 @@ const getBdTlLeaderboard = async (req, res) => {
 
     if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
+    // Adjust dates: make 'to' cover the full day
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include full day
+
     const leaderboardData = [];
 
     for (const manager of teamManagers) {
@@ -859,7 +868,7 @@ const getBdTlLeaderboard = async (req, res) => {
       let sheets = await BdSheet.findAll({
         where: {
           teamManagerId: manager.id,
-          startDate: { [Op.between]: [from, to] },
+          startDate: { [Op.between]: [fromDate, toDate] },
         },
         attributes: ["startDate", "activeStatus", "businessTask"],
       });
@@ -868,7 +877,7 @@ const getBdTlLeaderboard = async (req, res) => {
         sheets = await BdSheet.findAll({
           where: {
             tlAllocated: manager.name,
-            startDate: { [Op.between]: [from, to] },
+            startDate: { [Op.between]: [fromDate, toDate] },
           },
           attributes: ["startDate", "activeStatus", "businessTask"],
         });
@@ -901,7 +910,7 @@ const getBdTlLeaderboard = async (req, res) => {
           ORDER BY DATE("dateOfPayment");
           `,
           {
-            replacements: { userIds, from, to },
+            replacements: { userIds, from: fromDate, to: toDate },
             type: FundsAudit.sequelize.QueryTypes.SELECT,
           }
         );
@@ -916,7 +925,7 @@ const getBdTlLeaderboard = async (req, res) => {
       const targets = await BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
-          targetDate: { [Op.between]: [from, to] },
+          targetDate: { [Op.between]: [fromDate, toDate] },
         },
       });
 
@@ -976,12 +985,17 @@ const getAccountTargetVsAchieved = async (req, res) => {
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
+    // ----- ADJUST DATES TO COVER FULL DAY -----
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include full 'to' day
+
     // ----- FETCH TARGETS -----
     const targets = await model.BdTarget.findAll({
       where: {
         teamManagerId: managerId,
-        targetDate: { [Op.between]: [from, to] }
-      }
+        targetDate: { [Op.between]: [fromDate, toDate] },
+      },
     });
 
     // Convert targets to map
@@ -991,10 +1005,9 @@ const getAccountTargetVsAchieved = async (req, res) => {
       targetMap[date] = t.accounts || 0;
     });
 
-    // ----- FETCH ACHIEVED -----
+    // ----- FETCH ACHIEVED (via API) -----
     const phone = "+91" + manager.mobileNumber;
     const url = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getDailyReferralStatsByPhone?phone_number=${phone}&from_date=${from}&to_date=${to}`;
-
     const response = await axios.get(url);
     const referredUsers = response?.data?.result?.referred_users || [];
 
@@ -1006,10 +1019,10 @@ const getAccountTargetVsAchieved = async (req, res) => {
       });
     });
 
-    // ----- BUILD DATE RANGE -----
+    // ----- BUILD FULL DATE RANGE -----
     const dates = [];
-    let current = new Date(from);
-    const end = new Date(to);
+    let current = new Date(fromDate);
+    const end = new Date(toDate);
 
     while (current <= end) {
       dates.push(current.toISOString().slice(0, 10));
@@ -1020,7 +1033,7 @@ const getAccountTargetVsAchieved = async (req, res) => {
     const result = dates.map(date => ({
       date,
       target: targetMap[date] || 0,
-      achieved: achievedMap[date] || 0
+      achieved: achievedMap[date] || 0,
     }));
 
     return ReS(res, { success: true, data: result });
@@ -1032,6 +1045,7 @@ const getAccountTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getAccountTargetVsAchieved = getAccountTargetVsAchieved;
+
 
 
 const getAccountsCountWithTargetSummary = async (req, res) => {
