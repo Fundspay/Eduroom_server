@@ -1167,8 +1167,6 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    const normalizeId = (id) => (id == null ? null : String(id).trim());
-
     // Fetch all RaiseQuery rows
     const raiseQueries = await model.RaiseQuery.findAll({
       attributes: [
@@ -1180,7 +1178,6 @@ const getReferralPaymentStatus = async (req, res) => {
         "fundsAuditUserId",
         "phone_number",
         "email"
-       
       ],
       raw: true,
     });
@@ -1189,14 +1186,12 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map((u) => {
       const cloned = { ...u, isDownloaded: true };
 
-      // Try to find matching RaiseQuery
       let rq = raiseQueries.find(
         (r) =>
           (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
           (r.email && u.email && r.email.trim().toLowerCase() === u.email.trim().toLowerCase())
       );
 
-      // Attach queryStatus and isQueryRaised
       cloned.queryStatus = rq && rq.queryStatus ? rq.queryStatus : "";
       cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
 
@@ -1205,8 +1200,8 @@ const getReferralPaymentStatus = async (req, res) => {
 
     modifiedData.registered_users = updatedRegisteredUsers;
 
-    // Save all registered users to FundsAudit
-    const rowsToInsert = updatedRegisteredUsers.map((u) => ({
+    // Prepare rows for upsert
+    const rowsToUpsert = updatedRegisteredUsers.map((u) => ({
       userId: userId,
       registeredUserId: u.user_id,
       firstName: u.first_name,
@@ -1222,7 +1217,14 @@ const getReferralPaymentStatus = async (req, res) => {
       occupation: u.occupation || null,
     }));
 
-    await FundsAudit.bulkCreate(rowsToInsert);
+    // --- Bulk upsert to avoid duplicates ---
+    await Promise.all(
+      rowsToUpsert.map((row) =>
+        model.FundsAudit.upsert(row, {
+          conflictFields: ["userId", "registeredUserId"],
+        })
+      )
+    );
 
     return ReS(res, { success: true, data: modifiedData }, 200);
   } catch (error) {
@@ -1232,6 +1234,7 @@ const getReferralPaymentStatus = async (req, res) => {
 };
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
+
 
 
 // ✅ Get internship status summary per managerId (userId of manager)

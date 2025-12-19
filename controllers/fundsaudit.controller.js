@@ -5,7 +5,10 @@ const { FundsAudit, User, Status,Sequelize, TeamManager } = require("../models")
 const { Op } = Sequelize;
 
 // ✅ Add a new FundsAudit record
-var addFundsAudit = async function (req, res) {
+// ===========================
+// Safe FundsAudit Upsert Handler
+// ===========================
+const addFundsAudit = async function (req, res) {
     const {
         userId,
         registeredUserId,
@@ -18,31 +21,50 @@ var addFundsAudit = async function (req, res) {
         hasPaid,
         isDownloaded,
         queryStatus,
-        isQueryRaised
+        isQueryRaised,
+        occupation
     } = req.body;
 
-    if (!userId || !registeredUserId) return ReE(res, "userId and registeredUserId are required", 400);
+    if (!userId || !registeredUserId) {
+        return ReE(res, "userId and registeredUserId are required", 400);
+    }
 
     try {
-        const record = await model.FundsAudit.create({
-            userId,
-            registeredUserId,
-            firstName,
-            lastName,
-            phoneNumber,
-            email,
-            dateOfPayment,
-            dateOfDownload,
-            hasPaid,
-            isDownloaded,
-            queryStatus,
-            isQueryRaised
-        });
-        return ReS(res, record, 201);
+        // --- Upsert the record ---
+        const [record, created] = await model.FundsAudit.upsert(
+            {
+                userId,
+                registeredUserId,
+                firstName,
+                lastName,
+                phoneNumber,
+                email,
+                dateOfPayment,
+                dateOfDownload,
+                hasPaid,
+                isDownloaded,
+                queryStatus,
+                isQueryRaised,
+                occupation
+            },
+            {
+                conflictFields: ["userId", "registeredUserId"], // uses unique index
+                returning: true,
+            }
+        );
+
+        // --- Send response ---
+        return ReS(res, {
+            record,
+            created, // true = new record inserted, false = existing record updated
+        }, created ? 201 : 200);
+
     } catch (error) {
+        console.error("FundsAudit upsert error:", error);
         return ReE(res, error.message, 422);
     }
 };
+
 module.exports.addFundsAudit = addFundsAudit;
 
 // ✅ Fetch all FundsAudit records
