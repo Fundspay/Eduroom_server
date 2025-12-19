@@ -1153,7 +1153,7 @@ const getReferralPaymentStatus = async (req, res) => {
       );
     }
 
-    // Call external Lambda
+    // 1️⃣ Call external Lambda to get referral payment status
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
     let modifiedData = { ...apiResponse.data };
@@ -1167,25 +1167,17 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // Fetch all RaiseQuery rows
+    // 2️⃣ Fetch all RaiseQuery rows once
     const raiseQueries = await model.RaiseQuery.findAll({
-      attributes: [
-        "id",
-        "queryStatus",
-        "isQueryRaised",
-        "createdAt",
-        "userId",
-        "fundsAuditUserId",
-        "phone_number",
-        "email"
-      ],
+      attributes: ["queryStatus", "isQueryRaised", "phone_number", "email"],
       raw: true,
     });
 
-    // Map registered_users to RaiseQuery by email or phone
+    // 3️⃣ Normalize registered users with query info
     const updatedRegisteredUsers = regUsers.map(u => {
       const cloned = { ...u, isDownloaded: true };
 
+      // Find matching RaiseQuery
       const rq = raiseQueries.find(
         r =>
           (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
@@ -1193,16 +1185,24 @@ const getReferralPaymentStatus = async (req, res) => {
       );
 
       cloned.queryStatus = rq?.queryStatus || "";
-      cloned.isQueryRaised = rq?.isQueryRaised || false;
-
+      cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
       return cloned;
     });
 
-    modifiedData.registered_users = updatedRegisteredUsers;
+    // 4️⃣ Fetch existing registeredUserIds for this user
+    const existing = await model.FundsAudit.findAll({
+      where: { userId },
+      attributes: ["registeredUserId"],
+      raw: true,
+    });
+    const existingIds = new Set(existing.map(e => e.registeredUserId));
 
-    // Prepare rows to insert/update in FundsAudit
-    const rowsToInsert = updatedRegisteredUsers.map(u => ({
-      userId: userId,
+    // 5️⃣ Filter out duplicates
+    const newRows = updatedRegisteredUsers.filter(u => !existingIds.has(u.user_id));
+
+    // 6️⃣ Prepare rows to insert
+    const rowsToInsert = newRows.map(u => ({
+      userId,
       registeredUserId: u.user_id,
       firstName: u.first_name,
       lastName: u.last_name,
@@ -1217,25 +1217,13 @@ const getReferralPaymentStatus = async (req, res) => {
       occupation: u.occupation || null,
     }));
 
-    // ✅ Use bulkCreate with conflict handling on unique key
-    await model.FundsAudit.bulkCreate(rowsToInsert, {
-      updateOnDuplicate: [
-        "firstName",
-        "lastName",
-        "phoneNumber",
-        "email",
-        "dateOfPayment",
-        "dateOfDownload",
-        "hasPaid",
-        "isDownloaded",
-        "queryStatus",
-        "isQueryRaised",
-        "occupation",
-        "updatedAt"
-      ],
-      conflictFields: ["userId", "registeredUserId"], // unique constraint columns
-    });
+    // 7️⃣ Only insert new rows
+    if (rowsToInsert.length > 0) {
+      await model.FundsAudit.bulkCreate(rowsToInsert);
+    }
 
+    // 8️⃣ Return modified data
+    modifiedData.registered_users = updatedRegisteredUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
 
   } catch (error) {
