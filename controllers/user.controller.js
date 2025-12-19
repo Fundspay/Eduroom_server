@@ -1186,7 +1186,8 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map((u) => {
       const cloned = { ...u, isDownloaded: true };
 
-      let rq = raiseQueries.find(
+      // Find matching RaiseQuery
+      const rq = raiseQueries.find(
         (r) =>
           (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
           (r.email && u.email && r.email.trim().toLowerCase() === u.email.trim().toLowerCase())
@@ -1201,7 +1202,7 @@ const getReferralPaymentStatus = async (req, res) => {
     modifiedData.registered_users = updatedRegisteredUsers;
 
     // Prepare rows for upsert
-    const rowsToUpsert = updatedRegisteredUsers.map((u) => ({
+    const rowsToInsert = updatedRegisteredUsers.map((u) => ({
       userId: userId,
       registeredUserId: u.user_id,
       firstName: u.first_name,
@@ -1215,18 +1216,30 @@ const getReferralPaymentStatus = async (req, res) => {
       queryStatus: u.queryStatus || null,
       isQueryRaised: u.isQueryRaised,
       occupation: u.occupation || null,
+      createdAt: new Date(),
+      updatedAt: new Date()
     }));
 
-    // --- Bulk upsert to avoid duplicates ---
-    await Promise.all(
-      rowsToUpsert.map((row) =>
-        model.FundsAudit.upsert(row, {
-          conflictFields: ["userId", "registeredUserId"],
-        })
-      )
-    );
+    // ✅ Bulk upsert to avoid duplicates
+    await model.FundsAudit.bulkCreate(rowsToInsert, {
+      updateOnDuplicate: [
+        "firstName",
+        "lastName",
+        "phoneNumber",
+        "email",
+        "dateOfPayment",
+        "dateOfDownload",
+        "hasPaid",
+        "isDownloaded",
+        "queryStatus",
+        "isQueryRaised",
+        "occupation",
+        "updatedAt"
+      ]
+    });
 
     return ReS(res, { success: true, data: modifiedData }, 200);
+
   } catch (error) {
     console.error("Get Referral Payment Status Error:", error);
     return ReE(res, error.message || "Internal error", 500);
@@ -1234,7 +1247,6 @@ const getReferralPaymentStatus = async (req, res) => {
 };
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
-
 
 
 // ✅ Get internship status summary per managerId (userId of manager)
