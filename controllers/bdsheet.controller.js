@@ -32,9 +32,12 @@ const upsertBdSheet = async (req, res) => {
     });
 
     if (sheet) {
-      const updateFields = filterUpdateFields(req.body, sheet);
+      // Directly use whatever frontend is sending
+      const updateFields = { ...req.body };
 
-      await sheet.update(updateFields);
+      console.log("FIELDS TO UPDATE:", updateFields);
+
+      await sheet.update(updateFields, { fields: Object.keys(updateFields) });
       return ReS(res, { message: "BdSheet updated successfully", data: sheet });
     }
 
@@ -50,36 +53,8 @@ const upsertBdSheet = async (req, res) => {
   }
 };
 
-// Helper function
-function filterUpdateFields(reqBody, existingSheet) {
-  const allowed = {};
-
-  for (const key of Object.keys(reqBody)) {
-    const incoming = reqBody[key];
-
-    if (incoming === undefined || incoming === null) continue;
-
-    if (
-      ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].includes(key)
-    ) {
-      if (typeof incoming === "object" && !Array.isArray(incoming)) {
-        if (Object.keys(incoming).length === 0) continue;
-      }
-
-      allowed[key] = {
-        ...existingSheet[key],
-        ...incoming,
-      };
-      continue;
-    }
-
-    allowed[key] = incoming;
-  }
-
-  return allowed;
-}
-
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 const getBdSheet = async (req, res) => {
   try {

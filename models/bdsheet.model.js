@@ -8,6 +8,12 @@ module.exports = (sequelize, Sequelize) => {
       // FK → StudentResume
       studentResumeId: { type: Sequelize.BIGINT, allowNull: false },
 
+      // ADDED (THIS WAS MISSING)
+      teamManagerId: {
+        type: Sequelize.BIGINT,
+        allowNull: true,
+      },
+
       // -----------------------------
       // NEW BUSINESS TASK COLUMN
       // -----------------------------

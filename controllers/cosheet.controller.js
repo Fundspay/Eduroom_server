@@ -20,9 +20,6 @@ const createCoSheet = async (req, res) => {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
     if (!dataArray.length) return ReE(res, "No data provided", 400);
 
-    const duplicateDetails = [];
-    const invalidDetails = [];
-    const nullFieldDetails = [];
     const validDetails = [];
 
     const results = await Promise.all(
@@ -41,122 +38,59 @@ const createCoSheet = async (req, res) => {
             city: data.collegeDetails?.city ?? data.city ?? null,
             state: data.collegeDetails?.state ?? data.state ?? null,
             course: data.collegeDetails?.course ?? data.course ?? null,
+
+            mbaFeeApprox: data.mbaFeeApprox ?? null,
+            mbaBatchStrengthApprox: data.mbaBatchStrengthApprox ?? null,
+            collegeTier: data.collegeTier ?? null,
+            collegeLevel: data.collegeLevel ?? null,
+            comment: data.comment ?? null,
+            corporateRelations: data.corporateRelations ?? null,
+            placemetCell: data.placemetCell ?? null,
+
             dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
             callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
             internshipType: data.connect?.internshipType ?? data.internshipType ?? null,
             detailedResponse: data.connect?.detailedResponse ?? data.detailedResponse ?? null,
             connectedBy: data.connect?.connectedBy ?? data.connectedBy ?? null,
+
             teamManagerId: data.teamManagerId ?? req.user?.id ?? null,
           };
 
-          // -------------------
-          // 1. Null Field Check
-          // -------------------
-          const nullFields = Object.keys(payload).filter(
-            (key) => payload[key] === null && key !== "teamManagerId"
-          );
-          if (nullFields.length > 0) {
-            nullFieldDetails.push({
-              row: index + 1,
-              nullFields,
-              rowData: payload,
-            });
-          }
+          // ❗ Only check: skip completely empty rows (collegeName missing)
+          if (!payload.collegeName) return null;
 
-          // -------------------
-          // 2. Invalid Data Check
-          // -------------------
-          let invalidReasons = [];
-
-          if (payload.mobileNumber && !/^[0-9]{10}$/.test(payload.mobileNumber)) {
-            invalidReasons.push("Invalid mobile number");
-          }
-
-          if (payload.emailId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.emailId)) {
-            invalidReasons.push("Invalid email format");
-          }
-
-          if (invalidReasons.length > 0) {
-            invalidDetails.push({
-              row: index + 1,
-              reasons: invalidReasons,
-              rowData: payload,
-            });
-            return { success: false, type: "invalid", reasons: invalidReasons, data: payload };
-          }
-
-          // -------------------
-          // 3. Duplicate Check
-          // -------------------
-          const whereClause = {
-            teamManagerId: payload.teamManagerId,
-            collegeName: payload.collegeName,
-          };
-          if (payload.mobileNumber) whereClause.mobileNumber = payload.mobileNumber;
-          if (payload.emailId) whereClause.emailId = payload.emailId;
-
-          const existing = await model.CoSheet.findOne({ where: whereClause });
-
-          if (existing) {
-            duplicateDetails.push({
-              row: index + 1,
-              reason: "Duplicate record",
-              rowData: payload,
-            });
-            return { success: false, type: "duplicate", error: "Duplicate record skipped", data: payload };
-          }
-
-          // -------------------
-          // 4. Insert Valid Record
-          // -------------------
           const record = await model.CoSheet.create(payload);
           validDetails.push({
             row: index + 1,
             rowData: record,
           });
-          return { success: true, type: "valid", data: record };
+
+          return record;
         } catch (err) {
           console.error("Single CoSheet record create failed:", err);
-          invalidDetails.push({
-            row: index + 1,
-            reasons: [err.message],
-            rowData: data,
-          });
-          return { success: false, type: "invalid", error: err.message, data };
+          return null;
         }
       })
     );
 
-    // -------------------
-    // Final Structured Response
-    // -------------------
     return ReS(
       res,
       {
         success: true,
-        summary: {
-          total: dataArray.length,
-          created: validDetails.length,
-          duplicates: duplicateDetails.length,
-          invalid: invalidDetails.length,
-          nullFields: nullFieldDetails.length,
-        },
-        data: {
-          duplicates: duplicateDetails,
-          invalid: invalidDetails,
-          nullFields: nullFieldDetails,
-          valid: validDetails,
-        },
+        total: dataArray.length,
+        created: validDetails.length,
+        data: validDetails,
       },
       201
     );
   } catch (error) {
-    console.error("CoSheet Create Error:", error);c
+    console.error("CoSheet Create Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.createCoSheet = createCoSheet;
+
 
 // Update connect fields
 const updateConnectFields = async (req, res) => {
@@ -164,37 +98,40 @@ const updateConnectFields = async (req, res) => {
     const record = await model.CoSheet.findByPk(req.params.id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
 
-    const allowedFields = [
-      "sr", "collegeName", "coordinatorName", "mobileNumber", "emailId", "city", "state", "course",
-      "connectedBy", "dateOfConnect", "callResponse", "internshipType", "detailedResponse", "teamManagerId"
-    ];
+    const updates = {
+      sr: req.body.sr,
+      collegeName: req.body.collegeName,
+      coordinatorName: req.body.coordinatorName,
+      mobileNumber: req.body.mobileNumber,
+      emailId: req.body.emailId,
+      city: req.body.city,
+      state: req.body.state,
+      course: req.body.course,
 
-    const allowedInternshipTypes = ["fulltime", "sip", "liveproject", "wip", "others"];
-    const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
-    const updates = {};
+      mbaFeeApprox: req.body.mbaFeeApprox,
+      mbaBatchStrengthApprox: req.body.mbaBatchStrengthApprox,
+      collegeTier: req.body.collegeTier,
+      collegeLevel: req.body.collegeLevel,
+      comment: req.body.comment,
+      corporateRelations: req.body.corporateRelations,
+      placemetCell: req.body.placemetCell,
 
-    for (let f of allowedFields) {
-      if (req.body[f] !== undefined) {
-        if (f === "internshipType") {
-          if (req.body[f] && !allowedInternshipTypes.includes(req.body[f].toLowerCase())) {
-            return ReE(res, "Invalid internshipType. Allowed: fulltime, liveproject, wip, others", 400);
-          }
-          updates[f] = req.body[f].toLowerCase();
-        } else if (f === "callResponse") {
-          const val = req.body[f]?.toLowerCase();
-          if (val && !allowedCallResponses.includes(val)) {
-            return ReE(res, "Invalid callResponse. Allowed: connected, not answered, busy, switch off, invalid", 400);
-          }
-          updates[f] = val || null;
-        } else {
-          updates[f] = req.body[f];
-        }
-      }
-    }
+      connectedBy: req.body.connectedBy,
+      dateOfConnect: req.body.dateOfConnect,
+      callResponse: req.body.callResponse,
+      internshipType: req.body.internshipType,
+      detailedResponse: req.body.detailedResponse,
 
-    if (!Object.keys(updates).length) {
-      return ReE(res, "No fields to update", 400);
-    }
+      followUpBy: req.body.followUpBy,
+      followUpDate: req.body.followUpDate,
+      followUpResponse: req.body.followUpResponse,
+      resumeDate: req.body.resumeDate,
+      resumeCount: req.body.resumeCount,
+      expectedResponseDate: req.body.expectedResponseDate,
+      followupemailsent: req.body.followupemailsent,
+
+      teamManagerId: req.body.teamManagerId,
+    };
 
     await record.update(updates);
     return ReS(res, { success: true, data: record }, 200);
@@ -203,6 +140,7 @@ const updateConnectFields = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.updateConnectFields = updateConnectFields;
 
 // Get all CoSheets
