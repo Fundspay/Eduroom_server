@@ -45,6 +45,7 @@ const createCoSheet = async (req, res) => {
             collegeLevel: data.collegeLevel ?? null,
             comment: data.comment ?? null,
             corporateRelations: data.corporateRelations ?? null,
+            placemetCell: data.placemetCell ?? null,
 
             dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
             callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
@@ -113,6 +114,7 @@ const updateConnectFields = async (req, res) => {
       collegeLevel: req.body.collegeLevel,
       comment: req.body.comment,
       corporateRelations: req.body.corporateRelations,
+      placemetCell: req.body.placemetCell,
 
       connectedBy: req.body.connectedBy,
       dateOfConnect: req.body.dateOfConnect,

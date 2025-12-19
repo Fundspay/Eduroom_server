@@ -22,6 +22,7 @@ module.exports = (sequelize, Sequelize) => {
       collegeLevel: { type: Sequelize.STRING, allowNull: true },
       comment: { type: Sequelize.STRING, allowNull: true },
       corporateRelations: { type: Sequelize.STRING, allowNull: true },
+      placemetCell: { type: Sequelize.STRING, allowNull: true },
 
       // Connect details
       connectedBy: { type: Sequelize.STRING, allowNull: true },
