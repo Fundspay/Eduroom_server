@@ -97,37 +97,39 @@ const updateConnectFields = async (req, res) => {
     const record = await model.CoSheet.findByPk(req.params.id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
 
-    const allowedFields = [
-      "sr", "collegeName", "coordinatorName", "mobileNumber", "emailId", "city", "state", "course",
-      "connectedBy", "dateOfConnect", "callResponse", "internshipType", "detailedResponse", "teamManagerId"
-    ];
+    const updates = {
+      sr: req.body.sr,
+      collegeName: req.body.collegeName,
+      coordinatorName: req.body.coordinatorName,
+      mobileNumber: req.body.mobileNumber,
+      emailId: req.body.emailId,
+      city: req.body.city,
+      state: req.body.state,
+      course: req.body.course,
 
-    const allowedInternshipTypes = ["fulltime", "sip", "liveproject", "wip", "others"];
-    const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
-    const updates = {};
+      mbaFeeApprox: req.body.mbaFeeApprox,
+      mbaBatchStrengthApprox: req.body.mbaBatchStrengthApprox,
+      collegeTier: req.body.collegeTier,
+      collegeLevel: req.body.collegeLevel,
+      comment: req.body.comment,
+      corporateRelations: req.body.corporateRelations,
 
-    for (let f of allowedFields) {
-      if (req.body[f] !== undefined) {
-        if (f === "internshipType") {
-          if (req.body[f] && !allowedInternshipTypes.includes(req.body[f].toLowerCase())) {
-            return ReE(res, "Invalid internshipType. Allowed: fulltime, liveproject, wip, others", 400);
-          }
-          updates[f] = req.body[f].toLowerCase();
-        } else if (f === "callResponse") {
-          const val = req.body[f]?.toLowerCase();
-          if (val && !allowedCallResponses.includes(val)) {
-            return ReE(res, "Invalid callResponse. Allowed: connected, not answered, busy, switch off, invalid", 400);
-          }
-          updates[f] = val || null;
-        } else {
-          updates[f] = req.body[f];
-        }
-      }
-    }
+      connectedBy: req.body.connectedBy,
+      dateOfConnect: req.body.dateOfConnect,
+      callResponse: req.body.callResponse,
+      internshipType: req.body.internshipType,
+      detailedResponse: req.body.detailedResponse,
 
-    if (!Object.keys(updates).length) {
-      return ReE(res, "No fields to update", 400);
-    }
+      followUpBy: req.body.followUpBy,
+      followUpDate: req.body.followUpDate,
+      followUpResponse: req.body.followUpResponse,
+      resumeDate: req.body.resumeDate,
+      resumeCount: req.body.resumeCount,
+      expectedResponseDate: req.body.expectedResponseDate,
+      followupemailsent: req.body.followupemailsent,
+
+      teamManagerId: req.body.teamManagerId,
+    };
 
     await record.update(updates);
     return ReS(res, { success: true, data: record }, 200);
@@ -136,6 +138,7 @@ const updateConnectFields = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.updateConnectFields = updateConnectFields;
 
 // Get all CoSheets
