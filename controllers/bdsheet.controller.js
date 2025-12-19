@@ -32,7 +32,6 @@ const upsertBdSheet = async (req, res) => {
     });
 
     if (sheet) {
-      // Directly use whatever frontend is sending
       const updateFields = { ...req.body };
 
       console.log("FIELDS TO UPDATE:", updateFields);
@@ -41,7 +40,6 @@ const upsertBdSheet = async (req, res) => {
       return ReS(res, { message: "BdSheet updated successfully", data: sheet });
     }
 
-    // CREATE
     const newSheet = await model.BdSheet.create(req.body);
     return ReS(res, {
       message: "BdSheet created successfully",
@@ -94,9 +92,7 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: {
-            include: ["businessTask", "registration", "activeStatus"],
-          },
+          attributes: ["businessTask", "registration", "activeStatus"],
           limit: 1,
           order: [["id", "DESC"]],
         },
@@ -108,19 +104,19 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        if (Array.isArray(s.BdSheet)) {
-          s.BdSheet = s.BdSheet[0] || null;
+        // ✅ FIX: Sequelize returns BdSheets (plural)
+        if (Array.isArray(s.BdSheets)) {
+          s.BdSheets = s.BdSheets[0] || null;
         }
 
-        // 🔥 Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
             attributes: [
               "subscriptionWallet",
               "subscriptiondeductedWallet",
-              "id",              // << added
-              "collegeName",     // << added
+              "id",
+              "collegeName",
             ],
           });
 
@@ -134,9 +130,8 @@ const getBdSheet = async (req, res) => {
             const businessTask = wallet + deducted;
             s.businessTask = businessTask;
 
-            // NEW FIELDS
-            s.userId = user.id;              // << added
-            s.collegeName = user.collegeName; // << added
+            s.userId = user.id;
+            s.collegeName = user.collegeName;
 
             if (!businessTask || businessTask === 0) s.category = "not working";
             else if (businessTask >= 1 && businessTask <= 5)
@@ -156,12 +151,13 @@ const getBdSheet = async (req, res) => {
           }
         }
 
-        if (s.BdSheet && s.BdSheet.registration) {
-          s.registration = s.BdSheet.registration;
+        // ✅ FIXED references
+        if (s.BdSheets && s.BdSheets.registration) {
+          s.registration = s.BdSheets.registration;
         }
 
-        if (s.BdSheet) {
-          delete s.BdSheet.registration;
+        if (s.BdSheets) {
+          delete s.BdSheets.registration;
         }
 
         return s;
@@ -176,7 +172,7 @@ const getBdSheet = async (req, res) => {
     return ReS(res, {
       count: formattedData.length,
       data: formattedData,
-      managers: managers,
+      managers,
     });
   } catch (err) {
     console.log("GET BD SHEET ERROR:", err);
@@ -185,6 +181,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 
 const getBdSheetByCategory = async (req, res) => {
