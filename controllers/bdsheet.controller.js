@@ -34,7 +34,10 @@ const upsertBdSheet = async (req, res) => {
     if (sheet) {
       const updateFields = filterUpdateFields(req.body, sheet);
 
-      await sheet.update(updateFields);
+      // Log the fields that are going to be updated
+      console.log("FIELDS TO UPDATE:", updateFields);
+
+      await sheet.update(updateFields, { fields: Object.keys(updateFields) });
       return ReS(res, { message: "BdSheet updated successfully", data: sheet });
     }
 
@@ -57,22 +60,18 @@ function filterUpdateFields(reqBody, existingSheet) {
   for (const key of Object.keys(reqBody)) {
     const incoming = reqBody[key];
 
-    if (incoming === undefined || incoming === null) continue;
+    if (incoming === undefined) continue; // only skip undefined, allow null and falsy values
 
-    if (
-      ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].includes(key)
-    ) {
+    // Merge JSON fields for day1 - day7
+    if (["day1", "day2", "day3", "day4", "day5", "day6", "day7"].includes(key)) {
       if (typeof incoming === "object" && !Array.isArray(incoming)) {
-        if (Object.keys(incoming).length === 0) continue;
+        if (Object.keys(incoming).length === 0) continue; // skip empty object
       }
-
-      allowed[key] = {
-        ...existingSheet[key],
-        ...incoming,
-      };
+      allowed[key] = { ...existingSheet[key], ...incoming };
       continue;
     }
 
+    // For all other fields, take whatever frontend sends
     allowed[key] = incoming;
   }
 
@@ -80,6 +79,7 @@ function filterUpdateFields(reqBody, existingSheet) {
 }
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 const getBdSheet = async (req, res) => {
   try {
