@@ -1159,7 +1159,7 @@ const getReferralPaymentStatus = async (req, res) => {
     let modifiedData = { ...apiResponse.data };
 
     const regUsers = Array.isArray(modifiedData.registered_users)
-      ? modifiedData.registered_users.map((u) => ({ ...u }))
+      ? modifiedData.registered_users.map(u => ({ ...u }))
       : [];
 
     if (regUsers.length === 0) {
@@ -1183,26 +1183,25 @@ const getReferralPaymentStatus = async (req, res) => {
     });
 
     // Map registered_users to RaiseQuery by email or phone
-    const updatedRegisteredUsers = regUsers.map((u) => {
+    const updatedRegisteredUsers = regUsers.map(u => {
       const cloned = { ...u, isDownloaded: true };
 
-      // Find matching RaiseQuery
       const rq = raiseQueries.find(
-        (r) =>
+        r =>
           (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
           (r.email && u.email && r.email.trim().toLowerCase() === u.email.trim().toLowerCase())
       );
 
-      cloned.queryStatus = rq && rq.queryStatus ? rq.queryStatus : "";
-      cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
+      cloned.queryStatus = rq?.queryStatus || "";
+      cloned.isQueryRaised = rq?.isQueryRaised || false;
 
       return cloned;
     });
 
     modifiedData.registered_users = updatedRegisteredUsers;
 
-    // Prepare rows for upsert
-    const rowsToInsert = updatedRegisteredUsers.map((u) => ({
+    // Prepare rows to insert/update in FundsAudit
+    const rowsToInsert = updatedRegisteredUsers.map(u => ({
       userId: userId,
       registeredUserId: u.user_id,
       firstName: u.first_name,
@@ -1216,11 +1215,9 @@ const getReferralPaymentStatus = async (req, res) => {
       queryStatus: u.queryStatus || null,
       isQueryRaised: u.isQueryRaised,
       occupation: u.occupation || null,
-      createdAt: new Date(),
-      updatedAt: new Date()
     }));
 
-    // ✅ Bulk upsert to avoid duplicates
+    // ✅ Use bulkCreate with conflict handling on unique key
     await model.FundsAudit.bulkCreate(rowsToInsert, {
       updateOnDuplicate: [
         "firstName",
@@ -1235,7 +1232,8 @@ const getReferralPaymentStatus = async (req, res) => {
         "isQueryRaised",
         "occupation",
         "updatedAt"
-      ]
+      ],
+      conflictFields: ["userId", "registeredUserId"], // unique constraint columns
     });
 
     return ReS(res, { success: true, data: modifiedData }, 200);
