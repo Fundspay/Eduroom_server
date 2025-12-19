@@ -15,6 +15,14 @@ module.exports = (sequelize, Sequelize) => {
       state: { type: Sequelize.STRING, allowNull: true },
       course: { type: Sequelize.STRING, allowNull: true },
 
+      // 🔹 Newly added columns
+      mbaFeeApprox: { type: Sequelize.STRING, allowNull: true },
+      mbaBatchStrengthApprox: { type: Sequelize.STRING, allowNull: true },
+      collegeTier: { type: Sequelize.STRING, allowNull: true },
+      collegeLevel: { type: Sequelize.STRING, allowNull: true },
+      comment: { type: Sequelize.STRING, allowNull: true },
+      corporateRelations: { type: Sequelize.STRING, allowNull: true },
+
       // Connect details
       connectedBy: { type: Sequelize.STRING, allowNull: true },
       dateOfConnect: { type: Sequelize.DATE, allowNull: true },

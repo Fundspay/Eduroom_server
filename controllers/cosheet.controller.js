@@ -20,9 +20,6 @@ const createCoSheet = async (req, res) => {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
     if (!dataArray.length) return ReE(res, "No data provided", 400);
 
-    const duplicateDetails = [];
-    const invalidDetails = [];
-    const nullFieldDetails = [];
     const validDetails = [];
 
     const results = await Promise.all(
@@ -41,122 +38,58 @@ const createCoSheet = async (req, res) => {
             city: data.collegeDetails?.city ?? data.city ?? null,
             state: data.collegeDetails?.state ?? data.state ?? null,
             course: data.collegeDetails?.course ?? data.course ?? null,
+
+            mbaFeeApprox: data.mbaFeeApprox ?? null,
+            mbaBatchStrengthApprox: data.mbaBatchStrengthApprox ?? null,
+            collegeTier: data.collegeTier ?? null,
+            collegeLevel: data.collegeLevel ?? null,
+            comment: data.comment ?? null,
+            corporateRelations: data.corporateRelations ?? null,
+
             dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
             callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
             internshipType: data.connect?.internshipType ?? data.internshipType ?? null,
             detailedResponse: data.connect?.detailedResponse ?? data.detailedResponse ?? null,
             connectedBy: data.connect?.connectedBy ?? data.connectedBy ?? null,
+
             teamManagerId: data.teamManagerId ?? req.user?.id ?? null,
           };
 
-          // -------------------
-          // 1. Null Field Check
-          // -------------------
-          const nullFields = Object.keys(payload).filter(
-            (key) => payload[key] === null && key !== "teamManagerId"
-          );
-          if (nullFields.length > 0) {
-            nullFieldDetails.push({
-              row: index + 1,
-              nullFields,
-              rowData: payload,
-            });
-          }
+          // ❗ Only check: skip completely empty rows (collegeName missing)
+          if (!payload.collegeName) return null;
 
-          // -------------------
-          // 2. Invalid Data Check
-          // -------------------
-          let invalidReasons = [];
-
-          if (payload.mobileNumber && !/^[0-9]{10}$/.test(payload.mobileNumber)) {
-            invalidReasons.push("Invalid mobile number");
-          }
-
-          if (payload.emailId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.emailId)) {
-            invalidReasons.push("Invalid email format");
-          }
-
-          if (invalidReasons.length > 0) {
-            invalidDetails.push({
-              row: index + 1,
-              reasons: invalidReasons,
-              rowData: payload,
-            });
-            return { success: false, type: "invalid", reasons: invalidReasons, data: payload };
-          }
-
-          // -------------------
-          // 3. Duplicate Check
-          // -------------------
-          const whereClause = {
-            teamManagerId: payload.teamManagerId,
-            collegeName: payload.collegeName,
-          };
-          if (payload.mobileNumber) whereClause.mobileNumber = payload.mobileNumber;
-          if (payload.emailId) whereClause.emailId = payload.emailId;
-
-          const existing = await model.CoSheet.findOne({ where: whereClause });
-
-          if (existing) {
-            duplicateDetails.push({
-              row: index + 1,
-              reason: "Duplicate record",
-              rowData: payload,
-            });
-            return { success: false, type: "duplicate", error: "Duplicate record skipped", data: payload };
-          }
-
-          // -------------------
-          // 4. Insert Valid Record
-          // -------------------
           const record = await model.CoSheet.create(payload);
           validDetails.push({
             row: index + 1,
             rowData: record,
           });
-          return { success: true, type: "valid", data: record };
+
+          return record;
         } catch (err) {
           console.error("Single CoSheet record create failed:", err);
-          invalidDetails.push({
-            row: index + 1,
-            reasons: [err.message],
-            rowData: data,
-          });
-          return { success: false, type: "invalid", error: err.message, data };
+          return null;
         }
       })
     );
 
-    // -------------------
-    // Final Structured Response
-    // -------------------
     return ReS(
       res,
       {
         success: true,
-        summary: {
-          total: dataArray.length,
-          created: validDetails.length,
-          duplicates: duplicateDetails.length,
-          invalid: invalidDetails.length,
-          nullFields: nullFieldDetails.length,
-        },
-        data: {
-          duplicates: duplicateDetails,
-          invalid: invalidDetails,
-          nullFields: nullFieldDetails,
-          valid: validDetails,
-        },
+        total: dataArray.length,
+        created: validDetails.length,
+        data: validDetails,
       },
       201
     );
   } catch (error) {
-    console.error("CoSheet Create Error:", error);c
+    console.error("CoSheet Create Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.createCoSheet = createCoSheet;
+
 
 // Update connect fields
 const updateConnectFields = async (req, res) => {
