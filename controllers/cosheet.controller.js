@@ -13,7 +13,6 @@ const s3 = new AWS.S3({
   region: process.env.AWS_REGION,
 });
 
-
 // Create / Upload CoSheet (Excel JSON)
 const createCoSheet = async (req, res) => {
   try {
@@ -42,41 +41,26 @@ const createCoSheet = async (req, res) => {
 
             // -------- MBA / Meta --------
             mbaFeeApprox:
-              data.collegeDetails?.mbaFeeApprox ??
-              data.mbaFeeApprox ??
-              null,
+              data.collegeDetails?.mbaFeeApprox ?? data.mbaFeeApprox ?? null,
 
             mbaBatchStrengthApprox:
-              data.collegeDetails?.mbaBatchStrengthApprox ??
-              data.mbaBatchStrengthApprox ??
-              null,
+              data.collegeDetails?.mbaBatchStrengthApprox ?? data.mbaBatchStrengthApprox ?? null,
 
             collegeTier:
-              data.collegeDetails?.collegeTier ??
-              data.collegeTier ??
-              null,
+              data.collegeDetails?.collegeTier ?? data.collegeTier ?? null,
 
             collegeLevel:
-              data.collegeDetails?.collegeLevel ??
-              data.collegeLevel ??
-              null,
+              data.collegeDetails?.collegeLevel ?? data.collegeLevel ?? null,
 
             comment:
-              data.collegeDetails?.comment ??
-              data.comment ??
-              null,
+              data.collegeDetails?.comment ?? data.comment ?? null,
 
             corporateRelations:
-              data.collegeDetails?.corporateRelations ??
-              data.corporateRelations ??
-              null,
+              data.collegeDetails?.corporateRelations ?? data.corporateRelations ?? null,
 
-            // model column is placemetCell
-            placemetCell:
-              data.collegeDetails?.placementCell ??
-              data.placementCell ??
-              data.placemetCell ??
-              null,
+            // -------- Placement Cell (FIXED) --------
+            placementCell:
+              data.collegeDetails?.placementCell ?? data.placementCell ?? null,
 
             // -------- Connect Details --------
             dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
@@ -122,8 +106,6 @@ const createCoSheet = async (req, res) => {
 };
 
 module.exports.createCoSheet = createCoSheet;
-
-
 
 // Update connect fields
 const updateConnectFields = async (req, res) => {
