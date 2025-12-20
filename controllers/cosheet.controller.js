@@ -126,34 +126,26 @@ const updateConnectFields = async (req, res) => {
 
       // -------- MBA / Meta --------
       mbaFeeApprox:
-        req.body.collegeDetails?.mbaFeeApprox ??
-        req.body.mbaFeeApprox,
+        req.body.collegeDetails?.mbaFeeApprox ?? req.body.mbaFeeApprox,
 
       mbaBatchStrengthApprox:
-        req.body.collegeDetails?.mbaBatchStrengthApprox ??
-        req.body.mbaBatchStrengthApprox,
+        req.body.collegeDetails?.mbaBatchStrengthApprox ?? req.body.mbaBatchStrengthApprox,
 
       collegeTier:
-        req.body.collegeDetails?.collegeTier ??
-        req.body.collegeTier,
+        req.body.collegeDetails?.collegeTier ?? req.body.collegeTier,
 
       collegeLevel:
-        req.body.collegeDetails?.collegeLevel ??
-        req.body.collegeLevel,
+        req.body.collegeDetails?.collegeLevel ?? req.body.collegeLevel,
 
       comment:
-        req.body.collegeDetails?.comment ??
-        req.body.comment,
+        req.body.collegeDetails?.comment ?? req.body.comment,
 
       corporateRelations:
-        req.body.collegeDetails?.corporateRelations ??
-        req.body.corporateRelations,
+        req.body.collegeDetails?.corporateRelations ?? req.body.corporateRelations,
 
-      // model column name is placemetCell
-      placemetCell:
-        req.body.collegeDetails?.placementCell ??
-        req.body.placementCell ??
-        req.body.placemetCell,
+      // -------- Placement Cell (FIXED) --------
+      placementCell:
+        req.body.collegeDetails?.placementCell ?? req.body.placementCell ?? req.body.placemetCell,
 
       // -------- Connect Details --------
       connectedBy: req.body.connect?.connectedBy ?? req.body.connectedBy,
@@ -183,6 +175,7 @@ const updateConnectFields = async (req, res) => {
 };
 
 module.exports.updateConnectFields = updateConnectFields;
+
 
 
 // Get all CoSheets

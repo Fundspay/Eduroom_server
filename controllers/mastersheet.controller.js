@@ -61,10 +61,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Call response count
+    // Call response count — UPDATED: use connectedBy column instead of teamManagerId
     const callResponseCount = await model.CoSheet.count({
       where: {
-        ...managerIdFilter,
+        ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
         callResponse: { [Op.ne]: null },
         dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
