@@ -35,7 +35,7 @@ var listAll = async function (req, res) {
         }
 
         // ===============================================
-        // 2️⃣ CUSTOM DATE RANGE FILTER (NEW)
+        // 2️⃣ CUSTOM DATE RANGE FILTER
         // ===============================================
         if (startDate && endDate) {
             customStart = new Date(startDate);
@@ -46,19 +46,21 @@ var listAll = async function (req, res) {
         }
 
         // ===============================================
-        // 3️⃣ DEFAULT — CURRENT MONTH when NOTHING passed
+        // 3️⃣ DEFAULT — CURRENT DAY when NOTHING passed
         // ===============================================
         if (!monthYear && !startDate && !endDate) {
             const now = new Date();
-            const year = now.getUTCFullYear();
-            const month = now.getUTCMonth(); // 0–11
 
-            monthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0));
-            monthEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0));
+            const year = now.getUTCFullYear();
+            const month = now.getUTCMonth();
+            const day = now.getUTCDate();
+
+            monthStart = new Date(Date.UTC(year, month, day, 0, 0, 0));
+            monthEnd = new Date(Date.UTC(year, month, day + 1, 0, 0, 0));
         }
 
         // ===============================================
-        // WHERE CONDITION (priority: custom > month)
+        // WHERE CONDITION (priority: custom > month/day)
         // ===============================================
         const statusWhere = { isDeleted: false };
 
@@ -104,7 +106,6 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
-
 
 
 var updateStatus = async function (req, res) {
