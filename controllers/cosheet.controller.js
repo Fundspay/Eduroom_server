@@ -114,7 +114,7 @@ const updateConnectFields = async (req, res) => {
       collegeLevel: req.body.collegeLevel,
       comment: req.body.comment,
       corporateRelations: req.body.corporateRelations,
-      placemetCell: req.body.placemetCell,
+      placementCell: req.body.placementCell,
 
       connectedBy: req.body.connectedBy,
       dateOfConnect: req.body.dateOfConnect,
