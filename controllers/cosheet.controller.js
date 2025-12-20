@@ -26,6 +26,7 @@ const createCoSheet = async (req, res) => {
       dataArray.map(async (data, index) => {
         try {
           const payload = {
+            // -------- College Details --------
             sr: data.collegeDetails?.sr ?? data.sr ?? null,
             collegeName: data.collegeDetails?.collegeName ?? data.collegeName ?? null,
             coordinatorName: data.collegeDetails?.coordinatorName ?? data.coordinatorName ?? null,
@@ -39,14 +40,45 @@ const createCoSheet = async (req, res) => {
             state: data.collegeDetails?.state ?? data.state ?? null,
             course: data.collegeDetails?.course ?? data.course ?? null,
 
-            mbaFeeApprox: data.mbaFeeApprox ?? null,
-            mbaBatchStrengthApprox: data.mbaBatchStrengthApprox ?? null,
-            collegeTier: data.collegeTier ?? null,
-            collegeLevel: data.collegeLevel ?? null,
-            comment: data.comment ?? null,
-            corporateRelations: data.corporateRelations ?? null,
-            placemetCell: data.placemetCell ?? null,
+            // -------- MBA / Meta --------
+            mbaFeeApprox:
+              data.collegeDetails?.mbaFeeApprox ??
+              data.mbaFeeApprox ??
+              null,
 
+            mbaBatchStrengthApprox:
+              data.collegeDetails?.mbaBatchStrengthApprox ??
+              data.mbaBatchStrengthApprox ??
+              null,
+
+            collegeTier:
+              data.collegeDetails?.collegeTier ??
+              data.collegeTier ??
+              null,
+
+            collegeLevel:
+              data.collegeDetails?.collegeLevel ??
+              data.collegeLevel ??
+              null,
+
+            comment:
+              data.collegeDetails?.comment ??
+              data.comment ??
+              null,
+
+            corporateRelations:
+              data.collegeDetails?.corporateRelations ??
+              data.corporateRelations ??
+              null,
+
+            // model column is placemetCell
+            placemetCell:
+              data.collegeDetails?.placementCell ??
+              data.placementCell ??
+              data.placemetCell ??
+              null,
+
+            // -------- Connect Details --------
             dateOfConnect: data.connect?.dateOfConnect ?? data.dateOfConnect ?? null,
             callResponse: data.connect?.callResponse ?? data.callResponse ?? null,
             internshipType: data.connect?.internshipType ?? data.internshipType ?? null,
@@ -92,6 +124,7 @@ const createCoSheet = async (req, res) => {
 module.exports.createCoSheet = createCoSheet;
 
 
+
 // Update connect fields
 const updateConnectFields = async (req, res) => {
   try {
@@ -99,29 +132,55 @@ const updateConnectFields = async (req, res) => {
     if (!record) return ReE(res, "CoSheet record not found", 404);
 
     const updates = {
-      sr: req.body.sr,
-      collegeName: req.body.collegeName,
-      coordinatorName: req.body.coordinatorName,
-      mobileNumber: req.body.mobileNumber,
-      emailId: req.body.emailId,
-      city: req.body.city,
-      state: req.body.state,
-      course: req.body.course,
+      // -------- College Details --------
+      sr: req.body.collegeDetails?.sr ?? req.body.sr,
+      collegeName: req.body.collegeDetails?.collegeName ?? req.body.collegeName,
+      coordinatorName: req.body.collegeDetails?.coordinatorName ?? req.body.coordinatorName,
+      mobileNumber: req.body.collegeDetails?.mobileNumber ?? req.body.mobileNumber,
+      emailId: req.body.collegeDetails?.emailId ?? req.body.emailId,
+      city: req.body.collegeDetails?.city ?? req.body.city,
+      state: req.body.collegeDetails?.state ?? req.body.state,
+      course: req.body.collegeDetails?.course ?? req.body.course,
 
-      mbaFeeApprox: req.body.mbaFeeApprox,
-      mbaBatchStrengthApprox: req.body.mbaBatchStrengthApprox,
-      collegeTier: req.body.collegeTier,
-      collegeLevel: req.body.collegeLevel,
-      comment: req.body.comment,
-      corporateRelations: req.body.corporateRelations,
-      placementCell: req.body.placementCell,
+      // -------- MBA / Meta --------
+      mbaFeeApprox:
+        req.body.collegeDetails?.mbaFeeApprox ??
+        req.body.mbaFeeApprox,
 
-      connectedBy: req.body.connectedBy,
-      dateOfConnect: req.body.dateOfConnect,
-      callResponse: req.body.callResponse,
-      internshipType: req.body.internshipType,
-      detailedResponse: req.body.detailedResponse,
+      mbaBatchStrengthApprox:
+        req.body.collegeDetails?.mbaBatchStrengthApprox ??
+        req.body.mbaBatchStrengthApprox,
 
+      collegeTier:
+        req.body.collegeDetails?.collegeTier ??
+        req.body.collegeTier,
+
+      collegeLevel:
+        req.body.collegeDetails?.collegeLevel ??
+        req.body.collegeLevel,
+
+      comment:
+        req.body.collegeDetails?.comment ??
+        req.body.comment,
+
+      corporateRelations:
+        req.body.collegeDetails?.corporateRelations ??
+        req.body.corporateRelations,
+
+      // model column name is placemetCell
+      placemetCell:
+        req.body.collegeDetails?.placementCell ??
+        req.body.placementCell ??
+        req.body.placemetCell,
+
+      // -------- Connect Details --------
+      connectedBy: req.body.connect?.connectedBy ?? req.body.connectedBy,
+      dateOfConnect: req.body.connect?.dateOfConnect ?? req.body.dateOfConnect,
+      callResponse: req.body.connect?.callResponse ?? req.body.callResponse,
+      internshipType: req.body.connect?.internshipType ?? req.body.internshipType,
+      detailedResponse: req.body.connect?.detailedResponse ?? req.body.detailedResponse,
+
+      // -------- Follow-ups / Resume --------
       followUpBy: req.body.followUpBy,
       followUpDate: req.body.followUpDate,
       followUpResponse: req.body.followUpResponse,
@@ -142,6 +201,7 @@ const updateConnectFields = async (req, res) => {
 };
 
 module.exports.updateConnectFields = updateConnectFields;
+
 
 // Get all CoSheets
 const getCoSheets = async (req, res) => {
