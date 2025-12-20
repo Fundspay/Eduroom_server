@@ -35,7 +35,7 @@ var listAll = async function (req, res) {
         }
 
         // ===============================================
-        // 2️⃣ CUSTOM DATE RANGE FILTER
+        // 2️⃣ CUSTOM DATE RANGE FILTER (NEW)
         // ===============================================
         if (startDate && endDate) {
             customStart = new Date(startDate);
@@ -46,21 +46,19 @@ var listAll = async function (req, res) {
         }
 
         // ===============================================
-        // 3️⃣ DEFAULT — CURRENT DAY when NOTHING passed
+        // 3️⃣ DEFAULT — CURRENT MONTH when NOTHING passed
         // ===============================================
         if (!monthYear && !startDate && !endDate) {
             const now = new Date();
-
             const year = now.getUTCFullYear();
-            const month = now.getUTCMonth();
-            const day = now.getUTCDate();
+            const month = now.getUTCMonth(); // 0–11
 
-            monthStart = new Date(Date.UTC(year, month, day, 0, 0, 0));
-            monthEnd = new Date(Date.UTC(year, month, day + 1, 0, 0, 0));
+            monthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+            monthEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0));
         }
 
         // ===============================================
-        // WHERE CONDITION (priority: custom > month/day)
+        // WHERE CONDITION (priority: custom > month)
         // ===============================================
         const statusWhere = { isDeleted: false };
 
@@ -78,7 +76,8 @@ var listAll = async function (req, res) {
 
         // ===============================================
         const statuses = await model.Status.findAll({
-            where: statusWhere
+            where: statusWhere,
+            order: [["createdAt", "DESC"]] // latest first
         });
 
         const totalStudents = await model.Status.count({
@@ -106,6 +105,7 @@ var listAll = async function (req, res) {
 };
 
 module.exports.listAll = listAll;
+
 
 
 var updateStatus = async function (req, res) {
