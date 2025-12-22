@@ -76,7 +76,8 @@ var listAll = async function (req, res) {
 
         // ===============================================
         const statuses = await model.Status.findAll({
-            where: statusWhere
+            where: statusWhere,
+            order: [["registeredAt", "DESC"]] // latest first
         });
 
         const totalStudents = await model.Status.count({

@@ -61,10 +61,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Call response count
+    // Call response count — UPDATED: use connectedBy column instead of teamManagerId
     const callResponseCount = await model.CoSheet.count({
       where: {
-        ...managerIdFilter,
+        ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
         callResponse: { [Op.ne]: null },
         dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
@@ -242,9 +242,10 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
+      // ✅ Updated: Filter calls by connectedBy instead of teamManagerId
       const callResponseCount = await model.CoSheet.count({
         where: {
-          teamManagerId: managerId,
+          connectedBy: managerName,
           callResponse: { [Op.ne]: null },
           dateOfConnect: { [Op.between]: [sDate, eDate] },
         },
@@ -317,7 +318,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
-      // ✅ FIXED percentage calculation
       const percentage = {
         jds: Number(target.jds) > 0 ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
         calls: Number(target.calls) > 0 ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
@@ -329,7 +329,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
           : 0,
       };
 
-      // ✅ FIXED rank score
       const rankScore = parseFloat(
         (
           (
@@ -357,7 +356,6 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       });
     }
 
-    // ✅ Ranking
     managerData.sort((a, b) => b.rankScore - a.rankScore);
     managerData.forEach((m, i) => {
       m.rank = i + 1;
@@ -376,6 +374,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
 

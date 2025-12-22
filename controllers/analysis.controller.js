@@ -31,10 +31,19 @@ const getDailyAnalysis = async (req, res) => {
       eDate.setHours(23, 59, 59, 999);
     }
 
+    // ✅ LOCAL DATE FORMATTER (NO UTC)
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       dateList.push({
-        date: d.toISOString().split("T")[0],
+        date: formatDate(d),
         day: d.toLocaleDateString("en-IN", { weekday: "long" }),
         plannedJds: 0,
         plannedCalls: 0,
@@ -50,7 +59,6 @@ const getDailyAnalysis = async (req, res) => {
       });
     }
 
-    // Fetch ALL MyTargets for this teamManager in range
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -58,11 +66,10 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
-    // Fetch ALL CoSheet records for this teamManager in range
     const allRecords = await model.CoSheet.findAll({
       where: {
         teamManagerId,
-        dateOfConnect: { [Op.between]: [sDate, eDate] }  // ONLY CHECK dateOfConnect
+        dateOfConnect: { [Op.between]: [sDate, eDate] }
       }
     });
 
@@ -70,28 +77,26 @@ const getDailyAnalysis = async (req, res) => {
 
     const merged = dateList.map(d => {
       const target = targets.find(
-        t => t.targetDate && new Date(t.targetDate).toISOString().split("T")[0] === d.date
+        t => t.targetDate && formatDate(t.targetDate) === d.date
       );
+
       if (target) {
         d.plannedJds = target.jds;
         d.plannedCalls = target.calls;
       }
 
-      const dayRecords = allRecords.filter(r => {
-        const connectDate = r.dateOfConnect ? new Date(r.dateOfConnect).toISOString().split("T")[0] : null;
-        return connectDate === d.date;
-      });
+      const dayRecords = allRecords.filter(r =>
+        r.dateOfConnect && formatDate(r.dateOfConnect) === d.date
+      );
 
       dayRecords.forEach(r => {
-        if (r.dateOfConnect) {
-          const resp = (r.callResponse || "").trim().toLowerCase();
-          if (allowedCallResponses.includes(resp)) {
-            if (resp === "connected") d.connected++;
-            else if (resp === "not answered") d.notAnswered++;
-            else if (resp === "busy") d.busy++;
-            else if (resp === "switch off") d.switchOff++;
-            else if (resp === "invalid") d.invalid++;
-          }
+        const resp = (r.callResponse || "").trim().toLowerCase();
+        if (allowedCallResponses.includes(resp)) {
+          if (resp === "connected") d.connected++;
+          else if (resp === "not answered") d.notAnswered++;
+          else if (resp === "busy") d.busy++;
+          else if (resp === "switch off") d.switchOff++;
+          else if (resp === "invalid") d.invalid++;
         }
       });
 
@@ -99,11 +104,10 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
-      const jdCount = dayRecords.filter(
-        r => r.jdSentAt && new Date(r.jdSentAt).toISOString().split("T")[0] === d.date
+      d.jdSent = dayRecords.filter(
+        r => r.jdSentAt && formatDate(r.jdSentAt) === d.date
       ).length;
 
-      d.jdSent = jdCount;
       d.jdAchievementPercent =
         d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
 
@@ -128,27 +132,24 @@ const getDailyAnalysis = async (req, res) => {
 
     totals.achievementPercent =
       totals.plannedCalls > 0 ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2) : 0;
+
     totals.jdAchievementPercent =
       totals.plannedJds > 0 ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2) : 0;
 
-    const monthLabel = new Date(sDate).toLocaleString("en-IN", { month: "long", year: "numeric" });
+    const monthLabel = new Date(sDate).toLocaleString("en-IN", {
+      month: "long",
+      year: "numeric"
+    });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        month: monthLabel,
-        dates: merged,
-        totals
-      },
-      200
-    );
+    return ReS(res, { success: true, month: monthLabel, dates: merged, totals }, 200);
   } catch (error) {
     console.error("Daily Analysis Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 
 

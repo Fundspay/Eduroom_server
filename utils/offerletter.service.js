@@ -537,8 +537,9 @@ const generateOfferLetter = async (userId, courseId = null) => {
             Congratulations! We are pleased to confirm that you have been selected for the role of <b>${role}</b> at Eduroom. We believe that your skills, experience, and qualifications make you an excellent fit for this role.<br><br>
             <b>Starting Date:</b> ${startDate}<br>
             <b>Position:</b> ${position}<br>
-            <b>Work Location:</b> ${workLocation}<br>
-            <b>Benefits:</b> Certification of Internship and LOA (performance-based).<br><br>
+            <b>Work Mode:</b> ${workLocation}<br>
+            <b>Benefits:</b> Professional  Certification of Internship .<br>
+            <b>Stipend:</b> Stipend is based on the performance.<br><br>
             We eagerly anticipate welcoming you to our team and embarking on this journey together. Your talents and expertise will enrich our collaborative efforts as we work towards our shared goals. We are excited about the opportunity to leverage your skills and contributions to drive our company's success.
         </div>
     </div>
