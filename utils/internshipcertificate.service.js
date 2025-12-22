@@ -134,7 +134,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
  </head>
  <body>
      <div class="letter-container">
-         <div class="date">Date: <b>${today}</b></div>
+         <div class="date">Date: <b>${endDate}</b></div>
 
          <div class="content">
     <b>To Whom so ever it may concern</b>,<br><br>
