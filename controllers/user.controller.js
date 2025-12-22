@@ -1197,13 +1197,18 @@ const getReferralPaymentStatus = async (req, res) => {
     });
     const existingIds = new Set(existing.map(e => e.registeredUserId));
 
-    // 5️⃣ Filter out duplicates
-    const newRows = updatedRegisteredUsers.filter(u => !existingIds.has(u.user_id));
+    // 5️⃣ Filter out duplicates (existing + within response)
+    const seenIds = new Set(existingIds);
+    const newRows = updatedRegisteredUsers.filter(u => {
+      if (seenIds.has(u.registeredUserId)) return false;
+      seenIds.add(u.registeredUserId);
+      return true;
+    });
 
     // 6️⃣ Prepare rows to insert
     const rowsToInsert = newRows.map(u => ({
       userId,
-      registeredUserId: u.user_id,
+      registeredUserId: u.registeredUserId,
       firstName: u.first_name,
       lastName: u.last_name,
       phoneNumber: u.phone_number,
@@ -1233,7 +1238,6 @@ const getReferralPaymentStatus = async (req, res) => {
 };
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
-
 
 // ✅ Get internship status summary per managerId (userId of manager)
 const getInternshipStatusByUser = async (req, res) => {
