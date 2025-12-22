@@ -20,17 +20,49 @@ const sequelizeOptions = {
 };
 
 // Initialize Sequelize
-const sequelize = new Sequelize(CONFIG.db_name, CONFIG.db_user, dbPassword, sequelizeOptions);
+const sequelize = new Sequelize(
+    CONFIG.db_name,
+    CONFIG.db_user,
+    dbPassword,
+    sequelizeOptions
+);
 
-// Load models
+/* =========================================================
+   ⚠️ GLOBAL WARNING ONLY HOOK (NO THROW, NO BLOCK)
+   Logs file + line when 'undefined' reaches SQL
+   ========================================================= */
+sequelize.addHook("beforeQuery", (options) => {
+    if (
+        options?.sql &&
+        (options.sql.includes("'undefined'") ||
+         options.sql.includes("= undefined") ||
+         options.sql.includes("undefined"))
+    ) {
+        logger.warn("⚠️ SQL WITH UNDEFINED DETECTED");
+        logger.warn(options.sql);
+        console.trace("⚠️ QUERY ORIGIN (FILE & LINE)");
+        // IMPORTANT: do nothing else (no throw, no return)
+    }
+});
+
+/* ========================================================= */
+
 fs.readdirSync(__dirname)
-    .filter(file => file.indexOf(".") !== 0 && file !== basename && file.slice(-3) === ".js")
+    .filter(
+        file =>
+            file.indexOf(".") !== 0 &&
+            file !== basename &&
+            file.slice(-3) === ".js"
+    )
     .forEach(file => {
-        const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+        const model = require(path.join(__dirname, file))(
+            sequelize,
+            Sequelize.DataTypes
+        );
         db[model.name] = model;
     });
 
-    console.log("📦 Models loaded:", Object.keys(db));
+console.log("📦 Models loaded:", Object.keys(db));
 
 // Apply associations
 Object.keys(db).forEach(modelName => {
