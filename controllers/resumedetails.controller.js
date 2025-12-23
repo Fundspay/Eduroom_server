@@ -70,9 +70,8 @@ const getResumeAnalysis = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    // ✔ Get manager name using ID
     const manager = await model.TeamManager.findOne({
-      attributes: ["id", "name", "email"],
+      attributes: ["id", "name"],
       where: { id: teamManagerId },
       raw: true,
     });
@@ -80,10 +79,8 @@ const getResumeAnalysis = async (req, res) => {
     if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
     const managerName = manager.name;
-
     const { fromDate, toDate } = req.query;
 
-    // ✔ Valid follow-up responses
     const validResponses = [
       "sending in 1-2 days",
       "delayed",
@@ -91,41 +88,42 @@ const getResumeAnalysis = async (req, res) => {
       "resumes received",
     ];
 
-    // ✔ Follow-up filtering stays SAME (followUpDate)
+    const dateRange = {};
+    if (fromDate) dateRange[Op.gte] = new Date(fromDate);
+    if (toDate) dateRange[Op.lte] = new Date(toDate);
+
+    // 🔥 CRITICAL FIX: OR condition
     const where = {
       followUpBy: managerName,
-      followUpResponse: {
-        [Op.in]: validResponses,
-      },
+      followUpResponse: { [Op.in]: validResponses },
+      [Op.or]: [
+        // Follow-up logic
+        ...(Object.keys(dateRange).length
+          ? [{ followUpDate: dateRange }]
+          : []),
+
+        // Resume logic (NEW)
+        ...(Object.keys(dateRange).length
+          ? [{ resumeDate: dateRange }]
+          : []),
+      ],
     };
 
     let targetWhere = { teamManagerId };
 
-    let resumeFrom = null;
-    let resumeTo = null;
-
-    if (fromDate || toDate) {
-      where.followUpDate = {};
-      if (fromDate) where.followUpDate[Op.gte] = new Date(fromDate);
-      if (toDate) where.followUpDate[Op.lte] = new Date(toDate);
-
-      resumeFrom = fromDate ? new Date(fromDate) : null;
-      resumeTo = toDate ? new Date(toDate) : null;
-
-      targetWhere.targetDate = {};
-      if (fromDate) targetWhere.targetDate[Op.gte] = new Date(fromDate);
-      if (toDate) targetWhere.targetDate[Op.lte] = new Date(toDate);
+    if (Object.keys(dateRange).length) {
+      targetWhere.targetDate = dateRange;
     } else {
       const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
-      const endOfDay = new Date(today.setHours(23, 59, 59, 999));
+      const start = new Date(today.setHours(0, 0, 0, 0));
+      const end = new Date(today.setHours(23, 59, 59, 999));
 
-      where.followUpDate = { [Op.between]: [startOfDay, endOfDay] };
+      targetWhere.targetDate = { [Op.between]: [start, end] };
 
-      resumeFrom = startOfDay;
-      resumeTo = endOfDay;
-
-      targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
+      where[Op.or] = [
+        { followUpDate: { [Op.between]: [start, end] } },
+        { resumeDate: { [Op.between]: [start, end] } },
+      ];
     }
 
     const data = await model.CoSheet.findAll({
@@ -150,17 +148,17 @@ const getResumeAnalysis = async (req, res) => {
 
     const targets = await model.MyTarget.findAll({
       where: targetWhere,
-      attributes: ["targetDate", "followUps", "resumetarget"],
+      attributes: ["followUps", "resumetarget"],
       raw: true,
     });
 
     const totalFollowUpTarget = targets.reduce(
-      (sum, t) => sum + (t.followUps || 0),
+      (s, t) => s + (t.followUps || 0),
       0
     );
 
     const totalResumeTarget = targets.reduce(
-      (sum, t) => sum + (t.resumetarget || 0),
+      (s, t) => s + (t.resumetarget || 0),
       0
     );
 
@@ -173,42 +171,19 @@ const getResumeAnalysis = async (req, res) => {
       "no response": 0,
     };
 
-    let followUpBy = null;
+    let followUpBy = managerName;
 
     data.forEach((d) => {
-      if (d.followUpBy) {
-        totalAchievedFollowUps += 1;
-        followUpBy = d.followUpBy;
-      }
+      totalAchievedFollowUps += 1;
 
-      const responseKey = d.followUpResponse?.toLowerCase();
+      const response = d.followUpResponse?.toLowerCase();
 
-      if (responseKey === "resumes received") {
-        // ✅ RESUME COUNT FILTERED BY resumeDate
-        const resumeDate = d.resumeDate ? new Date(d.resumeDate) : null;
-
-        if (
-          resumeDate &&
-          (!resumeFrom || resumeDate >= resumeFrom) &&
-          (!resumeTo || resumeDate <= resumeTo)
-        ) {
-          const count = Number(d.resumeCount || 0);
-          totalAchievedResumes += count;
-        }
-      } else if (breakdown.hasOwnProperty(responseKey)) {
-        breakdown[responseKey] += Number(d.rowCount || 0);
+      if (response === "resumes received") {
+        totalAchievedResumes += Number(d.resumeCount || 0);
+      } else if (breakdown.hasOwnProperty(response)) {
+        breakdown[response] += Number(d.rowCount || 0);
       }
     });
-
-    const analysis = [
-      {
-        teamManagerId,
-        followUpBy,
-        achievedResumes: totalAchievedResumes,
-        achievedFollowUps: totalAchievedFollowUps,
-        breakdown,
-      },
-    ];
 
     const followUpEfficiency = totalFollowUpTarget
       ? ((totalAchievedFollowUps / totalFollowUpTarget) * 100).toFixed(2)
@@ -220,7 +195,15 @@ const getResumeAnalysis = async (req, res) => {
 
     return ReS(res, {
       success: true,
-      analysis,
+      analysis: [
+        {
+          teamManagerId,
+          followUpBy,
+          achievedResumes: totalAchievedResumes,
+          achievedFollowUps: totalAchievedFollowUps,
+          breakdown,
+        },
+      ],
       totals: {
         totalFollowUpTarget,
         totalAchievedFollowUps,
@@ -238,7 +221,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
