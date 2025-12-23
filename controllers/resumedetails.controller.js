@@ -347,9 +347,10 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       periods.push(formatLocalDate(new Date(d)));
     }
 
-    // --- only filter by resumeDate ---
+    // Only include rows where followUpResponse = "resumes received"
     const whereClause = {
       resumeDate: { [Op.between]: [startDate, endDate] },
+      followUpResponse: "resumes received",
     };
     if (teamManagerId) whereClause.teamManagerId = teamManagerId;
 
@@ -357,7 +358,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       where: whereClause,
       attributes: [
         [fn("DATE", col("resumeDate")), "resumeDay"],
-        [fn("SUM", col("resumeCount")), "resumeCount"], // sum of resumes strictly via resumeDate
+        [fn("SUM", col("resumeCount")), "resumeCount"],
       ],
       group: ["resumeDay"],
       raw: true,
