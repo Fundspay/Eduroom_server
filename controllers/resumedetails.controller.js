@@ -81,7 +81,6 @@ const getResumeAnalysis = async (req, res) => {
     const managerName = manager.name;
     const { fromDate, toDate } = req.query;
 
-    //  ADDED "unprofessional"
     const validResponses = [
       "sending in 1-2 days",
       "delayed",
@@ -163,7 +162,6 @@ const getResumeAnalysis = async (req, res) => {
     let totalAchievedFollowUps = 0;
     let totalAchievedResumes = 0;
 
-    //  ADDED unprofessional here ONLY
     const breakdown = {
       "sending in 1-2 days": 0,
       delayed: 0,
@@ -176,10 +174,8 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
-      //  follow-up count (exclude resumes received)
-      if (response !== "resumes received") {
-        totalAchievedFollowUps += Number(d.rowCount || 0);
-      }
+      // ✅ FIX: resumes received ALSO counts as follow-up
+      totalAchievedFollowUps += Number(d.rowCount || 0);
 
       if (response === "resumes received") {
         totalAchievedResumes += Number(d.resumeCount || 0);
@@ -224,8 +220,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
