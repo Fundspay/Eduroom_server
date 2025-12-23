@@ -296,15 +296,15 @@ const getCoSheetsWithCounts = async (req, res) => {
     //  PUSH RECORDS ONLY
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
-      if (resp === "connected") {
+      if (resp === "Connected") {
         counts.connected.records.push(r);
-      } else if (resp === "not answered") {
+      } else if (resp === "Not Answered") {
         counts.notAnswered.records.push(r);
-      } else if (resp === "busy") {
+      } else if (resp === "Busy") {
         counts.busy.records.push(r);
-      } else if (resp === "switch off") {
+      } else if (resp === "Switch Off") {
         counts.switchOff.records.push(r);
-      } else if (resp === "invalid") {
+      } else if (resp === "Invalid") {
         counts.invalid.records.push(r);
       }
     });
