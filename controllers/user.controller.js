@@ -1189,7 +1189,18 @@ const getReferralPaymentStatus = async (req, res) => {
       return cloned;
     });
 
-    // 4️⃣ Fetch existing registeredUserIds for this user
+    // 🔥 NEW: Deduplicate within current batch by user_id
+    // Keep only the first occurrence of each registeredUserId
+    const seenUserIds = new Set();
+    const deduplicatedUsers = updatedRegisteredUsers.filter(u => {
+      if (seenUserIds.has(u.user_id)) {
+        return false; // Skip duplicate
+      }
+      seenUserIds.add(u.user_id);
+      return true;
+    });
+
+    // 4️⃣ Fetch existing registeredUserIds for this user from database
     const existing = await model.FundsAudit.findAll({
       where: { userId },
       attributes: ["registeredUserId"],
@@ -1197,8 +1208,8 @@ const getReferralPaymentStatus = async (req, res) => {
     });
     const existingIds = new Set(existing.map(e => e.registeredUserId));
 
-    // 5️⃣ Filter out duplicates
-    const newRows = updatedRegisteredUsers.filter(u => !existingIds.has(u.user_id));
+    // 5️⃣ Filter out records that already exist in database
+    const newRows = deduplicatedUsers.filter(u => !existingIds.has(u.user_id));
 
     // 6️⃣ Prepare rows to insert
     const rowsToInsert = newRows.map(u => ({
@@ -1222,8 +1233,8 @@ const getReferralPaymentStatus = async (req, res) => {
       await model.FundsAudit.bulkCreate(rowsToInsert);
     }
 
-    // 8️⃣ Return modified data
-    modifiedData.registered_users = updatedRegisteredUsers;
+    // 8️⃣ Return modified data (use deduplicated list)
+    modifiedData.registered_users = deduplicatedUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
 
   } catch (error) {
@@ -1233,7 +1244,6 @@ const getReferralPaymentStatus = async (req, res) => {
 };
 
 module.exports.getReferralPaymentStatus = getReferralPaymentStatus;
-
 
 // ✅ Get internship status summary per managerId (userId of manager)
 const getInternshipStatusByUser = async (req, res) => {
