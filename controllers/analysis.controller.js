@@ -266,7 +266,6 @@ const getCoSheetsWithCounts = async (req, res) => {
     if (fromDate && !toDate) toDate = fromDate;
     if (!fromDate && toDate) fromDate = toDate;
 
-    // FIXED: LOCAL DATE RANGE (NO UTC SHIFT)
     const from = new Date(fromDate);
     from.setHours(0, 0, 0, 0);
 
@@ -294,27 +293,34 @@ const getCoSheetsWithCounts = async (req, res) => {
       invalid: { count: 0, records: [] }
     };
 
+    //  PUSH RECORDS ONLY
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
       if (resp === "connected") {
-        counts.connected.count++;
         counts.connected.records.push(r);
       } else if (resp === "not answered") {
-        counts.notAnswered.count++;
         counts.notAnswered.records.push(r);
       } else if (resp === "busy") {
-        counts.busy.count++;
         counts.busy.records.push(r);
       } else if (resp === "switch off") {
-        counts.switchOff.count++;
         counts.switchOff.records.push(r);
       } else if (resp === "invalid") {
-        counts.invalid.count++;
         counts.invalid.records.push(r);
       }
     });
 
-    return ReS(res, { success: true, teamManagerId, fromDate, toDate, counts, managers }, 200);
+    //  ROW COUNT = RECORD LENGTH
+    counts.connected.count = counts.connected.records.length;
+    counts.notAnswered.count = counts.notAnswered.records.length;
+    counts.busy.count = counts.busy.records.length;
+    counts.switchOff.count = counts.switchOff.records.length;
+    counts.invalid.count = counts.invalid.records.length;
+
+    return ReS(
+      res,
+      { success: true, teamManagerId, fromDate, toDate, counts, managers },
+      200
+    );
   } catch (error) {
     console.error("Get CoSheet Records With Counts Error:", error);
     return ReE(res, error.message, 500);
