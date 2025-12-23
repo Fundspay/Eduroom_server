@@ -293,23 +293,28 @@ const getCoSheetsWithCounts = async (req, res) => {
       invalid: { count: 0, records: [] }
     };
 
-    //  PUSH RECORDS ONLY
+    //  FIX: FULLY CASE-INSENSITIVE + SAFE NORMALIZATION
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
-      if (resp === "Connected") {
+
+      if (resp === "connected") {
         counts.connected.records.push(r);
-      } else if (resp === "Not Answered") {
+      } 
+      else if (resp === "not answered" || resp === "notanswered") {
         counts.notAnswered.records.push(r);
-      } else if (resp === "Busy") {
+      } 
+      else if (resp === "busy") {
         counts.busy.records.push(r);
-      } else if (resp === "Switch Off") {
+      } 
+      else if (resp === "switch off" || resp === "switchoff") {
         counts.switchOff.records.push(r);
-      } else if (resp === "Invalid") {
+      } 
+      else if (resp === "invalid") {
         counts.invalid.records.push(r);
       }
     });
 
-    //  ROW COUNT = RECORD LENGTH
+    // ROW COUNT = ACTUAL RECORD LENGTH
     counts.connected.count = counts.connected.records.length;
     counts.notAnswered.count = counts.notAnswered.records.length;
     counts.busy.count = counts.busy.records.length;
@@ -328,4 +333,5 @@ const getCoSheetsWithCounts = async (req, res) => {
 };
 
 module.exports.getCoSheetsWithCounts = getCoSheetsWithCounts;
+
 
