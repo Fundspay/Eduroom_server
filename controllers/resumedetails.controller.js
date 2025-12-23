@@ -103,13 +103,8 @@ const getResumeAnalysis = async (req, res) => {
       targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
     }
 
-    const categories = [
-      "resumes received",
-      "sending in 1-2 days",
-      "delayed",
-      "no response",
-      "unprofessional",
-    ];
+    // Only consider these categories for follow-up response
+    const validResponses = ["sending in 1-2 days", "delayed", "no response"];
 
     const data = await model.CoSheet.findAll({
       where,
@@ -118,7 +113,7 @@ const getResumeAnalysis = async (req, res) => {
         "followUpBy",
         "followUpResponse",
         [fn("COUNT", col("id")), "rowCount"],
-        [fn("SUM", col("resumeCount")), "resumeCountSum"], // ✔ ADDED
+        [fn("SUM", col("resumeCount")), "resumeCountSum"],
       ],
       group: ["teamManagerId", "followUpBy", "followUpResponse"],
       raw: true,
@@ -143,7 +138,7 @@ const getResumeAnalysis = async (req, res) => {
     let totalAchievedResumes = 0;
 
     const breakdown = {};
-    categories.forEach((c) => (breakdown[c] = 0));
+    validResponses.forEach((c) => (breakdown[c] = 0));
 
     let followUpBy = null;
 
@@ -154,16 +149,9 @@ const getResumeAnalysis = async (req, res) => {
       }
 
       const responseKey = d.followUpResponse?.toLowerCase();
-      if (responseKey && categories.includes(responseKey)) {
-        // ✔ ONLY resumes received uses SUM(resumeCount)
-        if (responseKey === "resumes received") {
-          const sum = Number(d.resumeCountSum || 0);
-          breakdown[responseKey] += sum;
-          totalAchievedResumes += sum;
-        } else {
-          breakdown[responseKey] += Number(d.rowCount || 0);
-          totalAchievedResumes += Number(d.rowCount || 0);
-        }
+      if (responseKey && validResponses.includes(responseKey)) {
+        breakdown[responseKey] += Number(d.rowCount || 0);
+        totalAchievedResumes += Number(d.rowCount || 0);
       }
     });
 
@@ -204,6 +192,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
