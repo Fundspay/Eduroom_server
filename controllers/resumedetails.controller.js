@@ -79,17 +79,17 @@ const getResumeAnalysis = async (req, res) => {
 
     if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
-    const managerName = manager.name;  // ✔ this matches followUpBy
+    const managerName = manager.name; // ✔ this matches followUpBy
 
     const { fromDate, toDate } = req.query;
 
-    const where = { followUpBy: managerName };   // ✔ UPDATED (replaced teamManagerId)
+    const where = { followUpBy: managerName }; // ✔ UPDATED (replaced teamManagerId)
     let targetWhere = { teamManagerId };
 
     if (fromDate || toDate) {
-      where.resumeDate = {};
-      if (fromDate) where.resumeDate[Op.gte] = new Date(fromDate);
-      if (toDate) where.resumeDate[Op.lte] = new Date(toDate);
+      where.followUpDate = {};
+      if (fromDate) where.followUpDate[Op.gte] = new Date(fromDate);
+      if (toDate) where.followUpDate[Op.lte] = new Date(toDate);
 
       targetWhere.targetDate = {};
       if (fromDate) targetWhere.targetDate[Op.gte] = new Date(fromDate);
@@ -99,7 +99,7 @@ const getResumeAnalysis = async (req, res) => {
       const startOfDay = new Date(today.setHours(0, 0, 0, 0));
       const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
-      where.resumeDate = { [Op.between]: [startOfDay, endOfDay] };
+      where.followUpDate = { [Op.between]: [startOfDay, endOfDay] };
       targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
     }
 
@@ -155,7 +155,6 @@ const getResumeAnalysis = async (req, res) => {
 
       const responseKey = d.followUpResponse?.toLowerCase();
       if (responseKey && categories.includes(responseKey)) {
-
         // ✔ ONLY resumes received uses SUM(resumeCount)
         if (responseKey === "resumes received") {
           const sum = Number(d.resumeCountSum || 0);
@@ -205,8 +204,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
