@@ -272,10 +272,19 @@ const getCoSheetsWithCounts = async (req, res) => {
     const to = new Date(toDate);
     to.setHours(23, 59, 59, 999);
 
-    // FILTER BY connectedBy instead of teamManagerId
+    // Fetch manager name first
+    const manager = await model.TeamManager.findOne({
+      where: { id: teamManagerId },
+      attributes: ["name"]
+    });
+    if (!manager) return ReE(res, "Manager not found", 404);
+
+    const managerName = manager.name;
+
+    // Filter CoSheets by connectedBy (name) instead of id
     const data = await model.CoSheet.findAll({
       where: {
-        connectedBy: teamManagerId,
+        connectedBy: managerName,
         dateOfConnect: { [Op.between]: [from, to] }
       },
       order: [["dateOfConnect", "ASC"]]
@@ -294,7 +303,7 @@ const getCoSheetsWithCounts = async (req, res) => {
       invalid: { count: 0, records: [] }
     };
 
-    //  CASE-INSENSITIVE + SAFE NORMALIZATION
+    // CASE-INSENSITIVE + SAFE NORMALIZATION
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
 
@@ -334,5 +343,6 @@ const getCoSheetsWithCounts = async (req, res) => {
 };
 
 module.exports.getCoSheetsWithCounts = getCoSheetsWithCounts;
+
 
 
