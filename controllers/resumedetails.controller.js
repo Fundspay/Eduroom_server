@@ -93,16 +93,37 @@ const getResumeAnalysis = async (req, res) => {
     if (fromDate) dateRange[Op.gte] = new Date(fromDate);
     if (toDate) dateRange[Op.lte] = new Date(toDate);
 
+    let followUpDateRange = {};
+    let resumeDateRange = {};
+
+    if (Object.keys(dateRange).length) {
+      followUpDateRange = { followUpDate: dateRange };
+      resumeDateRange = { resumeDate: dateRange };
+    } else {
+      const today = new Date();
+      const start = new Date(today.setHours(0, 0, 0, 0));
+      const end = new Date(today.setHours(23, 59, 59, 999));
+
+      followUpDateRange = {
+        followUpDate: { [Op.between]: [start, end] },
+      };
+      resumeDateRange = {
+        resumeDate: { [Op.between]: [start, end] },
+      };
+    }
+
     const where = {
       followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
       [Op.or]: [
-        ...(Object.keys(dateRange).length
-          ? [{ followUpDate: dateRange }]
-          : []),
-        ...(Object.keys(dateRange).length
-          ? [{ resumeDate: dateRange }]
-          : []),
+        {
+          ...followUpDateRange,
+          followUpResponse: { [Op.ne]: "resumes received" },
+        },
+        {
+          ...resumeDateRange,
+          followUpResponse: "resumes received",
+        },
       ],
     };
 
@@ -114,13 +135,7 @@ const getResumeAnalysis = async (req, res) => {
       const today = new Date();
       const start = new Date(today.setHours(0, 0, 0, 0));
       const end = new Date(today.setHours(23, 59, 59, 999));
-
       targetWhere.targetDate = { [Op.between]: [start, end] };
-
-      where[Op.or] = [
-        { followUpDate: { [Op.between]: [start, end] } },
-        { resumeDate: { [Op.between]: [start, end] } },
-      ];
     }
 
     const data = await model.CoSheet.findAll({
@@ -174,13 +189,13 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
-      // ✅ FIX: resumes received ALSO counts as follow-up
-      totalAchievedFollowUps += Number(d.rowCount || 0);
-
       if (response === "resumes received") {
         totalAchievedResumes += Number(d.resumeCount || 0);
-      } else if (breakdown.hasOwnProperty(response)) {
-        breakdown[response] += Number(d.rowCount || 0);
+      } else {
+        totalAchievedFollowUps += Number(d.rowCount || 0);
+        if (breakdown.hasOwnProperty(response)) {
+          breakdown[response] += Number(d.rowCount || 0);
+        }
       }
     });
 
@@ -220,6 +235,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
