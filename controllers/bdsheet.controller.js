@@ -7,8 +7,12 @@ const { TeamManager, BdTarget , Status,FundsAudit,BdSheet } = require("../models
 
 const upsertBdSheet = async (req, res) => {
   try {
-    const { studentResumeId } = req.body;
+    let { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
+
+    // normalize id
+    studentResumeId = Number(studentResumeId);
+    req.body.studentResumeId = studentResumeId;
 
     // ---- FETCH RESUME ----
     const resume = await model.StudentResume.findOne({
@@ -35,6 +39,13 @@ const upsertBdSheet = async (req, res) => {
       // Directly use whatever frontend is sending
       const updateFields = { ...req.body };
 
+      // 🔥 FIX: remove null / undefined fields so DB values are not wiped
+      Object.keys(updateFields).forEach((key) => {
+        if (updateFields[key] === null || updateFields[key] === undefined) {
+          delete updateFields[key];
+        }
+      });
+
       console.log("FIELDS TO UPDATE:", updateFields);
 
       await sheet.update(updateFields, { fields: Object.keys(updateFields) });
@@ -54,6 +65,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 const getBdSheet = async (req, res) => {
