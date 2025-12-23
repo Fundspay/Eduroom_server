@@ -70,7 +70,6 @@ const getResumeAnalysis = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    // ✔ Get manager name using ID
     const manager = await model.TeamManager.findOne({
       attributes: ["id", "name", "email"],
       where: { id: teamManagerId },
@@ -83,7 +82,7 @@ const getResumeAnalysis = async (req, res) => {
 
     const { fromDate, toDate } = req.query;
 
-    const validResponses = [
+    const followUpResponses = [
       "sending in 1-2 days",
       "delayed",
       "no response",
@@ -91,7 +90,9 @@ const getResumeAnalysis = async (req, res) => {
 
     const where = {
       followUpBy: managerName,
-      followUpResponse: { [Op.in]: validResponses },
+      followUpResponse: {
+        [Op.in]: [...followUpResponses, "resumes received"],
+      },
     };
 
     let targetWhere = { teamManagerId };
@@ -119,6 +120,7 @@ const getResumeAnalysis = async (req, res) => {
         "followUpBy",
         "followUpResponse",
         [fn("COUNT", col("id")), "rowCount"],
+        [fn("SUM", col("resumeCount")), "resumeCountSum"],
       ],
       group: ["followUpBy", "followUpResponse"],
       raw: true,
@@ -144,28 +146,28 @@ const getResumeAnalysis = async (req, res) => {
     let totalAchievedResumes = 0;
 
     const breakdown = {};
-    validResponses.forEach((r) => (breakdown[r] = 0));
-
-    let followUpBy = managerName;
+    followUpResponses.forEach((r) => (breakdown[r] = 0));
 
     data.forEach((d) => {
-      const count = Number(d.rowCount || 0);
+      const response = d.followUpResponse?.toLowerCase();
 
-      // ✔ FOLLOW-UP COUNT = TOTAL ROWS
-      totalAchievedFollowUps += count;
+      if (followUpResponses.includes(response)) {
+        const count = Number(d.rowCount || 0);
+        breakdown[response] += count;
+        totalAchievedFollowUps += count;
+      }
 
-      const responseKey = d.followUpResponse?.toLowerCase();
-      if (responseKey && validResponses.includes(responseKey)) {
-        breakdown[responseKey] += count;
+      if (response === "resumes received") {
+        totalAchievedResumes += Number(d.resumeCountSum || 0);
       }
     });
 
     const analysis = [
       {
         teamManagerId,
-        followUpBy,
-        achievedResumes: totalAchievedResumes, // ✔ CORRECTLY 0
-        achievedFollowUps: totalAchievedFollowUps, // ✔ NOW 2
+        followUpBy: managerName,
+        achievedResumes: totalAchievedResumes,
+        achievedFollowUps: totalAchievedFollowUps,
         breakdown,
       },
     ];
