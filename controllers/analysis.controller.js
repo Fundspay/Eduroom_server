@@ -104,8 +104,9 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
+      // ✅ UPDATED JD SENT LOGIC (USING detailedResponse)
       d.jdSent = dayRecords.filter(
-        r => r.jdSentAt && formatDate(r.jdSentAt) === d.date
+        r => (r.detailedResponse || "").trim().toLowerCase() === "send jd"
       ).length;
 
       d.jdAchievementPercent =
@@ -127,14 +128,28 @@ const getDailyAnalysis = async (req, res) => {
         sum.jdSent += d.jdSent;
         return sum;
       },
-      { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 }
+      {
+        plannedJds: 0,
+        plannedCalls: 0,
+        connected: 0,
+        notAnswered: 0,
+        busy: 0,
+        switchOff: 0,
+        invalid: 0,
+        achievedCalls: 0,
+        jdSent: 0
+      }
     );
 
     totals.achievementPercent =
-      totals.plannedCalls > 0 ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2) : 0;
+      totals.plannedCalls > 0
+        ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2)
+        : 0;
 
     totals.jdAchievementPercent =
-      totals.plannedJds > 0 ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2) : 0;
+      totals.plannedJds > 0
+        ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2)
+        : 0;
 
     const monthLabel = new Date(sDate).toLocaleString("en-IN", {
       month: "long",
@@ -149,7 +164,6 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
-
 
 
 // Get all connected CoSheet records for a teamManager
