@@ -70,6 +70,7 @@ const getResumeAnalysis = async (req, res) => {
     const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // ✔ Get manager name using ID
     const manager = await model.TeamManager.findOne({
       attributes: ["id", "name", "email"],
       where: { id: teamManagerId },
@@ -82,25 +83,34 @@ const getResumeAnalysis = async (req, res) => {
 
     const { fromDate, toDate } = req.query;
 
-    const followUpResponses = [
+    // ✔ Valid follow-up responses
+    const validResponses = [
       "sending in 1-2 days",
       "delayed",
       "no response",
+      "resumes received",
     ];
 
+    // ✔ Follow-up filtering stays SAME (followUpDate)
     const where = {
       followUpBy: managerName,
       followUpResponse: {
-        [Op.in]: [...followUpResponses, "resumes received"],
+        [Op.in]: validResponses,
       },
     };
 
     let targetWhere = { teamManagerId };
 
+    let resumeFrom = null;
+    let resumeTo = null;
+
     if (fromDate || toDate) {
       where.followUpDate = {};
       if (fromDate) where.followUpDate[Op.gte] = new Date(fromDate);
       if (toDate) where.followUpDate[Op.lte] = new Date(toDate);
+
+      resumeFrom = fromDate ? new Date(fromDate) : null;
+      resumeTo = toDate ? new Date(toDate) : null;
 
       targetWhere.targetDate = {};
       if (fromDate) targetWhere.targetDate[Op.gte] = new Date(fromDate);
@@ -111,18 +121,30 @@ const getResumeAnalysis = async (req, res) => {
       const endOfDay = new Date(today.setHours(23, 59, 59, 999));
 
       where.followUpDate = { [Op.between]: [startOfDay, endOfDay] };
+
+      resumeFrom = startOfDay;
+      resumeTo = endOfDay;
+
       targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
     }
 
     const data = await model.CoSheet.findAll({
       where,
       attributes: [
+        "teamManagerId",
         "followUpBy",
         "followUpResponse",
+        "resumeDate",
+        "resumeCount",
         [fn("COUNT", col("id")), "rowCount"],
-        [fn("SUM", col("resumeCount")), "resumeCountSum"],
       ],
-      group: ["followUpBy", "followUpResponse"],
+      group: [
+        "teamManagerId",
+        "followUpBy",
+        "followUpResponse",
+        "resumeDate",
+        "resumeCount",
+      ],
       raw: true,
     });
 
@@ -145,27 +167,43 @@ const getResumeAnalysis = async (req, res) => {
     let totalAchievedFollowUps = 0;
     let totalAchievedResumes = 0;
 
-    const breakdown = {};
-    followUpResponses.forEach((r) => (breakdown[r] = 0));
+    const breakdown = {
+      "sending in 1-2 days": 0,
+      delayed: 0,
+      "no response": 0,
+    };
+
+    let followUpBy = null;
 
     data.forEach((d) => {
-      const response = d.followUpResponse?.toLowerCase();
-
-      if (followUpResponses.includes(response)) {
-        const count = Number(d.rowCount || 0);
-        breakdown[response] += count;
-        totalAchievedFollowUps += count;
+      if (d.followUpBy) {
+        totalAchievedFollowUps += 1;
+        followUpBy = d.followUpBy;
       }
 
-      if (response === "resumes received") {
-        totalAchievedResumes += Number(d.resumeCountSum || 0);
+      const responseKey = d.followUpResponse?.toLowerCase();
+
+      if (responseKey === "resumes received") {
+        // ✅ RESUME COUNT FILTERED BY resumeDate
+        const resumeDate = d.resumeDate ? new Date(d.resumeDate) : null;
+
+        if (
+          resumeDate &&
+          (!resumeFrom || resumeDate >= resumeFrom) &&
+          (!resumeTo || resumeDate <= resumeTo)
+        ) {
+          const count = Number(d.resumeCount || 0);
+          totalAchievedResumes += count;
+        }
+      } else if (breakdown.hasOwnProperty(responseKey)) {
+        breakdown[responseKey] += Number(d.rowCount || 0);
       }
     });
 
     const analysis = [
       {
         teamManagerId,
-        followUpBy: managerName,
+        followUpBy,
         achievedResumes: totalAchievedResumes,
         achievedFollowUps: totalAchievedFollowUps,
         breakdown,
