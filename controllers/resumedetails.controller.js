@@ -92,17 +92,13 @@ const getResumeAnalysis = async (req, res) => {
     if (fromDate) dateRange[Op.gte] = new Date(fromDate);
     if (toDate) dateRange[Op.lte] = new Date(toDate);
 
-    // 🔥 CRITICAL FIX: OR condition
     const where = {
       followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
       [Op.or]: [
-        // Follow-up logic
         ...(Object.keys(dateRange).length
           ? [{ followUpDate: dateRange }]
           : []),
-
-        // Resume logic (NEW)
         ...(Object.keys(dateRange).length
           ? [{ resumeDate: dateRange }]
           : []),
@@ -174,9 +170,12 @@ const getResumeAnalysis = async (req, res) => {
     let followUpBy = managerName;
 
     data.forEach((d) => {
-      totalAchievedFollowUps += 1;
-
       const response = d.followUpResponse?.toLowerCase();
+
+      //  FIX: count follow-ups ONLY if NOT resumes received
+      if (response !== "resumes received") {
+        totalAchievedFollowUps += Number(d.rowCount || 0);
+      }
 
       if (response === "resumes received") {
         totalAchievedResumes += Number(d.resumeCount || 0);
@@ -221,6 +220,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
