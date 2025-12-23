@@ -186,18 +186,19 @@ const getResumeAnalysis = async (req, res) => {
 
     let followUpBy = managerName;
 
-    data.forEach((d) => {
-      const response = d.followUpResponse?.toLowerCase();
+   data.forEach((d) => {
+  const response = d.followUpResponse?.toLowerCase();
 
-      if (response === "resumes received") {
-        totalAchievedResumes += Number(d.resumeCount || 0);
-      } else {
-        totalAchievedFollowUps += Number(d.rowCount || 0);
-        if (breakdown.hasOwnProperty(response)) {
-          breakdown[response] += Number(d.rowCount || 0);
-        }
-      }
-    });
+  //  ALWAYS count as follow-up (including resumes received)
+  totalAchievedFollowUps += Number(d.rowCount || 0);
+
+  if (response === "resumes received") {
+    totalAchievedResumes += Number(d.resumeCount || 0);
+  } else if (breakdown.hasOwnProperty(response)) {
+    breakdown[response] += Number(d.rowCount || 0);
+  }
+});
+
 
     const followUpEfficiency = totalFollowUpTarget
       ? ((totalAchievedFollowUps / totalFollowUpTarget) * 100).toFixed(2)
@@ -235,7 +236,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
