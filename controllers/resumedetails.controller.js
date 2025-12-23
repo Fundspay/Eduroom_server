@@ -79,11 +79,12 @@ const getResumeAnalysis = async (req, res) => {
 
     if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
-    const managerName = manager.name; // ✔ this matches followUpBy
+    const managerName = manager.name; // ✔ use this for followUpBy filtering
 
     const { fromDate, toDate } = req.query;
 
-    const where = { followUpBy: managerName }; // ✔ UPDATED (replaced teamManagerId)
+    // Filter CoSheets by followUpBy = manager name
+    const where = { followUpBy: managerName };
     let targetWhere = { teamManagerId };
 
     if (fromDate || toDate) {
@@ -103,7 +104,7 @@ const getResumeAnalysis = async (req, res) => {
       targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
     }
 
-    // Only consider these categories for follow-up response
+    // Only valid responses
     const validResponses = ["sending in 1-2 days", "delayed", "no response"];
 
     const data = await model.CoSheet.findAll({
@@ -192,6 +193,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 
