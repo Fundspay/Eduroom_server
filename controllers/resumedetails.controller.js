@@ -347,6 +347,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       periods.push(formatLocalDate(new Date(d)));
     }
 
+    // --- only filter by resumeDate ---
     const whereClause = {
       resumeDate: { [Op.between]: [startDate, endDate] },
     };
@@ -356,7 +357,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       where: whereClause,
       attributes: [
         [fn("DATE", col("resumeDate")), "resumeDay"],
-        [fn("SUM", col("resumeCount")), "resumeCount"],
+        [fn("SUM", col("resumeCount")), "resumeCount"], // sum of resumes strictly via resumeDate
       ],
       group: ["resumeDay"],
       raw: true,
@@ -365,7 +366,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
     const resumeMap = {};
     data.forEach((d) => {
       const key = formatLocalDate(new Date(d.resumeDay));
-      resumeMap[key] = Number(d.resumeCount);
+      resumeMap[key] = Number(d.resumeCount || 0);
     });
 
     const targetWhere = {
@@ -408,6 +409,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 };
 
 module.exports.getResumeAnalysisPerCoSheet = getResumeAnalysisPerCoSheet;
+
 
 // 🔹 Endpoint: Get Resume Totals Per FollowUpBy (global, all users)
 const getFollowUpResumeTotals = async (req, res) => {
