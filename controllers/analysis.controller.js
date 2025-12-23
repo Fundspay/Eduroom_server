@@ -272,9 +272,10 @@ const getCoSheetsWithCounts = async (req, res) => {
     const to = new Date(toDate);
     to.setHours(23, 59, 59, 999);
 
+    // FILTER BY connectedBy instead of teamManagerId
     const data = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
+        connectedBy: teamManagerId,
         dateOfConnect: { [Op.between]: [from, to] }
       },
       order: [["dateOfConnect", "ASC"]]
@@ -293,7 +294,7 @@ const getCoSheetsWithCounts = async (req, res) => {
       invalid: { count: 0, records: [] }
     };
 
-    //  FIX: FULLY CASE-INSENSITIVE + SAFE NORMALIZATION
+    //  CASE-INSENSITIVE + SAFE NORMALIZATION
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
 
