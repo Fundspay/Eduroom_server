@@ -83,8 +83,21 @@ const getResumeAnalysis = async (req, res) => {
 
     const { fromDate, toDate } = req.query;
 
-    // Filter CoSheets by followUpBy = manager name
-    const where = { followUpBy: managerName };
+    // ✔ ONLY valid followUpResponses
+    const validResponses = [
+      "sending in 1-2 days",
+      "delayed",
+      "no response",
+    ];
+
+    // ✔ Filter CoSheets by manager NAME
+    const where = {
+      followUpBy: managerName,
+      followUpResponse: {
+        [Op.in]: validResponses,
+      },
+    };
+
     let targetWhere = { teamManagerId };
 
     if (fromDate || toDate) {
@@ -103,9 +116,6 @@ const getResumeAnalysis = async (req, res) => {
       where.followUpDate = { [Op.between]: [startOfDay, endOfDay] };
       targetWhere.targetDate = { [Op.between]: [startOfDay, endOfDay] };
     }
-
-    // Only valid responses
-    const validResponses = ["sending in 1-2 days", "delayed", "no response"];
 
     const data = await model.CoSheet.findAll({
       where,
@@ -169,6 +179,7 @@ const getResumeAnalysis = async (req, res) => {
     const followUpEfficiency = totalFollowUpTarget
       ? ((totalAchievedFollowUps / totalFollowUpTarget) * 100).toFixed(2)
       : 0;
+
     const resumeEfficiency = totalResumeTarget
       ? ((totalAchievedResumes / totalResumeTarget) * 100).toFixed(2)
       : 0;
@@ -193,8 +204,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
