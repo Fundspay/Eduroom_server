@@ -266,8 +266,12 @@ const getCoSheetsWithCounts = async (req, res) => {
     if (fromDate && !toDate) toDate = fromDate;
     if (!fromDate && toDate) fromDate = toDate;
 
-    const from = new Date(`${fromDate}T00:00:00.000Z`);
-    const to = new Date(`${toDate}T23:59:59.999Z`);
+    // FIXED: LOCAL DATE RANGE (NO UTC SHIFT)
+    const from = new Date(fromDate);
+    from.setHours(0, 0, 0, 0);
+
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
 
     const data = await model.CoSheet.findAll({
       where: {
@@ -316,4 +320,6 @@ const getCoSheetsWithCounts = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getCoSheetsWithCounts = getCoSheetsWithCounts;
+
