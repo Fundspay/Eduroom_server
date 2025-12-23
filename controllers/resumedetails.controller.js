@@ -347,10 +347,8 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       periods.push(formatLocalDate(new Date(d)));
     }
 
-    // Only include rows where followUpResponse = "resumes received"
     const whereClause = {
       resumeDate: { [Op.between]: [startDate, endDate] },
-      followUpResponse: "resumes received",
     };
     if (teamManagerId) whereClause.teamManagerId = teamManagerId;
 
@@ -367,7 +365,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
     const resumeMap = {};
     data.forEach((d) => {
       const key = formatLocalDate(new Date(d.resumeDay));
-      resumeMap[key] = Number(d.resumeCount || 0);
+      resumeMap[key] = Number(d.resumeCount);
     });
 
     const targetWhere = {
@@ -410,7 +408,6 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 };
 
 module.exports.getResumeAnalysisPerCoSheet = getResumeAnalysisPerCoSheet;
-
 
 // 🔹 Endpoint: Get Resume Totals Per FollowUpBy (global, all users)
 const getFollowUpResumeTotals = async (req, res) => {
