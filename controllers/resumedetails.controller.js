@@ -89,46 +89,39 @@ const getResumeAnalysis = async (req, res) => {
       "resumes received",
     ];
 
-    const dateRange = {};
-    if (fromDate) dateRange[Op.gte] = new Date(fromDate);
-    if (toDate) dateRange[Op.lte] = new Date(toDate);
+    // ---------------- DATE RANGE ----------------
+    let followUpDateRange = {};
+    let resumeDateRange = {};
 
-    const where = {
-      followUpBy: managerName,
-      followUpResponse: { [Op.in]: validResponses },
-      [Op.or]: [
-        ...(Object.keys(dateRange).length
-          ? [{ followUpDate: dateRange }]
-          : []),
-        ...(Object.keys(dateRange).length
-          ? [{ resumeDate: dateRange }]
-          : []),
-      ],
-    };
+    if (fromDate) {
+      followUpDateRange[Op.gte] = new Date(fromDate);
+      resumeDateRange[Op.gte] = new Date(fromDate);
+    }
+    if (toDate) {
+      followUpDateRange[Op.lte] = new Date(toDate);
+      resumeDateRange[Op.lte] = new Date(toDate);
+    }
 
-    let targetWhere = { teamManagerId };
-
-    if (Object.keys(dateRange).length) {
-      targetWhere.targetDate = dateRange;
-    } else {
+    if (!fromDate && !toDate) {
       const today = new Date();
       const start = new Date(today.setHours(0, 0, 0, 0));
       const end = new Date(today.setHours(23, 59, 59, 999));
 
-      targetWhere.targetDate = { [Op.between]: [start, end] };
-
-      where[Op.or] = [
-        { followUpDate: { [Op.between]: [start, end] } },
-        { resumeDate: { [Op.between]: [start, end] } },
-      ];
+      followUpDateRange = { [Op.between]: [start, end] };
+      resumeDateRange = { [Op.between]: [start, end] };
     }
 
+    // ---------------- MAIN QUERY ----------------
     const data = await model.CoSheet.findAll({
-      where,
+      where: {
+        followUpBy: managerName,
+        followUpResponse: { [Op.in]: validResponses },
+      },
       attributes: [
         "teamManagerId",
         "followUpBy",
         "followUpResponse",
+        "followUpDate",
         "resumeDate",
         "resumeCount",
         [fn("COUNT", col("id")), "rowCount"],
@@ -137,6 +130,7 @@ const getResumeAnalysis = async (req, res) => {
         "teamManagerId",
         "followUpBy",
         "followUpResponse",
+        "followUpDate",
         "resumeDate",
         "resumeCount",
       ],
@@ -144,7 +138,7 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     const targets = await model.MyTarget.findAll({
-      where: targetWhere,
+      where: { teamManagerId },
       attributes: ["followUps", "resumetarget"],
       raw: true,
     });
@@ -171,16 +165,32 @@ const getResumeAnalysis = async (req, res) => {
 
     let followUpBy = managerName;
 
+    // ---------------- FINAL COUNTING ----------------
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
-      // ✅ FIX: resumes received ALSO counts as follow-up
-      totalAchievedFollowUps += Number(d.rowCount || 0);
+      // FOLLOW-UP COUNT → ONLY followUpDate
+      if (
+        response !== "resumes received" &&
+        d.followUpDate &&
+        new Date(d.followUpDate) >= (followUpDateRange[Op.gte] || followUpDateRange[Op.between]?.[0]) &&
+        new Date(d.followUpDate) <= (followUpDateRange[Op.lte] || followUpDateRange[Op.between]?.[1])
+      ) {
+        totalAchievedFollowUps += Number(d.rowCount || 0);
 
-      if (response === "resumes received") {
+        if (breakdown.hasOwnProperty(response)) {
+          breakdown[response] += Number(d.rowCount || 0);
+        }
+      }
+
+      // RESUME COUNT → ONLY resumeDate
+      if (
+        response === "resumes received" &&
+        d.resumeDate &&
+        new Date(d.resumeDate) >= (resumeDateRange[Op.gte] || resumeDateRange[Op.between]?.[0]) &&
+        new Date(d.resumeDate) <= (resumeDateRange[Op.lte] || resumeDateRange[Op.between]?.[1])
+      ) {
         totalAchievedResumes += Number(d.resumeCount || 0);
-      } else if (breakdown.hasOwnProperty(response)) {
-        breakdown[response] += Number(d.rowCount || 0);
       }
     });
 
@@ -220,6 +230,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
