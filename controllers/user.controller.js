@@ -1177,7 +1177,6 @@ const getReferralPaymentStatus = async (req, res) => {
     const updatedRegisteredUsers = regUsers.map(u => {
       const cloned = { ...u, isDownloaded: true };
 
-      // Find matching RaiseQuery
       const rq = raiseQueries.find(
         r =>
           (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
@@ -1189,18 +1188,15 @@ const getReferralPaymentStatus = async (req, res) => {
       return cloned;
     });
 
-    // 🔥 NEW: Deduplicate within current batch by user_id
-    // Keep only the first occurrence of each registeredUserId
+    // 🔥 Deduplicate by user_id
     const seenUserIds = new Set();
     const deduplicatedUsers = updatedRegisteredUsers.filter(u => {
-      if (seenUserIds.has(u.user_id)) {
-        return false; // Skip duplicate
-      }
+      if (seenUserIds.has(u.user_id)) return false;
       seenUserIds.add(u.user_id);
       return true;
     });
 
-    // 4️⃣ Fetch existing registeredUserIds for this user from database
+    // 4️⃣ Fetch existing registeredUserIds for this user from FundsAudit
     const existing = await model.FundsAudit.findAll({
       where: { userId },
       attributes: ["registeredUserId"],
@@ -1211,7 +1207,7 @@ const getReferralPaymentStatus = async (req, res) => {
     // 5️⃣ Filter out records that already exist in database
     const newRows = deduplicatedUsers.filter(u => !existingIds.has(u.user_id));
 
-    // 6️⃣ Prepare rows to insert
+    // 6️⃣ Prepare rows to insert with default reviews
     const rowsToInsert = newRows.map(u => ({
       userId,
       registeredUserId: u.user_id,
@@ -1226,15 +1222,23 @@ const getReferralPaymentStatus = async (req, res) => {
       queryStatus: u.queryStatus || null,
       isQueryRaised: u.isQueryRaised,
       occupation: u.occupation || null,
+      managerReview: "not completed",
+      userReview: "not completed",
     }));
 
-    // 7️⃣ Only insert new rows
+    // 7️⃣ Insert new rows
     if (rowsToInsert.length > 0) {
       await model.FundsAudit.bulkCreate(rowsToInsert);
     }
 
-    // 8️⃣ Return modified data (use deduplicated list)
-    modifiedData.registered_users = deduplicatedUsers;
+    // 8️⃣ Return modified data with default reviews
+    const finalRegisteredUsers = deduplicatedUsers.map(u => ({
+      ...u,
+      managerReview: "not completed",
+      userReview: "not completed",
+    }));
+
+    modifiedData.registered_users = finalRegisteredUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
 
   } catch (error) {
@@ -1607,3 +1611,5 @@ const getReferralPaidUsersDateWise = async (req, res) => {
 };
 
 module.exports.getReferralPaidUsersDateWise = getReferralPaidUsersDateWise;
+
+

@@ -102,8 +102,6 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.BIGINT,
         allowNull: true
       },
-      managerReview: { type: Sequelize.STRING, allowNull: true, defaultValue: "not completed" },
-      userReview: { type: Sequelize.STRING, allowNull: true, defaultValue: "not completed" },
       lastLoginAt: { type: Sequelize.DATE, allowNull: true },
       lastLogoutAt: { type: Sequelize.DATE, allowNull: true },
       isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
