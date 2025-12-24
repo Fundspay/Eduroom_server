@@ -332,7 +332,14 @@ const getDashboardStats = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // ---------------------------
-    // FIXED DATE FILTER (BdTarget)
+    // Manager Filter
+    // ---------------------------
+    const managerFilter = managerId
+      ? { teamManagerId: parseInt(managerId, 10) }
+      : {};
+
+    // ---------------------------
+    // DATE FILTER (BdTarget)
     // ---------------------------
     let targetDateFilter = {};
     if (startDate && endDate) {
@@ -352,12 +359,8 @@ const getDashboardStats = async (req, res) => {
       };
     }
 
-    const managerFilter = managerId
-      ? { teamManagerId: parseInt(managerId, 10) }
-      : {};
-
     // ---------------------------
-    // 1️⃣ BdTarget stats
+    // 1️⃣ BdTarget (TARGET DATA - UNCHANGED)
     // ---------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
@@ -378,7 +381,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // FIXED DATE FILTER (BdSheet)
+    // DATE FILTER (BdSheet)
     // ---------------------------
     let sheetDateFilter = {};
     if (startDate && endDate) {
@@ -398,36 +401,68 @@ const getDashboardStats = async (req, res) => {
       };
     }
 
+    // ---------------------------
+    // 2️⃣ BdSheet (INTERNS DATA - UNCHANGED)
+    // ---------------------------
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...managerFilter,
         ...(startDate && endDate ? sheetDateFilter : {}),
       },
-      attributes: ["businessTask", "activeStatus"],
+      attributes: ["activeStatus"],
     });
 
-    let totalInterns = bdSheetData.length;
+    const totalInterns = bdSheetData.length;
+    const totalActiveInterns = bdSheetData.filter(
+      row => row.activeStatus?.toLowerCase() === "active"
+    ).length;
+
+    // ---------------------------
+    // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit) ✅
+    // ---------------------------
+    const statuses = await model.Status.findAll({
+      where: managerId ? { teamManagerId: managerId } : {},
+      attributes: ["userId"],
+    });
+
+    const userIds = statuses.map(s => s.userId);
+
     let totalAccountsSheet = 0;
-    let totalActiveInterns = 0;
 
-    bdSheetData.forEach((row) => {
-      const taskNum = parseInt(row.businessTask);
-      if (!isNaN(taskNum)) totalAccountsSheet += taskNum;
+    if (userIds.length) {
+      const accountsResult = await model.FundsAudit.sequelize.query(
+        `
+        SELECT COUNT(DISTINCT "userId") AS achieved_accounts
+        FROM "FundsAudits"
+        WHERE "userId" IN (:userIds)
+          AND "hasPaid" = true
+          ${startDate && endDate ? `AND "dateOfPayment" BETWEEN :start AND :end` : ""}
+        `,
+        {
+          replacements: {
+            userIds,
+            start: startDate,
+            end: endDate,
+          },
+          type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+        }
+      );
 
-      if (row.activeStatus?.toLowerCase() === "active") {
-        totalActiveInterns += 1;
-      }
-    });
+      totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
+    }
 
+    // ---------------------------
+    // FINAL RESPONSE (FORMAT UNCHANGED)
+    // ---------------------------
     return ReS(res, {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget,
+        totalAccounts: totalAccountsTarget, // 🎯 TARGET
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet,
+        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED
         totalActiveInterns,
       },
       appliedFilters: {
@@ -436,12 +471,15 @@ const getDashboardStats = async (req, res) => {
         endDate,
       },
     });
+
   } catch (err) {
+    console.error("Dashboard Stats Error:", err);
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 // HARD-CODED RANGES (not stored in DB)
