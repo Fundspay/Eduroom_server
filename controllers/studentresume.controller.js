@@ -816,9 +816,9 @@ const getUserTargetAnalysis = async (req, res) => {
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        resumeDate: { [Op.between]: [startDate, endDate] },
+        interviewDate: { [Op.between]: [startDate, endDate] },
         // robust match: ignore leading/trailing spaces and case
-        followupBy: { [Op.iLike]: userName },
+        interviewedBy: { [Op.iLike]: userName },
       },
       attributes: ["resumeDate", "collegeName", "isRegistered"],
       raw: true,
