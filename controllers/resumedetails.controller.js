@@ -90,7 +90,7 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       DATE FIX (ONLY CHANGE)
+       DATE RANGE (DATE ONLY)
     ======================= */
     const dateRange = {};
     if (fromDate) {
@@ -104,7 +104,6 @@ const getResumeAnalysis = async (req, res) => {
       end.setHours(23, 59, 59, 999);
       dateRange[Op.lte] = end;
     }
-    /* ======================= */
 
     let followUpDateRange = {};
     let resumeDateRange = {};
@@ -143,34 +142,26 @@ const getResumeAnalysis = async (req, res) => {
     };
 
     let targetWhere = { teamManagerId };
-
     if (Object.keys(dateRange).length) {
       targetWhere.targetDate = dateRange;
-    } else {
-      const today = new Date();
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-      targetWhere.targetDate = { [Op.between]: [start, end] };
     }
 
+    /* =======================
+        MAIN FIX IS HERE
+    ======================= */
     const data = await model.CoSheet.findAll({
       where,
       attributes: [
         "teamManagerId",
         "followUpBy",
         "followUpResponse",
-        "resumeDate",
-        "resumeCount",
         [fn("COUNT", col("id")), "rowCount"],
+        [fn("SUM", col("resumeCount")), "totalResumes"],
       ],
       group: [
         "teamManagerId",
         "followUpBy",
         "followUpResponse",
-        "resumeDate",
-        "resumeCount",
       ],
       raw: true,
     });
@@ -201,16 +192,13 @@ const getResumeAnalysis = async (req, res) => {
       unprofessional: 0,
     };
 
-    let followUpBy = managerName;
-
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
-      // resumes received ALSO count as follow-up
       totalAchievedFollowUps += Number(d.rowCount || 0);
 
       if (response === "resumes received") {
-        totalAchievedResumes += Number(d.resumeCount || 0);
+        totalAchievedResumes += Number(d.totalResumes || 0);
       } else if (breakdown.hasOwnProperty(response)) {
         breakdown[response] += Number(d.rowCount || 0);
       }
@@ -229,7 +217,7 @@ const getResumeAnalysis = async (req, res) => {
       analysis: [
         {
           teamManagerId,
-          followUpBy,
+          followUpBy: managerName,
           achievedResumes: totalAchievedResumes,
           achievedFollowUps: totalAchievedFollowUps,
           breakdown,
@@ -252,6 +240,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
