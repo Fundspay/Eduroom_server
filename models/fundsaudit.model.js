@@ -18,8 +18,8 @@ module.exports = (sequelize, Sequelize) => {
       queryStatus: { type: Sequelize.STRING, allowNull: true },
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: true },
       occupation: { type: Sequelize.STRING, allowNull: true },
-      managerReview: { type: Sequelize.STRING, allowNull: true, defaultValue: "Not approved" },
-      userReview: { type: Sequelize.STRING, allowNull: true, defaultValue: " Not completed " },
+      managerReview: { type: Sequelize.STRING, allowNull: true, defaultValue: "Null" },
+      userReview: { type: Sequelize.STRING, allowNull: true, defaultValue: " Null" },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
     },

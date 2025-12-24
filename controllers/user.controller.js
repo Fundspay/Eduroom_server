@@ -1222,8 +1222,8 @@ const getReferralPaymentStatus = async (req, res) => {
       queryStatus: u.queryStatus || null,
       isQueryRaised: u.isQueryRaised,
       occupation: u.occupation || null,
-      managerReview: "Not approved",
-      userReview: "Not completed ",
+      managerReview: "Null",
+      userReview: "Null",
     }));
 
     // 7️⃣ Insert new rows
