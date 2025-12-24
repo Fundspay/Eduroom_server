@@ -112,8 +112,10 @@ const getResumeAnalysis = async (req, res) => {
       };
     }
 
+    //  FIX IS HERE (teamManagerId added)
     const where = {
-      followUpBy: managerName,
+      teamManagerId,              //  REQUIRED
+      followUpBy: managerName,    //  manager name matched here
       followUpResponse: { [Op.in]: validResponses },
       [Op.or]: [
         {
@@ -186,15 +188,12 @@ const getResumeAnalysis = async (req, res) => {
 
     let followUpBy = managerName;
 
-    //  ONLY CHANGE IS HERE
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
-      //  resumes received ALSO counts as follow-up (followUpDate already enforced)
       totalAchievedFollowUps += Number(d.rowCount || 0);
 
       if (response === "resumes received") {
-        //  resumes counted strictly via resumeDate
         totalAchievedResumes += Number(d.resumeCount || 0);
       } else if (breakdown.hasOwnProperty(response)) {
         breakdown[response] += Number(d.rowCount || 0);
@@ -237,6 +236,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 
