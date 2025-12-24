@@ -7,8 +7,12 @@ const { TeamManager, BdTarget , Status,FundsAudit,BdSheet } = require("../models
 
 const upsertBdSheet = async (req, res) => {
   try {
-    const { studentResumeId } = req.body;
+    let { studentResumeId } = req.body;
     if (!studentResumeId) return ReE(res, "studentResumeId is required", 400);
+
+    //  FORCE STRING (critical fix)
+    studentResumeId = String(studentResumeId);
+    req.body.studentResumeId = studentResumeId;
 
     // ---- FETCH RESUME ----
     const resume = await model.StudentResume.findOne({
@@ -28,20 +32,32 @@ const upsertBdSheet = async (req, res) => {
 
     // ------- UPSERT -------
     let sheet = await model.BdSheet.findOne({
-      where: { studentResumeId },
+      where: { studentResumeId: String(studentResumeId) },
     });
 
     if (sheet) {
-      // Directly use whatever frontend is sending
       const updateFields = { ...req.body };
+
+      // prevent accidental wipes
+      Object.keys(updateFields).forEach((key) => {
+        if (updateFields[key] === null || updateFields[key] === undefined) {
+          delete updateFields[key];
+        }
+      });
 
       console.log("FIELDS TO UPDATE:", updateFields);
 
       await sheet.update(updateFields, { fields: Object.keys(updateFields) });
-      return ReS(res, { message: "BdSheet updated successfully", data: sheet });
+
+      //  return fresh data from DB
+      const updatedSheet = await model.BdSheet.findByPk(sheet.id);
+      return ReS(res, {
+        message: "BdSheet updated successfully",
+        data: updatedSheet,
+      });
     }
 
-    // CREATE
+    // CREATE (only when truly missing)
     const newSheet = await model.BdSheet.create(req.body);
     return ReS(res, {
       message: "BdSheet created successfully",
@@ -54,6 +70,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 const getBdSheet = async (req, res) => {

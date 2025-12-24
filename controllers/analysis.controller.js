@@ -104,8 +104,9 @@ const getDailyAnalysis = async (req, res) => {
       d.achievementPercent =
         d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
 
+      // ✅ UPDATED JD SENT LOGIC (USING detailedResponse)
       d.jdSent = dayRecords.filter(
-        r => r.jdSentAt && formatDate(r.jdSentAt) === d.date
+        r => (r.detailedResponse || "").trim().toLowerCase() === "send jd"
       ).length;
 
       d.jdAchievementPercent =
@@ -127,14 +128,28 @@ const getDailyAnalysis = async (req, res) => {
         sum.jdSent += d.jdSent;
         return sum;
       },
-      { plannedJds: 0, plannedCalls: 0, connected: 0, notAnswered: 0, busy: 0, switchOff: 0, invalid: 0, achievedCalls: 0, jdSent: 0 }
+      {
+        plannedJds: 0,
+        plannedCalls: 0,
+        connected: 0,
+        notAnswered: 0,
+        busy: 0,
+        switchOff: 0,
+        invalid: 0,
+        achievedCalls: 0,
+        jdSent: 0
+      }
     );
 
     totals.achievementPercent =
-      totals.plannedCalls > 0 ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2) : 0;
+      totals.plannedCalls > 0
+        ? ((totals.achievedCalls / totals.plannedCalls) * 100).toFixed(2)
+        : 0;
 
     totals.jdAchievementPercent =
-      totals.plannedJds > 0 ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2) : 0;
+      totals.plannedJds > 0
+        ? ((totals.jdSent / totals.plannedJds) * 100).toFixed(2)
+        : 0;
 
     const monthLabel = new Date(sDate).toLocaleString("en-IN", {
       month: "long",
@@ -149,9 +164,6 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
-
-
-
 
 
 // Get all connected CoSheet records for a teamManager
@@ -254,12 +266,25 @@ const getCoSheetsWithCounts = async (req, res) => {
     if (fromDate && !toDate) toDate = fromDate;
     if (!fromDate && toDate) fromDate = toDate;
 
-    const from = new Date(`${fromDate}T00:00:00.000Z`);
-    const to = new Date(`${toDate}T23:59:59.999Z`);
+    const from = new Date(fromDate);
+    from.setHours(0, 0, 0, 0);
 
+    const to = new Date(toDate);
+    to.setHours(23, 59, 59, 999);
+
+    // Fetch manager name first
+    const manager = await model.TeamManager.findOne({
+      where: { id: teamManagerId },
+      attributes: ["name"]
+    });
+    if (!manager) return ReE(res, "Manager not found", 404);
+
+    const managerName = manager.name;
+
+    // Filter CoSheets by connectedBy (name) instead of id
     const data = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
+        connectedBy: managerName,
         dateOfConnect: { [Op.between]: [from, to] }
       },
       order: [["dateOfConnect", "ASC"]]
@@ -278,30 +303,46 @@ const getCoSheetsWithCounts = async (req, res) => {
       invalid: { count: 0, records: [] }
     };
 
+    // CASE-INSENSITIVE + SAFE NORMALIZATION
     data.forEach(r => {
       const resp = (r.callResponse || "").trim().toLowerCase();
+
       if (resp === "connected") {
-        counts.connected.count++;
         counts.connected.records.push(r);
-      } else if (resp === "not answered") {
-        counts.notAnswered.count++;
+      } 
+      else if (resp === "not answered" || resp === "notanswered") {
         counts.notAnswered.records.push(r);
-      } else if (resp === "busy") {
-        counts.busy.count++;
+      } 
+      else if (resp === "busy") {
         counts.busy.records.push(r);
-      } else if (resp === "switch off") {
-        counts.switchOff.count++;
+      } 
+      else if (resp === "switch off" || resp === "switchoff") {
         counts.switchOff.records.push(r);
-      } else if (resp === "invalid") {
-        counts.invalid.count++;
+      } 
+      else if (resp === "invalid") {
         counts.invalid.records.push(r);
       }
     });
 
-    return ReS(res, { success: true, teamManagerId, fromDate, toDate, counts, managers }, 200);
+    // ROW COUNT = ACTUAL RECORD LENGTH
+    counts.connected.count = counts.connected.records.length;
+    counts.notAnswered.count = counts.notAnswered.records.length;
+    counts.busy.count = counts.busy.records.length;
+    counts.switchOff.count = counts.switchOff.records.length;
+    counts.invalid.count = counts.invalid.records.length;
+
+    return ReS(
+      res,
+      { success: true, teamManagerId, fromDate, toDate, counts, managers },
+      200
+    );
   } catch (error) {
     console.error("Get CoSheet Records With Counts Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getCoSheetsWithCounts = getCoSheetsWithCounts;
+
+
+
