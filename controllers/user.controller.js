@@ -1231,12 +1231,24 @@ const getReferralPaymentStatus = async (req, res) => {
       await model.FundsAudit.bulkCreate(rowsToInsert);
     }
 
-    // 8️⃣ Return modified data with default reviews
-    const finalRegisteredUsers = deduplicatedUsers.map(u => ({
-      ...u,
-      managerReview: "not completed",
-      userReview: "not completed",
-    }));
+    // 8️⃣ Fetch actual review data from FundsAudit
+    const fundsAuditRecords = await model.FundsAudit.findAll({
+      where: { registeredUserId: deduplicatedUsers.map(u => u.user_id) },
+      attributes: ["registeredUserId", "managerReview", "userReview"],
+      raw: true,
+    });
+
+    const reviewMap = new Map(fundsAuditRecords.map(r => [r.registeredUserId, r]));
+
+    // Merge reviews into response
+    const finalRegisteredUsers = deduplicatedUsers.map(u => {
+      const record = reviewMap.get(u.user_id);
+      return {
+        ...u,
+        managerReview: record?.managerReview || "not completed",
+        userReview: record?.userReview || "not completed",
+      };
+    });
 
     modifiedData.registered_users = finalRegisteredUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
