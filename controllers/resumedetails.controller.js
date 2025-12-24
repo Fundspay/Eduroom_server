@@ -91,8 +91,7 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       ✅ FINAL DATE FIX
-       DATE(followUpDate)
+       DATE RANGE (FIXED)
     ======================= */
     const where = {
       followUpBy: managerName,
@@ -101,13 +100,23 @@ const getResumeAnalysis = async (req, res) => {
 
     if (fromDate && toDate) {
       where[Op.and] = [
-        sequelize.where(
-          sequelize.fn("DATE", sequelize.col("followUpDate")),
+        model.sequelize.where(
+          model.sequelize.fn("DATE", model.sequelize.col("followUpDate")),
           {
             [Op.between]: [fromDate, toDate],
           }
         ),
       ];
+    } else {
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+
+      where.followUpDate = {
+        [Op.between]: [start, end],
+      };
     }
 
     let targetWhere = { teamManagerId };
@@ -156,12 +165,14 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
+      // ONLY count follow-ups
       if (response !== "resumes received") {
         totalAchievedFollowUps += Number(d.rowCount || 0);
         if (breakdown.hasOwnProperty(response)) {
           breakdown[response] += Number(d.rowCount || 0);
         }
       } else {
+        // resume logic untouched
         totalAchievedResumes += Number(d.resumeCount || 0);
       }
     });
@@ -202,7 +213,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 
