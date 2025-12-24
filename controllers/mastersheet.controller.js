@@ -70,10 +70,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Resume received sum — UPDATED
+    // Resume received sum — UPDATED to match getResumeAnalysis
     const resumeData = await model.CoSheet.findAll({
       where: {
-        ...managerIdFilter,
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
@@ -96,11 +96,11 @@ var fetchMasterSheetTargets = async function (req, res) {
     resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
     const collegesAchieved = collegeSet.size;
 
-    // FOLLOW-UPS COUNT — also count resumes received
+    // FOLLOW-UPS COUNT — also count resumes received like getResumeAnalysis
     const followUpsCount = await model.CoSheet.count({
       where: {
-        ...managerIdFilter,
-        followUpResponse: "resumes received",
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
+        followUpResponse: { [Op.in]: ["sending in 1-2 days", "delayed", "no response", "unprofessional", "resumes received"] },
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
@@ -196,6 +196,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
