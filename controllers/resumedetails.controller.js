@@ -256,7 +256,7 @@ const gettotalResumeAnalysis = async (req, res) => {
 
     const categories = ["resumes received", "sending in 1-2 days", "delayed", "no response", "unprofessional"];
 
-    const data = await model.CoSheet.findAll({
+    const data = await model.CoSheets.findAll({
       where,
       attributes: [
         [fn("DATE", col("resumeDate")), "resumeDay"],
