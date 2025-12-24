@@ -572,49 +572,48 @@ const getPaidAccountsDayWise = async (req, res) => {
 
 module.exports.getPaidAccountsDayWise = getPaidAccountsDayWise;
 
-const upsertFundsAuditReviews = async (req, res) => {
+const upsertFundsAuditByRegisteredUser = async (req, res) => {
   try {
-    let { id } = req.params; // FundsAudit record ID
+    const { registeredUserId } = req.params;
     const { managerReview, userReview } = req.body;
 
-    id = parseInt(id, 10);
-    if (isNaN(id)) return ReE(res, "Invalid FundsAudit ID", 400);
-
+    if (!registeredUserId) return ReE(res, "registeredUserId is required", 400);
     if (managerReview === undefined && userReview === undefined) {
       return ReE(res, "Nothing to update", 400);
     }
 
-    // Check if record exists
-    let record = await model.FundsAudit.findByPk(id);
-    if (!record) return ReE(res, "FundsAudit record not found", 404);
+    // Find the existing record by registeredUserId
+    let record = await model.FundsAudit.findOne({ where: { registeredUserId } });
 
-    // Prepare update object
     const updateFields = {};
     if (managerReview !== undefined) updateFields.managerReview = managerReview;
     if (userReview !== undefined) updateFields.userReview = userReview;
 
-    // Update the record
-    await model.FundsAudit.update(updateFields, { where: { id } });
+    if (record) {
+      // 🔹 Update existing record
+      await model.FundsAudit.update(updateFields, { where: { registeredUserId } });
+    } else {
+      // 🔹 Insert new record with default values if not provided
+      record = await model.FundsAudit.create({
+        registeredUserId,
+        managerReview: managerReview || "not completed",
+        userReview: userReview || "not completed",
+      });
+    }
 
-    // Fetch updated record
-    const updatedRecord = await model.FundsAudit.findByPk(id, {
-      attributes: [
-        "id",
-        "userId",
-        "registeredUserId",
-        "managerReview",
-        "userReview",
-      ],
+    // Fetch updated/created record
+    const finalRecord = await model.FundsAudit.findOne({
+      where: { registeredUserId },
+      attributes: ["id", "userId", "registeredUserId", "managerReview", "userReview"],
       raw: true,
     });
 
-    return ReS(res, { success: true, data: updatedRecord }, 200);
+    return ReS(res, { success: true, data: finalRecord }, 200);
 
   } catch (error) {
-    console.error("Upsert FundsAudit Reviews Error:", error);
+    console.error("Upsert FundsAudit by RegisteredUserId Error:", error);
     return ReE(res, error.message || "Internal error", 500);
   }
 };
 
-module.exports.upsertFundsAuditReviews = upsertFundsAuditReviews;
-
+module.exports.upsertFundsAuditByRegisteredUser = upsertFundsAuditByRegisteredUser;
