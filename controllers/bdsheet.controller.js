@@ -351,9 +351,14 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     // Manager Filter
     // ---------------------------
-    const managerFilter = managerId
-      ? { teamManagerId: parseInt(managerId, 10) }
-      : {};
+    let managerFilter = {};
+    let teamManagerName = null;
+
+    if (managerId) {
+      const manager = await TeamManager.findByPk(managerId);
+      if (!manager) return ReE(res, "Team Manager not found", 404);
+      teamManagerName = manager.name;
+    }
 
     // ---------------------------
     // DATE FILTER (BdTarget)
@@ -362,26 +367,18 @@ const getDashboardStats = async (req, res) => {
     if (startDate && endDate) {
       targetDateFilter = {
         [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            "<=",
-            endDate
-          ),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("targetDate")), ">=", startDate),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("targetDate")), "<=", endDate),
         ],
       };
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGET DATA - UNCHANGED)
+    // 1️⃣ BdTarget (TARGET DATA)
     // ---------------------------
-    const bdTargetData = await model.BdTarget.findAll({
+    const bdTargetData = await BdTarget.findAll({
       where: {
-        ...managerFilter,
+        ...(teamManagerName ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? targetDateFilter : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
@@ -404,26 +401,18 @@ const getDashboardStats = async (req, res) => {
     if (startDate && endDate) {
       sheetDateFilter = {
         [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            "<=",
-            endDate
-          ),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
         ],
       };
     }
 
     // ---------------------------
-    // 2️⃣ BdSheet (INTERNS DATA - UNCHANGED)
+    // 2️⃣ BdSheet (INTERNS DATA)
     // ---------------------------
-    const bdSheetData = await model.BdSheet.findAll({
+    const bdSheetData = await BdSheet.findAll({
       where: {
-        ...managerFilter,
+        ...(teamManagerName ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? sheetDateFilter : {}),
       },
       attributes: ["activeStatus"],
@@ -437,17 +426,22 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit) ✅
     // ---------------------------
-    const statuses = await model.Status.findAll({
-      where: managerId ? { teamManagerId: managerId } : {},
-      attributes: ["userId"],
-    });
 
-    const userIds = statuses.map(s => s.userId);
+    let userIds = [];
+
+    if (teamManagerName) {
+      // Get all users under this manager from Status (avoid querying teamManagerId)
+      const statuses = await Status.findAll({
+        where: { teamManager: teamManagerName },
+        attributes: ["userId"],
+      });
+      userIds = statuses.map(s => s.userId);
+    }
 
     let totalAccountsSheet = 0;
 
     if (userIds.length) {
-      const accountsResult = await model.FundsAudit.sequelize.query(
+      const accountsResult = await FundsAudit.sequelize.query(
         `
         SELECT COUNT(DISTINCT "userId") AS achieved_accounts
         FROM "FundsAudits"
@@ -456,12 +450,8 @@ const getDashboardStats = async (req, res) => {
           ${startDate && endDate ? `AND "dateOfPayment" BETWEEN :start AND :end` : ""}
         `,
         {
-          replacements: {
-            userIds,
-            start: startDate,
-            end: endDate,
-          },
-          type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+          replacements: { userIds, start: startDate, end: endDate },
+          type: FundsAudit.sequelize.QueryTypes.SELECT,
         }
       );
 
@@ -469,17 +459,17 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // FINAL RESPONSE (FORMAT UNCHANGED)
+    // FINAL RESPONSE
     // ---------------------------
     return ReS(res, {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget, // 🎯 TARGET
+        totalAccounts: totalAccountsTarget,
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED
+        totalAccounts: totalAccountsSheet,
         totalActiveInterns,
       },
       appliedFilters: {
@@ -496,7 +486,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
 
 
 // HARD-CODED RANGES (not stored in DB)
