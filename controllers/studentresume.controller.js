@@ -812,12 +812,11 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch resumes only for this team manager and robust followupBy match
+    // Fetch resumes only for this team manager
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         interviewDate: { [Op.between]: [startDate, endDate] },
-        // robust match: ignore leading/trailing spaces and case
         interviewedBy: { [Op.iLike]: userName },
       },
       attributes: ["resumeDate", "collegeName", "isRegistered"],
@@ -855,12 +854,13 @@ const getUserTargetAnalysis = async (req, res) => {
     };
 
     resumes.forEach((resume) => {
-      if (resume.collegeName) achieved.collegesAchieved.add(resume.collegeName);
+      if (resume.collegeName)
+        achieved.collegesAchieved.add(resume.collegeName);
 
       // Count all resumes
       achieved.resumesAchieved += 1;
 
-      // Add resumeDates for all
+      // Resume dates
       if (resume.resumeDate) {
         const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -869,19 +869,10 @@ const getUserTargetAnalysis = async (req, res) => {
           year: "numeric",
         });
         achieved.resumeDates.push(formattedDate);
-      }
 
-      // Only registered resumes count as interviewsAchieved
-      if (resume.isRegistered) {
+        // ✅ INTERVIEWS = ALL RESUMES (isRegistered REMOVED)
         achieved.interviewsAchieved += 1;
-        achieved.interviewDates.push(
-          new Date(resume.resumeDate).toLocaleDateString("en-GB", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          })
-        );
+        achieved.interviewDates.push(formattedDate);
       }
     });
 
