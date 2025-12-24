@@ -91,22 +91,20 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       DATE RANGE (FIXED)
+       FOLLOW-UP DATE RANGE (UNCHANGED)
     ======================= */
-    const where = {
+    const followUpWhere = {
       followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
     };
 
     if (fromDate && toDate) {
-      where[Op.and] = [
-        model.sequelize.where(
-          model.sequelize.fn("DATE", model.sequelize.col("followUpDate")),
-          {
-            [Op.between]: [fromDate, toDate],
-          }
-        ),
-      ];
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+
+      followUpWhere.followUpDate = { [Op.between]: [start, end] };
     } else {
       const today = new Date();
       const start = new Date(today);
@@ -114,15 +112,11 @@ const getResumeAnalysis = async (req, res) => {
       const end = new Date(today);
       end.setHours(23, 59, 59, 999);
 
-      where.followUpDate = {
-        [Op.between]: [start, end],
-      };
+      followUpWhere.followUpDate = { [Op.between]: [start, end] };
     }
 
-    let targetWhere = { teamManagerId };
-
     const data = await model.CoSheet.findAll({
-      where,
+      where: followUpWhere,
       attributes: [
         "teamManagerId",
         "followUpBy",
@@ -134,8 +128,43 @@ const getResumeAnalysis = async (req, res) => {
       raw: true,
     });
 
+    /* =======================
+       RESUME COUNT (FIXED)
+       → resumeDate + response = resumes received
+    ======================= */
+    const resumeWhere = {
+      followUpBy: managerName,
+      followUpResponse: "resumes received",
+    };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+
+      resumeWhere.resumeDate = { [Op.between]: [start, end] };
+    } else {
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+
+      resumeWhere.resumeDate = { [Op.between]: [start, end] };
+    }
+
+    const resumeData = await model.CoSheet.findAll({
+      where: resumeWhere,
+      attributes: [[fn("SUM", col("resumeCount")), "resumeCount"]],
+      raw: true,
+    });
+
+    /* =======================
+       TARGETS (UNCHANGED)
+    ======================= */
     const targets = await model.MyTarget.findAll({
-      where: targetWhere,
+      where: { teamManagerId },
       attributes: ["followUps", "resumetarget"],
       raw: true,
     });
@@ -150,30 +179,25 @@ const getResumeAnalysis = async (req, res) => {
       0
     );
 
+    /* =======================
+       CALCULATIONS
+    ======================= */
     let totalAchievedFollowUps = 0;
-    let totalAchievedResumes = 0;
+    let totalAchievedResumes = Number(resumeData[0]?.resumeCount || 0);
 
     const breakdown = {
       "sending in 1-2 days": 0,
       delayed: 0,
       "no response": 0,
       unprofessional: 0,
+      "resumes received": 0,
     };
-
-    let followUpBy = managerName;
 
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
-
-      // ONLY count follow-ups
-      if (response !== "resumes received") {
+      if (breakdown.hasOwnProperty(response)) {
         totalAchievedFollowUps += Number(d.rowCount || 0);
-        if (breakdown.hasOwnProperty(response)) {
-          breakdown[response] += Number(d.rowCount || 0);
-        }
-      } else {
-        // resume logic untouched
-        totalAchievedResumes += Number(d.resumeCount || 0);
+        breakdown[response] += Number(d.rowCount || 0);
       }
     });
 
@@ -190,7 +214,7 @@ const getResumeAnalysis = async (req, res) => {
       analysis: [
         {
           teamManagerId,
-          followUpBy,
+          followUpBy: managerName,
           achievedResumes: totalAchievedResumes,
           achievedFollowUps: totalAchievedFollowUps,
           breakdown,
