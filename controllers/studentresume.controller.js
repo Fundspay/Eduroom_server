@@ -725,13 +725,13 @@ const listResumesByUserId = async (req, res) => {
     });
     if (!manager) return ReE(res, "Manager not found", 404);
 
-    const managerName = manager.name;  // ⭐ we will match this with followupBy
+    const managerName = manager.name;  //  we will match this with followupBy
 
     // ---------------------------
     // Fetch resumes WHERE followupBy == managerName
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { followupBy: managerName },  // ⭐ UPDATED EXACTLY AS YOU ASKED
+      where: { interviewedBy: managerName },  //  UPDATED EXACTLY AS YOU ASKED
       include: [
         {
           model: model.FundsAuditStudent,

@@ -198,8 +198,6 @@ var fetchMasterSheetTargets = async function (req, res) {
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
 
 
-
-
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
   try {
     let { startDate, endDate, month } = req.query;
