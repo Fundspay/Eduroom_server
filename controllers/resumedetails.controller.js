@@ -191,6 +191,7 @@ const getResumeAnalysis = async (req, res) => {
       delayed: 0,
       "no response": 0,
       unprofessional: 0,
+      "resumes received": 0,
     };
 
     followUps.forEach((f) => {
