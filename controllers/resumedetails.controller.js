@@ -82,34 +82,43 @@ const getResumeAnalysis = async (req, res) => {
     const { fromDate, toDate } = req.query;
 
     /* =======================
-       FOLLOW-UPS (BY followUpDate) WITH DATE ONLY FILTER
+       DATE RANGE (COMMON)
     ======================= */
-    const followUpsWhere = {
-      followUpBy: managerName,
-      followUpResponse: {
-        [Op.in]: [
-          "sending in 1-2 days",
-          "delayed",
-          "no response",
-          "unprofessional",
-        ],
-      },
-    };
-
-    if (fromDate || toDate) {
-      followUpsWhere[Op.and] = [
-        sequelize.where(
-          sequelize.fn("DATE", sequelize.col("followUpDate")),
-          {
-            ...(fromDate && { [Op.gte]: fromDate }),
-            ...(toDate && { [Op.lte]: toDate }),
-          }
-        ),
-      ];
+    const dateRange = {};
+    if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateRange[Op.gte] = start;
+    }
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange[Op.lte] = end;
     }
 
+    /* =======================
+       FOLLOW-UPS (BY followUpDate)
+    ======================= */
     const followUps = await model.CoSheet.findAll({
-      where: followUpsWhere,
+      where: {
+        followUpBy: managerName,
+        followUpResponse: {
+          [Op.in]: [
+            "sending in 1-2 days",
+            "delayed",
+            "no response",
+            "unprofessional",
+          ],
+        },
+        followUpDate: Object.keys(dateRange).length
+          ? dateRange
+          : {
+              [Op.between]: [
+                new Date(new Date().setHours(0, 0, 0, 0)),
+                new Date(new Date().setHours(23, 59, 59, 999)),
+              ],
+            },
+      },
       attributes: [
         "followUpResponse",
         [fn("COUNT", col("id")), "rowCount"],
@@ -119,27 +128,21 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     /* =======================
-       RESUMES (BY resumeDate + response) WITH DATE ONLY FILTER
+       RESUMES (BY resumeDate + response)
     ======================= */
-    const resumesWhere = {
-      followUpBy: managerName,
-      followUpResponse: "resumes received",
-    };
-
-    if (fromDate || toDate) {
-      resumesWhere[Op.and] = [
-        sequelize.where(
-          sequelize.fn("DATE", sequelize.col("resumeDate")),
-          {
-            ...(fromDate && { [Op.gte]: fromDate }),
-            ...(toDate && { [Op.lte]: toDate }),
-          }
-        ),
-      ];
-    }
-
     const resumes = await model.CoSheet.findAll({
-      where: resumesWhere,
+      where: {
+        followUpBy: managerName,
+        followUpResponse: "resumes received",
+        resumeDate: Object.keys(dateRange).length
+          ? dateRange
+          : {
+              [Op.between]: [
+                new Date(new Date().setHours(0, 0, 0, 0)),
+                new Date(new Date().setHours(23, 59, 59, 999)),
+              ],
+            },
+      },
       attributes: [[fn("SUM", col("resumeCount")), "resumeCount"]],
       raw: true,
     });
@@ -149,16 +152,15 @@ const getResumeAnalysis = async (req, res) => {
     ======================= */
     let targetWhere = { teamManagerId };
 
-    if (fromDate || toDate) {
-      targetWhere[Op.and] = [
-        sequelize.where(
-          sequelize.fn("DATE", sequelize.col("targetDate")),
-          {
-            ...(fromDate && { [Op.gte]: fromDate }),
-            ...(toDate && { [Op.lte]: toDate }),
-          }
-        ),
-      ];
+    if (Object.keys(dateRange).length) {
+      targetWhere.targetDate = dateRange;
+    } else {
+      targetWhere.targetDate = {
+        [Op.between]: [
+          new Date(new Date().setHours(0, 0, 0, 0)),
+          new Date(new Date().setHours(23, 59, 59, 999)),
+        ],
+      };
     }
 
     const targets = await model.MyTarget.findAll({
@@ -237,7 +239,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
