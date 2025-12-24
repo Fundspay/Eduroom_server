@@ -1,7 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { Op, fn, col, literal, where } = require("sequelize");
+const { Op, fn, col } = model.Sequelize;
 const moment = require("moment");
 const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 
@@ -81,8 +81,16 @@ const getResumeAnalysis = async (req, res) => {
     const managerName = manager.name;
     const { fromDate, toDate } = req.query;
 
+    const validResponses = [
+      "sending in 1-2 days",
+      "delayed",
+      "no response",
+      "unprofessional",
+      "resumes received",
+    ];
+
     /* =======================
-       DATE RANGE (COMMON)
+       DATE RANGE (ONLY CHANGE)
     ======================= */
     const dateRange = {};
     if (fromDate) {
@@ -90,78 +98,59 @@ const getResumeAnalysis = async (req, res) => {
       start.setHours(0, 0, 0, 0);
       dateRange[Op.gte] = start;
     }
+
     if (toDate) {
       const end = new Date(toDate);
       end.setHours(23, 59, 59, 999);
       dateRange[Op.lte] = end;
     }
+    /* ======================= */
 
-    /* =======================
-       FOLLOW-UPS (BY followUpDate)
-    ======================= */
-    const followUps = await model.CoSheet.findAll({
-      where: {
-        followUpBy: managerName,
-        followUpResponse: {
-          [Op.in]: [
-            "sending in 1-2 days",
-            "delayed",
-            "no response",
-            "unprofessional",
-          ],
-        },
-        followUpDate: Object.keys(dateRange).length
-          ? dateRange
-          : {
-              [Op.between]: [
-                new Date(new Date().setHours(0, 0, 0, 0)),
-                new Date(new Date().setHours(23, 59, 59, 999)),
-              ],
-            },
-      },
-      attributes: [
-        "followUpResponse",
-        [fn("COUNT", col("id")), "rowCount"],
-      ],
-      group: ["followUpResponse"],
-      raw: true,
-    });
+    let followUpDateRange = {};
+    if (Object.keys(dateRange).length) {
+      followUpDateRange = { followUpDate: dateRange };
+    } else {
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+      followUpDateRange = {
+        followUpDate: { [Op.between]: [start, end] },
+      };
+    }
 
-    /* =======================
-       RESUMES (BY resumeDate + response)
-    ======================= */
-    const resumes = await model.CoSheet.findAll({
-      where: {
-        followUpBy: managerName,
-        followUpResponse: "resumes received",
-        resumeDate: Object.keys(dateRange).length
-          ? dateRange
-          : {
-              [Op.between]: [
-                new Date(new Date().setHours(0, 0, 0, 0)),
-                new Date(new Date().setHours(23, 59, 59, 999)),
-              ],
-            },
-      },
-      attributes: [[fn("SUM", col("resumeCount")), "resumeCount"]],
-      raw: true,
-    });
+    const where = {
+      followUpBy: managerName,
+      followUpResponse: { [Op.in]: validResponses },
+      ...followUpDateRange, // only filter by followUpDate
+    };
 
-    /* =======================
-       TARGETS (UNCHANGED)
-    ======================= */
     let targetWhere = { teamManagerId };
 
     if (Object.keys(dateRange).length) {
       targetWhere.targetDate = dateRange;
     } else {
-      targetWhere.targetDate = {
-        [Op.between]: [
-          new Date(new Date().setHours(0, 0, 0, 0)),
-          new Date(new Date().setHours(23, 59, 59, 999)),
-        ],
-      };
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+      targetWhere.targetDate = { [Op.between]: [start, end] };
     }
+
+    const data = await model.CoSheet.findAll({
+      where,
+      attributes: [
+        "teamManagerId",
+        "followUpBy",
+        "followUpResponse",
+        "resumeCount",
+        [fn("COUNT", col("id")), "rowCount"],
+      ],
+      group: ["teamManagerId", "followUpBy", "followUpResponse", "resumeCount"],
+      raw: true,
+    });
 
     const targets = await model.MyTarget.findAll({
       where: targetWhere,
@@ -179,11 +168,8 @@ const getResumeAnalysis = async (req, res) => {
       0
     );
 
-    /* =======================
-       CALCULATIONS
-    ======================= */
     let totalAchievedFollowUps = 0;
-    let totalAchievedResumes = Number(resumes[0]?.resumeCount || 0);
+    let totalAchievedResumes = 0;
 
     const breakdown = {
       "sending in 1-2 days": 0,
@@ -192,14 +178,20 @@ const getResumeAnalysis = async (req, res) => {
       unprofessional: 0,
     };
 
-    followUps.forEach((f) => {
-      const response = f.followUpResponse.toLowerCase();
-      const count = Number(f.rowCount || 0);
+    let followUpBy = managerName;
 
-      totalAchievedFollowUps += count;
+    data.forEach((d) => {
+      const response = d.followUpResponse?.toLowerCase();
 
-      if (breakdown.hasOwnProperty(response)) {
-        breakdown[response] += count;
+      // ONLY count follow-ups
+      if (response !== "resumes received") {
+        totalAchievedFollowUps += Number(d.rowCount || 0);
+        if (breakdown.hasOwnProperty(response)) {
+          breakdown[response] += Number(d.rowCount || 0);
+        }
+      } else {
+        // still keep resume count untouched
+        totalAchievedResumes += Number(d.resumeCount || 0);
       }
     });
 
@@ -216,7 +208,7 @@ const getResumeAnalysis = async (req, res) => {
       analysis: [
         {
           teamManagerId,
-          followUpBy: managerName,
+          followUpBy,
           achievedResumes: totalAchievedResumes,
           achievedFollowUps: totalAchievedFollowUps,
           breakdown,
@@ -239,6 +231,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
