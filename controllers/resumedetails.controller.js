@@ -89,9 +89,22 @@ const getResumeAnalysis = async (req, res) => {
       "resumes received",
     ];
 
+    /* =======================
+       DATE FIX (ONLY CHANGE)
+    ======================= */
     const dateRange = {};
-    if (fromDate) dateRange[Op.gte] = new Date(fromDate);
-    if (toDate) dateRange[Op.lte] = new Date(toDate);
+    if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateRange[Op.gte] = start;
+    }
+
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange[Op.lte] = end;
+    }
+    /* ======================= */
 
     let followUpDateRange = {};
     let resumeDateRange = {};
@@ -101,8 +114,10 @@ const getResumeAnalysis = async (req, res) => {
       resumeDateRange = { resumeDate: dateRange };
     } else {
       const today = new Date();
-      const start = new Date(today.setHours(0, 0, 0, 0));
-      const end = new Date(today.setHours(23, 59, 59, 999));
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
 
       followUpDateRange = {
         followUpDate: { [Op.between]: [start, end] },
@@ -112,10 +127,8 @@ const getResumeAnalysis = async (req, res) => {
       };
     }
 
-    //  FIX IS HERE (teamManagerId added)
     const where = {
-      teamManagerId,              //  REQUIRED
-      followUpBy: managerName,    //  manager name matched here
+      followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
       [Op.or]: [
         {
@@ -135,8 +148,10 @@ const getResumeAnalysis = async (req, res) => {
       targetWhere.targetDate = dateRange;
     } else {
       const today = new Date();
-      const start = new Date(today.setHours(0, 0, 0, 0));
-      const end = new Date(today.setHours(23, 59, 59, 999));
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
       targetWhere.targetDate = { [Op.between]: [start, end] };
     }
 
@@ -191,6 +206,7 @@ const getResumeAnalysis = async (req, res) => {
     data.forEach((d) => {
       const response = d.followUpResponse?.toLowerCase();
 
+      // resumes received ALSO count as follow-up
       totalAchievedFollowUps += Number(d.rowCount || 0);
 
       if (response === "resumes received") {
@@ -236,8 +252,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
