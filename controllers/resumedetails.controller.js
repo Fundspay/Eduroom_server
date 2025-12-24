@@ -84,17 +84,8 @@ const getResumeAnalysis = async (req, res) => {
     /* =======================
        DATE RANGE (COMMON)
     ======================= */
-    const dateRange = {};
-    if (fromDate) {
-      const start = new Date(fromDate);
-      start.setHours(0, 0, 0, 0);
-      dateRange[Op.gte] = start;
-    }
-    if (toDate) {
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-      dateRange[Op.lte] = end;
-    }
+    const startDate = fromDate || new Date().toISOString().split("T")[0];
+    const endDate = toDate || new Date().toISOString().split("T")[0];
 
     /* =======================
        FOLLOW-UPS (BY followUpDate)
@@ -111,14 +102,12 @@ const getResumeAnalysis = async (req, res) => {
             "resumes received",
           ],
         },
-        followUpDate: Object.keys(dateRange).length
-          ? dateRange
-          : {
-              [Op.between]: [
-                new Date(new Date().setHours(0, 0, 0, 0)),
-                new Date(new Date().setHours(23, 59, 59, 999)),
-              ],
-            },
+        [Op.and]: [
+          sequelize.where(
+            fn("DATE", col("followUpDate")),
+            { [Op.between]: [startDate, endDate] } // compare date only
+          ),
+        ],
       },
       attributes: [
         "followUpResponse",
@@ -135,34 +124,27 @@ const getResumeAnalysis = async (req, res) => {
       where: {
         followUpBy: managerName,
         followUpResponse: "resumes received",
-        resumeDate: Object.keys(dateRange).length
-          ? dateRange
-          : {
-              [Op.between]: [
-                new Date(new Date().setHours(0, 0, 0, 0)),
-                new Date(new Date().setHours(23, 59, 59, 999)),
-              ],
-            },
+        [Op.and]: [
+          sequelize.where(
+            fn("DATE", col("resumeDate")),
+            { [Op.between]: [startDate, endDate] } // compare date only
+          ),
+        ],
       },
       attributes: [[fn("SUM", col("resumeCount")), "resumeCount"]],
       raw: true,
     });
 
     /* =======================
-       TARGETS (UNCHANGED)
+       TARGETS (DATE FILTER FIXED)
     ======================= */
     let targetWhere = { teamManagerId };
-
-    if (Object.keys(dateRange).length) {
-      targetWhere.targetDate = dateRange;
-    } else {
-      targetWhere.targetDate = {
-        [Op.between]: [
-          new Date(new Date().setHours(0, 0, 0, 0)),
-          new Date(new Date().setHours(23, 59, 59, 999)),
-        ],
-      };
-    }
+    targetWhere.targetDate = {
+      [Op.between]: [
+        new Date(startDate + "T00:00:00.000Z"),
+        new Date(endDate + "T23:59:59.999Z"),
+      ],
+    };
 
     const targets = await model.MyTarget.findAll({
       where: targetWhere,
@@ -240,6 +222,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 const gettotalResumeAnalysis = async (req, res) => {
