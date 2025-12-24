@@ -84,8 +84,17 @@ const getResumeAnalysis = async (req, res) => {
     /* =======================
        DATE RANGE (COMMON)
     ======================= */
-    const startDate = fromDate ? fromDate : new Date().toISOString().split("T")[0];
-    const endDate = toDate ? toDate : new Date().toISOString().split("T")[0];
+    const dateRange = {};
+    if (fromDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      dateRange[Op.gte] = start;
+    }
+    if (toDate) {
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+      dateRange[Op.lte] = end;
+    }
 
     /* =======================
        FOLLOW-UPS (BY followUpDate)
@@ -102,14 +111,14 @@ const getResumeAnalysis = async (req, res) => {
             "resumes received",
           ],
         },
-        [Op.and]: [
-          sequelize.where(
-            fn("DATE", col("followUpDate")),
-            {
-              [Op.between]: [startDate, endDate],
-            }
-          ),
-        ],
+        followUpDate: Object.keys(dateRange).length
+          ? dateRange
+          : {
+              [Op.between]: [
+                new Date(new Date().setHours(0, 0, 0, 0)),
+                new Date(new Date().setHours(23, 59, 59, 999)),
+              ],
+            },
       },
       attributes: [
         "followUpResponse",
@@ -126,14 +135,14 @@ const getResumeAnalysis = async (req, res) => {
       where: {
         followUpBy: managerName,
         followUpResponse: "resumes received",
-        [Op.and]: [
-          sequelize.where(
-            fn("DATE", col("resumeDate")),
-            {
-              [Op.between]: [startDate, endDate],
-            }
-          ),
-        ],
+        resumeDate: Object.keys(dateRange).length
+          ? dateRange
+          : {
+              [Op.between]: [
+                new Date(new Date().setHours(0, 0, 0, 0)),
+                new Date(new Date().setHours(23, 59, 59, 999)),
+              ],
+            },
       },
       attributes: [[fn("SUM", col("resumeCount")), "resumeCount"]],
       raw: true,
@@ -144,10 +153,8 @@ const getResumeAnalysis = async (req, res) => {
     ======================= */
     let targetWhere = { teamManagerId };
 
-    if (fromDate || toDate) {
-      targetWhere.targetDate = {
-        [Op.between]: [new Date(startDate), new Date(endDate + "T23:59:59.999Z")],
-      };
+    if (Object.keys(dateRange).length) {
+      targetWhere.targetDate = dateRange;
     } else {
       targetWhere.targetDate = {
         [Op.between]: [
@@ -233,7 +240,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 const gettotalResumeAnalysis = async (req, res) => {
