@@ -91,31 +91,24 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       ✅ DATE FIX (CORE)
-       Uses DATE(followUpDate)
+       ✅ FINAL DATE FIX
+       DATE(followUpDate)
     ======================= */
-    let dateCondition = {};
-    if (fromDate && toDate) {
-      dateCondition = {
-        [Op.and]: [
-          fn("DATE", col("followUpDate")),
-          { [Op.between]: [fromDate, toDate] },
-        ],
-      };
-    }
-
     const where = {
       followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
-      ...(fromDate && toDate
-        ? {
-            [Op.and]: [
-              fn("DATE", col("followUpDate")),
-              { [Op.between]: [fromDate, toDate] },
-            ],
-          }
-        : {}),
     };
+
+    if (fromDate && toDate) {
+      where[Op.and] = [
+        sequelize.where(
+          sequelize.fn("DATE", sequelize.col("followUpDate")),
+          {
+            [Op.between]: [fromDate, toDate],
+          }
+        ),
+      ];
+    }
 
     let targetWhere = { teamManagerId };
 
