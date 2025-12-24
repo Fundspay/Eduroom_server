@@ -41,6 +41,7 @@ router.get("/remaining-time/:userId", userController.getUserRemainingTime);
 router.put("/user/business-info/:id", userController.updateBusinessTarget);
 router.get("/referral/paid-count", userController.getReferralPaidCount);
 router.get("/referral/count", userController.getReferralPaidUsersDateWise);
+router.put("/user/reviews/:userId", userController.upsertUserReviews);
 
 
 module.exports = router;

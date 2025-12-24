@@ -1173,7 +1173,16 @@ const getReferralPaymentStatus = async (req, res) => {
       raw: true,
     });
 
-    // 3️⃣ Normalize registered users with query info
+    // 3️⃣ Fetch all User info for registered users
+    const regUserIds = regUsers.map(u => u.user_id).filter(Boolean);
+    const usersInfo = await model.User.findAll({
+      where: { id: regUserIds },
+      attributes: ["id", "managerReview", "userReview"],
+      raw: true,
+    });
+    const userInfoMap = new Map(usersInfo.map(u => [u.id, u]));
+
+    // 4️⃣ Normalize registered users with query info and user review fields
     const updatedRegisteredUsers = regUsers.map(u => {
       const cloned = { ...u, isDownloaded: true };
 
@@ -1186,21 +1195,24 @@ const getReferralPaymentStatus = async (req, res) => {
 
       cloned.queryStatus = rq?.queryStatus || "";
       cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
+
+      // Add user table fields
+      const userInfo = userInfoMap.get(u.user_id);
+      cloned.managerReview = userInfo?.managerReview || "not completed";
+      cloned.userReview = userInfo?.userReview || "not completed";
+
       return cloned;
     });
 
-    // 🔥 NEW: Deduplicate within current batch by user_id
-    // Keep only the first occurrence of each registeredUserId
+    // 🔥 Deduplicate within current batch by user_id
     const seenUserIds = new Set();
     const deduplicatedUsers = updatedRegisteredUsers.filter(u => {
-      if (seenUserIds.has(u.user_id)) {
-        return false; // Skip duplicate
-      }
+      if (seenUserIds.has(u.user_id)) return false;
       seenUserIds.add(u.user_id);
       return true;
     });
 
-    // 4️⃣ Fetch existing registeredUserIds for this user from database
+    // 5️⃣ Fetch existing registeredUserIds for this user from database
     const existing = await model.FundsAudit.findAll({
       where: { userId },
       attributes: ["registeredUserId"],
@@ -1208,10 +1220,10 @@ const getReferralPaymentStatus = async (req, res) => {
     });
     const existingIds = new Set(existing.map(e => e.registeredUserId));
 
-    // 5️⃣ Filter out records that already exist in database
+    // 6️⃣ Filter out records that already exist in database
     const newRows = deduplicatedUsers.filter(u => !existingIds.has(u.user_id));
 
-    // 6️⃣ Prepare rows to insert
+    // 7️⃣ Prepare rows to insert
     const rowsToInsert = newRows.map(u => ({
       userId,
       registeredUserId: u.user_id,
@@ -1228,12 +1240,12 @@ const getReferralPaymentStatus = async (req, res) => {
       occupation: u.occupation || null,
     }));
 
-    // 7️⃣ Only insert new rows
+    // 8️⃣ Only insert new rows
     if (rowsToInsert.length > 0) {
       await model.FundsAudit.bulkCreate(rowsToInsert);
     }
 
-    // 8️⃣ Return modified data (use deduplicated list)
+    // 9️⃣ Return modified data (use deduplicated list)
     modifiedData.registered_users = deduplicatedUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
 
@@ -1607,3 +1619,43 @@ const getReferralPaidUsersDateWise = async (req, res) => {
 };
 
 module.exports.getReferralPaidUsersDateWise = getReferralPaidUsersDateWise;
+
+const upsertUserReviews = async (req, res) => {
+  try {
+    let { userId } = req.params;
+    const { managerReview, userReview } = req.body;
+
+    userId = parseInt(userId, 10);
+    if (isNaN(userId)) return ReE(res, "Invalid userId", 400);
+
+    // Validate input
+    if (managerReview === undefined && userReview === undefined) {
+      return ReE(res, "Nothing to update", 400);
+    }
+
+    const user = await model.User.findByPk(userId);
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Prepare update object
+    const updateFields = {};
+    if (managerReview !== undefined) updateFields.managerReview = managerReview;
+    if (userReview !== undefined) updateFields.userReview = userReview;
+
+    // Upsert logic: Update if exists
+    await model.User.update(updateFields, { where: { id: userId } });
+
+    // Fetch updated user
+    const updatedUser = await model.User.findByPk(userId, {
+      attributes: ["id", "managerReview", "userReview"],
+      raw: true,
+    });
+
+    return ReS(res, { success: true, data: updatedUser }, 200);
+
+  } catch (error) {
+    console.error("Upsert User Reviews Error:", error);
+    return ReE(res, error.message || "Internal error", 500);
+  }
+};
+
+module.exports.upsertUserReviews = upsertUserReviews;
