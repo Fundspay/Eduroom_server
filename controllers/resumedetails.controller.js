@@ -233,7 +233,6 @@ const getResumeAnalysis = async (req, res) => {
 module.exports.getResumeAnalysis = getResumeAnalysis;
 
 
-
 const gettotalResumeAnalysis = async (req, res) => {
   try {
     const { teamManagerId } = req.params;
