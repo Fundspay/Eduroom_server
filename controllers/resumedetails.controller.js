@@ -1,7 +1,7 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { Op, fn, col } = model.Sequelize;
+const { Op, fn, col, literal, where } = require("sequelize");
 const moment = require("moment");
 const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 
