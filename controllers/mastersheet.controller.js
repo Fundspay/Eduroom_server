@@ -61,7 +61,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Call response count — UPDATED: use connectedBy column instead of teamManagerId
+    // Call response count
     const callResponseCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
@@ -70,7 +70,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Resume received sum
+    // Resume received sum — UPDATED
     const resumeData = await model.CoSheet.findAll({
       where: {
         ...managerIdFilter,
@@ -96,7 +96,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
     const collegesAchieved = collegeSet.size;
 
-    // FOLLOW-UPS COUNT
+    // FOLLOW-UPS COUNT — also count resumes received
     const followUpsCount = await model.CoSheet.count({
       where: {
         ...managerIdFilter,
@@ -196,6 +196,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
