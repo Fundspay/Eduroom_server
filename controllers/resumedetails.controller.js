@@ -193,12 +193,16 @@ const getResumeAnalysis = async (req, res) => {
     };
 
     data.forEach((d) => {
-      const response = d.followUpResponse?.toLowerCase();
-      if (breakdown.hasOwnProperty(response)) {
-        totalAchievedFollowUps += Number(d.rowCount || 0);
-        breakdown[response] += Number(d.rowCount || 0);
-      }
-    });
+  const response = d.followUpResponse?.toLowerCase();
+
+  // FOLLOW-UP COUNT (includes resumes received)
+  totalAchievedFollowUps += Number(d.rowCount || 0);
+
+  if (breakdown.hasOwnProperty(response)) {
+    breakdown[response] += Number(d.rowCount || 0);
+  }
+});
+
 
     const followUpEfficiency = totalFollowUpTarget
       ? ((totalAchievedFollowUps / totalFollowUpTarget) * 100).toFixed(2)
