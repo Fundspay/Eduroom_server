@@ -108,7 +108,6 @@ const getResumeAnalysis = async (req, res) => {
             "delayed",
             "no response",
             "unprofessional",
-            "resumes received",
           ],
         },
         followUpDate: Object.keys(dateRange).length
