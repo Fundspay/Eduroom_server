@@ -10,7 +10,6 @@ var fetchMasterSheetTargets = async function (req, res) {
     const today = new Date();
     let sDate, eDate;
 
-    // Month handling or default to current month
     if (month) {
       const [year, mon] = month.split("-");
       sDate = new Date(year, mon - 1, 1);
@@ -23,7 +22,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // Normalize date range
     sDate.setHours(0, 0, 0, 0);
     eDate.setHours(23, 59, 59, 999);
 
@@ -52,7 +50,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       });
     }
 
-    // JD sent count
     const jdSentCount = await model.CoSheet.count({
       where: {
         ...managerIdFilter,
@@ -61,7 +58,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Call response count
     const callResponseCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
@@ -70,7 +66,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Resume received sum
     const resumeData = await model.CoSheet.findAll({
       where: {
         ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
@@ -80,9 +75,9 @@ var fetchMasterSheetTargets = async function (req, res) {
       attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
       raw: true,
     });
+
     const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
-    // ACTUAL COLLEGE COUNT & RESUME COUNT — UPDATED LOGIC
     const resumes = await model.StudentResume.findAll({
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
@@ -91,27 +86,32 @@ var fetchMasterSheetTargets = async function (req, res) {
           { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
         ],
       },
-      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
+      attributes: ["collegeName", "Dateofonboarding", "updatedAt"],
       raw: true,
     });
 
     const collegeSet = new Set();
-    resumes.forEach((r) => {
-      if (r.collegeName) collegeSet.add(r.collegeName);
-    });
-    const collegesAchieved = collegeSet.size;
-    const resumesAchieved = resumes.length; // same logic as listResumesByUserId
+    resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
 
-    // FOLLOW-UPS COUNT
+    const collegesAchieved = collegeSet.size;
+    const resumesAchieved = resumes.length;
+
     const followUpsCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
-        followUpResponse: { [Op.in]: ["sending in 1-2 days", "delayed", "no response", "unprofessional", "resumes received"] },
+        followUpResponse: {
+          [Op.in]: [
+            "sending in 1-2 days",
+            "delayed",
+            "no response",
+            "unprofessional",
+            "resumes received",
+          ],
+        },
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
 
-    // RESUME SELECTED COUNT
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
@@ -120,7 +120,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Generate date list
     const dateList = [];
     for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
       const current = new Date(d);
@@ -137,7 +136,6 @@ var fetchMasterSheetTargets = async function (req, res) {
       });
     }
 
-    // Fetch existing targets
     const existingTargets = await model.MyTarget.findAll({
       where: {
         ...managerIdFilter,
@@ -145,26 +143,28 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Merge targets
+    // ✅ FIXED MERGE LOGIC (SUM WHEN NO MANAGER)
     const merged = dateList.map((d) => {
-      const found = existingTargets.find((t) => {
+      const matchedTargets = existingTargets.filter((t) => {
         const tDateStr = new Date(t.targetDate).toLocaleDateString("en-CA");
         return tDateStr === d.date;
       });
 
       return {
         ...d,
-        jds: found ? found.jds : d.jds,
-        calls: found ? found.calls : d.calls,
-        followUps: found ? found.followUps : d.followUps,
-        resumetarget: found ? found.resumetarget : d.resumetarget,
-        collegeTarget: found ? found.collegeTarget : d.collegeTarget,
-        interviewsTarget: found ? found.interviewsTarget : d.interviewsTarget,
-        resumesReceivedTarget: found ? found.resumesReceivedTarget : d.resumesReceivedTarget,
+        jds: matchedTargets.reduce((s, t) => s + (t.jds || 0), 0),
+        calls: matchedTargets.reduce((s, t) => s + (t.calls || 0), 0),
+        followUps: matchedTargets.reduce((s, t) => s + (t.followUps || 0), 0),
+        resumetarget: matchedTargets.reduce((s, t) => s + (t.resumetarget || 0), 0),
+        collegeTarget: matchedTargets.reduce((s, t) => s + (t.collegeTarget || 0), 0),
+        interviewsTarget: matchedTargets.reduce((s, t) => s + (t.interviewsTarget || 0), 0),
+        resumesReceivedTarget: matchedTargets.reduce(
+          (s, t) => s + (t.resumesReceivedTarget || 0),
+          0
+        ),
       };
     });
 
-    // Totals
     const totals = {
       jds: merged.reduce((s, t) => s + t.jds, 0),
       calls: merged.reduce((s, t) => s + t.calls, 0),
@@ -175,27 +175,29 @@ var fetchMasterSheetTargets = async function (req, res) {
       resumesReceivedTarget: merged.reduce((s, t) => s + t.resumesReceivedTarget, 0),
     };
 
-    return ReS(res, {
-      success: true,
-      jdSentCount,
-      callResponseCount,
-      resumeReceivedSum,
-      followUpsCount,
-      resumeSelectedCount,
-      collegesAchieved,
-      resumesAchieved,
-      managers,
-      dates: merged,
-      totals,
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        jdSentCount,
+        callResponseCount,
+        resumeReceivedSum,
+        followUpsCount,
+        resumeSelectedCount,
+        collegesAchieved,
+        resumesAchieved,
+        managers,
+        dates: merged,
+        totals,
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
-
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
