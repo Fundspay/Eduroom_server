@@ -725,13 +725,13 @@ const listResumesByUserId = async (req, res) => {
     });
     if (!manager) return ReE(res, "Manager not found", 404);
 
-    const managerName = manager.name;  // ⭐ we will match this with followupBy
+    const managerName = manager.name;  //  we will match this with followupBy
 
     // ---------------------------
     // Fetch resumes WHERE followupBy == managerName
     // ---------------------------
     const resumes = await model.StudentResume.findAll({
-      where: { followupBy: managerName },  // ⭐ UPDATED EXACTLY AS YOU ASKED
+      where: { interviewedBy: managerName },  //  UPDATED EXACTLY AS YOU ASKED
       include: [
         {
           model: model.FundsAuditStudent,
@@ -809,22 +809,41 @@ const getUserTargetAnalysis = async (req, res) => {
 
     let startDate = fromDate ? new Date(fromDate) : new Date();
     startDate.setHours(0, 0, 0, 0);
+
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch resumes only for this team manager and robust followupBy match
+    // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
     const resumes = await model.StudentResume.findAll({
       where: {
-        teamManagerId,
-        resumeDate: { [Op.between]: [startDate, endDate] },
-        // robust match: ignore leading/trailing spaces and case
-        followupBy: { [Op.iLike]: userName },
+        interviewedBy: userName,
+        [Op.or]: [
+          { Dateofonboarding: { [Op.between]: [startDate, endDate] } },
+          { Dateofonboarding: null, updatedAt: { [Op.between]: [startDate, endDate] } },
+        ],
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered"],
+      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
       raw: true,
     });
 
-    // Fetch target data
+    const collegeSet = new Set();
+    resumes.forEach((r) => {
+      if (r.collegeName) collegeSet.add(r.collegeName);
+    });
+
+    const collegesAchieved = collegeSet.size;
+    const resumesAchieved = resumes.length;
+
+    // RESUME SELECTED COUNT — same logic as fetchMasterSheetTargets
+    const resumeSelectedCount = await model.StudentResume.count({
+      where: {
+        interviewedBy: userName,
+        finalSelectionStatus: "Selected",
+        Dateofonboarding: { [Op.between]: [startDate, endDate] },
+      },
+    });
+
+    // Fetch target data (UNCHANGED)
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -844,58 +863,18 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate resumes
-    const achieved = {
-      followupBy: userName,
-      collegesAchieved: new Set(),
-      resumesAchieved: 0,
-      interviewsAchieved: 0,
-      resumeDates: [],
-      interviewDates: [],
-    };
-
-    resumes.forEach((resume) => {
-      if (resume.collegeName) achieved.collegesAchieved.add(resume.collegeName);
-
-      // Count all resumes
-      achieved.resumesAchieved += 1;
-
-      // Add resumeDates for all
-      if (resume.resumeDate) {
-        const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
-          weekday: "long",
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        });
-        achieved.resumeDates.push(formattedDate);
-      }
-
-      // Only registered resumes count as interviewsAchieved
-      if (resume.isRegistered) {
-        achieved.interviewsAchieved += 1;
-        achieved.interviewDates.push(
-          new Date(resume.resumeDate).toLocaleDateString("en-GB", {
-            weekday: "long",
-            day: "2-digit",
-            month: "long",
-            year: "numeric",
-          })
-        );
-      }
-    });
-
     const result = [
       {
-        followupBy: achieved.followupBy,
+        followupBy: userName,
         collegeTarget: Number(targetData.collegeTarget),
-        collegesAchieved: achieved.collegesAchieved.size,
+        collegesAchieved,
         interviewsTarget: Number(targetData.interviewsTarget),
-        interviewsAchieved: achieved.interviewsAchieved,
+        interviewsAchieved: resumes.length, // same as resumesAchieved, can adjust if needed
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
-        resumesAchieved: achieved.resumesAchieved,
-        resumeDates: achieved.resumeDates,
-        interviewDates: achieved.interviewDates,
+        resumesAchieved,
+        resumeDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
+        interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
+        resumeSelectedCount,
       },
     ];
 

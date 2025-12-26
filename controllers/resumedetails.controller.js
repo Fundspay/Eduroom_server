@@ -129,8 +129,7 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     /* =======================
-       RESUME COUNT (FIXED)
-       → resumeDate + response = resumes received
+       RESUME COUNT (UNCHANGED)
     ======================= */
     const resumeWhere = {
       followUpBy: managerName,
@@ -161,10 +160,29 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     /* =======================
-       TARGETS (UNCHANGED)
+       TARGETS (FIXED – DATE BASED)
     ======================= */
+    const targetWhere = { teamManagerId };
+
+    if (fromDate && toDate) {
+      const start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+
+      targetWhere.targetDate = { [Op.between]: [start, end] };
+    } else {
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+
+      targetWhere.targetDate = { [Op.between]: [start, end] };
+    }
+
     const targets = await model.MyTarget.findAll({
-      where: { teamManagerId },
+      where: targetWhere,
       attributes: ["followUps", "resumetarget"],
       raw: true,
     });
@@ -180,7 +198,7 @@ const getResumeAnalysis = async (req, res) => {
     );
 
     /* =======================
-       CALCULATIONS
+       CALCULATIONS (UNCHANGED)
     ======================= */
     let totalAchievedFollowUps = 0;
     let totalAchievedResumes = Number(resumeData[0]?.resumeCount || 0);
@@ -237,6 +255,7 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
+
 
 
 
@@ -342,14 +361,27 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       ? new Date(toDate)
       : new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+
     let periods = [];
-    for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+    for (
+      let d = new Date(startDate);
+      d <= endDate;
+      d.setDate(d.getDate() + 1)
+    ) {
       periods.push(formatLocalDate(new Date(d)));
     }
 
+    /* =======================
+       RESUME COUNT (FIXED)
+       → resumeDate + response = resumes received
+    ======================= */
     const whereClause = {
+      followUpResponse: "resumes received",
       resumeDate: { [Op.between]: [startDate, endDate] },
     };
+
     if (teamManagerId) whereClause.teamManagerId = teamManagerId;
 
     const data = await model.CoSheet.findAll({
@@ -368,6 +400,9 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
       resumeMap[key] = Number(d.resumeCount);
     });
 
+    /* =======================
+       TARGETS (UNCHANGED)
+    ======================= */
     const targetWhere = {
       targetDate: { [Op.between]: [startDate, endDate] },
     };
@@ -408,6 +443,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 };
 
 module.exports.getResumeAnalysisPerCoSheet = getResumeAnalysisPerCoSheet;
+
 
 // 🔹 Endpoint: Get Resume Totals Per FollowUpBy (global, all users)
 const getFollowUpResumeTotals = async (req, res) => {

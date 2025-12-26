@@ -61,7 +61,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Call response count — UPDATED: use connectedBy column instead of teamManagerId
+    // Call response count
     const callResponseCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
@@ -73,7 +73,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     // Resume received sum
     const resumeData = await model.CoSheet.findAll({
       where: {
-        ...managerIdFilter,
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
@@ -82,25 +82,31 @@ var fetchMasterSheetTargets = async function (req, res) {
     });
     const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
-    // ACTUAL COLLEGE COUNT
+    // ACTUAL COLLEGE COUNT & RESUME COUNT — UPDATED LOGIC
     const resumes = await model.StudentResume.findAll({
       where: {
-        ...managerIdFilter,
-        resumeDate: { [Op.between]: [sDate, eDate] },
+        ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
+        [Op.or]: [
+          { Dateofonboarding: { [Op.between]: [sDate, eDate] } },
+          { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
+        ],
       },
-      attributes: ["collegeName"],
+      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
       raw: true,
     });
 
     const collegeSet = new Set();
-    resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
+    resumes.forEach((r) => {
+      if (r.collegeName) collegeSet.add(r.collegeName);
+    });
     const collegesAchieved = collegeSet.size;
+    const resumesAchieved = resumes.length; // same logic as listResumesByUserId
 
     // FOLLOW-UPS COUNT
     const followUpsCount = await model.CoSheet.count({
       where: {
-        ...managerIdFilter,
-        followUpResponse: "resumes received",
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
+        followUpResponse: { [Op.in]: ["sending in 1-2 days", "delayed", "no response", "unprofessional", "resumes received"] },
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
@@ -110,7 +116,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         finalSelectionStatus: "Selected",
-        interviewDate: { [Op.between]: [sDate, eDate] },
+        Dateofonboarding: { [Op.between]: [sDate, eDate] },
       },
     });
 
@@ -154,9 +160,7 @@ var fetchMasterSheetTargets = async function (req, res) {
         resumetarget: found ? found.resumetarget : d.resumetarget,
         collegeTarget: found ? found.collegeTarget : d.collegeTarget,
         interviewsTarget: found ? found.interviewsTarget : d.interviewsTarget,
-        resumesReceivedTarget: found
-          ? found.resumesReceivedTarget
-          : d.resumesReceivedTarget,
+        resumesReceivedTarget: found ? found.resumesReceivedTarget : d.resumesReceivedTarget,
       };
     });
 
@@ -168,34 +172,30 @@ var fetchMasterSheetTargets = async function (req, res) {
       resumetarget: merged.reduce((s, t) => s + t.resumetarget, 0),
       collegeTarget: merged.reduce((s, t) => s + t.collegeTarget, 0),
       interviewsTarget: merged.reduce((s, t) => s + t.interviewsTarget, 0),
-      resumesReceivedTarget: merged.reduce(
-        (s, t) => s + t.resumesReceivedTarget,
-        0
-      ),
+      resumesReceivedTarget: merged.reduce((s, t) => s + t.resumesReceivedTarget, 0),
     };
 
-    return ReS(
-      res,
-      {
-        success: true,
-        jdSentCount,
-        callResponseCount,
-        resumeReceivedSum,
-        followUpsCount,
-        resumeSelectedCount,
-        collegesAchieved,
-        managers,
-        dates: merged,
-        totals,
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      jdSentCount,
+      callResponseCount,
+      resumeReceivedSum,
+      followUpsCount,
+      resumeSelectedCount,
+      collegesAchieved,
+      resumesAchieved,
+      managers,
+      dates: merged,
+      totals,
+    }, 200);
+
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
@@ -287,7 +287,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         where: {
           interviewedBy: managerName,
           finalSelectionStatus: "Selected",
-          interviewDate: { [Op.between]: [sDate, eDate] },
+          Dateofonboarding: { [Op.between]: [sDate, eDate] },
         },
       });
 
