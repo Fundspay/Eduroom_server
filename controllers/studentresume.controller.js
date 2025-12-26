@@ -807,14 +807,25 @@ const getUserTargetAnalysis = async (req, res) => {
 
     const userName = user.name.trim();
 
-    const startDate = fromDate ? new Date(fromDate) : new Date();
-    const endDate = toDate ? new Date(toDate) : new Date();
+    let startDate = fromDate ? new Date(fromDate) : new Date();
+    startDate.setHours(0, 0, 0, 0);
 
-    //  UPDATED LOGIC: DATE ONLY comparison
+    let endDate = toDate ? new Date(toDate) : new Date();
+    endDate.setHours(23, 59, 59, 999);
+
+    // UPDATED LOGIC: include null interviewDate and fallback to updatedAt for date range
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        [Op.and]: literal(`DATE(COALESCE("interviewDate", "updatedAt")) BETWEEN '${startDate.toISOString().split('T')[0]}' AND '${endDate.toISOString().split('T')[0]}'`),
+        [Op.or]: [
+          {
+            interviewDate: { [Op.between]: [startDate, endDate] },
+          },
+          {
+            interviewDate: null,
+            updatedAt: { [Op.between]: [startDate, endDate] },
+          },
+        ],
       },
       attributes: ["resumeDate", "collegeName", "isRegistered", "interviewDate", "updatedAt"],
       raw: true,
@@ -898,8 +909,6 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
-
-
 
 
 // ✅ SEND MAIL TO STUDENT
