@@ -886,133 +886,143 @@ const getTargetVsAchieved = async (req, res) => {
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
-  const getBdTlLeaderboard = async (req, res) => {
-    try {
-      const { from, to } = req.query;
-      if (!from || !to) return ReE(res, "from, to are required", 400);
+ const getBdTlLeaderboard = async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return ReE(res, "from, to are required", 400);
 
-      const teamManagers = await TeamManager.findAll({
-        attributes: ["id", "name", "mobileNumber"],
+    const teamManagers = await TeamManager.findAll({
+      attributes: ["id", "name", "mobileNumber"],
+    });
+
+    if (!teamManagers.length) return ReE(res, "No team managers found", 404);
+
+    // Adjust dates: make 'to' cover the full day
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999); // include full day
+
+    const leaderboardData = [];
+
+    for (const manager of teamManagers) {
+      // Fetch BdSheet entries (try both teamManagerId and tlAllocated)
+      let sheets = await BdSheet.findAll({
+        where: {
+          teamManagerId: manager.id,
+          startDate: { [Op.between]: [fromDate, toDate] },
+        },
+        attributes: ["startDate", "activeStatus", "businessTask"],
       });
 
-      if (!teamManagers.length) return ReE(res, "No team managers found", 404);
-
-      // Adjust dates: make 'to' cover the full day
-      const fromDate = new Date(from);
-      const toDate = new Date(to);
-      toDate.setHours(23, 59, 59, 999); // include full day
-
-      const leaderboardData = [];
-
-      for (const manager of teamManagers) {
-        // Fetch BdSheet entries (try both teamManagerId and tlAllocated)
-        let sheets = await BdSheet.findAll({
+      if (sheets.length === 0) {
+        sheets = await BdSheet.findAll({
           where: {
-            teamManagerId: manager.id,
+            tlAllocated: manager.name,
             startDate: { [Op.between]: [fromDate, toDate] },
           },
           attributes: ["startDate", "activeStatus", "businessTask"],
         });
-
-        if (sheets.length === 0) {
-          sheets = await BdSheet.findAll({
-            where: {
-              tlAllocated: manager.name,
-              startDate: { [Op.between]: [fromDate, toDate] },
-            },
-            attributes: ["startDate", "activeStatus", "businessTask"],
-          });
-        }
-
-        const totalInterns = sheets.length;
-        const activeInterns = sheets.filter(
-          s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
-        ).length;
-
-        // Achieved accounts using dateOfPayment
-        const statuses = await Status.findAll({
-          where: { teamManager: manager.name },
-          attributes: ["userId"],
-        });
-
-        const userIds = statuses.map(s => s.userId);
-        let achievedAccounts = 0;
-
-        if (userIds.length) {
-          const accountsResult = await FundsAudit.sequelize.query(
-            `
-            SELECT DATE("dateOfPayment") AS paid_date,
-                  COUNT(DISTINCT "userId") AS unique_paid_users
-            FROM "FundsAudits"
-            WHERE "userId" IN (:userIds)
-              AND "hasPaid" = true
-              AND "dateOfPayment" BETWEEN :from AND :to
-            GROUP BY DATE("dateOfPayment")
-            ORDER BY DATE("dateOfPayment");
-            `,
-            {
-              replacements: { userIds, from: fromDate, to: toDate },
-              type: FundsAudit.sequelize.QueryTypes.SELECT,
-            }
-          );
-
-          achievedAccounts = accountsResult.reduce(
-            (sum, row) => sum + parseInt(row.unique_paid_users || 0),
-            0
-          );
-        }
-
-        // Targets from BdTarget
-        const targets = await BdTarget.findAll({
-          where: {
-            teamManagerId: manager.id,
-            targetDate: { [Op.between]: [fromDate, toDate] },
-          },
-        });
-
-        const internsAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
-        const internsActive = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
-        const accountsTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
-
-        const efficiency = accountsTarget > 0
-          ? ((achievedAccounts / accountsTarget) * 100).toFixed(2)
-          : 0;
-
-        leaderboardData.push({
-          tlName: manager.name,
-          mobileNumber: manager.mobileNumber,
-          internsAllocated,
-          totalInterns,
-          internsActive,
-          activeInterns,
-          accounts: achievedAccounts,
-          accountsTarget,
-          efficiency: parseFloat(efficiency),
-        });
       }
 
-      // Sort leaderboard
-      leaderboardData.sort((a, b) => {
-        if (b.efficiency !== a.efficiency) return b.efficiency - a.efficiency;
-        if (b.accounts !== a.accounts) return b.accounts - a.accounts;
-        return b.totalInterns - a.totalInterns;
+      const totalInterns = sheets.length;
+      const activeInterns = sheets.filter(
+        s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
+      ).length;
+
+      // Achieved accounts using dateOfPayment
+      const statuses = await Status.findAll({
+        where: { teamManager: manager.name },
+        attributes: ["userId"],
       });
 
-      const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
+      const userIds = statuses.map(s => s.userId);
+      let achievedAccounts = 0;
 
-      return ReS(res, {
-        success: true,
-        leaderboard: rankedData,
-        totalManagers: rankedData.length,
+      if (userIds.length) {
+        const accountsResult = await FundsAudit.sequelize.query(
+          `
+          SELECT DATE("dateOfPayment") AS paid_date,
+                 COUNT(DISTINCT "userId") AS unique_paid_users
+          FROM "FundsAudits"
+          WHERE "userId" IN (:userIds)
+            AND "hasPaid" = true
+            AND "dateOfPayment" BETWEEN :from AND :to
+          GROUP BY DATE("dateOfPayment")
+          ORDER BY DATE("dateOfPayment");
+          `,
+          {
+            replacements: { userIds, from: fromDate, to: toDate },
+            type: FundsAudit.sequelize.QueryTypes.SELECT,
+          }
+        );
+
+        achievedAccounts = accountsResult.reduce(
+          (sum, row) => sum + parseInt(row.unique_paid_users || 0),
+          0
+        );
+      }
+
+      // ---------------------------
+      // Targets from BdTarget (UPDATED LOGIC)
+      // ---------------------------
+      const bdTargetData = await BdTarget.findAll({
+        where: {
+          teamManagerId: manager.id,
+          targetDate: { [Op.between]: [fromDate, toDate] },
+        },
+        attributes: ["internsAllocated", "internsActive", "accounts"],
       });
 
-    } catch (err) {
-      console.error("BD TL Leaderboard Error:", err);
-      return ReE(res, err.message, 500);
+      let internsAllocated = 0;
+      let internsActive = 0;
+      let accountsTarget = 0;
+
+      bdTargetData.forEach((row) => {
+        internsAllocated += Number(row.internsAllocated) || 0;
+        internsActive += Number(row.internsActive) || 0; // Correct column now
+        accountsTarget += Number(row.accounts) || 0;
+      });
+
+      const efficiency = accountsTarget > 0
+        ? ((achievedAccounts / accountsTarget) * 100).toFixed(2)
+        : 0;
+
+      leaderboardData.push({
+        tlName: manager.name,
+        mobileNumber: manager.mobileNumber,
+        internsAllocated,
+        totalInterns,
+        internsActive,
+        activeInterns,
+        accounts: achievedAccounts,
+        accountsTarget,
+        efficiency: parseFloat(efficiency),
+      });
     }
-  };
 
-  module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+    // Sort leaderboard
+    leaderboardData.sort((a, b) => {
+      if (b.efficiency !== a.efficiency) return b.efficiency - a.efficiency;
+      if (b.accounts !== a.accounts) return b.accounts - a.accounts;
+      return b.totalInterns - a.totalInterns;
+    });
+
+    const rankedData = leaderboardData.map((item, index) => ({ rank: index + 1, ...item }));
+
+    return ReS(res, {
+      success: true,
+      leaderboard: rankedData,
+      totalManagers: rankedData.length,
+    });
+
+  } catch (err) {
+    console.error("BD TL Leaderboard Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
 
 
 const getAccountTargetVsAchieved = async (req, res) => {
