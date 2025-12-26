@@ -85,13 +85,13 @@ var fetchMasterSheetTargets = async function (req, res) {
     // ACTUAL COLLEGE COUNT & RESUME COUNT — UPDATED LOGIC
     const resumes = await model.StudentResume.findAll({
       where: {
-        ...managerIdFilter,
+        ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         [Op.or]: [
-          { interviewDate: { [Op.between]: [sDate, eDate] } },
-          { interviewDate: null, updatedAt: { [Op.between]: [sDate, eDate] } },
+          { Dateofonboarding: { [Op.between]: [sDate, eDate] } },
+          { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
         ],
       },
-      attributes: ["collegeName", "resumeDate", "interviewDate", "updatedAt"],
+      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
       raw: true,
     });
 
@@ -100,7 +100,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       if (r.collegeName) collegeSet.add(r.collegeName);
     });
     const collegesAchieved = collegeSet.size;
-    const resumesAchieved = resumes.length;
+    const resumesAchieved = resumes.length; // same logic as listResumesByUserId
 
     // FOLLOW-UPS COUNT
     const followUpsCount = await model.CoSheet.count({
@@ -195,6 +195,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
