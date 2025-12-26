@@ -789,6 +789,8 @@ const listResumesByUserId = async (req, res) => {
 module.exports.listResumesByUserId = listResumesByUserId;
 
 
+const { Op, fn, col } = require("sequelize");
+
 const getUserTargetAnalysis = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -809,21 +811,24 @@ const getUserTargetAnalysis = async (req, res) => {
 
     let startDate = fromDate ? new Date(fromDate) : new Date();
     startDate.setHours(0, 0, 0, 0);
+
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // Fetch resumes only for this team manager
+    // 🔥 UPDATED LOGIC HERE (MATCHES YOUR SQL QUERY)
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        interviewDate: { [Op.between]: [startDate, endDate] },
-        interviewedBy: { [Op.iLike]: userName },
+        [Op.or]: [
+          { interviewDate: null },
+          { interviewDate: { [Op.notBetween]: [startDate, endDate] } },
+        ],
       },
       attributes: ["resumeDate", "collegeName", "isRegistered"],
       raw: true,
     });
 
-    // Fetch target data
+    // Fetch target data (UNCHANGED)
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -843,7 +848,7 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate resumes
+    // Aggregate resumes (UNCHANGED)
     const achieved = {
       followupBy: userName,
       collegesAchieved: new Set(),
@@ -857,10 +862,8 @@ const getUserTargetAnalysis = async (req, res) => {
       if (resume.collegeName)
         achieved.collegesAchieved.add(resume.collegeName);
 
-      // Count all resumes
       achieved.resumesAchieved += 1;
 
-      // Resume dates
       if (resume.resumeDate) {
         const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
           weekday: "long",
@@ -868,9 +871,8 @@ const getUserTargetAnalysis = async (req, res) => {
           month: "long",
           year: "numeric",
         });
-        achieved.resumeDates.push(formattedDate);
 
-        // ✅ INTERVIEWS = ALL RESUMES (isRegistered REMOVED)
+        achieved.resumeDates.push(formattedDate);
         achieved.interviewsAchieved += 1;
         achieved.interviewDates.push(formattedDate);
       }
@@ -904,6 +906,7 @@ module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
 
 
 
+ 
 // ✅ SEND MAIL TO STUDENT
 const sendMailToStudent = async (req, res) => {
   try {
