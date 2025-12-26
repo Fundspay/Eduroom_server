@@ -424,13 +424,11 @@ const getDashboardStats = async (req, res) => {
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit) ✅
+    // 3️⃣ ACHIEVED ACCOUNTS (UPDATED – SAME AS LEADERBOARD) 
     // ---------------------------
-
     let userIds = [];
 
     if (teamManagerName) {
-      // Get all users under this manager from Status (avoid querying teamManagerId)
       const statuses = await Status.findAll({
         where: { teamManager: teamManagerName },
         attributes: ["userId"],
@@ -443,11 +441,14 @@ const getDashboardStats = async (req, res) => {
     if (userIds.length) {
       const accountsResult = await FundsAudit.sequelize.query(
         `
-        SELECT COUNT(DISTINCT "userId") AS achieved_accounts
+        SELECT DATE("dateOfPayment") AS paid_date,
+               COUNT(DISTINCT "userId") AS unique_paid_users
         FROM "FundsAudits"
         WHERE "userId" IN (:userIds)
           AND "hasPaid" = true
           ${startDate && endDate ? `AND "dateOfPayment" BETWEEN :start AND :end` : ""}
+        GROUP BY DATE("dateOfPayment")
+        ORDER BY DATE("dateOfPayment")
         `,
         {
           replacements: { userIds, start: startDate, end: endDate },
@@ -455,7 +456,10 @@ const getDashboardStats = async (req, res) => {
         }
       );
 
-      totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
+      totalAccountsSheet = accountsResult.reduce(
+        (sum, row) => sum + parseInt(row.unique_paid_users || 0),
+        0
+      );
     }
 
     // ---------------------------
@@ -486,6 +490,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 // HARD-CODED RANGES (not stored in DB)
