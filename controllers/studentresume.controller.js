@@ -813,13 +813,16 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // UPDATED LOGIC: use only Dateofonboarding for date range
+    // UPDATED LOGIC: Resume count like listResumesByUserId, filter by Dateofonboarding or fallback to updatedAt
     const resumes = await model.StudentResume.findAll({
       where: {
-        teamManagerId,
-        Dateofonboarding: { [Op.between]: [startDate, endDate] },
+        interviewedBy: userName,
+        [Op.or]: [
+          { Dateofonboarding: { [Op.between]: [startDate, endDate] } },
+          { Dateofonboarding: null, updatedAt: { [Op.between]: [startDate, endDate] } },
+        ],
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered", "Dateofonboarding"],
+      attributes: ["resumeDate", "collegeName", "isRegistered", "Dateofonboarding", "updatedAt"],
       raw: true,
     });
 
@@ -847,7 +850,7 @@ const getUserTargetAnalysis = async (req, res) => {
     const achieved = {
       followupBy: userName,
       collegesAchieved: new Set(),
-      resumesAchieved: 0,
+      resumesAchieved: resumes.length, // same as totalRecords in listResumesByUserId
       interviewsAchieved: 0,
       resumeDates: [],
       interviewDates: [],
@@ -857,10 +860,8 @@ const getUserTargetAnalysis = async (req, res) => {
       if (resume.collegeName)
         achieved.collegesAchieved.add(resume.collegeName);
 
-      achieved.resumesAchieved += 1;
-
-      // Use Dateofonboarding as the date to display
-      const dateToUse = resume.Dateofonboarding;
+      // Use Dateofonboarding if exists, else fallback to updatedAt
+      const dateToUse = resume.Dateofonboarding || resume.updatedAt;
 
       if (dateToUse) {
         const formattedDate = new Date(dateToUse).toLocaleDateString("en-GB", {
@@ -901,6 +902,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 
 // ✅ SEND MAIL TO STUDENT
