@@ -940,17 +940,26 @@ const getBdTlLeaderboard = async (req, res) => {
         );
       }
 
-      // Targets from BdTarget
-      const targets = await BdTarget.findAll({
+      // ---------------------------
+      // Targets from BdTarget (UPDATED LOGIC)
+      // ---------------------------
+      const bdTargetData = await BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
           targetDate: { [Op.between]: [fromDate, toDate] },
         },
+        attributes: ["internsAllocated", "internsActive", "accounts"],
       });
 
-      const internsAllocated = targets.reduce((sum, t) => sum + (t.internsAllocated || 0), 0);
-      const internsActive = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
-      const accountsTarget = targets.reduce((sum, t) => sum + (t.accounts || 0), 0);
+      let internsAllocated = 0;
+      let internsActive = 0;
+      let accountsTarget = 0;
+
+      bdTargetData.forEach((row) => {
+        internsAllocated += Number(row.internsAllocated) || 0;
+        internsActive += Number(row.internsActive) || 0; // Correct column now
+        accountsTarget += Number(row.accounts) || 0;
+      });
 
       const efficiency = accountsTarget > 0
         ? ((achievedAccounts / accountsTarget) * 100).toFixed(2)
@@ -991,6 +1000,7 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
 
 
 const getAccountTargetVsAchieved = async (req, res) => {
