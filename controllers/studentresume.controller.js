@@ -813,7 +813,7 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // UPDATED LOGIC: Resume count like listResumesByUserId, filter by Dateofonboarding or fallback to updatedAt
+    // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
     const resumes = await model.StudentResume.findAll({
       where: {
         interviewedBy: userName,
@@ -822,8 +822,25 @@ const getUserTargetAnalysis = async (req, res) => {
           { Dateofonboarding: null, updatedAt: { [Op.between]: [startDate, endDate] } },
         ],
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered", "Dateofonboarding", "updatedAt"],
+      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
       raw: true,
+    });
+
+    const collegeSet = new Set();
+    resumes.forEach((r) => {
+      if (r.collegeName) collegeSet.add(r.collegeName);
+    });
+
+    const collegesAchieved = collegeSet.size;
+    const resumesAchieved = resumes.length;
+
+    // RESUME SELECTED COUNT — same logic as fetchMasterSheetTargets
+    const resumeSelectedCount = await model.StudentResume.count({
+      where: {
+        interviewedBy: userName,
+        finalSelectionStatus: "Selected",
+        Dateofonboarding: { [Op.between]: [startDate, endDate] },
+      },
     });
 
     // Fetch target data (UNCHANGED)
@@ -846,48 +863,18 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate resumes
-    const achieved = {
-      followupBy: userName,
-      collegesAchieved: new Set(),
-      resumesAchieved: resumes.length, // same as totalRecords in listResumesByUserId
-      interviewsAchieved: 0,
-      resumeDates: [],
-      interviewDates: [],
-    };
-
-    resumes.forEach((resume) => {
-      if (resume.collegeName)
-        achieved.collegesAchieved.add(resume.collegeName);
-
-      // Use Dateofonboarding if exists, else fallback to updatedAt
-      const dateToUse = resume.Dateofonboarding || resume.updatedAt;
-
-      if (dateToUse) {
-        const formattedDate = new Date(dateToUse).toLocaleDateString("en-GB", {
-          weekday: "long",
-          day: "2-digit",
-          month: "long",
-          year: "numeric",
-        });
-
-        achieved.resumeDates.push(formattedDate);
-        achieved.interviewsAchieved += 1;
-        achieved.interviewDates.push(formattedDate);
-      }
-    });
-
     const result = [
       {
-        followupBy: achieved.followupBy,
+        followupBy: userName,
         collegeTarget: Number(targetData.collegeTarget),
-        collegesAchieved: achieved.collegesAchieved.size,
+        collegesAchieved,
         interviewsTarget: Number(targetData.interviewsTarget),
-        interviewsAchieved: achieved.interviewsAchieved,
+        interviewsAchieved: resumes.length, // same as resumesAchieved, can adjust if needed
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
-        resumesAchieved: achieved.resumesAchieved,
-        resumeDates: achieved.resumeDates,
-        interviewDates: achieved.interviewDates,
+        resumesAchieved,
+        resumeDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
+        interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
+        resumeSelectedCount,
       },
     ];
 
