@@ -813,7 +813,7 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    //  UPDATED LOGIC HERE (MATCHES YOUR SQL QUERY)
+    //  UPDATED LOGIC: include null interviewDate and fallback to updatedAt
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
@@ -822,7 +822,7 @@ const getUserTargetAnalysis = async (req, res) => {
           { interviewDate: { [Op.notBetween]: [startDate, endDate] } },
         ],
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered"],
+      attributes: ["resumeDate", "collegeName", "isRegistered", "interviewDate", "updatedAt"],
       raw: true,
     });
 
@@ -862,8 +862,11 @@ const getUserTargetAnalysis = async (req, res) => {
 
       achieved.resumesAchieved += 1;
 
-      if (resume.resumeDate) {
-        const formattedDate = new Date(resume.resumeDate).toLocaleDateString("en-GB", {
+      // Use interviewDate if exists, else fallback to updatedAt
+      const dateToUse = resume.interviewDate || resume.updatedAt;
+
+      if (dateToUse) {
+        const formattedDate = new Date(dateToUse).toLocaleDateString("en-GB", {
           weekday: "long",
           day: "2-digit",
           month: "long",
@@ -904,7 +907,7 @@ module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
 
 
 
- 
+
 // ✅ SEND MAIL TO STUDENT
 const sendMailToStudent = async (req, res) => {
   try {
