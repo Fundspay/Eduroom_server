@@ -789,8 +789,6 @@ const listResumesByUserId = async (req, res) => {
 module.exports.listResumesByUserId = listResumesByUserId;
 
 
-const { Op, fn, col } = require("sequelize");
-
 const getUserTargetAnalysis = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -815,7 +813,7 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // 🔥 UPDATED LOGIC HERE (MATCHES YOUR SQL QUERY)
+    //  UPDATED LOGIC HERE (MATCHES YOUR SQL QUERY)
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
