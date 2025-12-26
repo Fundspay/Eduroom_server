@@ -807,20 +807,14 @@ const getUserTargetAnalysis = async (req, res) => {
 
     const userName = user.name.trim();
 
-    let startDate = fromDate ? new Date(fromDate) : new Date();
-    startDate.setHours(0, 0, 0, 0);
+    const startDate = fromDate ? new Date(fromDate) : new Date();
+    const endDate = toDate ? new Date(toDate) : new Date();
 
-    let endDate = toDate ? new Date(toDate) : new Date();
-    endDate.setHours(23, 59, 59, 999);
-
-    //  UPDATED LOGIC: include null interviewDate and fallback to updatedAt
+    //  UPDATED LOGIC: DATE ONLY comparison
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        [Op.or]: [
-          { interviewDate: null },
-          { interviewDate: { [Op.notBetween]: [startDate, endDate] } },
-        ],
+        [Op.and]: literal(`DATE(COALESCE("interviewDate", "updatedAt")) BETWEEN '${startDate.toISOString().split('T')[0]}' AND '${endDate.toISOString().split('T')[0]}'`),
       },
       attributes: ["resumeDate", "collegeName", "isRegistered", "interviewDate", "updatedAt"],
       raw: true,
@@ -846,7 +840,7 @@ const getUserTargetAnalysis = async (req, res) => {
       resumesReceivedTarget: 0,
     };
 
-    // Aggregate resumes (UNCHANGED)
+    // Aggregate resumes
     const achieved = {
       followupBy: userName,
       collegesAchieved: new Set(),
