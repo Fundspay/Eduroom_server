@@ -349,7 +349,7 @@ const getDashboardStats = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     // ---------------------------
-    // Manager Filter
+    // Manager validation
     // ---------------------------
     let teamManagerName = null;
 
@@ -385,7 +385,7 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     const bdTargetData = await BdTarget.findAll({
       where: {
-        ...(teamManagerName ? { teamManagerId: managerId } : {}),
+        ...(managerId ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? targetDateFilter : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
@@ -395,7 +395,7 @@ const getDashboardStats = async (req, res) => {
     let totalInternsActive = 0;
     let totalAccountsTarget = 0;
 
-    bdTargetData.forEach((row) => {
+    bdTargetData.forEach(row => {
       totalInternsAllocated += Number(row.internsAllocated) || 0;
       totalInternsActive += Number(row.internsActive) || 0;
       totalAccountsTarget += Number(row.accounts) || 0;
@@ -423,61 +423,29 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 2️⃣ BdSheet (INTERNS DATA)
+    // 2️⃣ BdSheet (INTERNS + ACHIEVED ACCOUNTS)
     // ---------------------------
     const bdSheetData = await BdSheet.findAll({
       where: {
-        ...(teamManagerName ? { teamManagerId: managerId } : {}),
+        ...(managerId ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? sheetDateFilter : {}),
       },
-      attributes: ["activeStatus"],
+      attributes: ["activeStatus", "businessTask"],
     });
 
     const totalInterns = bdSheetData.length;
+
     const totalActiveInterns = bdSheetData.filter(
       row => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-    // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
-    // ---------------------------
-    let userIds = [];
-
-    if (teamManagerName) {
-      const statuses = await Status.findAll({
-        where: { teamManager: teamManagerName },
-        attributes: ["userId"],
-      });
-      userIds = statuses.map(s => s.userId);
-    }
-
+    // ✅ ACHIEVED ACCOUNTS = SUM OF businessTask
     let totalAccountsSheet = 0;
 
-    if (userIds.length && startDate && endDate) {
-      const fromDate = new Date(startDate);
-      const toDate = new Date(endDate);
-      toDate.setHours(23, 59, 59, 999); // ✅ FULL DAY FIX
-
-      const accountsResult = await FundsAudit.sequelize.query(
-        `
-        SELECT COUNT(DISTINCT "userId") AS achieved_accounts
-        FROM "FundsAudits"
-        WHERE "userId" IN (:userIds)
-          AND "hasPaid" = true
-          AND "dateOfPayment" BETWEEN :start AND :end
-        `,
-        {
-          replacements: {
-            userIds,
-            start: fromDate,
-            end: toDate,
-          },
-          type: FundsAudit.sequelize.QueryTypes.SELECT,
-        }
-      );
-
-      totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-    }
+    bdSheetData.forEach(row => {
+      const task = parseInt(row.businessTask || 0, 10);
+      if (!isNaN(task)) totalAccountsSheet += task;
+    });
 
     // ---------------------------
     // FINAL RESPONSE (UNCHANGED)
@@ -486,11 +454,11 @@ const getDashboardStats = async (req, res) => {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget,
+        totalAccounts: totalAccountsTarget, // 🎯 TARGET
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet,
+        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED (businessTask)
         totalActiveInterns,
       },
       appliedFilters: {
@@ -507,6 +475,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
