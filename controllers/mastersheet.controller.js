@@ -287,7 +287,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         where: {
           interviewedBy: managerName,
           finalSelectionStatus: "Selected",
-          interviewDate: { [Op.between]: [sDate, eDate] },
+          Dateofonboarding: { [Op.between]: [sDate, eDate] },
         },
       });
 
