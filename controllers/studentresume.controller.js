@@ -813,21 +813,13 @@ const getUserTargetAnalysis = async (req, res) => {
     let endDate = toDate ? new Date(toDate) : new Date();
     endDate.setHours(23, 59, 59, 999);
 
-    // UPDATED LOGIC: include null interviewDate and fallback to updatedAt for date range
+    // UPDATED LOGIC: use only Dateofonboarding for date range
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        [Op.or]: [
-          {
-            interviewDate: { [Op.between]: [startDate, endDate] },
-          },
-          {
-            interviewDate: null,
-            updatedAt: { [Op.between]: [startDate, endDate] },
-          },
-        ],
+        Dateofonboarding: { [Op.between]: [startDate, endDate] },
       },
-      attributes: ["resumeDate", "collegeName", "isRegistered", "interviewDate", "updatedAt"],
+      attributes: ["resumeDate", "collegeName", "isRegistered", "Dateofonboarding"],
       raw: true,
     });
 
@@ -867,8 +859,8 @@ const getUserTargetAnalysis = async (req, res) => {
 
       achieved.resumesAchieved += 1;
 
-      // Use interviewDate if exists, else fallback to updatedAt
-      const dateToUse = resume.interviewDate || resume.updatedAt;
+      // Use Dateofonboarding as the date to display
+      const dateToUse = resume.Dateofonboarding;
 
       if (dateToUse) {
         const formattedDate = new Date(dateToUse).toLocaleDateString("en-GB", {
