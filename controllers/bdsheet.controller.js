@@ -47,9 +47,20 @@ const upsertBdSheet = async (req, res) => {
 
       console.log("FIELDS TO UPDATE:", updateFields);
 
+      // 🔥 MERGE JSON fields instead of replacing
+      ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].forEach((dayKey) => {
+        if (updateFields[dayKey] && sheet[dayKey]) {
+          // Merge existing JSON with new JSON
+          updateFields[dayKey] = {
+            ...sheet[dayKey],
+            ...updateFields[dayKey],
+          };
+        }
+      });
+
       await sheet.update(updateFields, { fields: Object.keys(updateFields) });
 
-      //  return fresh data from DB
+      // return fresh data from DB
       const updatedSheet = await model.BdSheet.findByPk(sheet.id);
       return ReS(res, {
         message: "BdSheet updated successfully",
@@ -70,6 +81,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 
@@ -114,8 +126,6 @@ const getBdSheet = async (req, res) => {
           attributes: {
             include: ["businessTask", "registration", "activeStatus"],
           },
-          limit: 1,
-          order: [["id", "DESC"]],
         },
       ],
       order: [["id", "DESC"]],
@@ -125,8 +135,9 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
+        // ✅ ALWAYS PICK LATEST BdSheet
         if (Array.isArray(s.BdSheet)) {
-          s.BdSheet = s.BdSheet[0] || null;
+          s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
 
         // 🔥 Fetch user for wallet + userId + collegeName
@@ -136,8 +147,8 @@ const getBdSheet = async (req, res) => {
             attributes: [
               "subscriptionWallet",
               "subscriptiondeductedWallet",
-              "id",              // << added
-              "collegeName",     // << added
+              "id",
+              "collegeName",
             ],
           });
 
@@ -151,9 +162,8 @@ const getBdSheet = async (req, res) => {
             const businessTask = wallet + deducted;
             s.businessTask = businessTask;
 
-            // NEW FIELDS
-            s.userId = user.id;              // << added
-            s.collegeName = user.collegeName; // << added
+            s.userId = user.id;
+            s.collegeName = user.collegeName;
 
             if (!businessTask || businessTask === 0) s.category = "not working";
             else if (businessTask >= 1 && businessTask <= 5)
@@ -202,6 +212,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 
 const getBdSheetByCategory = async (req, res) => {
