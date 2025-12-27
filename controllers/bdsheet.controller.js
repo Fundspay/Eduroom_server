@@ -47,9 +47,20 @@ const upsertBdSheet = async (req, res) => {
 
       console.log("FIELDS TO UPDATE:", updateFields);
 
+      // 🔥 MERGE JSON fields instead of replacing
+      ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].forEach((dayKey) => {
+        if (updateFields[dayKey] && sheet[dayKey]) {
+          // Merge existing JSON with new JSON
+          updateFields[dayKey] = {
+            ...sheet[dayKey],
+            ...updateFields[dayKey],
+          };
+        }
+      });
+
       await sheet.update(updateFields, { fields: Object.keys(updateFields) });
 
-      //  return fresh data from DB
+      // return fresh data from DB
       const updatedSheet = await model.BdSheet.findByPk(sheet.id);
       return ReS(res, {
         message: "BdSheet updated successfully",
@@ -70,6 +81,7 @@ const upsertBdSheet = async (req, res) => {
 };
 
 module.exports.upsertBdSheet = upsertBdSheet;
+
 
 
 
