@@ -67,7 +67,7 @@ const toDate = (value) => {
 const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
-    console.log("📥 Incoming rows:", dataArray.length);
+    console.log("Incoming rows:", dataArray.length);
 
     const teamManagerId = req.body.teamManagerId ?? req.user?.id ?? null;
 
@@ -77,16 +77,16 @@ const createResume = async (req, res) => {
         const coSheet = await model.CoSheet.findOne({ where: { teamManagerId } });
         if (coSheet) coSheetId = coSheet.id;
       } catch (err) {
-        console.warn("⚠️ CoSheet lookup failed:", err.message);
+        console.warn("CoSheet lookup failed:", err.message);
       }
     }
 
     const cleanedArray = dataArray.filter(d =>
       d && Object.values(d).some(v => v !== null && v !== undefined && v !== "")
     );
-    console.log("🧹 After empty-row cleanup:", cleanedArray.length);
+    console.log("After empty-row cleanup:", cleanedArray.length);
 
-    const rawPayloads = cleanedArray.map(data => ({
+    let payloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
       resumeDate: toDate(data.resumeDate),
       collegeName: data.collegeName ?? null,
@@ -94,7 +94,7 @@ const createResume = async (req, res) => {
       internshipType: data.internshipType ?? null,
       followupBy: data.followupBy ?? null,
       studentName: data.studentName ?? null,
-      mobileNumber: data.mobileNumber ?? null,
+      mobileNumber: data.mobileNumber ? String(data.mobileNumber).trim() : null,
       emailId: data.emailId ?? null,
       domain: data.domain ?? null,
       interviewDate: toDate(data.interviewDate),
@@ -105,36 +105,24 @@ const createResume = async (req, res) => {
       alloted: data.alloted ?? null,
     }));
 
-    let payloads = rawPayloads.filter(p => p.mobileNumber);
-    console.log("📱 After mobile filter:", payloads.length);
+    // Keep only payloads with mobile numbers
+    payloads = payloads.filter(p => p.mobileNumber);
+    console.log("After mobile filter:", payloads.length);
 
-    payloads = payloads.map(p => ({
-      ...p,
-      mobileNumber: String(p.mobileNumber).trim()
-    }));
-
-    const seenMobiles = new Set();
-    const beforeInternalDup = payloads.length;
-    payloads = payloads.filter(p => {
-      if (seenMobiles.has(p.mobileNumber)) return false;
-      seenMobiles.add(p.mobileNumber);
-      return true;
-    });
-    console.log("♻️ Removed internal duplicates:", beforeInternalDup - payloads.length);
-
+    // Check duplicates only in DB
     const existing = await model.StudentResume.findAll({
-      where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } }
+      where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } },
     });
 
     const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
-    console.log("🗃️ Existing DB mobiles found:", existingMobiles.size);
+    console.log("Existing DB mobiles found:", existingMobiles.size);
 
     const beforeDBDup = payloads.length;
     payloads = payloads.filter(p => !existingMobiles.has(p.mobileNumber));
-    console.log("🚫 Removed DB duplicates:", beforeDBDup - payloads.length);
+    console.log("Removed DB duplicates:", beforeDBDup - payloads.length);
 
-    console.log("📦 Final payload count for insert:", payloads.length);
-    console.log("📦 Sample payload:", payloads[0]);
+    console.log("Final payload count for insert:", payloads.length);
+    console.log("Sample payload:", payloads[0]);
 
     let records = [];
     try {
@@ -142,9 +130,9 @@ const createResume = async (req, res) => {
         returning: true,
         ignoreDuplicates: true,
       });
-      console.log("✅ Bulk insert success, inserted:", records.length);
+      console.log("Bulk insert success, inserted:", records.length);
     } catch (err) {
-      console.error("❌ Bulk insert failed:", err);
+      console.error("Bulk insert failed:", err);
     }
 
     return res.status(200).json({
@@ -154,7 +142,7 @@ const createResume = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("🔥 StudentResume Create Error:", error);
+    console.error("StudentResume Create Error:", error);
     return res.status(200).json({
       success: false,
       inserted: 0,
@@ -165,7 +153,6 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
-
 
 
 //  Update Resume Record
