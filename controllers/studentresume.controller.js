@@ -322,7 +322,7 @@ const listResumes = async (req, res) => {
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: 200, // safety limit (frontend unchanged)
+      limit: 500, // safety limit (frontend unchanged)
     });
 
     console.log(`Total resumes fetched: ${records.length}`);
