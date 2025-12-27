@@ -42,6 +42,23 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
+    // 🔹 CHECK END DATE - Don't allow certificate generation before end date
+    const userCourseData = user.courseDates?.[courseId];
+    if (userCourseData?.endDate) {
+      const currentDate = new Date();
+      const courseEndDate = new Date(userCourseData.endDate);
+      
+      if (currentDate < courseEndDate) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Certificate cannot be generated yet. The course end date has not been reached.",
+          endDate: userCourseData.endDate,
+          courseName: userCourseData.courseName,
+        });
+      }
+    }
+
     // 🔹 Get business target from user JSON first, fallback to course
     const userTargetObj = user.businessTargets?.[courseId];
     const businessTarget = userTargetObj?.target !== undefined
@@ -154,7 +171,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
 };
 
 module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
-
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
