@@ -381,7 +381,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGET)
+    // 1️⃣ BdTarget (TARGET DATA)
     // ---------------------------
     const bdTargetData = await BdTarget.findAll({
       where: {
@@ -423,14 +423,14 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 2️⃣ BdSheet (INTERNS)
+    // 2️⃣ BdSheet (INTERNS DATA)
     // ---------------------------
     const bdSheetData = await BdSheet.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? sheetDateFilter : {}),
       },
-      attributes: ["activeStatus", "mobileNumber"],
+      attributes: ["activeStatus", "mobileNumber"], // ⚠️ REQUIRED
     });
 
     const totalInterns = bdSheetData.length;
@@ -440,31 +440,35 @@ const getDashboardStats = async (req, res) => {
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (✅ CORRECT SOURCE)
+    // 3️⃣ ACHIEVED ACCOUNTS (✅ EXACT getBdSheet LOGIC)
     // ---------------------------
     let totalAccountsSheet = 0;
 
-    if (teamManagerName) {
-      // get unique mobile numbers
-      const uniqueMobiles = [
-        ...new Set(bdSheetData.map(b => b.mobileNumber).filter(Boolean))
-      ];
+    // get unique mobile numbers
+    const uniqueMobiles = [
+      ...new Set(
+        bdSheetData
+          .map(row => row.mobileNumber)
+          .filter(Boolean)
+      ),
+    ];
 
-      if (uniqueMobiles.length) {
-        const users = await User.findAll({
-          where: { phoneNumber: { [Op.in]: uniqueMobiles } },
-          attributes: [
-            "subscriptionWallet",
-            "subscriptiondeductedWallet",
-          ],
-        });
+    if (uniqueMobiles.length) {
+      const users = await User.findAll({
+        where: {
+          phoneNumber: { [Op.in]: uniqueMobiles },
+        },
+        attributes: [
+          "subscriptionWallet",
+          "subscriptiondeductedWallet",
+        ],
+      });
 
-        users.forEach(u => {
-          const wallet = Number(u.subscriptionWallet || 0);
-          const deducted = Number(u.subscriptiondeductedWallet || 0);
-          totalAccountsSheet += wallet + deducted;
-        });
-      }
+      users.forEach(user => {
+        const wallet = Number(user.subscriptionWallet || 0);
+        const deducted = Number(user.subscriptiondeductedWallet || 0);
+        totalAccountsSheet += wallet + deducted;
+      });
     }
 
     // ---------------------------
@@ -474,11 +478,11 @@ const getDashboardStats = async (req, res) => {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget,
+        totalAccounts: totalAccountsTarget, // 🎯 TARGET
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet, // ✅ CORRECT ACHIEVED
+        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED
         totalActiveInterns,
       },
       appliedFilters: {
