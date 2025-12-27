@@ -345,39 +345,26 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 const getDashboardStats = async (req, res) => {
   try {
-    const managerId = req.query.managerId;
-    const { startDate, endDate } = req.query;
+    const { managerId, startDate, endDate } = req.query;
 
     // ---------------------------
     // Manager validation
     // ---------------------------
-    let teamManagerName = null;
-
     if (managerId) {
       const manager = await TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
-      teamManagerName = manager.name;
     }
 
     // ---------------------------
-    // DATE FILTER (BdTarget)
+    // Date objects (important)
     // ---------------------------
-    let targetDateFilter = {};
+    let fromDate = null;
+    let toDate = null;
+
     if (startDate && endDate) {
-      targetDateFilter = {
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("targetDate")),
-            "<=",
-            endDate
-          ),
-        ],
-      };
+      fromDate = new Date(startDate);
+      toDate = new Date(endDate);
+      toDate.setHours(23, 59, 59, 999);
     }
 
     // ---------------------------
@@ -386,7 +373,9 @@ const getDashboardStats = async (req, res) => {
     const bdTargetData = await BdTarget.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
-        ...(startDate && endDate ? targetDateFilter : {}),
+        ...(fromDate && toDate
+          ? { targetDate: { [Op.between]: [fromDate, toDate] } }
+          : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
@@ -402,62 +391,36 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // DATE FILTER (BdSheet)
-    // ---------------------------
-    let sheetDateFilter = {};
-    if (startDate && endDate) {
-      sheetDateFilter = {
-        [Op.and]: [
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            ">=",
-            startDate
-          ),
-          Sequelize.where(
-            Sequelize.fn("DATE", Sequelize.col("startDate")),
-            "<=",
-            endDate
-          ),
-        ],
-      };
-    }
-
-    // ---------------------------
-    // 2️⃣ BdSheet (INTERNS DATA)
+    // 2️⃣ BdSheet (INTERNS DATA — DATE FILTER APPLIED)
     // ---------------------------
     const bdSheetData = await BdSheet.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
-        ...(startDate && endDate ? sheetDateFilter : {}),
+        ...(fromDate && toDate
+          ? { startDate: { [Op.between]: [fromDate, toDate] } }
+          : {}),
       },
-      attributes: ["activeStatus", "mobileNumber"], // ⚠️ REQUIRED
+      attributes: ["activeStatus", "mobileNumber"],
     });
 
     const totalInterns = bdSheetData.length;
 
     const totalActiveInterns = bdSheetData.filter(
-      row => row.activeStatus?.toLowerCase() === "active"
+      s => s.activeStatus?.toLowerCase() === "active"
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (✅ EXACT getBdSheet LOGIC)
+    // 3️⃣ ACHIEVED ACCOUNTS (businessTask logic + DATE FILTER)
     // ---------------------------
     let totalAccountsSheet = 0;
 
-    // get unique mobile numbers
-    const uniqueMobiles = [
-      ...new Set(
-        bdSheetData
-          .map(row => row.mobileNumber)
-          .filter(Boolean)
-      ),
+    const mobileNumbers = [
+      ...new Set(bdSheetData.map(s => s.mobileNumber).filter(Boolean)),
     ];
 
-    if (uniqueMobiles.length) {
+    if (mobileNumbers.length) {
       const users = await User.findAll({
-        where: {
-          phoneNumber: { [Op.in]: uniqueMobiles },
-        },
+        where: { phoneNumber: { [Op.in]: mobileNumbers } },
         attributes: [
           "subscriptionWallet",
           "subscriptiondeductedWallet",
@@ -465,9 +428,9 @@ const getDashboardStats = async (req, res) => {
       });
 
       users.forEach(user => {
-        const wallet = Number(user.subscriptionWallet || 0);
-        const deducted = Number(user.subscriptiondeductedWallet || 0);
-        totalAccountsSheet += wallet + deducted;
+        totalAccountsSheet +=
+          Number(user.subscriptionWallet || 0) +
+          Number(user.subscriptiondeductedWallet || 0);
       });
     }
 
@@ -478,11 +441,11 @@ const getDashboardStats = async (req, res) => {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget, // 🎯 TARGET
+        totalAccounts: totalAccountsTarget,
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED
+        totalAccounts: totalAccountsSheet,
         totalActiveInterns,
       },
       appliedFilters: {
