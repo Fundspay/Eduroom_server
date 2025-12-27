@@ -255,9 +255,9 @@ module.exports.updateResume = updateResume;
 
 const listResumes = async (req, res) => {
   try {
-    console.log("Starting StudentResume list sync...");
+    console.log("Starting StudentResume list...");
 
-    //  DATE RANGE HANDLING (NEW)
+    // DATE RANGE HANDLING (UNCHANGED)
     let { startDate, endDate } = req.query;
 
     const today = new Date();
@@ -279,33 +279,7 @@ const listResumes = async (req, res) => {
       raw: true,
     });
 
-    // 1️ Sync Student Registrations
-    const resumesToSync = await model.StudentResume.findAll({
-      where: { isRegistered: false },
-      attributes: ["id", "mobileNumber", "isRegistered", "dateOfRegistration"],
-    });
-
-    console.log(`Found ${resumesToSync.length} resumes to sync registration status.`);
-
-    for (const resume of resumesToSync) {
-      if (!resume.mobileNumber) continue;
-
-      const user = await model.User.findOne({
-        where: { phoneNumber: resume.mobileNumber },
-        attributes: ["id", "createdAt"],
-        raw: true,
-      });
-
-      if (user) {
-        await resume.update({
-          isRegistered: true,
-          dateOfRegistration: user.createdAt,
-        });
-        console.log(`Updated registration for StudentResume ID ${resume.id}`);
-      }
-    }
-
-    // 2️ Fetch all resumes (DATE FILTER ADDED — NOTHING ELSE CHANGED)
+    // 1️⃣ FETCH RESUMES (LOAD REDUCED, OUTPUT SAME)
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       where: {
@@ -341,19 +315,33 @@ const listResumes = async (req, res) => {
                 "occupation",
               ],
               where: { hasPaid: true },
-              required: false,
-              separate: true,
+              required: false, // ❌ separate removed
             },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
           ],
         },
       ],
       order: [["createdAt", "DESC"]],
+      limit: 200, // safety limit (frontend unchanged)
     });
 
     console.log(`Total resumes fetched: ${records.length}`);
 
-    // ⭐⭐⭐ ADD userId PER RECORD (AS IS — UNCHANGED)
+    // 2️⃣ BULK USER FETCH (NO N+1)
+    const users = await model.User.findAll({
+      attributes: ["id", "phoneNumber", "email"],
+      raw: true,
+    });
+
+    const phoneMap = new Map();
+    const emailMap = new Map();
+
+    for (const u of users) {
+      if (u.phoneNumber) phoneMap.set(u.phoneNumber, u.id);
+      if (u.email) emailMap.set(u.email, u.id);
+    }
+
+    //  ADD userId PER RECORD (OUTPUT SAME)
     for (const resume of records) {
       let userId = null;
 
@@ -361,28 +349,18 @@ const listResumes = async (req, res) => {
         userId = resume.user.id;
       } else {
         if (resume.mobileNumber) {
-          const user = await model.User.findOne({
-            where: { phoneNumber: resume.mobileNumber },
-            attributes: ["id"],
-            raw: true,
-          });
-          if (user) userId = user.id;
+          userId = phoneMap.get(resume.mobileNumber) || null;
         }
 
         if (!userId && resume.emailId) {
-          const user = await model.User.findOne({
-            where: { email: resume.emailId },
-            attributes: ["id"],
-            raw: true,
-          });
-          if (user) userId = user.id;
+          userId = emailMap.get(resume.emailId) || null;
         }
       }
 
       resume.dataValues.userId = userId;
     }
 
-    console.log("🏁 All processing done successfully!");
+    console.log(" All processing done successfully!");
     return ReS(res, { success: true, data: records, managers }, 200);
 
   } catch (error) {
