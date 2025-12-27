@@ -381,7 +381,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGET DATA)
+    // 1️⃣ BdTarget (TARGET)
     // ---------------------------
     const bdTargetData = await BdTarget.findAll({
       where: {
@@ -423,14 +423,14 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 2️⃣ BdSheet (INTERNS + ACHIEVED ACCOUNTS)
+    // 2️⃣ BdSheet (INTERNS)
     // ---------------------------
     const bdSheetData = await BdSheet.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
         ...(startDate && endDate ? sheetDateFilter : {}),
       },
-      attributes: ["activeStatus", "businessTask"],
+      attributes: ["activeStatus", "mobileNumber"],
     });
 
     const totalInterns = bdSheetData.length;
@@ -439,13 +439,33 @@ const getDashboardStats = async (req, res) => {
       row => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-    // ✅ ACHIEVED ACCOUNTS = SUM OF businessTask
+    // ---------------------------
+    // 3️⃣ ACHIEVED ACCOUNTS (✅ CORRECT SOURCE)
+    // ---------------------------
     let totalAccountsSheet = 0;
 
-    bdSheetData.forEach(row => {
-      const task = parseInt(row.businessTask || 0, 10);
-      if (!isNaN(task)) totalAccountsSheet += task;
-    });
+    if (teamManagerName) {
+      // get unique mobile numbers
+      const uniqueMobiles = [
+        ...new Set(bdSheetData.map(b => b.mobileNumber).filter(Boolean))
+      ];
+
+      if (uniqueMobiles.length) {
+        const users = await User.findAll({
+          where: { phoneNumber: { [Op.in]: uniqueMobiles } },
+          attributes: [
+            "subscriptionWallet",
+            "subscriptiondeductedWallet",
+          ],
+        });
+
+        users.forEach(u => {
+          const wallet = Number(u.subscriptionWallet || 0);
+          const deducted = Number(u.subscriptiondeductedWallet || 0);
+          totalAccountsSheet += wallet + deducted;
+        });
+      }
+    }
 
     // ---------------------------
     // FINAL RESPONSE (UNCHANGED)
@@ -454,11 +474,11 @@ const getDashboardStats = async (req, res) => {
       bdTarget: {
         totalInternsAllocated,
         totalInternsActive,
-        totalAccounts: totalAccountsTarget, // 🎯 TARGET
+        totalAccounts: totalAccountsTarget,
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet, // ✅ ACHIEVED (businessTask)
+        totalAccounts: totalAccountsSheet, // ✅ CORRECT ACHIEVED
         totalActiveInterns,
       },
       appliedFilters: {
@@ -475,7 +495,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
 
 
 
