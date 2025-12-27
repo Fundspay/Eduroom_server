@@ -1155,39 +1155,55 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       ).then((results) => results.every(Boolean));
 
       const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
-      let overallStatus = existingStatuses[String(courseId)] === "Completed"
-        ? "Completed"
-        : "In Progress";
-
-      // ✅ FIXED: Special rules for determining completion
-      if (courseId === "24") {
-        // For course 24, consider only business target completion
-        overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
-      } else if (
-        allSessionsAboveThreshold && isBusinessTargetMet  // ✅ BOTH must be true
-      ) {
+      
+      // ✅ FIXED: Protect old completed users - cutoff date for new logic
+      const NEW_LOGIC_CUTOFF_DATE = new Date("2025-12-27"); // Today's date when fix was deployed
+      const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
+      const isOldUser = !courseStartDateStr || new Date(courseStartDateStr) < NEW_LOGIC_CUTOFF_DATE;
+      
+      // If user was already marked "Completed" before the fix, keep them as "Completed"
+      const wasAlreadyCompleted = existingStatuses[String(courseId)] === "Completed";
+      
+      let overallStatus = "In Progress";
+      
+      if (wasAlreadyCompleted && isOldUser) {
+        // ✅ Preserve old completed status for users who started before today
         overallStatus = "Completed";
+      } else {
+        // ✅ Apply new logic for new users or users who weren't completed yet
+        if (courseId === "24") {
+          // For course 24, consider only business target completion
+          overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
+        } else if (allSessionsAboveThreshold && isBusinessTargetMet) {
+          // For all other courses: BOTH conditions must be met
+          overallStatus = "Completed";
+        }
       }
 
-      // Check internship status
+      // Check internship status (can override to Terminated or On Hold only)
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
 
       if (statusRecord && statusRecord.internshipStatus) {
         const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
-        if (["terminated"].includes(normalized)) overallStatus = "Terminated";
-        else if (["on hold", "hold", "onhold"].includes(normalized)) overallStatus = "On Hold";
+        if (["terminated"].includes(normalized)) {
+          overallStatus = "Terminated";
+        } else if (["on hold", "hold", "onhold"].includes(normalized)) {
+          overallStatus = "On Hold";
+        }
       }
 
-      // Special rule for Mobile App Developer
+      // ✅ FIXED: Special rule for Mobile App Developer - only applies if business target is also met
       if (
         courseId === "9" &&
         overallStatus !== "Completed" &&
+        overallStatus !== "Terminated" &&
+        overallStatus !== "On Hold" &&
         Number(overallCompletionRate) >= 99.99 &&
-        subscriptiondeductedWallet === 1
+        subscriptiondeductedWallet >= 1 &&
+        isBusinessTargetMet  // ✅ Added business target check
       ) {
-        const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
         const cutoffDate = new Date("2025-12-10");
         if (!courseStartDateStr || new Date(courseStartDateStr) < cutoffDate) {
           overallStatus = "Completed";
