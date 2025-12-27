@@ -356,7 +356,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // Date objects (important)
+    // Date handling
     // ---------------------------
     let fromDate = null;
     let toDate = null;
@@ -368,7 +368,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGET DATA)
+    // 1️⃣ BdTarget (TARGETS)
     // ---------------------------
     const bdTargetData = await BdTarget.findAll({
       where: {
@@ -384,14 +384,14 @@ const getDashboardStats = async (req, res) => {
     let totalInternsActive = 0;
     let totalAccountsTarget = 0;
 
-    bdTargetData.forEach(row => {
-      totalInternsAllocated += Number(row.internsAllocated) || 0;
-      totalInternsActive += Number(row.internsActive) || 0;
-      totalAccountsTarget += Number(row.accounts) || 0;
+    bdTargetData.forEach(t => {
+      totalInternsAllocated += Number(t.internsAllocated || 0);
+      totalInternsActive += Number(t.internsActive || 0);
+      totalAccountsTarget += Number(t.accounts || 0);
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet (INTERNS DATA — DATE FILTER APPLIED)
+    // 2️⃣ BdSheet + StudentResume (DATE FILTER)
     // ---------------------------
     const bdSheetData = await BdSheet.findAll({
       where: {
@@ -400,7 +400,14 @@ const getDashboardStats = async (req, res) => {
           ? { startDate: { [Op.between]: [fromDate, toDate] } }
           : {}),
       },
-      attributes: ["activeStatus", "mobileNumber"],
+      attributes: ["activeStatus"],
+      include: [
+        {
+          model: StudentResume,
+          attributes: ["mobileNumber"],
+          required: true,
+        },
+      ],
     });
 
     const totalInterns = bdSheetData.length;
@@ -410,12 +417,16 @@ const getDashboardStats = async (req, res) => {
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (businessTask logic + DATE FILTER)
+    // 3️⃣ ACHIEVED ACCOUNTS (businessTask logic)
     // ---------------------------
     let totalAccountsSheet = 0;
 
     const mobileNumbers = [
-      ...new Set(bdSheetData.map(s => s.mobileNumber).filter(Boolean)),
+      ...new Set(
+        bdSheetData
+          .map(s => s.StudentResume?.mobileNumber)
+          .filter(Boolean)
+      ),
     ];
 
     if (mobileNumbers.length) {
@@ -427,10 +438,10 @@ const getDashboardStats = async (req, res) => {
         ],
       });
 
-      users.forEach(user => {
+      users.forEach(u => {
         totalAccountsSheet +=
-          Number(user.subscriptionWallet || 0) +
-          Number(user.subscriptiondeductedWallet || 0);
+          Number(u.subscriptionWallet || 0) +
+          Number(u.subscriptiondeductedWallet || 0);
       });
     }
 
