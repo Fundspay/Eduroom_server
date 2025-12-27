@@ -1159,13 +1159,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? "Completed"
         : "In Progress";
 
-      // Special rules for determining completion
+      // ✅ FIXED: Special rules for determining completion
       if (courseId === "24") {
         // For course 24, consider only business target completion
         overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
       } else if (
-        Number(overallCompletionRate) === 100 ||
-        (isBusinessTargetMet && allSessionsAboveThreshold)
+        allSessionsAboveThreshold && isBusinessTargetMet  // ✅ BOTH must be true
       ) {
         overallStatus = "Completed";
       }
@@ -1213,7 +1212,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         coursePreviews: course.CoursePreviews || [],
         overallStatus,
-        overallCompletionRate: Number(displayCompletionRate.toFixed(2)), // ✅ Use displayCompletionRate
+        overallCompletionRate: Number(displayCompletionRate.toFixed(2)),
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
@@ -1229,8 +1228,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 };
 
 module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
-
-
 
 const getBusinessTarget = async (req, res) => {
   try {
