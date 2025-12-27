@@ -351,7 +351,7 @@ const getDashboardStats = async (req, res) => {
     // Manager validation
     // ---------------------------
     if (managerId) {
-      const manager = await TeamManager.findByPk(managerId);
+      const manager = await model.TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
     }
 
@@ -368,9 +368,9 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGETS)
+    // 1️⃣ BdTarget (TARGET DATA)
     // ---------------------------
-    const bdTargetData = await BdTarget.findAll({
+    const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
         ...(fromDate && toDate
@@ -393,7 +393,7 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     // 2️⃣ BdSheet + StudentResume (DATE FILTER)
     // ---------------------------
-    const bdSheetData = await BdSheet.findAll({
+    const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
         ...(fromDate && toDate
@@ -403,7 +403,7 @@ const getDashboardStats = async (req, res) => {
       attributes: ["activeStatus"],
       include: [
         {
-          model: StudentResume,
+          model: model.StudentResume, // ✅ FIXED
           attributes: ["mobileNumber"],
           required: true,
         },
@@ -430,7 +430,7 @@ const getDashboardStats = async (req, res) => {
     ];
 
     if (mobileNumbers.length) {
-      const users = await User.findAll({
+      const users = await model.User.findAll({
         where: { phoneNumber: { [Op.in]: mobileNumbers } },
         attributes: [
           "subscriptionWallet",
