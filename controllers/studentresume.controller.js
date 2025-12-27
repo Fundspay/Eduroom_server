@@ -64,6 +64,7 @@ const toDate = (value) => {
   return null;
 };
 
+
 const createResume = async (req, res) => {
   try {
     const dataArray = Array.isArray(req.body) ? req.body : [req.body];
@@ -81,21 +82,23 @@ const createResume = async (req, res) => {
       }
     }
 
+    // Remove completely empty rows
     const cleanedArray = dataArray.filter(d =>
       d && Object.values(d).some(v => v !== null && v !== undefined && v !== "")
     );
     console.log("After empty-row cleanup:", cleanedArray.length);
 
+    // Map to raw payloads
     let payloads = cleanedArray.map(data => ({
       sr: data.sr ?? null,
       resumeDate: toDate(data.resumeDate),
-      collegeName: data.collegeName ?? null,
+      collegeName: String(data.collegeName || "").trim(),
       course: data.course ?? null,
       internshipType: data.internshipType ?? null,
       followupBy: data.followupBy ?? null,
-      studentName: data.studentName ?? null,
-      mobileNumber: data.mobileNumber ? String(data.mobileNumber).trim() : null,
-      emailId: data.emailId ?? null,
+      studentName: String(data.studentName || "").trim(),
+      mobileNumber: String(data.mobileNumber || "").replace(/\s/g, ""), // remove all whitespace
+      emailId: String(data.emailId || "").trim(),
       domain: data.domain ?? null,
       interviewDate: toDate(data.interviewDate),
       dateOfOnboarding: toDate(data.dateOfOnboarding) ?? null,
@@ -105,16 +108,24 @@ const createResume = async (req, res) => {
       alloted: data.alloted ?? null,
     }));
 
-    // Keep only payloads with mobile numbers
-    payloads = payloads.filter(p => p.mobileNumber);
-    console.log("After mobile filter:", payloads.length);
+    // Remove internal duplicates in payload
+    const seenMobiles = new Set();
+    const beforeInternalDup = payloads.length;
+    payloads = payloads.filter(p => {
+      if (seenMobiles.has(p.mobileNumber)) return false;
+      seenMobiles.add(p.mobileNumber);
+      return true;
+    });
+    console.log("Removed internal duplicates:", beforeInternalDup - payloads.length);
 
-    // Check duplicates only in DB
+    // Remove DB duplicates
+    const mobileNumbers = payloads.map(p => p.mobileNumber);
     const existing = await model.StudentResume.findAll({
-      where: { mobileNumber: { [Op.in]: payloads.map(p => p.mobileNumber) } },
+      where: { mobileNumber: { [Op.in]: mobileNumbers } },
+      attributes: ["mobileNumber"]
     });
 
-    const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).trim()));
+    const existingMobiles = new Set(existing.map(e => String(e.mobileNumber).replace(/\s/g, "")));
     console.log("Existing DB mobiles found:", existingMobiles.size);
 
     const beforeDBDup = payloads.length;
@@ -122,7 +133,7 @@ const createResume = async (req, res) => {
     console.log("Removed DB duplicates:", beforeDBDup - payloads.length);
 
     console.log("Final payload count for insert:", payloads.length);
-    console.log("Sample payload:", payloads[0]);
+    if (payloads.length > 0) console.log("Sample payload:", payloads[0]);
 
     let records = [];
     try {
@@ -138,7 +149,7 @@ const createResume = async (req, res) => {
     return res.status(200).json({
       success: true,
       inserted: records.length,
-      totalSent: payloads.length,
+      totalSent: Array.isArray(req.body) ? req.body.length : 1,
     });
 
   } catch (error) {
@@ -153,6 +164,8 @@ const createResume = async (req, res) => {
 };
 
 module.exports.createResume = createResume;
+
+
 
 
 //  Update Resume Record
