@@ -282,6 +282,20 @@ var getUserAnalysis = async function (req, res) {
     // Fixed targets for days 6-10
     const defaultTargets = [25, 35, 45, 55, 65];
 
+    // Category for each day
+    const categoryDistribution = [
+      "OFFER LETTER",
+      "BRONZE",
+      "SILVER",
+      "GOLD",
+      "DIAMOND",
+      "LOA",
+      "1500 STIPEND",
+      "2500 STIPEND",
+      "3500 STIPEND",
+      "5000 STIPEND"
+    ];
+
     const data = [];
     const totalDays = 10;
 
@@ -299,10 +313,12 @@ var getUserAnalysis = async function (req, res) {
         SR: i + 1,
         DAY_OF_WORK: `DAY ${i + 1}`,
         DATE_DAY: dateDay,
-        WORK_STATUS: "Not Completed", // 0 = not completed by default
+        WORK_STATUS: "Not Completed", // default
         COMMENT: "",
-        BUSINESS_TASK: null, // keep null for now
-        DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5] // first 5 days calculated, rest default
+        BUSINESS_TASK: null,
+        DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5],
+        PERCENT_OF_WORK: "0.00%", // default
+        CATEGORY: categoryDistribution[i] || ""
       });
     }
 
@@ -313,6 +329,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
