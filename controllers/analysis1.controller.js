@@ -321,10 +321,9 @@ var getUserAnalysis = async function (req, res) {
     });
 
     const businessTaskValue =
-      (parseInt(user?.subscriptionLeft || 0, 10) +
-        parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
+      parseInt(user?.subscriptionWallet || 0, 10)| 0;
 
-    // 🔥 FIX: convert to TEXT
+    //  FIX: convert to TEXT
     const businessTaskText = String(businessTaskValue);
 
     const taskValue = parseInt(business_task || 0, 10);
