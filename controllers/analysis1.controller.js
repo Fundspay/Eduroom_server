@@ -332,7 +332,16 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task, course_id, course_name } = record;
 
-    //  FIX: USE DB VALUE ONLY
+    //  FETCH ACHIEVED BUSINESS TASK FROM USER TABLE
+    const user = await model.User.findOne({
+      where: { id: userId },
+      attributes: ["subscriptionWallet"]
+    });
+
+    const achievedBusinessTask =
+      parseInt(user?.subscriptionWallet || 0, 10) || 0;
+
+    // SINGLE SOURCE OF TRUTH (DB)
     const taskValue =
       business_task !== null && business_task !== undefined
         ? parseInt(business_task, 10)
@@ -382,14 +391,13 @@ var getUserAnalysis = async function (req, res) {
       let percentOfWork = "0.00%";
 
       if (currentDate && currentDate <= today) {
-        const achieved = Math.min(dailyTarget, taskValue);
+        const achieved = Math.min(dailyTarget, achievedBusinessTask);
         percentOfWork =
           dailyTarget > 0
             ? ((achieved / dailyTarget) * 100).toFixed(2) + "%"
             : "0.00%";
       }
 
-      // Preserve existing work_status and comment
       const existingDay = await model.analysis1.findOne({
         where: { user_id: userId, day_no: i + 1 }
       });
@@ -397,7 +405,7 @@ var getUserAnalysis = async function (req, res) {
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
-      //  FIX: DO NOT OVERWRITE business_task
+      //  DO NOT OVERWRITE business_task
       await model.analysis1.upsert({
         user_id: userId,
         day_no: i + 1,
@@ -419,6 +427,7 @@ var getUserAnalysis = async function (req, res) {
         WORK_STATUS: workStatus,
         COMMENT: comment,
         BUSINESS_TASK: businessTaskText,
+        ACHIEVED_BUSINESS_TASK: achievedBusinessTask,
         DAILY_TARGET: dailyTarget,
         PERCENT_OF_WORK: percentOfWork,
         CATEGORY: categoryDistribution[i]
@@ -433,8 +442,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
-
 
 
 
