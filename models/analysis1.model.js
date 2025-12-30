@@ -36,7 +36,7 @@ module.exports = (sequelize, Sequelize) => {
 
       // FIXED TYPE
       business_task: {
-        type: Sequelize.INTEGER,
+        type: Sequelize.TEXT,
         allowNull: true,
         defaultValue: 0,
       },
