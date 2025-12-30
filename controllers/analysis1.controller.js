@@ -176,12 +176,11 @@ var fetchStoredCoursesByUser = async function (req, res) {
     // Fetch achieved business task
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionWallet", "subscriptiondeductedWallet"]
+      attributes: ["subscriptionWallet"]
     });
 
     const achievedBusinessTask =
-      (parseInt(user?.subscriptionWallet || 0, 10) +
-        parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
+      (parseInt(user?.subscriptionWallet || 0, 10) || 0);
 
     // Fetch day-wise analysis data
     const analysisDays = await model.analysis1.findAll({
