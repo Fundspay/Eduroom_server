@@ -13,7 +13,7 @@ router.put("/update/:userId", analysis1Controller.updateStoredCourse);
 //analysis 
 router.get("/analysis/:userId", analysis1Controller.getUserAnalysis);
 //update the work status
-router.post("/user/day-work/", analysis1Controller.upsertUserDayWork);
+router.post("/user/day-work", analysis1Controller.upsertUserDayWork);
 
 
 
