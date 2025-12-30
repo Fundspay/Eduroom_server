@@ -258,46 +258,56 @@ var updateStoredCourse = async function (req, res) {
 
 module.exports.updateStoredCourse = updateStoredCourse;
 
-var getUserAnalysis = async function(req, res) {
+var getUserAnalysis = async function (req, res) {
   try {
     const { userId } = req.params;
     if (!userId) return ReE(res, "User ID is required", 400);
 
-    const records = await model.analysis1.findAll({
-      where: { user_id: userId },
-      order: [["day_no", "ASC"]]
+    // Fetch the user's course info
+    const record = await model.analysis1.findOne({
+      where: { user_id: userId }
     });
 
-    // Map day-wise format
-    const data = records.map((rec, index) => {
-      // Calculate Date & Day based on start_date + day_no
-      let dateDay = null;
-      if (rec.start_date) {
-        const date = new Date(rec.start_date);
-        date.setDate(date.getDate() + (rec.day_no - 1));
-        const options = { day: "numeric", month: "short", weekday: "long" };
-        dateDay = date.toLocaleDateString("en-US", options);
-      }
+    if (!record) return ReE(res, "Record not found", 404);
 
-      return {
-        SR: index + 1,
-        DAY_OF_WORK: `DAY ${rec.day_no}`,
+    const { start_date, end_date, business_task } = record;
+    const taskValue = business_task?.task || 0;
+
+    // Define day-wise percentages
+    const percentageDistribution = [18, 22, 25, 25, 10, 0, 0, 0, 0, 0];
+    const dailyTargets = percentageDistribution.map(p => Math.round((p / 100) * taskValue));
+
+    const data = [];
+
+    const totalDays = 10; // We want 10 days
+    const startDate = new Date(start_date);
+
+    for (let i = 0; i < totalDays; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(currentDate.getDate() + i);
+
+      const options = { day: "numeric", month: "short", weekday: "long" };
+      const dateDay = currentDate.toLocaleDateString("en-US", options);
+
+      data.push({
+        SR: i + 1,
+        DAY_OF_WORK: `DAY ${i + 1}`,
         DATE_DAY: dateDay,
-        WORK_STATUS: rec.work_status,
-        COMMENT: rec.comment || "",
-        BUSINESS_TASK: rec.business_task || null,
-        DAILY_TARGET: rec.daily_target || 0
-      };
-    });
+        WORK_STATUS: 0, // 0 = not completed by default
+        COMMENT: "",
+        BUSINESS_TASK: null, // keep null for now
+        DAILY_TARGET: dailyTargets[i] || 0
+      });
+    }
 
     return ReS(res, { success: true, data }, 200);
-
   } catch (err) {
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 var upsertUserDayWork = async function(req, res) {
   try {
