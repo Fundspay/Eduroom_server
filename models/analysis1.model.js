@@ -12,28 +12,30 @@ module.exports = (sequelize, Sequelize) => {
       user_id: {
         type: Sequelize.BIGINT,
         allowNull: false,
+        unique: true
       },
 
       course_id: {
         type: Sequelize.STRING(100),
-        allowNull: false,
+        allowNull: true,
       },
 
       course_name: {
         type: Sequelize.STRING(255),
-        allowNull: false,
+        allowNull: true,
       },
 
       start_date: {
         type: Sequelize.DATEONLY,
-        allowNull: false,
+        allowNull: true,
       },
 
       end_date: {
         type: Sequelize.DATEONLY,
-        allowNull: false,
+        allowNull: true,
       },
 
+      // ✅ FIX: keep JSON (matches DB)
       business_task: {
         type: Sequelize.JSON,
         allowNull: true,

@@ -5,87 +5,82 @@ const { Op } = require("sequelize");
 
 var extractAndStoreCourseDates = async function (req, res) {
   try {
-    // Step 1️⃣: Already processed users (kept as-is, NOT used for filtering)
-    const existingRecords = await model.analysis1.findAll({
-      attributes: ["user_id"]
-    });
-    const existingUserIds = existingRecords.map(r => r.user_id);
-
-    // Step 2️⃣: Fetch users with selected course
-    // 🔥 FIX: Removed NOT IN filter so upsert can work
+    // 1️⃣ Fetch ALL active users
     const users = await model.User.findAll({
-      where: {
-        isDeleted: false,
-        selected: { [Op.ne]: null },
-        courseDates: { [Op.ne]: null }
-      },
-      attributes: ["id", "selected", "courseDates"]
+      where: { isDeleted: false },
+      attributes: ["id", "selected", "courseDates", "businessTargets"]
     });
 
     let processed = 0;
-    const newlyProcessedCourses = [];
+    const responseData = [];
 
-    // Step 3️⃣: Extract selected course and store
     for (const user of users) {
-      const { id: userId, selected, courseDates } = user;
+      const userId = user.id;
 
+      let course_id = null;
+      let course_name = null;
+      let start_date = null;
+      let end_date = null;
+      let business_task = {};
+
+      // 2️⃣ If selected course exists, extract it
       if (
-        !selected ||
-        !courseDates ||
-        typeof courseDates !== "object" ||
-        !courseDates[selected]
+        user.selected &&
+        user.courseDates &&
+        typeof user.courseDates === "object" &&
+        user.courseDates[String(user.selected)]
       ) {
-        continue;
+        const selectedCourse = user.courseDates[String(user.selected)];
+
+        course_id = selectedCourse.course_id || null;
+        course_name = selectedCourse.course_name || null;
+        start_date = selectedCourse.start_date || null;
+        end_date = selectedCourse.end_date || null;
+
+        // 3️⃣ Extract business target ONLY (no achieved)
+        if (
+          user.businessTargets &&
+          user.businessTargets[String(user.selected)]
+        ) {
+          business_task = {
+            target: user.businessTargets[String(user.selected)].target || 0
+          };
+        }
       }
 
-      const selectedCourse = courseDates[selected];
-
-      if (
-        !selectedCourse.course_id ||
-        !selectedCourse.course_name ||
-        !selectedCourse.start_date ||
-        !selectedCourse.end_date
-      ) continue;
-
-      // Step 4️⃣: Fetch businessTarget from Courses table
-      let businessTask = null;
-      const courseRecord = await model.Courses.findOne({
-        where: { id: selectedCourse.course_id },
-        attributes: ["businessTarget"]
-      });
-
-      if (courseRecord) businessTask = courseRecord.businessTarget;
-
-      // Step 5️⃣: Store in analysis1
+      // 4️⃣ Store / Update ALWAYS
       await model.analysis1.upsert({
         user_id: userId,
-        course_id: selectedCourse.course_id,
-        course_name: selectedCourse.course_name,
-        start_date: selectedCourse.start_date,
-        end_date: selectedCourse.end_date,
-        business_task: businessTask || 0
+        course_id,
+        course_name,
+        start_date,
+        end_date,
+        business_task
       });
 
-      // Step 6️⃣: Calculate daysLeft
-      const today = new Date();
-      const endDate = new Date(selectedCourse.end_date);
-      const diffTime =
-        endDate.setHours(0, 0, 0, 0) -
-        today.setHours(0, 0, 0, 0);
+      // 5️⃣ Calculate days left (response only)
+      let daysLeft = null;
+      if (end_date) {
+        const today = new Date();
+        const end = new Date(end_date);
+        const diff =
+          end.setHours(0, 0, 0, 0) -
+          today.setHours(0, 0, 0, 0);
 
-      const daysLeft = Math.max(
-        Math.floor(diffTime / (1000 * 60 * 60 * 24)),
-        0
-      );
+        daysLeft = Math.max(
+          Math.floor(diff / (1000 * 60 * 60 * 24)),
+          0
+        );
+      }
 
-      newlyProcessedCourses.push({
+      responseData.push({
         user_id: userId,
-        course_id: selectedCourse.course_id,
-        course_name: selectedCourse.course_name,
-        start_date: selectedCourse.start_date,
-        end_date: selectedCourse.end_date,
+        course_id,
+        course_name,
+        start_date,
+        end_date,
         daysLeft,
-        business_task: businessTask || 0
+        business_task
       });
 
       processed++;
@@ -95,10 +90,9 @@ var extractAndStoreCourseDates = async function (req, res) {
       res,
       {
         success: true,
-        message:
-          "Selected course details with business task extracted and stored successfully",
+        message: "User course data synced successfully",
         recordsProcessed: processed,
-        data: newlyProcessedCourses
+        data: responseData
       },
       200
     );
