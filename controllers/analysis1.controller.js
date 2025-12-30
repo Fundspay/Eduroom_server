@@ -220,8 +220,11 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      //  SINGLE SOURCE OF TRUTH
-      const business_task = c.business_task || 0;
+      //  FIX: STRICT DB VALUE (NO OVERRIDE, NO FALLBACK)
+      const business_task =
+        c.business_task !== null && c.business_task !== undefined
+          ? Number(c.business_task)
+          : 0;
 
       return {
         user_id: c.user_id,
@@ -252,6 +255,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 
