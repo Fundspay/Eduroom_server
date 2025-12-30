@@ -332,17 +332,14 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task, course_id, course_name } = record;
 
-    const user = await model.User.findOne({
-      where: { id: userId },
-      attributes: ["subscriptionLeft", "subscriptiondeductedWallet","subscriptionWallet"]
-    });
+    //  FIX: USE DB VALUE ONLY
+    const taskValue =
+      business_task !== null && business_task !== undefined
+        ? parseInt(business_task, 10)
+        : 0;
 
-    const businessTaskValue =
-      parseInt(user?.subscriptionWallet || 0, 10) || 0;
+    const businessTaskText = String(taskValue);
 
-    const businessTaskText = String(businessTaskValue);
-
-    const taskValue = parseInt(business_task || 0, 10);
     const percentageDistribution = [18, 22, 25, 25, 10];
     const dailyTargets = percentageDistribution.map(p =>
       Math.round((p / 100) * taskValue)
@@ -385,14 +382,14 @@ var getUserAnalysis = async function (req, res) {
       let percentOfWork = "0.00%";
 
       if (currentDate && currentDate <= today) {
-        const achieved = Math.min(dailyTarget, businessTaskValue);
+        const achieved = Math.min(dailyTarget, taskValue);
         percentOfWork =
           dailyTarget > 0
             ? ((achieved / dailyTarget) * 100).toFixed(2) + "%"
             : "0.00%";
       }
 
-      //  Preserve existing work_status and comment
+      // Preserve existing work_status and comment
       const existingDay = await model.analysis1.findOne({
         where: { user_id: userId, day_no: i + 1 }
       });
@@ -400,6 +397,7 @@ var getUserAnalysis = async function (req, res) {
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
+      //  FIX: DO NOT OVERWRITE business_task
       await model.analysis1.upsert({
         user_id: userId,
         day_no: i + 1,
@@ -408,7 +406,6 @@ var getUserAnalysis = async function (req, res) {
         start_date: start_date || null,
         end_date: end_date || null,
         daily_target: dailyTarget,
-        business_task: businessTaskText,
         percent_of_work: percentOfWork,
         category: categoryDistribution[i],
         work_status: workStatus,
@@ -436,6 +433,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 
