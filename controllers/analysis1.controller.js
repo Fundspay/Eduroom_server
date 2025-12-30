@@ -275,9 +275,12 @@ var getUserAnalysis = async function (req, res) {
     // Get business task value
     const taskValue = business_task || 0;
 
-    // Define day-wise percentages
-    const percentageDistribution = [18, 22, 25, 25, 10, 0, 0, 0, 0, 0];
+    // Day-wise percentages for first 5 days
+    const percentageDistribution = [18, 22, 25, 25, 10];
     const dailyTargets = percentageDistribution.map(p => Math.round((p / 100) * taskValue));
+
+    // Fixed targets for days 6-10
+    const defaultTargets = [25, 35, 45, 55, 65];
 
     const data = [];
     const totalDays = 10;
@@ -299,7 +302,7 @@ var getUserAnalysis = async function (req, res) {
         WORK_STATUS: 0, // 0 = not completed by default
         COMMENT: "",
         BUSINESS_TASK: null, // keep null for now
-        DAILY_TARGET: dailyTargets[i] || 0
+        DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5] // first 5 days calculated, rest default
       });
     }
 
@@ -310,7 +313,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 var upsertUserDayWork = async function(req, res) {
