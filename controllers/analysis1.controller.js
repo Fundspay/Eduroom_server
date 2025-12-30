@@ -8,7 +8,7 @@ var extractAndStoreCourseDates = async function (req, res) {
     // 1️⃣ Fetch ALL active users
     const users = await model.User.findAll({
       where: { isDeleted: false },
-      attributes: ["id", "selected", "courseDates", "businessTargets"]
+      attributes: ["id", "selected", "courseDates"]
     });
 
     let processed = 0;
@@ -21,9 +21,9 @@ var extractAndStoreCourseDates = async function (req, res) {
       let course_name = null;
       let start_date = null;
       let end_date = null;
-      let business_task = {};
+      let business_task = 0;
 
-      // 2️⃣ If selected course exists, extract it
+      // 2️⃣ FIXED extraction logic
       if (
         user.selected &&
         user.courseDates &&
@@ -32,19 +32,21 @@ var extractAndStoreCourseDates = async function (req, res) {
       ) {
         const selectedCourse = user.courseDates[String(user.selected)];
 
-        course_id = selectedCourse.course_id || null;
-        course_name = selectedCourse.course_name || null;
-        start_date = selectedCourse.start_date || null;
-        end_date = selectedCourse.end_date || null;
+        course_id = user.selected; // ✅ course_id comes from selected
+        course_name = selectedCourse.courseName || null;
+        start_date = selectedCourse.startDate || null;
+        end_date = selectedCourse.endDate || null;
 
-        // 3️⃣ Extract business target ONLY (no achieved)
-        if (
-          user.businessTargets &&
-          user.businessTargets[String(user.selected)]
-        ) {
-          business_task = {
-            target: user.businessTargets[String(user.selected)].target || 0
-          };
+        // 3️⃣ Fetch business task
+        if (course_id) {
+          const courseRecord = await model.Courses.findOne({
+            where: { id: course_id },
+            attributes: ["businessTarget"]
+          });
+
+          if (courseRecord) {
+            business_task = courseRecord.businessTarget || 0;
+          }
         }
       }
 
@@ -63,6 +65,7 @@ var extractAndStoreCourseDates = async function (req, res) {
       if (end_date) {
         const today = new Date();
         const end = new Date(end_date);
+
         const diff =
           end.setHours(0, 0, 0, 0) -
           today.setHours(0, 0, 0, 0);
@@ -102,6 +105,7 @@ var extractAndStoreCourseDates = async function (req, res) {
 };
 
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
+
 
 var fetchAllStoredCourses = async function (req, res) {
   try {
