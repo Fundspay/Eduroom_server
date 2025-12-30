@@ -12,7 +12,6 @@ module.exports = (sequelize, Sequelize) => {
       user_id: {
         type: Sequelize.BIGINT,
         allowNull: false,
-        unique: false // multiple rows per user
       },
 
       course_id: {
@@ -35,20 +34,20 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
       },
 
+      // FIXED TYPE
       business_task: {
-        type: Sequelize.JSON,
+        type: Sequelize.INTEGER,
         allowNull: true,
-        defaultValue: {}
+        defaultValue: 0
       },
 
       day_no: {
         type: Sequelize.INTEGER,
         allowNull: false,
-        defaultValue: 1
       },
 
       work_status: {
-        type: Sequelize.TEXT, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
+        type: Sequelize.INTEGER, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
         defaultValue: 0
       },
 
@@ -61,6 +60,19 @@ module.exports = (sequelize, Sequelize) => {
         type: Sequelize.INTEGER,
         allowNull: true,
         defaultValue: 0
+      },
+
+      //  NEW
+      percent_of_work: {
+        type: Sequelize.STRING(10),
+        allowNull: true,
+        defaultValue: "0.00%"
+      },
+
+      //  NEW
+      category: {
+        type: Sequelize.STRING(100),
+        allowNull: true
       },
 
       createdAt: {
@@ -78,6 +90,12 @@ module.exports = (sequelize, Sequelize) => {
     {
       tableName: "user_course_dates",
       timestamps: true,
+      indexes: [
+        {
+          unique: true,
+          fields: ["user_id", "day_no"] // REQUIRED FOR UPSERT SAFETY
+        }
+      ]
     }
   );
 
