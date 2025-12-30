@@ -209,8 +209,8 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      // Get business_task from Users.businessTargets
-      const target = user.businessTargets?.[c.course_id]?.target || 0;
+      // ✅ Use business_task from analysis1 table first, fallback to user.businessTargets
+      const business_task = c.business_task || user.businessTargets?.[c.course_id]?.target || 0;
 
       return {
         user_id: c.user_id,
@@ -219,7 +219,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
         start_date: c.start_date,
         end_date: c.end_date,
         daysLeft,
-        business_task: target,
+        business_task,
         achieved_business_task: achievedBusinessTask,
         current_category: currentCategory
       };
@@ -238,6 +238,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 var updateStoredCourse = async function (req, res) {
