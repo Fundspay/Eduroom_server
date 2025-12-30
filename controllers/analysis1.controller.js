@@ -109,13 +109,55 @@ var extractAndStoreCourseDates = async function (req, res) {
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
 
 
+
+var fetchAllStoredCourses = async function (req, res) {
+  try {
+    // Fetch all stored selected courses
+    const courses = await model.analysis1.findAll({
+      attributes: ["user_id", "course_id", "course_name", "start_date", "end_date", "business_task"],
+      order: [["user_id", "ASC"]]
+    });
+
+    const today = new Date();
+
+    // Add daysLeft dynamically
+    const coursesWithDaysLeft = courses.map(c => {
+      const endDate = new Date(c.end_date);
+      const diffTime = endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
+      const daysLeft = Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0);
+
+      return {
+        user_id: c.user_id,
+        course_id: c.course_id,
+        course_name: c.course_name,
+        start_date: c.start_date,
+        end_date: c.end_date,
+        daysLeft,
+        business_task: c.business_task
+      };
+    });
+
+    return ReS(res, {
+      success: true,
+      message: "All stored selected course data fetched successfully",
+      totalRecords: coursesWithDaysLeft.length,
+      data: coursesWithDaysLeft
+    }, 200);
+
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.fetchAllStoredCourses = fetchAllStoredCourses;
+
 var fetchStoredCoursesByUser = async function (req, res) {
   try {
     const { userId } = req.params;
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch courses from analysis1
+    // Fetch courses
     const courses = await model.analysis1.findAll({
       where: { user_id: userId },
       attributes: ["user_id", "course_id", "course_name", "start_date", "end_date", "business_task"],
@@ -167,10 +209,8 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      // Use business_task from analysis1 first, fallback to User.businessTargets
-      const business_task = c.business_task !== undefined && c.business_task !== null
-        ? c.business_task
-        : user.businessTargets?.[c.course_id]?.target || 0;
+      // ✅ Use business_task from analysis1 table first, fallback to user.businessTargets
+      const business_task = c.business_task || user.businessTargets?.[c.course_id]?.target || 0;
 
       return {
         user_id: c.user_id,
@@ -198,6 +238,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 var updateStoredCourse = async function (req, res) {
