@@ -27,16 +27,14 @@ var extractAndStoreCourseDates = async function (req, res) {
         typeof user.courseDates === "object" &&
         Object.keys(user.courseDates).length > 0
       ) {
-        // 🔥 SAME AS SQL json_each
         const firstCourseKey = Object.keys(user.courseDates)[0];
         const courseData = user.courseDates[firstCourseKey];
 
-        course_id = parseInt(firstCourseKey);
-        course_name = courseData.courseName || null;
-        start_date = courseData.startDate || null;
-        end_date = courseData.endDate || null;
+        course_id = firstCourseKey ? parseInt(firstCourseKey) : null;
+        course_name = courseData?.courseName || null;
+        start_date = courseData?.startDate || null;
+        end_date = courseData?.endDate || null;
 
-        // 🔥 Business task from Users.businessTargets
         if (
           user.businessTargets &&
           user.businessTargets[firstCourseKey] &&
@@ -46,13 +44,17 @@ var extractAndStoreCourseDates = async function (req, res) {
         }
       }
 
+      // 🔹 Provide a default day_no = null if no start_date
       await model.analysis1.upsert({
         user_id: userId,
         course_id,
         course_name,
         start_date,
         end_date,
-        business_task
+        business_task,
+        day_no: null, // fix NOT NULL constraint error
+        work_status: "Not Completed",
+        comment: ""
       });
 
       let daysLeft = null;
