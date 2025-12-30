@@ -173,14 +173,13 @@ var fetchStoredCoursesByUser = async function (req, res) {
       }, 200);
     }
 
-    // Fetch achieved business task
+    // Fetch user info (achieved business task + business targets)
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionWallet"]
+      attributes: ["subscriptionWallet", "businessTargets"]
     });
 
-    const achievedBusinessTask =
-      (parseInt(user?.subscriptionWallet || 0, 10) || 0);
+    const achievedBusinessTask = parseInt(user?.subscriptionWallet || 0, 10) || 0;
 
     // Fetch day-wise analysis data
     const analysisDays = await model.analysis1.findAll({
@@ -210,6 +209,9 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
+      // Get business_task from Users.businessTargets
+      const target = user.businessTargets?.[c.course_id]?.target || 0;
+
       return {
         user_id: c.user_id,
         course_id: c.course_id,
@@ -217,7 +219,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
         start_date: c.start_date,
         end_date: c.end_date,
         daysLeft,
-        business_task: c.business_task,
+        business_task: target,
         achieved_business_task: achievedBusinessTask,
         current_category: currentCategory
       };
@@ -236,7 +238,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
-
 
 
 var updateStoredCourse = async function (req, res) {
@@ -316,7 +317,7 @@ var getUserAnalysis = async function (req, res) {
 
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
+      attributes: ["subscriptionLeft", "subscriptiondeductedWallet","subscriptionWallet"]
     });
 
     const businessTaskValue =
