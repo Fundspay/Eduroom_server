@@ -367,35 +367,21 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
-      const [dayRecord, created] = await model.analysis1.findOrCreate({
-        where: {
-          user_id: userId,
-          day_no: i + 1
-        },
-        defaults: {
-          user_id: userId,
-          day_no: i + 1,
-          course_id: course_id || null,
-          course_name: course_name || null,
-          start_date: start_date || null,
-          end_date: end_date || null,
-          daily_target: dailyTarget,
-          business_task: businessTaskText, // ✅ FIXED
-          percent_of_work: percentOfWork,
-          category: categoryDistribution[i],
-          work_status: "Not Completed",
-          comment: ""
-        }
+      // ✅ Use upsert to handle unique constraints
+      await model.analysis1.upsert({
+        user_id: userId,
+        day_no: i + 1,
+        course_id: course_id || null,
+        course_name: course_name || null,
+        start_date: start_date || null,
+        end_date: end_date || null,
+        daily_target: dailyTarget,
+        business_task: businessTaskText,
+        percent_of_work: percentOfWork,
+        category: categoryDistribution[i],
+        work_status: "Not Completed",
+        comment: ""
       });
-
-      if (!created) {
-        await dayRecord.update({
-          daily_target: dailyTarget,
-          business_task: businessTaskText, // ✅ FIXED
-          percent_of_work: percentOfWork,
-          category: categoryDistribution[i]
-        });
-      }
 
       data.push({
         SR: i + 1,
@@ -418,7 +404,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 var upsertUserDayWork = async function(req, res) {
