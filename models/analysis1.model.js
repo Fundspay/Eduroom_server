@@ -12,7 +12,7 @@ module.exports = (sequelize, Sequelize) => {
       user_id: {
         type: Sequelize.BIGINT,
         allowNull: false,
-        unique: true
+        unique: false // multiple rows per user
       },
 
       course_id: {
@@ -35,11 +35,32 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
       },
 
-      // ✅ FIX: keep JSON (matches DB)
       business_task: {
         type: Sequelize.JSON,
         allowNull: true,
         defaultValue: {}
+      },
+
+      day_no: {
+        type: Sequelize.INTEGER,
+        allowNull: false,
+        defaultValue: 1
+      },
+
+      work_status: {
+        type: Sequelize.TEXT, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
+        defaultValue: 0
+      },
+
+      comment: {
+        type: Sequelize.TEXT,
+        allowNull: true
+      },
+
+      daily_target: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: 0
       },
 
       createdAt: {

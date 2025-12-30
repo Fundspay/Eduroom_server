@@ -198,16 +198,19 @@ module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
 
 var updateStoredCourse = async function (req, res) {
   try {
-    const { id } = req.params;
+    const { userId } = req.params;
     const { course_name, start_date, end_date, business_task } = req.body;
 
-    if (!id) return ReE(res, "Record ID is required", 400);
+    if (!userId) return ReE(res, "User ID is required", 400);
 
-    // Fetch existing record
-    const record = await model.analysis1.findOne({ where: { id } });
-    if (!record) return ReE(res, "Record not found", 404);
+    // Fetch existing record by user_id
+    const record = await model.analysis1.findOne({
+      where: { user_id: userId }
+    });
 
-    // Update only the fields provided
+    if (!record) return ReE(res, "Record not found for this user", 404);
+
+    // Update only provided fields
     if (course_name !== undefined) record.course_name = course_name;
     if (start_date !== undefined) record.start_date = start_date;
     if (end_date !== undefined) record.end_date = end_date;
@@ -217,28 +220,118 @@ var updateStoredCourse = async function (req, res) {
 
     // Calculate updated daysLeft
     const today = new Date();
-    const endDate = new Date(record.end_date);
-    const diffTime = endDate.setHours(0,0,0,0) - today.setHours(0,0,0,0);
-    const daysLeft = Math.max(Math.floor(diffTime / (1000*60*60*24)), 0);
+    let daysLeft = null;
 
-    return ReS(res, {
-      success: true,
-      message: "Record updated successfully",
-      data: {
-        id: record.id,
-        user_id: record.user_id,
-        course_id: record.course_id,
-        course_name: record.course_name,
-        start_date: record.start_date,
-        end_date: record.end_date,
-        business_task: record.business_task,
-        daysLeft
-      }
-    }, 200);
+    if (record.end_date) {
+      const endDate = new Date(record.end_date);
+      const diffTime =
+        endDate.setHours(0, 0, 0, 0) -
+        today.setHours(0, 0, 0, 0);
 
+      daysLeft = Math.max(
+        Math.floor(diffTime / (1000 * 60 * 60 * 24)),
+        0
+      );
+    }
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Record updated successfully",
+        data: {
+          user_id: record.user_id,
+          course_id: record.course_id,
+          course_name: record.course_name,
+          start_date: record.start_date,
+          end_date: record.end_date,
+          business_task: record.business_task,
+          daysLeft
+        }
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.updateStoredCourse = updateStoredCourse;
+
+var getUserAnalysis = async function(req, res) {
+  try {
+    const { userId } = req.params;
+    if (!userId) return ReE(res, "User ID is required", 400);
+
+    const records = await model.analysis1.findAll({
+      where: { user_id: userId },
+      order: [["day_no", "ASC"]]
+    });
+
+    // Map day-wise format
+    const data = records.map((rec, index) => {
+      // Calculate Date & Day based on start_date + day_no
+      let dateDay = null;
+      if (rec.start_date) {
+        const date = new Date(rec.start_date);
+        date.setDate(date.getDate() + (rec.day_no - 1));
+        const options = { day: "numeric", month: "short", weekday: "long" };
+        dateDay = date.toLocaleDateString("en-US", options);
+      }
+
+      return {
+        SR: index + 1,
+        DAY_OF_WORK: `DAY ${rec.day_no}`,
+        DATE_DAY: dateDay,
+        WORK_STATUS: rec.work_status,
+        COMMENT: rec.comment || "",
+        BUSINESS_TASK: rec.business_task || null,
+        DAILY_TARGET: rec.daily_target || 0
+      };
+    });
+
+    return ReS(res, { success: true, data }, 200);
+
+  } catch (err) {
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getUserAnalysis = getUserAnalysis;
+
+var upsertUserDayWork = async function(req, res) {
+  try {
+    const { user_id, day_no } = req.body;
+    const { work_status, comment, daily_target } = req.body;
+
+    if (!user_id || !day_no) return ReE(res, "User ID and Day No are required", 400);
+
+    // Find existing record
+    let record = await model.analysis1.findOne({ where: { user_id, day_no } });
+
+    if (!record) {
+      // Create new row if not exists
+      record = await model.analysis1.create({
+        user_id,
+        day_no,
+        work_status: work_status || 0,
+        comment: comment || null,
+        daily_target: daily_target || 0
+      });
+    } else {
+      // Update existing
+      if (work_status !== undefined) record.work_status = work_status;
+      if (comment !== undefined) record.comment = comment;
+      if (daily_target !== undefined) record.daily_target = daily_target;
+      await record.save();
+    }
+
+    return ReS(res, { success: true, data: record }, 200);
+
+  } catch (err) {
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.upsertUserDayWork = upsertUserDayWork;
+
