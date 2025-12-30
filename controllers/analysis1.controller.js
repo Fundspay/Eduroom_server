@@ -171,21 +171,26 @@ var fetchStoredCoursesByUser = async function (req, res) {
     });
 
     if (!courses.length) {
-      return ReS(res, {
-        success: true,
-        message: `No selected courses found for user ${userId}`,
-        totalRecords: 0,
-        data: []
-      }, 200);
+      return ReS(
+        res,
+        {
+          success: true,
+          message: `No selected courses found for user ${userId}`,
+          totalRecords: 0,
+          data: []
+        },
+        200
+      );
     }
 
-    // Fetch user info (achieved business task + business targets)
+    // Fetch user info (achieved business task)
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionWallet", "businessTargets"]
+      attributes: ["subscriptionWallet"]
     });
 
-    const achievedBusinessTask = parseInt(user?.subscriptionWallet || 0, 10) || 0;
+    const achievedBusinessTask =
+      parseInt(user?.subscriptionWallet || 0, 10) || 0;
 
     // Fetch day-wise analysis data
     const analysisDays = await model.analysis1.findAll({
@@ -215,8 +220,8 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      // ✅ Use business_task from analysis1 table first, fallback to user.businessTargets
-      const business_task = c.business_task || user.businessTargets?.[c.course_id]?.target || 0;
+      //  SINGLE SOURCE OF TRUTH
+      const business_task = c.business_task || 0;
 
       return {
         user_id: c.user_id,
@@ -231,13 +236,16 @@ var fetchStoredCoursesByUser = async function (req, res) {
       };
     });
 
-    return ReS(res, {
-      success: true,
-      message: `Selected course data fetched for user ${userId}`,
-      totalRecords: coursesWithDaysLeft.length,
-      data: coursesWithDaysLeft
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        message: `Selected course data fetched for user ${userId}`,
+        totalRecords: coursesWithDaysLeft.length,
+        data: coursesWithDaysLeft
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
