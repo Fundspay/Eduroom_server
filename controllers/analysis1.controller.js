@@ -271,23 +271,26 @@ var getUserAnalysis = async function (req, res) {
     if (!record) return ReE(res, "Record not found", 404);
 
     const { start_date, end_date, business_task } = record;
-    const taskValue = business_task?.task || 0;
+
+    // Get business task value
+    const taskValue = business_task || 0;
 
     // Define day-wise percentages
     const percentageDistribution = [18, 22, 25, 25, 10, 0, 0, 0, 0, 0];
     const dailyTargets = percentageDistribution.map(p => Math.round((p / 100) * taskValue));
 
     const data = [];
-
-    const totalDays = 10; // We want 10 days
-    const startDate = new Date(start_date);
+    const totalDays = 10;
 
     for (let i = 0; i < totalDays; i++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(currentDate.getDate() + i);
+      let dateDay = "Date not available";
 
-      const options = { day: "numeric", month: "short", weekday: "long" };
-      const dateDay = currentDate.toLocaleDateString("en-US", options);
+      if (start_date) {
+        const currentDate = new Date(start_date);
+        currentDate.setDate(currentDate.getDate() + i);
+        const options = { day: "numeric", month: "short", weekday: "long" };
+        dateDay = currentDate.toLocaleDateString("en-US", options);
+      }
 
       data.push({
         SR: i + 1,
@@ -307,6 +310,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
