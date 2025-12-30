@@ -418,8 +418,7 @@ module.exports.getUserAnalysis = getUserAnalysis;
 
 var upsertUserDayWork = async function(req, res) {
   try {
-    const { user_id, day_no } = req.body;
-    const { work_status, comment, daily_target } = req.body;
+    const { user_id, day_no, work_status, comment, daily_target } = req.body;
 
     if (!user_id || !day_no) return ReE(res, "User ID and Day No are required", 400);
 
@@ -431,19 +430,19 @@ var upsertUserDayWork = async function(req, res) {
       record = await model.analysis1.create({
         user_id,
         day_no,
-        work_status: work_status || 0,
+        work_status: work_status || "Not Completed",
         comment: comment || null,
         daily_target: daily_target || 0
       });
     } else {
-      // Update existing
+      // Update existing record
       if (work_status !== undefined) record.work_status = work_status;
       if (comment !== undefined) record.comment = comment;
       if (daily_target !== undefined) record.daily_target = daily_target;
       await record.save();
     }
 
-    //  Fetch BUSINESS_TASK from User table (subscriptionLeft + subscriptiondeductedWallet)
+    // Fetch BUSINESS_TASK from User table
     const user = await model.User.findOne({
       where: { id: user_id },
       attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
@@ -451,11 +450,11 @@ var upsertUserDayWork = async function(req, res) {
 
     const businessTaskValue =
       (parseInt(user?.subscriptionLeft || 0, 10) +
-        parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
+       parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
 
     // Include BUSINESS_TASK in response
     const responseData = {
-      ...record.dataValues,
+      ...record.toJSON(),
       BUSINESS_TASK: businessTaskValue
     };
 
@@ -467,5 +466,6 @@ var upsertUserDayWork = async function(req, res) {
 };
 
 module.exports.upsertUserDayWork = upsertUserDayWork;
+
 
 
