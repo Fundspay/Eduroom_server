@@ -272,7 +272,7 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task } = record;
 
-    // ✅ Fetch BUSINESS_TASK from User table (subscriptionLeft + subscriptiondeductedWallet)
+    //  Fetch BUSINESS_TASK from User table (subscriptionLeft + subscriptiondeductedWallet)
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
@@ -304,15 +304,26 @@ var getUserAnalysis = async function (req, res) {
 
     const data = [];
     const totalDays = 10;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // normalize time
 
     for (let i = 0; i < totalDays; i++) {
       let dateDay = "Date not available";
+      let currentDate = null;
 
       if (start_date) {
-        const currentDate = new Date(start_date);
+        currentDate = new Date(start_date);
         currentDate.setDate(currentDate.getDate() + i);
         const options = { day: "numeric", month: "short", weekday: "long" };
         dateDay = currentDate.toLocaleDateString("en-US", options);
+      }
+
+      //  Calculate % OF WORK only for today and previous days using BUSINESS_TASK
+      let percentOfWork = "0.00%";
+      if (currentDate && currentDate <= today) {
+        const dailyTarget = i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5];
+        const achieved = Math.min(dailyTarget, businessTaskValue); // use BUSINESS_TASK as achieved for now
+        percentOfWork = dailyTarget > 0 ? ((achieved / dailyTarget) * 100).toFixed(2) + "%" : "0.00%";
       }
 
       data.push({
@@ -321,9 +332,9 @@ var getUserAnalysis = async function (req, res) {
         DATE_DAY: dateDay,
         WORK_STATUS: "Not Completed", // default
         COMMENT: "",
-        BUSINESS_TASK: businessTaskValue, // ✅ from User table
+        BUSINESS_TASK: businessTaskValue, // from User table
         DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5],
-        PERCENT_OF_WORK: "0.00%", // default
+        PERCENT_OF_WORK: percentOfWork,
         CATEGORY: categoryDistribution[i] || ""
       });
     }
@@ -335,6 +346,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 
