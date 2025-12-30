@@ -366,7 +366,7 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
-      //  UPSERT DAY-WISE DATA
+      // UPSERT DAY-WISE DATA
       const [dayRecord, created] = await model.analysis1.findOrCreate({
         where: {
           user_id: userId,
@@ -378,7 +378,9 @@ var getUserAnalysis = async function (req, res) {
           daily_target: dailyTarget,
           business_task: businessTaskValue,
           percent_of_work: percentOfWork,
-          category: categoryDistribution[i]
+          category: categoryDistribution[i],
+          work_status: "Not Completed",
+          comment: ""
         }
       });
 
@@ -387,7 +389,9 @@ var getUserAnalysis = async function (req, res) {
           daily_target: dailyTarget,
           business_task: businessTaskValue,
           percent_of_work: percentOfWork,
-          category: categoryDistribution[i]
+          category: categoryDistribution[i],
+          work_status: dayRecord.work_status || "Not Completed",
+          comment: dayRecord.comment || ""
         });
       }
 
@@ -412,7 +416,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 var upsertUserDayWork = async function(req, res) {
