@@ -332,7 +332,7 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task, course_id, course_name } = record;
 
-    //  FETCH ACHIEVED BUSINESS TASK FROM USER TABLE
+    // FETCH ACHIEVED BUSINESS TASK
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionWallet"]
@@ -341,7 +341,6 @@ var getUserAnalysis = async function (req, res) {
     const achievedBusinessTask =
       parseInt(user?.subscriptionWallet || 0, 10) || 0;
 
-    // SINGLE SOURCE OF TRUTH (DB)
     const taskValue =
       business_task !== null && business_task !== undefined
         ? parseInt(business_task, 10)
@@ -388,13 +387,18 @@ var getUserAnalysis = async function (req, res) {
       const dailyTarget =
         i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5];
 
+      // INLINE cumulative calculation (NO extra variable)
+      const totalTargetTillToday = [...Array(i + 1)].reduce((sum, _, idx) => {
+        return sum + (idx < 5 ? dailyTargets[idx] || 0 : defaultTargets[idx - 5]);
+      }, 0);
+
       let percentOfWork = "0.00%";
 
       if (currentDate && currentDate <= today) {
-        const achieved = Math.min(dailyTarget, achievedBusinessTask);
+        const achieved = Math.min(totalTargetTillToday, achievedBusinessTask);
         percentOfWork =
-          dailyTarget > 0
-            ? ((achieved / dailyTarget) * 100).toFixed(2) + "%"
+          totalTargetTillToday > 0
+            ? ((achieved / totalTargetTillToday) * 100).toFixed(2) + "%"
             : "0.00%";
       }
 
@@ -405,7 +409,6 @@ var getUserAnalysis = async function (req, res) {
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
-      //  DO NOT OVERWRITE business_task
       await model.analysis1.upsert({
         user_id: userId,
         day_no: i + 1,
@@ -442,7 +445,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 var upsertUserDayWork = async function(req, res) {
