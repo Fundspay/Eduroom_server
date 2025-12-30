@@ -25,7 +25,6 @@ var extractAndStoreCourseDates = async function (req, res) {
 
       // 2️⃣ FIXED extraction logic
       if (
-        user.selected &&
         user.courseDates &&
         typeof user.courseDates === "object" &&
         user.courseDates[String(user.selected)]
