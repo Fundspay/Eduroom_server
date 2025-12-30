@@ -5,19 +5,19 @@ const { Op } = require("sequelize");
 
 var extractAndStoreCourseDates = async function (req, res) {
   try {
-    // Step 1️⃣: Already processed users
+    // Step 1️⃣: Already processed users (kept as-is, NOT used for filtering)
     const existingRecords = await model.analysis1.findAll({
       attributes: ["user_id"]
     });
     const existingUserIds = existingRecords.map(r => r.user_id);
 
-    // Step 2️⃣: Fetch new users with selected course
+    // Step 2️⃣: Fetch users with selected course
+    // 🔥 FIX: Removed NOT IN filter so upsert can work
     const users = await model.User.findAll({
       where: {
         isDeleted: false,
         selected: { [Op.ne]: null },
-        courseDates: { [Op.ne]: null },
-        id: { [Op.notIn]: existingUserIds } // incremental
+        courseDates: { [Op.ne]: null }
       },
       attributes: ["id", "selected", "courseDates"]
     });
@@ -29,7 +29,12 @@ var extractAndStoreCourseDates = async function (req, res) {
     for (const user of users) {
       const { id: userId, selected, courseDates } = user;
 
-      if (!selected || !courseDates || typeof courseDates !== "object" || !courseDates[selected]) {
+      if (
+        !selected ||
+        !courseDates ||
+        typeof courseDates !== "object" ||
+        !courseDates[selected]
+      ) {
         continue;
       }
 
@@ -48,6 +53,7 @@ var extractAndStoreCourseDates = async function (req, res) {
         where: { id: selectedCourse.course_id },
         attributes: ["businessTarget"]
       });
+
       if (courseRecord) businessTask = courseRecord.businessTarget;
 
       // Step 5️⃣: Store in analysis1
@@ -63,8 +69,14 @@ var extractAndStoreCourseDates = async function (req, res) {
       // Step 6️⃣: Calculate daysLeft
       const today = new Date();
       const endDate = new Date(selectedCourse.end_date);
-      const diffTime = endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
-      const daysLeft = Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0);
+      const diffTime =
+        endDate.setHours(0, 0, 0, 0) -
+        today.setHours(0, 0, 0, 0);
+
+      const daysLeft = Math.max(
+        Math.floor(diffTime / (1000 * 60 * 60 * 24)),
+        0
+      );
 
       newlyProcessedCourses.push({
         user_id: userId,
@@ -79,13 +91,17 @@ var extractAndStoreCourseDates = async function (req, res) {
       processed++;
     }
 
-    return ReS(res, {
-      success: true,
-      message: "Selected course details with business task extracted and stored successfully",
-      recordsProcessed: processed,
-      data: newlyProcessedCourses
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        message:
+          "Selected course details with business task extracted and stored successfully",
+        recordsProcessed: processed,
+        data: newlyProcessedCourses
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
