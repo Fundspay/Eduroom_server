@@ -348,9 +348,6 @@ var getUserAnalysis = async function (req, res) {
 module.exports.getUserAnalysis = getUserAnalysis;
 
 
-
-
-
 var upsertUserDayWork = async function(req, res) {
   try {
     const { user_id, day_no } = req.body;
@@ -378,7 +375,23 @@ var upsertUserDayWork = async function(req, res) {
       await record.save();
     }
 
-    return ReS(res, { success: true, data: record }, 200);
+    //  Fetch BUSINESS_TASK from User table (subscriptionLeft + subscriptiondeductedWallet)
+    const user = await model.User.findOne({
+      where: { id: user_id },
+      attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
+    });
+
+    const businessTaskValue =
+      (parseInt(user?.subscriptionLeft || 0, 10) +
+        parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
+
+    // Include BUSINESS_TASK in response
+    const responseData = {
+      ...record.dataValues,
+      BUSINESS_TASK: businessTaskValue
+    };
+
+    return ReS(res, { success: true, data: responseData }, 200);
 
   } catch (err) {
     return ReE(res, err.message, 500);
@@ -386,4 +399,5 @@ var upsertUserDayWork = async function(req, res) {
 };
 
 module.exports.upsertUserDayWork = upsertUserDayWork;
+
 
