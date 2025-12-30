@@ -299,7 +299,7 @@ var getUserAnalysis = async function (req, res) {
         SR: i + 1,
         DAY_OF_WORK: `DAY ${i + 1}`,
         DATE_DAY: dateDay,
-        WORK_STATUS: 0, // 0 = not completed by default
+        WORK_STATUS: "Not Completed", // 0 = not completed by default
         COMMENT: "",
         BUSINESS_TASK: null, // keep null for now
         DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5] // first 5 days calculated, rest default
