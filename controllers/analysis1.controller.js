@@ -270,18 +270,17 @@ var getUserAnalysis = async function (req, res) {
 
     if (!record) return ReE(res, "Record not found", 404);
 
-    const { start_date, end_date, business_task } = record;
+    const { start_date, end_date } = record;
 
-    //  Calculate total business task
-    let taskValue = 0;
-    if (business_task && typeof business_task === "object") {
-      taskValue = Object.values(business_task).reduce((sum, val) => {
-        const t = parseInt(val || 0, 10);
-        return sum + (isNaN(t) ? 0 : t);
-      }, 0);
-    } else {
-      taskValue = parseInt(business_task || 0, 10);
-    }
+    //  Fetch business task from User table (subscriptionLeft + subscriptiondeductedWallet)
+    const user = await model.User.findOne({
+      where: { id: userId },
+      attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
+    });
+
+    const taskValue =
+      (parseInt(user?.subscriptionLeft || 0, 10) +
+        parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
 
     // Day-wise percentages for first 5 days
     const percentageDistribution = [18, 22, 25, 25, 10];
@@ -304,10 +303,6 @@ var getUserAnalysis = async function (req, res) {
       "5000 STIPEND"
     ];
 
-    // Placeholder: Achieved business task per day
-    // Replace this with real data fetching logic later
-    const achievedPerDay = Array(10).fill(0); // default 0 achieved for all days
-
     const data = [];
     const totalDays = 10;
 
@@ -321,20 +316,15 @@ var getUserAnalysis = async function (req, res) {
         dateDay = currentDate.toLocaleDateString("en-US", options);
       }
 
-      const dailyTarget = i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5];
-      const achieved = achievedPerDay[i] || 0;
-      const percentOfWork =
-        dailyTarget > 0 ? ((achieved / dailyTarget) * 100).toFixed(2) + "%" : "0.00%";
-
       data.push({
         SR: i + 1,
         DAY_OF_WORK: `DAY ${i + 1}`,
         DATE_DAY: dateDay,
         WORK_STATUS: "Not Completed", // default
         COMMENT: "",
-        BUSINESS_TASK: taskValue,
-        DAILY_TARGET: dailyTarget,
-        PERCENT_OF_WORK: percentOfWork,
+        BUSINESS_TASK: taskValue, //  updated to use subscriptionLeft + subscriptiondeductedWallet
+        DAILY_TARGET: i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5],
+        PERCENT_OF_WORK: "0.00%", // default
         CATEGORY: categoryDistribution[i] || ""
       });
     }
@@ -346,7 +336,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 
