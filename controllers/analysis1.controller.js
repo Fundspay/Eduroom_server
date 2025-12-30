@@ -122,9 +122,12 @@ var fetchAllStoredCourses = async function (req, res) {
 
     // Add daysLeft dynamically
     const coursesWithDaysLeft = courses.map(c => {
-      const endDate = new Date(c.end_date);
-      const diffTime = endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
-      const daysLeft = Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0);
+      let daysLeft = null;
+      if (c.end_date) {
+        const endDate = new Date(c.end_date);
+        const diffTime = endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
+        daysLeft = Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0);
+      }
 
       return {
         user_id: c.user_id,
@@ -133,7 +136,9 @@ var fetchAllStoredCourses = async function (req, res) {
         start_date: c.start_date,
         end_date: c.end_date,
         daysLeft,
-        business_task: c.business_task
+        business_task: c.business_task !== undefined && c.business_task !== null
+          ? Number(c.business_task)
+          : 0
       };
     });
 
@@ -150,6 +155,7 @@ var fetchAllStoredCourses = async function (req, res) {
 };
 
 module.exports.fetchAllStoredCourses = fetchAllStoredCourses;
+
 
 var fetchStoredCoursesByUser = async function (req, res) {
   try {
