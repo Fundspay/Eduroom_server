@@ -47,7 +47,7 @@ module.exports = (sequelize, Sequelize) => {
       },
 
       work_status: {
-        type: Sequelize.INTEGER, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
+        type: Sequelize.TEXT, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
         defaultValue: 0
       },
 
