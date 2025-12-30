@@ -303,7 +303,7 @@ var getUserAnalysis = async function (req, res) {
 
     if (!record) return ReE(res, "Record not found", 404);
 
-    const { start_date, end_date, business_task } = record;
+    const { start_date, end_date, business_task, course_id, course_name } = record;
 
     // Fetch achieved BUSINESS_TASK from User table
     const user = await model.User.findOne({
@@ -366,7 +366,7 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
-      // UPSERT DAY-WISE DATA
+      // UPSERT DAY-WISE DATA (FIXED)
       const [dayRecord, created] = await model.analysis1.findOrCreate({
         where: {
           user_id: userId,
@@ -375,6 +375,10 @@ var getUserAnalysis = async function (req, res) {
         defaults: {
           user_id: userId,
           day_no: i + 1,
+          course_id: course_id || null,
+          course_name: course_name || null,
+          start_date: start_date || null,
+          end_date: end_date || null,
           daily_target: dailyTarget,
           business_task: businessTaskValue,
           percent_of_work: percentOfWork,
@@ -389,9 +393,7 @@ var getUserAnalysis = async function (req, res) {
           daily_target: dailyTarget,
           business_task: businessTaskValue,
           percent_of_work: percentOfWork,
-          category: categoryDistribution[i],
-          work_status: dayRecord.work_status || "Not Completed",
-          comment: dayRecord.comment || ""
+          category: categoryDistribution[i]
         });
       }
 
