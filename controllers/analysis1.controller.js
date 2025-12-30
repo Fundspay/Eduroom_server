@@ -313,20 +313,20 @@ var getUserAnalysis = async function (req, res) {
 
     if (!record) return ReE(res, "Record not found", 404);
 
-    const { start_date, end_date, business_task, course_id, course_name } = record;
+    const { start_date, end_date, course_id, course_name } = record;
 
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionLeft", "subscriptiondeductedWallet","subscriptionWallet"]
+      attributes: ["businessTargets", "subscriptionWallet"]
     });
 
-    const businessTaskValue =
-      parseInt(user?.subscriptionWallet || 0, 10)| 0;
+    // ✅ Use businessTargets for target value
+    const targetValue =
+      user.businessTargets?.[course_id]?.target || 0;
 
-    //  FIX: convert to TEXT
-    const businessTaskText = String(businessTaskValue);
+    const businessTaskText = String(targetValue);
 
-    const taskValue = parseInt(business_task || 0, 10);
+    const taskValue = parseInt(targetValue || 0, 10);
     const percentageDistribution = [18, 22, 25, 25, 10];
     const dailyTargets = percentageDistribution.map(p =>
       Math.round((p / 100) * taskValue)
@@ -369,14 +369,13 @@ var getUserAnalysis = async function (req, res) {
       let percentOfWork = "0.00%";
 
       if (currentDate && currentDate <= today) {
-        const achieved = Math.min(dailyTarget, businessTaskValue);
+        const achieved = Math.min(dailyTarget, parseInt(user?.subscriptionWallet || 0, 10));
         percentOfWork =
           dailyTarget > 0
             ? ((achieved / dailyTarget) * 100).toFixed(2) + "%"
             : "0.00%";
       }
 
-      // ✅ Use upsert to handle unique constraints
       await model.analysis1.upsert({
         user_id: userId,
         day_no: i + 1,
@@ -413,6 +412,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
