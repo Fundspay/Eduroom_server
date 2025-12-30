@@ -296,7 +296,6 @@ var getUserAnalysis = async function (req, res) {
     const { userId } = req.params;
     if (!userId) return ReE(res, "User ID is required", 400);
 
-    // Fetch course info
     const record = await model.analysis1.findOne({
       where: { user_id: userId }
     });
@@ -305,7 +304,6 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task, course_id, course_name } = record;
 
-    // Fetch achieved BUSINESS_TASK from User table
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionLeft", "subscriptiondeductedWallet"]
@@ -315,8 +313,10 @@ var getUserAnalysis = async function (req, res) {
       (parseInt(user?.subscriptionLeft || 0, 10) +
         parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
 
-    // DAILY TARGET LOGIC (unchanged)
-    const taskValue = business_task || 0;
+    // 🔥 FIX: convert to TEXT
+    const businessTaskText = String(businessTaskValue);
+
+    const taskValue = parseInt(business_task || 0, 10);
     const percentageDistribution = [18, 22, 25, 25, 10];
     const dailyTargets = percentageDistribution.map(p =>
       Math.round((p / 100) * taskValue)
@@ -366,7 +366,6 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
-      // UPSERT DAY-WISE DATA (FIXED)
       const [dayRecord, created] = await model.analysis1.findOrCreate({
         where: {
           user_id: userId,
@@ -380,7 +379,7 @@ var getUserAnalysis = async function (req, res) {
           start_date: start_date || null,
           end_date: end_date || null,
           daily_target: dailyTarget,
-          business_task: businessTaskValue,
+          business_task: businessTaskText, // ✅ FIXED
           percent_of_work: percentOfWork,
           category: categoryDistribution[i],
           work_status: "Not Completed",
@@ -391,7 +390,7 @@ var getUserAnalysis = async function (req, res) {
       if (!created) {
         await dayRecord.update({
           daily_target: dailyTarget,
-          business_task: businessTaskValue,
+          business_task: businessTaskText, // ✅ FIXED
           percent_of_work: percentOfWork,
           category: categoryDistribution[i]
         });
@@ -403,7 +402,7 @@ var getUserAnalysis = async function (req, res) {
         DATE_DAY: dateDay,
         WORK_STATUS: "Not Completed",
         COMMENT: "",
-        BUSINESS_TASK: businessTaskValue,
+        BUSINESS_TASK: businessTaskText,
         DAILY_TARGET: dailyTarget,
         PERCENT_OF_WORK: percentOfWork,
         CATEGORY: categoryDistribution[i]
@@ -418,6 +417,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
