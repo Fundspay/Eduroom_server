@@ -146,7 +146,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch courses for the specific user
+    // Fetch courses
     const courses = await model.analysis1.findAll({
       where: { user_id: userId },
       attributes: ["user_id", "course_id", "course_name", "start_date", "end_date", "business_task"],
@@ -162,7 +162,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
       }, 200);
     }
 
-    // Fetch achieved business task from User table
+    // Fetch achieved business task
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionWallet", "subscriptiondeductedWallet"]
@@ -172,38 +172,33 @@ var fetchStoredCoursesByUser = async function (req, res) {
       (parseInt(user?.subscriptionWallet || 0, 10) +
         parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
 
+    // Fetch day-wise analysis data
+    const analysisDays = await model.analysis1.findAll({
+      where: { user_id: userId },
+      order: [["day_no", "ASC"]]
+    });
+
+    // Find last completed day (100%)
+    let currentCategory = null;
+    for (const day of analysisDays) {
+      if (day.daily_target > 0 && achievedBusinessTask >= day.daily_target) {
+        currentCategory = day.category;
+      } else {
+        break;
+      }
+    }
+
     const today = new Date();
 
-    const categoryDistribution = [
-      "OFFER LETTER",
-      "BRONZE",
-      "SILVER",
-      "GOLD",
-      "DIAMOND",
-      "LOA",
-      "1500 STIPEND",
-      "2500 STIPEND",
-      "3500 STIPEND",
-      "5000 STIPEND"
-    ];
-
-    // Add daysLeft dynamically
     const coursesWithDaysLeft = courses.map(c => {
       const endDate = c.end_date ? new Date(c.end_date) : null;
-      const diffTime = endDate ? endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0) : 0;
-      const daysLeft = endDate ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0) : null;
+      const diffTime = endDate
+        ? endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)
+        : 0;
 
-      // Determine current category based on achieved business task
-      let currentCategory = null;
-      if (c.business_task && achievedBusinessTask >= c.business_task) {
-        const totalCategories = categoryDistribution.length;
-        // Calculate the appropriate category index proportionally
-        const index = Math.min(
-          totalCategories - 1,
-          Math.floor((achievedBusinessTask / c.business_task) * totalCategories)
-        );
-        currentCategory = categoryDistribution[index];
-      }
+      const daysLeft = endDate
+        ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
+        : null;
 
       return {
         user_id: c.user_id,
@@ -214,7 +209,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
         daysLeft,
         business_task: c.business_task,
         achieved_business_task: achievedBusinessTask,
-        current_category: currentCategory // ✅ new field
+        current_category: currentCategory
       };
     });
 
@@ -231,6 +226,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 var updateStoredCourse = async function (req, res) {
