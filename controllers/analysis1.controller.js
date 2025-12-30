@@ -174,11 +174,36 @@ var fetchStoredCoursesByUser = async function (req, res) {
 
     const today = new Date();
 
+    const categoryDistribution = [
+      "OFFER LETTER",
+      "BRONZE",
+      "SILVER",
+      "GOLD",
+      "DIAMOND",
+      "LOA",
+      "1500 STIPEND",
+      "2500 STIPEND",
+      "3500 STIPEND",
+      "5000 STIPEND"
+    ];
+
     // Add daysLeft dynamically
     const coursesWithDaysLeft = courses.map(c => {
       const endDate = c.end_date ? new Date(c.end_date) : null;
       const diffTime = endDate ? endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0) : 0;
       const daysLeft = endDate ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0) : null;
+
+      // Determine current category based on achieved business task
+      let currentCategory = null;
+      if (c.business_task && achievedBusinessTask >= c.business_task) {
+        const totalCategories = categoryDistribution.length;
+        // Calculate the appropriate category index proportionally
+        const index = Math.min(
+          totalCategories - 1,
+          Math.floor((achievedBusinessTask / c.business_task) * totalCategories)
+        );
+        currentCategory = categoryDistribution[index];
+      }
 
       return {
         user_id: c.user_id,
@@ -187,8 +212,9 @@ var fetchStoredCoursesByUser = async function (req, res) {
         start_date: c.start_date,
         end_date: c.end_date,
         daysLeft,
-        business_task: c.business_task, // existing field
-        achieved_business_task: achievedBusinessTask // new field
+        business_task: c.business_task,
+        achieved_business_task: achievedBusinessTask,
+        current_category: currentCategory // ✅ new field
       };
     });
 
@@ -205,7 +231,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
-
 
 
 var updateStoredCourse = async function (req, res) {
