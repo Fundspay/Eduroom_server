@@ -38,7 +38,7 @@ module.exports = (sequelize, Sequelize) => {
       business_task: {
         type: Sequelize.INTEGER,
         allowNull: true,
-        defaultValue: 0
+        defaultValue: 0,
       },
 
       day_no: {
@@ -47,32 +47,33 @@ module.exports = (sequelize, Sequelize) => {
       },
 
       work_status: {
-        type: Sequelize.TEXT, // 0 = NOT COMPLETED, 1 = COMPLETED, 2 = ON HOLD
-        defaultValue: 0
+        type: Sequelize.TEXT,
+        allowNull: false,
+        defaultValue: "Not Completed",
       },
 
       comment: {
         type: Sequelize.TEXT,
-        allowNull: true
+        allowNull: true,
       },
 
       daily_target: {
         type: Sequelize.INTEGER,
         allowNull: true,
-        defaultValue: 0
+        defaultValue: 0,
       },
 
       //  NEW
       percent_of_work: {
         type: Sequelize.STRING(10),
         allowNull: true,
-        defaultValue: "0.00%"
+        defaultValue: "0.00%",
       },
 
       //  NEW
       category: {
         type: Sequelize.STRING(100),
-        allowNull: true
+        allowNull: true,
       },
 
       createdAt: {
@@ -93,9 +94,9 @@ module.exports = (sequelize, Sequelize) => {
       indexes: [
         {
           unique: true,
-          fields: ["user_id", "day_no"] // REQUIRED FOR UPSERT SAFETY
-        }
-      ]
+          fields: ["user_id", "day_no"], // REQUIRED FOR UPSERT SAFETY
+        },
+      ],
     }
   );
 
