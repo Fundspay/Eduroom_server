@@ -254,49 +254,46 @@ var updateStoredCourse = async function (req, res) {
 
     if (!userId) return ReE(res, "User ID is required", 400);
 
-    // Fetch existing record by user_id
-    const record = await model.analysis1.findOne({
+    // Fetch all records for the user
+    const records = await model.analysis1.findAll({
       where: { user_id: userId }
     });
 
-    if (!record) return ReE(res, "Record not found for this user", 404);
+    if (!records.length) return ReE(res, "No records found for this user", 404);
 
-    // Update only provided fields
-    if (course_name !== undefined) record.course_name = course_name;
-    if (start_date !== undefined) record.start_date = start_date;
-    if (end_date !== undefined) record.end_date = end_date;
-    if (business_task !== undefined) record.business_task = business_task;
+    // Update only provided fields in all records
+    for (const record of records) {
+      if (course_name !== undefined) record.course_name = course_name;
+      if (start_date !== undefined) record.start_date = start_date;
+      if (end_date !== undefined) record.end_date = end_date;
+      if (business_task !== undefined) record.business_task = business_task;
+      await record.save();
+    }
 
-    await record.save();
-
-    // Calculate updated daysLeft
+    // Calculate updated daysLeft using the first record (all records have same dates now)
     const today = new Date();
     let daysLeft = null;
 
-    if (record.end_date) {
-      const endDate = new Date(record.end_date);
+    if (records[0].end_date) {
+      const endDate = new Date(records[0].end_date);
       const diffTime =
-        endDate.setHours(0, 0, 0, 0) -
-        today.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0);
 
-      daysLeft = Math.max(
-        Math.floor(diffTime / (1000 * 60 * 60 * 24)),
-        0
-      );
+      daysLeft = Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0);
     }
 
     return ReS(
       res,
       {
         success: true,
-        message: "Record updated successfully",
+        message: "Records updated successfully",
         data: {
-          user_id: record.user_id,
-          course_id: record.course_id,
-          course_name: record.course_name,
-          start_date: record.start_date,
-          end_date: record.end_date,
-          business_task: record.business_task,
+          user_id: userId,
+          course_id: records[0].course_id,
+          course_name: course_name,
+          start_date: start_date,
+          end_date: end_date,
+          business_task,
           daysLeft
         }
       },
@@ -308,6 +305,7 @@ var updateStoredCourse = async function (req, res) {
 };
 
 module.exports.updateStoredCourse = updateStoredCourse;
+
 
 var getUserAnalysis = async function (req, res) {
   try {
