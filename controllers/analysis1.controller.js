@@ -5,10 +5,9 @@ const { Op } = require("sequelize");
 
 var extractAndStoreCourseDates = async function (req, res) {
   try {
-    // 1️⃣ Fetch ALL active users
     const users = await model.User.findAll({
       where: { isDeleted: false },
-      attributes: ["id", "selected", "courseDates"]
+      attributes: ["id", "courseDates", "businessTargets"]
     });
 
     let processed = 0;
@@ -23,33 +22,30 @@ var extractAndStoreCourseDates = async function (req, res) {
       let end_date = null;
       let business_task = 0;
 
-      // 2️⃣ FIXED extraction logic
       if (
         user.courseDates &&
         typeof user.courseDates === "object" &&
-        user.courseDates[String(user.selected)]
+        Object.keys(user.courseDates).length > 0
       ) {
-        const selectedCourse = user.courseDates[String(user.selected)];
+        // 🔥 SAME AS SQL json_each
+        const firstCourseKey = Object.keys(user.courseDates)[0];
+        const courseData = user.courseDates[firstCourseKey];
 
-        course_id = user.selected; // ✅ course_id comes from selected
-        course_name = selectedCourse.courseName || null;
-        start_date = selectedCourse.startDate || null;
-        end_date = selectedCourse.endDate || null;
+        course_id = parseInt(firstCourseKey);
+        course_name = courseData.courseName || null;
+        start_date = courseData.startDate || null;
+        end_date = courseData.endDate || null;
 
-        // 3️⃣ Fetch business task
-        if (course_id) {
-          const courseRecord = await model.Courses.findOne({
-            where: { id: course_id },
-            attributes: ["businessTarget"]
-          });
-
-          if (courseRecord) {
-            business_task = courseRecord.businessTarget || 0;
-          }
+        // 🔥 Business task from Users.businessTargets
+        if (
+          user.businessTargets &&
+          user.businessTargets[firstCourseKey] &&
+          user.businessTargets[firstCourseKey].target
+        ) {
+          business_task = user.businessTargets[firstCourseKey].target;
         }
       }
 
-      // 4️⃣ Store / Update ALWAYS
       await model.analysis1.upsert({
         user_id: userId,
         course_id,
@@ -59,7 +55,6 @@ var extractAndStoreCourseDates = async function (req, res) {
         business_task
       });
 
-      // 5️⃣ Calculate days left (response only)
       let daysLeft = null;
       if (end_date) {
         const today = new Date();
@@ -88,22 +83,20 @@ var extractAndStoreCourseDates = async function (req, res) {
       processed++;
     }
 
-    return ReS(
-      res,
-      {
-        success: true,
-        message: "User course data synced successfully",
-        recordsProcessed: processed,
-        data: responseData
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      message: "User course data synced successfully",
+      recordsProcessed: processed,
+      data: responseData
+    }, 200);
+
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
+
 
 
 var fetchAllStoredCourses = async function (req, res) {
