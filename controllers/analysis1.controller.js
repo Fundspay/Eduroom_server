@@ -44,7 +44,7 @@ var extractAndStoreCourseDates = async function (req, res) {
         }
       }
 
-      // 🔹 Provide a default day_no = null if no start_date
+      // 🔹 FIX: Provide day_no = 1 as placeholder
       await model.analysis1.upsert({
         user_id: userId,
         course_id,
@@ -52,7 +52,7 @@ var extractAndStoreCourseDates = async function (req, res) {
         start_date,
         end_date,
         business_task,
-        day_no: null, // fix NOT NULL constraint error
+        day_no: 1, // must provide non-null for NOT NULL column
         work_status: "Not Completed",
         comment: ""
       });
@@ -98,7 +98,6 @@ var extractAndStoreCourseDates = async function (req, res) {
 };
 
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
-
 
 
 var fetchAllStoredCourses = async function (req, res) {
