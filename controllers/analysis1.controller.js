@@ -439,7 +439,7 @@ var getUserAnalysis = async function (req, res) {
       // WORK STATUS PERCENTAGE
       let workStatusPercentage = 0;
       if (workStatus === "Completed") workStatusPercentage = 100;
-      else if (workStatus === "InProgress") workStatusPercentage = 33;
+      else if (workStatus === "In Progress") workStatusPercentage = 33;
       else if (workStatus === "Not Completed") workStatusPercentage = 0;
 
       // COLOR PERCENTAGE (DATE-BASED)
