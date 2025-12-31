@@ -176,7 +176,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
 
     if (!userId) return ReE(res, "userId is required", 400);
 
-    // Fetch courses
     const courses = await model.analysis1.findAll({
       where: { user_id: userId },
       attributes: ["user_id", "course_id", "course_name", "start_date", "end_date", "business_task"],
@@ -196,7 +195,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
       );
     }
 
-    // Fetch user info (achieved business task)
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionWallet"]
@@ -211,7 +209,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
       order: [["day_no", "ASC"]]
     });
 
-    // Find last completed day (100%)
+    // Find last completed day (existing logic)
     let currentCategory = null;
     for (const day of analysisDays) {
       if (day.daily_target > 0 && achievedBusinessTask >= day.daily_target) {
@@ -220,6 +218,20 @@ var fetchStoredCoursesByUser = async function (req, res) {
         break;
       }
     }
+
+    //  NEW: WORK STATUS PERCENTAGE CALCULATION
+    const totalDays = 10;
+    let workStatusTotal = 0;
+
+    for (const day of analysisDays) {
+      if (day.work_status === "Connected") workStatusTotal += 100;
+      else if (day.work_status === "Pending") workStatusTotal += 33;
+      else if (day.work_status === "Not Connected") workStatusTotal += 0;
+    }
+
+    const workStatusPercentage = Number(
+      (workStatusTotal / totalDays).toFixed(2)
+    );
 
     const today = new Date();
 
@@ -233,7 +245,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      //  FIX: STRICT DB VALUE (NO OVERRIDE, NO FALLBACK)
       const business_task =
         c.business_task !== null && c.business_task !== undefined
           ? Number(c.business_task)
@@ -248,7 +259,8 @@ var fetchStoredCoursesByUser = async function (req, res) {
         daysLeft,
         business_task,
         achieved_business_task: achievedBusinessTask,
-        current_category: currentCategory
+        current_category: currentCategory,
+        work_status_percentage: workStatusPercentage //  NEW FIELD
       };
     });
 
@@ -268,6 +280,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 
