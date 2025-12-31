@@ -44,13 +44,13 @@ var extractAndStoreCourseDates = async function (req, res) {
         }
       }
 
-      // 🔹 Check if row exists first
+      //  Check if row exists
       const existingRecord = await model.analysis1.findOne({
         where: { user_id: userId, day_no: 1 }
       });
 
       if (existingRecord) {
-        // Update existing record
+        //  Update existing
         await model.analysis1.update(
           {
             course_id,
@@ -63,8 +63,20 @@ var extractAndStoreCourseDates = async function (req, res) {
           },
           { where: { user_id: userId, day_no: 1 } }
         );
+      } else {
+        // INSERT for new user
+        await model.analysis1.create({
+          user_id: userId,
+          day_no: 1,
+          course_id,
+          course_name,
+          start_date,
+          end_date,
+          business_task,
+          work_status: "Not Completed",
+          comment: ""
+        });
       }
-      // If no record exists, do NOT insert anything (skip)
 
       let daysLeft = null;
       if (end_date) {
@@ -96,7 +108,7 @@ var extractAndStoreCourseDates = async function (req, res) {
 
     return ReS(res, {
       success: true,
-      message: "User course data synced successfully (only updated existing records)",
+      message: "User course data synced successfully",
       recordsProcessed: processed,
       data: responseData
     }, 200);
@@ -107,6 +119,7 @@ var extractAndStoreCourseDates = async function (req, res) {
 };
 
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
+
 
 
 
