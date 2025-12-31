@@ -411,7 +411,7 @@ var getUserAnalysis = async function (req, res) {
         dateDay = currentDate.toLocaleDateString("en-US", options);
       }
 
-      //  DAILY TARGET LOGIC (ONLY CHANGE)
+      // DAILY TARGET (UNCHANGED)
       const dailyTarget =
         i < 5
           ? [...Array(i + 1)].reduce((sum, _, idx) => {
@@ -435,6 +435,25 @@ var getUserAnalysis = async function (req, res) {
 
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
+
+      // WORK STATUS PERCENTAGE
+      let workStatusPercentage = 0;
+      if (workStatus === "Completed") workStatusPercentage = 100;
+      else if (workStatus === "InProgress") workStatusPercentage = 33;
+      else if (workStatus === "Not Completed") workStatusPercentage = 0;
+
+      // COLOR PERCENTAGE (DATE-BASED)
+      let colorPercentage = 0;
+
+      if (currentDate && currentDate <= today) {
+        const numericPercentOfWork = parseFloat(percentOfWork) || 0;
+        colorPercentage = Number(
+          (
+            workStatusPercentage * 0.2 +
+            numericPercentOfWork * 0.8
+          ).toFixed(2)
+        );
+      }
 
       await model.analysis1.upsert({
         user_id: userId,
@@ -460,6 +479,7 @@ var getUserAnalysis = async function (req, res) {
         ACHIEVED_BUSINESS_TASK: achievedBusinessTask,
         DAILY_TARGET: dailyTarget,
         PERCENT_OF_WORK: percentOfWork,
+        COLOR_PERCENTAGE: colorPercentage,
         CATEGORY: categoryDistribution[i]
       });
     }
@@ -472,7 +492,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 var upsertUserDayWork = async function(req, res) {
