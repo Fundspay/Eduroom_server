@@ -442,8 +442,8 @@ var getUserAnalysis = async function (req, res) {
       else if (workStatus === "In Progress") workStatusPercentage = 33;
       else if (workStatus === "Not Completed") workStatusPercentage = 0;
 
-      // COLOR PERCENTAGE (DATE-BASED)
-      let colorPercentage = 0;
+      // COLOR PERCENTAGE (FIXED: FUTURE = null)
+      let colorPercentage = null;
 
       if (currentDate && currentDate <= today) {
         const numericPercentOfWork = parseFloat(percentOfWork) || 0;
@@ -492,6 +492,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
