@@ -332,7 +332,6 @@ var getUserAnalysis = async function (req, res) {
 
     const { start_date, end_date, business_task, course_id, course_name } = record;
 
-    // FETCH ACHIEVED BUSINESS TASK
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionWallet"]
@@ -384,21 +383,21 @@ var getUserAnalysis = async function (req, res) {
         dateDay = currentDate.toLocaleDateString("en-US", options);
       }
 
-      const dailyTarget =
-        i < 5 ? dailyTargets[i] || 0 : defaultTargets[i - 5];
-
-      // INLINE cumulative calculation (NO extra variable)
-      const totalTargetTillToday = [...Array(i + 1)].reduce((sum, _, idx) => {
-        return sum + (idx < 5 ? dailyTargets[idx] || 0 : defaultTargets[idx - 5]);
+      // ✅ DAILY TARGET AS CUMULATIVE (same variable name)
+      const dailyTarget = [...Array(i + 1)].reduce((sum, _, idx) => {
+        return (
+          sum +
+          (idx < 5 ? dailyTargets[idx] || 0 : defaultTargets[idx - 5])
+        );
       }, 0);
 
       let percentOfWork = "0.00%";
 
       if (currentDate && currentDate <= today) {
-        const achieved = Math.min(totalTargetTillToday, achievedBusinessTask);
+        const achieved = Math.min(dailyTarget, achievedBusinessTask);
         percentOfWork =
-          totalTargetTillToday > 0
-            ? ((achieved / totalTargetTillToday) * 100).toFixed(2) + "%"
+          dailyTarget > 0
+            ? ((achieved / dailyTarget) * 100).toFixed(2) + "%"
             : "0.00%";
       }
 
@@ -445,6 +444,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
