@@ -282,9 +282,6 @@ var fetchStoredCoursesByUser = async function (req, res) {
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
 
 
-
-
-
 var updateStoredCourse = async function (req, res) {
   try {
     const { userId } = req.params;
@@ -385,7 +382,7 @@ var getUserAnalysis = async function (req, res) {
       "SILVER",
       "GOLD",
       "DIAMOND",
-      "LOA",
+      "LETTER OF APPRECIATION (LOA)",
       "1500 STIPEND",
       "2500 STIPEND",
       "3500 STIPEND",
