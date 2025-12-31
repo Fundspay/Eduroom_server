@@ -398,17 +398,16 @@ var getUserAnalysis = async function (req, res) {
         dateDay = currentDate.toLocaleDateString("en-US", options);
       }
 
-      // ✅ cumulative daily target (unchanged)
-      const dailyTarget = [...Array(i + 1)].reduce((sum, _, idx) => {
-        return (
-          sum +
-          (idx < 5 ? dailyTargets[idx] || 0 : defaultTargets[idx - 5])
-        );
-      }, 0);
+      //  DAILY TARGET LOGIC (ONLY CHANGE)
+      const dailyTarget =
+        i < 5
+          ? [...Array(i + 1)].reduce((sum, _, idx) => {
+              return sum + (dailyTargets[idx] || 0);
+            }, 0)
+          : defaultTargets[i - 5];
 
       let percentOfWork = "0.00%";
 
-      // ✅ AUTO DATE-BASED CALCULATION (FIXED)
       if (currentDate && currentDate <= today) {
         const achieved = Math.min(dailyTarget, achievedBusinessTask);
         percentOfWork =
@@ -460,6 +459,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 var upsertUserDayWork = async function(req, res) {
