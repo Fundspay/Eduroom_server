@@ -225,7 +225,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 
     for (const day of analysisDays) {
       if (day.work_status === "Connected") workStatusTotal += 100;
-      else if (day.work_status === "Pending") workStatusTotal += 33;
+      else if (day.work_status === "In Progress") workStatusTotal += 33;
       else if (day.work_status === "Not Connected") workStatusTotal += 0;
     }
 
