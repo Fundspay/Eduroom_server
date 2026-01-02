@@ -353,7 +353,16 @@ var getUserAnalysis = async function (req, res) {
 
     if (!record) return ReE(res, "Record not found", 404);
 
-    const { start_date, end_date, business_task, course_id, course_name } = record;
+    // end_date NOT fetched from DB
+    const { start_date, business_task, course_id, course_name } = record;
+
+    //  CALCULATED end_date = start_date + 4 days (5 days total)
+    let calculatedEndDate = null;
+    if (start_date) {
+      calculatedEndDate = new Date(start_date);
+      calculatedEndDate.setDate(calculatedEndDate.getDate() + 4);
+      calculatedEndDate.setHours(0, 0, 0, 0);
+    }
 
     const user = await model.User.findOne({
       where: { id: userId },
@@ -374,6 +383,7 @@ var getUserAnalysis = async function (req, res) {
     const dailyTargets = percentageDistribution.map(p =>
       Math.round((p / 100) * taskValue)
     );
+
     const defaultTargets = [25, 35, 45, 55, 65];
 
     const categoryDistribution = [
@@ -389,7 +399,9 @@ var getUserAnalysis = async function (req, res) {
       "5000 STIPEND"
     ];
 
+    //  10 DAYS LOOP — UNCHANGED
     const totalDays = 10;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -408,7 +420,6 @@ var getUserAnalysis = async function (req, res) {
         dateDay = currentDate.toLocaleDateString("en-US", options);
       }
 
-      // DAILY TARGET (UNCHANGED)
       const dailyTarget =
         i < 5
           ? [...Array(i + 1)].reduce((sum, _, idx) => {
@@ -433,22 +444,15 @@ var getUserAnalysis = async function (req, res) {
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
-      // WORK STATUS PERCENTAGE
       let workStatusPercentage = 0;
       if (workStatus === "Completed") workStatusPercentage = 100;
       else if (workStatus === "In Progress") workStatusPercentage = 33;
-      else if (workStatus === "Not Completed") workStatusPercentage = 0;
 
-      // COLOR PERCENTAGE (FIXED: FUTURE = null)
       let colorPercentage = null;
-
       if (currentDate && currentDate <= today) {
         const numericPercentOfWork = parseFloat(percentOfWork) || 0;
         colorPercentage = Number(
-          (
-            workStatusPercentage * 0.2 +
-            numericPercentOfWork * 0.8
-          ).toFixed(2)
+          (workStatusPercentage * 0.2 + numericPercentOfWork * 0.8).toFixed(2)
         );
       }
 
@@ -458,7 +462,7 @@ var getUserAnalysis = async function (req, res) {
         course_id: course_id || null,
         course_name: course_name || null,
         start_date: start_date || null,
-        end_date: end_date || null,
+        end_date: calculatedEndDate || null, // calculated, not fetched
         daily_target: dailyTarget,
         percent_of_work: percentOfWork,
         category: categoryDistribution[i],
@@ -489,6 +493,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 
