@@ -865,20 +865,22 @@ const getTargetVsAchieved = async (req, res) => {
     }
 
     // ---------------------------
-    // Manager validation
+    // 1️⃣ Manager validation
     // ---------------------------
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
     // ---------------------------
-    // Date handling
+    // 2️⃣ Date handling
     // ---------------------------
     const fromDate = new Date(from);
+    fromDate.setHours(0, 0, 0, 0);
+
     const toDate = new Date(to);
     toDate.setHours(23, 59, 59, 999);
 
     // ---------------------------
-    // Fetch BdSheet + StudentResume
+    // 3️⃣ Fetch BdSheet + StudentResume
     // ---------------------------
     const sheets = await model.BdSheet.findAll({
       where: {
@@ -896,32 +898,34 @@ const getTargetVsAchieved = async (req, res) => {
     });
 
     // ---------------------------
-    // Build date-wise achieved (businessTask)
+    // 4️⃣ Build date-wise achieved
+    //     (✔ ONLY subscriptionWallet)
     // ---------------------------
     const achievedByDate = {};
 
     for (const sheet of sheets) {
-      const dateKey = new Date(sheet.startDate).toISOString().split("T")[0];
+      const dateKey = new Date(sheet.startDate)
+        .toISOString()
+        .split("T")[0];
+
       const mobile = sheet.StudentResume?.mobileNumber;
       if (!mobile) continue;
 
       const user = await model.User.findOne({
         where: { phoneNumber: mobile },
-        attributes: ["subscriptionWallet", "subscriptiondeductedWallet"],
+        attributes: ["subscriptionWallet"],
       });
 
       if (!user) continue;
 
-      const businessTask =
-        Number(user.subscriptionWallet || 0) +
-        Number(user.subscriptiondeductedWallet || 0);
+      const businessTask = Number(user.subscriptionWallet || 0);
 
       achievedByDate[dateKey] =
         (achievedByDate[dateKey] || 0) + businessTask;
     }
 
     // ---------------------------
-    // Fetch targets
+    // 5️⃣ Fetch targets
     // ---------------------------
     const targets = await model.BdTarget.findAll({
       where: {
@@ -933,23 +937,27 @@ const getTargetVsAchieved = async (req, res) => {
 
     const targetByDate = {};
     targets.forEach(t => {
-      const dateKey = new Date(t.targetDate).toISOString().split("T")[0];
+      const dateKey = new Date(t.targetDate)
+        .toISOString()
+        .split("T")[0];
+
       targetByDate[dateKey] =
         (targetByDate[dateKey] || 0) + Number(t.accounts || 0);
     });
 
     // ---------------------------
-    // Generate full date range
+    // 6️⃣ Generate full date range
     // ---------------------------
     const dateRange = [];
     let current = new Date(fromDate);
+
     while (current <= toDate) {
       dateRange.push(current.toISOString().split("T")[0]);
       current.setDate(current.getDate() + 1);
     }
 
     // ---------------------------
-    // Date-wise comparison
+    // 7️⃣ Date-wise comparison
     // ---------------------------
     const dateWise = dateRange.map(date => {
       const target = targetByDate[date] || 0;
@@ -960,18 +968,20 @@ const getTargetVsAchieved = async (req, res) => {
         target,
         achieved,
         difference: achieved - target,
-        percentage: target > 0
-          ? ((achieved / target) * 100).toFixed(2)
-          : 0,
+        percentage:
+          target > 0
+            ? ((achieved / target) * 100).toFixed(2)
+            : 0,
       };
     });
 
     // ---------------------------
-    // Totals
+    // 8️⃣ Totals
     // ---------------------------
     const totalTarget = dateWise.reduce((s, d) => s + d.target, 0);
     const totalAchieved = dateWise.reduce((s, d) => s + d.achieved, 0);
     const totalDifference = totalAchieved - totalTarget;
+
     const totalPercentage =
       totalTarget > 0
         ? ((totalAchieved / totalTarget) * 100).toFixed(2)
@@ -995,6 +1005,7 @@ const getTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
+
 
 //  const getBdTlLeaderboard = async (req, res) => {
 //   try {
@@ -1139,6 +1150,8 @@ const getBdTlLeaderboard = async (req, res) => {
     if (!from || !to) return ReE(res, "from, to are required", 400);
 
     const fromDate = new Date(from);
+    fromDate.setHours(0, 0, 0, 0);
+
     const toDate = new Date(to);
     toDate.setHours(23, 59, 59, 999);
 
@@ -1154,7 +1167,7 @@ const getBdTlLeaderboard = async (req, res) => {
 
     for (const manager of teamManagers) {
       // ---------------------------
-      // 1️⃣ BdSheet + StudentResume (DATE FILTER)
+      // 1️⃣ BdSheet + StudentResume
       // ---------------------------
       let sheets = await model.BdSheet.findAll({
         where: {
@@ -1196,7 +1209,7 @@ const getBdTlLeaderboard = async (req, res) => {
       ).length;
 
       // ---------------------------
-      // 2️⃣ ACHIEVED ACCOUNTS (businessTask logic ✅)
+      // 2️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
       // ---------------------------
       let achievedAccounts = 0;
 
@@ -1211,16 +1224,11 @@ const getBdTlLeaderboard = async (req, res) => {
       if (mobileNumbers.length) {
         const users = await model.User.findAll({
           where: { phoneNumber: { [Op.in]: mobileNumbers } },
-          attributes: [
-            "subscriptionWallet",
-            "subscriptiondeductedWallet",
-          ],
+          attributes: ["subscriptionWallet"],
         });
 
         users.forEach(u => {
-          achievedAccounts +=
-            Number(u.subscriptionWallet || 0) +
-            Number(u.subscriptiondeductedWallet || 0);
+          achievedAccounts += Number(u.subscriptionWallet || 0);
         });
       }
 
@@ -1251,7 +1259,7 @@ const getBdTlLeaderboard = async (req, res) => {
           : 0;
 
       // ---------------------------
-      // PUSH RESULT (FORMAT UNCHANGED)
+      // PUSH RESULT
       // ---------------------------
       leaderboardData.push({
         tlName: manager.name,
@@ -1293,6 +1301,7 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
 
 
 const getAccountTargetVsAchieved = async (req, res) => {
