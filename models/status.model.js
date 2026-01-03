@@ -25,6 +25,7 @@ module.exports = (sequelize, Sequelize) => {
             offerMessage: { type: Sequelize.STRING, allowNull: true },
             referralCode: { type: Sequelize.STRING, allowNull: true },
             pushto: { type: Sequelize.STRING, allowNull: true },
+            pushComment: { type: Sequelize.STRING, allowNull: true },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
