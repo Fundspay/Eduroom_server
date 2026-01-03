@@ -247,16 +247,16 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       const managerName = manager.name.trim();
       const managerId = manager.id;
 
+      //  Corrected: use managerName instead of undefined managerNameFilter
       const jdSentCount = await model.CoSheet.count({
-  where: {
-    ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
-    detailedResponse: "Send JD",
-    dateOfConnect: { [Op.between]: [sDate, eDate] },
-  },
-});
+        where: {
+          connectedBy: managerName,
+          detailedResponse: "Send JD",
+          dateOfConnect: { [Op.between]: [sDate, eDate] },
+        },
+      });
 
-
-      // ✅ Updated: Filter calls by connectedBy instead of teamManagerId
+      //  Filter calls by connectedBy
       const callResponseCount = await model.CoSheet.count({
         where: {
           connectedBy: managerName,
@@ -388,6 +388,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
 
