@@ -352,7 +352,7 @@ const getDashboardStats = async (req, res) => {
     const { managerId, startDate, endDate } = req.query;
 
     // ---------------------------
-    // Manager validation
+    // 1️⃣ Manager Validation
     // ---------------------------
     if (managerId) {
       const manager = await model.TeamManager.findByPk(managerId);
@@ -360,10 +360,9 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // Date handling (DEFAULT = CURRENT MONTH TILL TODAY)
+    // 2️⃣ Date Handling (DEFAULT = CURRENT MONTH → TODAY)
     // ---------------------------
-    let fromDate = null;
-    let toDate = null;
+    let fromDate, toDate;
 
     if (startDate && endDate) {
       fromDate = new Date(startDate);
@@ -382,7 +381,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 1️⃣ BdTarget (TARGET DATA)
+    // 3️⃣ BD TARGET (TARGET NUMBERS)
     // ---------------------------
     const bdTargetData = await model.BdTarget.findAll({
       where: {
@@ -403,7 +402,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet + StudentResume
+    // 4️⃣ BD SHEET + STUDENT RESUME
     // ---------------------------
     const bdSheetData = await model.BdSheet.findAll({
       where: {
@@ -427,7 +426,7 @@ const getDashboardStats = async (req, res) => {
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS
+    // 5️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
     // ---------------------------
     let totalAccountsSheet = 0;
 
@@ -442,21 +441,16 @@ const getDashboardStats = async (req, res) => {
     if (mobileNumbers.length) {
       const users = await model.User.findAll({
         where: { phoneNumber: { [Op.in]: mobileNumbers } },
-        attributes: [
-          "subscriptionWallet",
-          "subscriptiondeductedWallet",
-        ],
+        attributes: ["subscriptionWallet"],
       });
 
       users.forEach(u => {
-        totalAccountsSheet +=
-          Number(u.subscriptionWallet || 0) +
-          Number(u.subscriptiondeductedWallet || 0);
+        totalAccountsSheet += Number(u.subscriptionWallet || 0);
       });
     }
 
     // ---------------------------
-    // FINAL RESPONSE (ONLY DATE DISPLAY FIXED)
+    // 6️⃣ FINAL RESPONSE
     // ---------------------------
     return ReS(res, {
       bdTarget: {
@@ -466,13 +460,13 @@ const getDashboardStats = async (req, res) => {
       },
       bdSheet: {
         totalInterns,
-        totalAccounts: totalAccountsSheet,
         totalActiveInterns,
+        totalAccounts: totalAccountsSheet,
       },
       appliedFilters: {
         managerId: managerId || "ALL",
-        startDate: fromDate.toLocaleDateString("en-CA"), //  IST display
-        endDate: toDate.toLocaleDateString("en-CA"),     //  IST display
+        startDate: fromDate.toLocaleDateString("en-CA"),
+        endDate: toDate.toLocaleDateString("en-CA"),
       },
     });
 
@@ -483,8 +477,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
-
 
 
 
