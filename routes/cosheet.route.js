@@ -8,7 +8,7 @@ router.put("/update/:id", cosheetController.updateConnectFields);
 router.get("/list", cosheetController.getCoSheets);
 router.get("/list/jdsent", cosheetController.getCoSheetsWithJDSent);
 router.get("/list/:managerName", cosheetController.getCoSheetByManager);
-router.get("cna/list/:managerName", cosheetController.getCoSheetByManagerCNA);
+router.get("/cna/list/:managerName", cosheetController.getCoSheetByManagerCNA);
  router.post("/:id/send-jd", cosheetController.sendJDToCollege);
 // router.get("/stats/all", cosheetController.getCallStatsAllUsers);
 router.get("/stats/user/:teamManagerId", cosheetController.getCallStatsByUserWithTarget);
