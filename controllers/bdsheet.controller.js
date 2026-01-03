@@ -93,9 +93,17 @@ const getBdSheet = async (req, res) => {
       whereCondition.id = resumeId;
     }
 
-    const bdSheetWhere = {};
     if (managerId) {
-      bdSheetWhere.teamManagerId = managerId;
+      const manager = await model.TeamManager.findOne({
+        where: { id: managerId },
+        attributes: ["name"],
+      });
+
+      if (manager && manager.name) {
+        whereCondition.alloted = manager.name;
+      } else {
+        whereCondition.alloted = "__invalid__";
+      }
     }
 
     const data = await model.StudentResume.findAll({
@@ -112,9 +120,10 @@ const getBdSheet = async (req, res) => {
       include: [
         {
           model: model.BdSheet,
-          required: true, // only students who have BdSheets
-          where: bdSheetWhere,
-          attributes: ["businessTask", "registration", "activeStatus"],
+          required: false,
+          attributes: {
+            include: ["businessTask", "registration", "activeStatus"],
+          },
         },
       ],
       order: [["id", "DESC"]],
@@ -124,20 +133,25 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // ALWAYS PICK LATEST BdSheet
+        //  ALWAYS PICK LATEST BdSheet
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
 
-        // Fetch user for wallet + userId + collegeName
+        //  Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
-            attributes: ["subscriptionWallet", "id", "collegeName"],
+            attributes: [
+              "subscriptionWallet",
+              "subscriptiondeductedWallet",
+              "id",
+              "collegeName",
+            ],
           });
 
           if (user) {
-            // ONLY subscriptionWallet is used now
+            //  ONLY subscriptionWallet is used now
             const businessTask = parseInt(user.subscriptionWallet || 0, 10);
             s.businessTask = businessTask;
 
@@ -145,13 +159,20 @@ const getBdSheet = async (req, res) => {
             s.collegeName = user.collegeName;
 
             if (!businessTask || businessTask === 0) s.category = "not working";
-            else if (businessTask >= 1 && businessTask <= 5) s.category = "Starter";
-            else if (businessTask >= 6 && businessTask <= 10) s.category = "Basic";
-            else if (businessTask >= 11 && businessTask <= 15) s.category = "Bronze";
-            else if (businessTask >= 16 && businessTask <= 20) s.category = "Silver";
-            else if (businessTask >= 21 && businessTask <= 25) s.category = "Gold";
-            else if (businessTask >= 26 && businessTask <= 35) s.category = "Diamond";
-            else if (businessTask >= 36 && businessTask <= 70) s.category = "Platinum";
+            else if (businessTask >= 1 && businessTask <= 5)
+              s.category = "Starter";
+            else if (businessTask >= 6 && businessTask <= 10)
+              s.category = "Basic";
+            else if (businessTask >= 11 && businessTask <= 15)
+              s.category = "Bronze";
+            else if (businessTask >= 16 && businessTask <= 20)
+              s.category = "Silver";
+            else if (businessTask >= 21 && businessTask <= 25)
+              s.category = "Gold";
+            else if (businessTask >= 26 && businessTask <= 35)
+              s.category = "Diamond";
+            else if (businessTask >= 36 && businessTask <= 70)
+              s.category = "Platinum";
           }
         }
 
@@ -184,7 +205,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
-
 
 const getBdSheetByCategory = async (req, res) => {
   try {
