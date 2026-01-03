@@ -199,17 +199,34 @@ module.exports.getCoSheets = getCoSheets;
 
 
 // Get single CoSheet
-const getCoSheetById = async (req, res) => {
+const getCoSheetByManager = async (req, res) => {
   try {
-    const record = await model.CoSheet.findByPk(req.params.id);
-    if (!record) return ReE(res, "CoSheet record not found", 404);
-    return ReS(res, { success: true, data: record }, 200);
+    const { managerName } = req.params; // Frontend sends manager name
+
+    if (!managerName) return ReE(res, "managerName is required", 400);
+
+    // Fetch CoSheet records where connectedBy matches the manager name and callResponse is "connected"
+    const records = await model.CoSheet.findAll({
+      where: {
+        connectedBy: managerName,
+        callResponse: "connected"
+      },
+      order: [["dateOfConnect", "ASC"]] // Optional: order by date
+    });
+
+    if (!records.length) {
+      return ReS(res, { success: true, data: [], message: "No connected CoSheet records found for this manager" }, 200);
+    }
+
+    return ReS(res, { success: true, data: records }, 200);
   } catch (error) {
-    console.error("CoSheet Fetch Single Error:", error);
+    console.error("CoSheet Fetch By Manager Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-module.exports.getCoSheetById = getCoSheetById;
+
+module.exports.getCoSheetByManager = getCoSheetByManager;
+
 
 
 const sendJDToCollege = async (req, res) => {
