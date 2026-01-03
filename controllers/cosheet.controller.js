@@ -201,24 +201,33 @@ module.exports.getCoSheets = getCoSheets;
 // Get single CoSheet
 const getCoSheetByManager = async (req, res) => {
   try {
-    const { managerName } = req.params; // Frontend sends manager name
+    let { managerName } = req.params; // Frontend sends manager name
 
     if (!managerName) return ReE(res, "managerName is required", 400);
 
-    // Fetch CoSheet records where connectedBy matches the manager name and callResponse is "connected"
+    managerName = managerName.trim().toLowerCase(); // Trim & lowercase for consistent matching
+
+    // Fetch CoSheet records where connectedBy matches manager name and callResponse is "connected"
     const records = await model.CoSheet.findAll({
       where: {
-        connectedBy: managerName,
-        callResponse: "connected"
+        connectedBy: {
+          [Op.iLike]: managerName // Case-insensitive match (works with PostgreSQL)
+        },
+        callResponse: {
+          [Op.iLike]: "connected" // Case-insensitive "connected"
+        }
       },
       order: [["dateOfConnect", "ASC"]] // Optional: order by date
     });
 
-    if (!records.length) {
-      return ReS(res, { success: true, data: [], message: "No connected CoSheet records found for this manager" }, 200);
-    }
-
-    return ReS(res, { success: true, data: records }, 200);
+    return ReS(res, {
+      success: true,
+      count: records.length,
+      data: records,
+      message: records.length
+        ? `Found ${records.length} connected CoSheet records for manager ${managerName}`
+        : "No connected CoSheet records found for this manager"
+    }, 200);
   } catch (error) {
     console.error("CoSheet Fetch By Manager Error:", error);
     return ReE(res, error.message, 500);
