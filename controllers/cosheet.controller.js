@@ -197,7 +197,6 @@ const getCoSheets = async (req, res) => {
 module.exports.getCoSheets = getCoSheets;
 
 
-
 // Get single CoSheet
 const getCoSheetByManager = async (req, res) => {
   try {
@@ -275,6 +274,75 @@ const getCoSheetByManagerCNA = async (req, res) => {
         callResponse: { [Op.iLike]: "Not Answered" }, // Case-insensitive
         dateOfConnect: { [Op.between]: [from, to] } // Date range filter
       },
+      order: [["dateOfConnect", "ASC"]]
+    });
+
+    // ---------------------------
+    // Fetch all registered managers
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
+      order: [["name", "ASC"]]
+    });
+
+    return ReS(res, {
+      success: true,
+      count: records.length,
+      data: records,
+      managers, // All registered managers
+      message: records.length
+        ? `Found ${records.length} "Not Answered" CoSheet records for manager ${managerName} between ${from.toISOString().split("T")[0]} and ${to.toISOString().split("T")[0]}`
+        : "No 'Not Answered' CoSheet records found for this manager in the given date range"
+    }, 200);
+
+  } catch (error) {
+    console.error("CoSheet Fetch By Manager Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getCoSheetByManagerCNA = getCoSheetByManagerCNA;
+
+
+// Get single CoSheet filtered by manager and callResponse = "Busy"
+const getCoSheetByManagerBusy = async (req, res) => {
+  try {
+    let { managerName } = req.params; // Frontend sends manager name
+    let { fromDate, toDate } = req.query; // Optional date range
+
+    if (!managerName) return ReE(res, "managerName is required", 400);
+
+    managerName = managerName.trim().toLowerCase(); // Trim & lowercase for consistent matching
+
+    // ---------------------------
+    // Date handling (default = current month till today)
+    // ---------------------------
+    const today = new Date();
+    let from, to;
+
+    if (fromDate && toDate) {
+      from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+    } else {
+      from = new Date(today.getFullYear(), today.getMonth(), 1); // first day of current month
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(today);
+      to.setHours(23, 59, 59, 999);
+    }
+
+    // ---------------------------
+    // Fetch CoSheet records
+    // ---------------------------
+    const records = await model.CoSheet.findAll({
+      where: {
+        connectedBy: { [Op.iLike]: managerName }, // Case-insensitive match
+        callResponse: { [Op.iLike]: "Busy" }, // Case-insensitive
+        dateOfConnect: { [Op.between]: [from, to] } // Date range filter
+      },
       order: [["dateOfConnect", "ASC"]] // Optional: order by date
     });
 
@@ -289,12 +357,21 @@ const getCoSheetByManagerCNA = async (req, res) => {
       return `${yyyy}-${mm}-${dd}`;
     };
 
+     // ---------------------------
+    // Fetch all registered managers
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
+      order: [["name", "ASC"]]
+    });
+
     return ReS(res, {
       success: true,
       count: records.length,
       data: records,
+      managers,
       message: records.length
-        ? `Found ${records.length} "Not Answered" CoSheet records for manager ${managerName} between ${formatLocalDate(from)} and ${formatLocalDate(to)}`
+        ? `Found ${records.length} "Busy" CoSheet records for manager ${managerName} between ${formatLocalDate(from)} and ${formatLocalDate(to)}`
         : "No 'Not Answered' CoSheet records found for this manager in the given date range"
     }, 200);
 
@@ -304,8 +381,165 @@ const getCoSheetByManagerCNA = async (req, res) => {
   }
 };
 
-module.exports.getCoSheetByManagerCNA = getCoSheetByManagerCNA;
+module.exports.getCoSheetByManagerBusy = getCoSheetByManagerBusy;
 
+// Get single CoSheet filtered by manager and callResponse = "Busy"
+const getCoSheetByManagerSwitchoff = async (req, res) => {
+  try {
+    let { managerName } = req.params; // Frontend sends manager name
+    let { fromDate, toDate } = req.query; // Optional date range
+
+    if (!managerName) return ReE(res, "managerName is required", 400);
+
+    managerName = managerName.trim().toLowerCase(); // Trim & lowercase for consistent matching
+
+    // ---------------------------
+    // Date handling (default = current month till today)
+    // ---------------------------
+    const today = new Date();
+    let from, to;
+
+    if (fromDate && toDate) {
+      from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+    } else {
+      from = new Date(today.getFullYear(), today.getMonth(), 1); // first day of current month
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(today);
+      to.setHours(23, 59, 59, 999);
+    }
+
+    // ---------------------------
+    // Fetch CoSheet records
+    // ---------------------------
+    const records = await model.CoSheet.findAll({
+      where: {
+        connectedBy: { [Op.iLike]: managerName }, // Case-insensitive match
+        callResponse: { [Op.iLike]: "Switch Off" }, // Case-insensitive
+        dateOfConnect: { [Op.between]: [from, to] } // Date range filter
+      },
+      order: [["dateOfConnect", "ASC"]] // Optional: order by date
+    });
+
+    // ---------------------------
+    // Format local date for message
+    // ---------------------------
+    const formatLocalDate = (date) => {
+      const d = new Date(date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+     // ---------------------------
+    // Fetch all registered managers
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
+      order: [["name", "ASC"]]
+    });
+
+    return ReS(res, {
+      success: true,
+      count: records.length,
+      data: records,
+      managers,
+      message: records.length
+        ? `Found ${records.length} "Busy" CoSheet records for manager ${managerName} between ${formatLocalDate(from)} and ${formatLocalDate(to)}`
+        : "No 'Not Answered' CoSheet records found for this manager in the given date range"
+    }, 200);
+
+  } catch (error) {
+    console.error("CoSheet Fetch By Manager Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getCoSheetByManagerSwitchoff = getCoSheetByManagerSwitchoff;
+
+// Get single CoSheet filtered by manager and callResponse = "Busy"
+const getCoSheetByManagerInvalid = async (req, res) => {
+  try {
+    let { managerName } = req.params; // Frontend sends manager name
+    let { fromDate, toDate } = req.query; // Optional date range
+
+    if (!managerName) return ReE(res, "managerName is required", 400);
+
+    managerName = managerName.trim().toLowerCase(); // Trim & lowercase for consistent matching
+
+    // ---------------------------
+    // Date handling (default = current month till today)
+    // ---------------------------
+    const today = new Date();
+    let from, to;
+
+    if (fromDate && toDate) {
+      from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+    } else {
+      from = new Date(today.getFullYear(), today.getMonth(), 1); // first day of current month
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(today);
+      to.setHours(23, 59, 59, 999);
+    }
+
+    // ---------------------------
+    // Fetch CoSheet records
+    // ---------------------------
+    const records = await model.CoSheet.findAll({
+      where: {
+        connectedBy: { [Op.iLike]: managerName }, // Case-insensitive match
+        callResponse: { [Op.iLike]: "Invalid" }, // Case-insensitive
+        dateOfConnect: { [Op.between]: [from, to] } // Date range filter
+      },
+      order: [["dateOfConnect", "ASC"]] // Optional: order by date
+    });
+
+    // ---------------------------
+    // Format local date for message
+    // ---------------------------
+    const formatLocalDate = (date) => {
+      const d = new Date(date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
+     // ---------------------------
+    // Fetch all registered managers
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
+      order: [["name", "ASC"]]
+    });
+
+    return ReS(res, {
+      success: true,
+      count: records.length,
+      data: records,
+      managers,
+      message: records.length
+        ? `Found ${records.length} "Busy" CoSheet records for manager ${managerName} between ${formatLocalDate(from)} and ${formatLocalDate(to)}`
+        : "No 'Not Answered' CoSheet records found for this manager in the given date range"
+    }, 200);
+
+  } catch (error) {
+    console.error("CoSheet Fetch By Manager Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid;
 
 
 const sendJDToCollege = async (req, res) => {
