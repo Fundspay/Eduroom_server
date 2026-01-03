@@ -242,12 +242,13 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       const managerId = manager.id;
 
       const jdSentCount = await model.CoSheet.count({
-        where: {
-          teamManagerId: managerId,
-          detailedResponse: "Send JD",
-          dateOfConnect: { [Op.between]: [sDate, eDate] },
-        },
-      });
+  where: {
+    ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
+    detailedResponse: "Send JD",
+    dateOfConnect: { [Op.between]: [sDate, eDate] },
+  },
+});
+
 
       // ✅ Updated: Filter calls by connectedBy instead of teamManagerId
       const callResponseCount = await model.CoSheet.count({
