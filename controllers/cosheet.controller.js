@@ -664,14 +664,14 @@ const getColleges = async (req, res) => {
     let query = `
       SELECT DISTINCT "collegeName"
       FROM "CoSheets"
-      WHERE "state" = $1
+      WHERE "state" = :state
     `;
 
-    const replacements = [state];
+    const replacements = { state };
 
     if (city) {
-      query += ` AND "city" = $2`;
-      replacements.push(city);
+      query += ` AND "city" = :city`;
+      replacements.city = city;
     }
 
     query += ` ORDER BY "collegeName"`;
@@ -693,6 +693,7 @@ const getColleges = async (req, res) => {
 };
 
 module.exports.getColleges = getColleges;
+
 
 
 
