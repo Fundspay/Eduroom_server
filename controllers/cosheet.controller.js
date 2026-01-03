@@ -658,10 +658,7 @@ const getColleges = async (req, res) => {
     const { state, city } = req.query;
 
     if (!state) {
-      return res.status(400).json({
-        success: false,
-        message: "state is required",
-      });
+      return ReE(res, "state is required", 400);
     }
 
     let query = `
@@ -679,25 +676,23 @@ const getColleges = async (req, res) => {
 
     query += ` ORDER BY "collegeName"`;
 
-    const data = await sequelize.query(query, {
+    const data = await model.sequelize.query(query, {
       replacements,
-      type: sequelize.QueryTypes.SELECT,
+      type: model.Sequelize.QueryTypes.SELECT,
     });
 
-    return res.status(200).json({
-      success: true,
+    return ReS(res, {
       count: data.length,
       data,
-    });
+    }, 200);
+
   } catch (error) {
     console.error("Error fetching colleges:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return ReE(res, error.message, 500);
   }
 };
 
-module.exports.getColleges = getColleges;
+module.exports = { getColleges };
+
 
 
