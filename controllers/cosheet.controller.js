@@ -219,10 +219,19 @@ const getCoSheetByManager = async (req, res) => {
       order: [["dateOfConnect", "ASC"]] // Optional: order by date
     });
 
+     // ---------------------------
+    // Fetch all registered managers
+    // ---------------------------
+    const managers = await model.TeamManager.findAll({
+      attributes: ["id", "name", "email", "mobileNumber"],
+      order: [["name", "ASC"]]
+    });
+
     return ReS(res, {
       success: true,
       count: records.length,
       data: records,
+      managers,
       message: records.length
         ? `Found ${records.length} connected CoSheet records for manager ${managerName}`
         : "No connected CoSheet records found for this manager"
