@@ -22,8 +22,9 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    sDate.setHours(0, 0, 0, 0);
-    eDate.setHours(23, 59, 59, 999);
+    // 🔹 DATE ONLY (remove time completely)
+    const startOnlyDate = sDate.toISOString().split("T")[0];
+    const endOnlyDate = eDate.toISOString().split("T")[0];
 
     let managers = [];
     let managerIdFilter = {};
@@ -54,7 +55,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...managerIdFilter,
         detailedResponse: "Send JD",
-        dateOfConnect: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("dateOfConnect")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
     });
 
@@ -62,7 +66,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
         callResponse: { [Op.ne]: null },
-        dateOfConnect: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("dateOfConnect")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
     });
 
@@ -70,7 +77,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
         followUpResponse: "resumes received",
-        resumeDate: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("resumeDate")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
       attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
       raw: true,
@@ -82,8 +92,19 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         [Op.or]: [
-          { Dateofonboarding: { [Op.between]: [sDate, eDate] } },
-          { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
+          {
+            [Op.and]: [
+              fn("DATE", col("Dateofonboarding")),
+              { [Op.between]: [startOnlyDate, endOnlyDate] },
+            ],
+          },
+          {
+            Dateofonboarding: null,
+            [Op.and]: [
+              fn("DATE", col("updatedAt")),
+              { [Op.between]: [startOnlyDate, endOnlyDate] },
+            ],
+          },
         ],
       },
       attributes: ["collegeName", "Dateofonboarding", "updatedAt"],
@@ -108,7 +129,10 @@ var fetchMasterSheetTargets = async function (req, res) {
             "resumes received",
           ],
         },
-        resumeDate: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("resumeDate")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
     });
 
@@ -116,15 +140,18 @@ var fetchMasterSheetTargets = async function (req, res) {
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         finalSelectionStatus: "Selected",
-        Dateofonboarding: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("Dateofonboarding")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
     });
 
     const dateList = [];
-    for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(startOnlyDate); d <= new Date(endOnlyDate); d.setDate(d.getDate() + 1)) {
       const current = new Date(d);
       dateList.push({
-        date: current.toLocaleDateString("en-CA"),
+        date: current.toISOString().split("T")[0],
         day: current.toLocaleDateString("en-US", { weekday: "long" }),
         jds: 0,
         calls: 0,
@@ -139,14 +166,16 @@ var fetchMasterSheetTargets = async function (req, res) {
     const existingTargets = await model.MyTarget.findAll({
       where: {
         ...managerIdFilter,
-        targetDate: { [Op.between]: [sDate, eDate] },
+        [Op.and]: [
+          fn("DATE", col("targetDate")),
+          { [Op.between]: [startOnlyDate, endOnlyDate] },
+        ],
       },
     });
 
-    // ✅ FIXED MERGE LOGIC (SUM WHEN NO MANAGER)
     const merged = dateList.map((d) => {
       const matchedTargets = existingTargets.filter((t) => {
-        const tDateStr = new Date(t.targetDate).toLocaleDateString("en-CA");
+        const tDateStr = new Date(t.targetDate).toISOString().split("T")[0];
         return tDateStr === d.date;
       });
 
@@ -198,6 +227,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
