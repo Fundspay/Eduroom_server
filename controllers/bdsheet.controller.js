@@ -83,8 +83,6 @@ const upsertBdSheet = async (req, res) => {
 module.exports.upsertBdSheet = upsertBdSheet;
 
 
-
-
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -135,12 +133,12 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // ✅ ALWAYS PICK LATEST BdSheet
+        //  ALWAYS PICK LATEST BdSheet
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
 
-        // 🔥 Fetch user for wallet + userId + collegeName
+        //  Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
@@ -153,13 +151,8 @@ const getBdSheet = async (req, res) => {
           });
 
           if (user) {
-            const wallet = parseInt(user.subscriptionWallet || 0, 10);
-            const deducted = parseInt(
-              user.subscriptiondeductedWallet || 0,
-              10
-            );
-
-            const businessTask = wallet + deducted;
+            //  ONLY subscriptionWallet is used now
+            const businessTask = parseInt(user.subscriptionWallet || 0, 10);
             s.businessTask = businessTask;
 
             s.userId = user.id;
