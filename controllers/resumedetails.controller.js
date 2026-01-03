@@ -325,12 +325,14 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
     const { fromDate, toDate } = req.query;
 
     const now = new Date();
+
+    // Default range: entire current month if fromDate/toDate not provided
     const startDate = fromDate
       ? new Date(fromDate)
-      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      : new Date(now.getFullYear(), now.getMonth(), 1); // first day of current month
     const endDate = toDate
       ? new Date(toDate)
-      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      : new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month
 
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
@@ -414,6 +416,7 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 };
 
 module.exports.getResumeAnalysisPerCoSheet = getResumeAnalysisPerCoSheet;
+
 
 
 // 🔹 Endpoint: Get Resume Totals Per FollowUpBy (global, all users)
