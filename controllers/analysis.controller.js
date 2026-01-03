@@ -25,13 +25,14 @@ const getDailyAnalysis = async (req, res) => {
       eDate = new Date(endDate);
       eDate.setHours(23, 59, 59, 999);
     } else {
-      sDate = new Date(today);
+      //  DEFAULT → MONTH TILL TODAY
+      sDate = new Date(today.getFullYear(), today.getMonth(), 1);
       sDate.setHours(0, 0, 0, 0);
       eDate = new Date(today);
       eDate.setHours(23, 59, 59, 999);
     }
 
-    // ✅ LOCAL DATE FORMATTER (NO UTC)
+    //  LOCAL DATE FORMATTER (NO UTC)
     const formatDate = (date) => {
       const d = new Date(date);
       const yyyy = d.getFullYear();
@@ -73,7 +74,13 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
-    const allowedCallResponses = ["connected", "not answered", "busy", "switch off", "invalid"];
+    const allowedCallResponses = [
+      "connected",
+      "not answered",
+      "busy",
+      "switch off",
+      "invalid"
+    ];
 
     const merged = dateList.map(d => {
       const target = targets.find(
@@ -100,17 +107,23 @@ const getDailyAnalysis = async (req, res) => {
         }
       });
 
-      d.achievedCalls = d.connected + d.notAnswered + d.busy + d.switchOff + d.invalid;
-      d.achievementPercent =
-        d.plannedCalls > 0 ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2) : 0;
+      d.achievedCalls =
+        d.connected + d.notAnswered + d.busy + d.switchOff + d.invalid;
 
-      // ✅ UPDATED JD SENT LOGIC (USING detailedResponse)
+      d.achievementPercent =
+        d.plannedCalls > 0
+          ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2)
+          : 0;
+
+      // JD SENT
       d.jdSent = dayRecords.filter(
         r => (r.detailedResponse || "").trim().toLowerCase() === "send jd"
       ).length;
 
       d.jdAchievementPercent =
-        d.plannedJds > 0 ? ((d.jdSent / d.plannedJds) * 100).toFixed(2) : 0;
+        d.plannedJds > 0
+          ? ((d.jdSent / d.plannedJds) * 100).toFixed(2)
+          : 0;
 
       return d;
     });
@@ -156,7 +169,11 @@ const getDailyAnalysis = async (req, res) => {
       year: "numeric"
     });
 
-    return ReS(res, { success: true, month: monthLabel, dates: merged, totals }, 200);
+    return ReS(
+      res,
+      { success: true, month: monthLabel, dates: merged, totals },
+      200
+    );
   } catch (error) {
     console.error("Daily Analysis Error:", error);
     return ReE(res, error.message, 500);
@@ -164,6 +181,7 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 
 // Get all connected CoSheet records for a teamManager
