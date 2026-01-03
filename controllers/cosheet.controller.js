@@ -662,30 +662,36 @@ const getColleges = async (req, res) => {
     }
 
     let query = `
-      SELECT DISTINCT "collegeName"
+      SELECT DISTINCT ON (LOWER("collegeName"))
+        "collegeName"
       FROM "CoSheets"
-      WHERE "state" = :state
+      WHERE LOWER("state") = LOWER(:state)
     `;
 
     const replacements = { state };
 
     if (city) {
-      query += ` AND "city" = :city`;
+      query += ` AND LOWER("city") = LOWER(:city)`;
       replacements.city = city;
     }
 
-    query += ` ORDER BY "collegeName"`;
+    query += `
+      ORDER BY LOWER("collegeName"), "collegeName"
+    `;
 
     const data = await model.sequelize.query(query, {
       replacements,
       type: model.Sequelize.QueryTypes.SELECT,
     });
 
-    return ReS(res, {
-      count: data.length,
-      data,
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        count: data.length,
+        data,
+      },
+      200
+    );
   } catch (error) {
     console.error("Error fetching colleges:", error);
     return ReE(res, error.message, 500);
