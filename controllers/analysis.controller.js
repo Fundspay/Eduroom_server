@@ -10,6 +10,17 @@ const getDailyAnalysis = async (req, res) => {
     const { teamManagerId, startDate, endDate, month } = req.query;
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
+    // 🔹 FETCH MANAGER NAME (FOR connectedBy)
+    const manager = await model.TeamManager.findOne({
+      where: { id: teamManagerId },
+      attributes: ["name"],
+      raw: true
+    });
+
+    if (!manager) return ReE(res, "Team manager not found", 404);
+
+    const managerName = manager.name.trim();
+
     const today = new Date();
     let sDate, eDate;
 
@@ -25,14 +36,14 @@ const getDailyAnalysis = async (req, res) => {
       eDate = new Date(endDate);
       eDate.setHours(23, 59, 59, 999);
     } else {
-      //  DEFAULT → MONTH TILL TODAY
+      // DEFAULT → MONTH TILL TODAY
       sDate = new Date(today.getFullYear(), today.getMonth(), 1);
       sDate.setHours(0, 0, 0, 0);
       eDate = new Date(today);
       eDate.setHours(23, 59, 59, 999);
     }
 
-    //  LOCAL DATE FORMATTER (NO UTC)
+    // LOCAL DATE FORMATTER
     const formatDate = (date) => {
       const d = new Date(date);
       const yyyy = d.getFullYear();
@@ -67,9 +78,10 @@ const getDailyAnalysis = async (req, res) => {
       }
     });
 
+    //  FIXED: USE connectedBy INSTEAD OF teamManagerId
     const allRecords = await model.CoSheet.findAll({
       where: {
-        teamManagerId,
+        connectedBy: managerName,
         dateOfConnect: { [Op.between]: [sDate, eDate] }
       }
     });
@@ -115,7 +127,7 @@ const getDailyAnalysis = async (req, res) => {
           ? ((d.achievedCalls / d.plannedCalls) * 100).toFixed(2)
           : 0;
 
-      // JD SENT
+      //  JD SENT (NOW CORRECT)
       d.jdSent = dayRecords.filter(
         r => (r.detailedResponse || "").trim().toLowerCase() === "send jd"
       ).length;
@@ -181,6 +193,7 @@ const getDailyAnalysis = async (req, res) => {
 };
 
 module.exports.getDailyAnalysis = getDailyAnalysis;
+
 
 
 
