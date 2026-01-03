@@ -463,7 +463,7 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // FINAL RESPONSE (UNCHANGED)
+    // FINAL RESPONSE (ONLY DATE DISPLAY FIXED)
     // ---------------------------
     return ReS(res, {
       bdTarget: {
@@ -478,8 +478,8 @@ const getDashboardStats = async (req, res) => {
       },
       appliedFilters: {
         managerId: managerId || "ALL",
-        startDate: fromDate,
-        endDate: toDate,
+        startDate: fromDate.toLocaleDateString("en-CA"), //  IST display
+        endDate: toDate.toLocaleDateString("en-CA"),     //  IST display
       },
     });
 
@@ -490,6 +490,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
