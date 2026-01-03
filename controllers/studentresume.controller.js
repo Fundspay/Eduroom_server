@@ -785,10 +785,13 @@ const getUserTargetAnalysis = async (req, res) => {
 
     const userName = user.name.trim();
 
-    let startDate = fromDate ? new Date(fromDate) : new Date();
+    const now = new Date();
+
+    // Default range: from 1st of current month to today if fromDate/toDate not provided
+    let startDate = fromDate ? new Date(fromDate) : new Date(now.getFullYear(), now.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
 
-    let endDate = toDate ? new Date(toDate) : new Date();
+    let endDate = toDate ? new Date(toDate) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     endDate.setHours(23, 59, 59, 999);
 
     // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
@@ -867,6 +870,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 
 

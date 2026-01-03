@@ -91,7 +91,7 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       DATE RANGE LOGIC (DEFAULT TO CURRENT MONTH)
+       DATE RANGE LOGIC (DEFAULT TO 1st OF MONTH TO TODAY)
     ======================= */
     let start, end;
 
@@ -102,9 +102,9 @@ const getResumeAnalysis = async (req, res) => {
       end.setHours(23, 59, 59, 999);
     } else {
       const today = new Date();
-      start = new Date(today.getFullYear(), today.getMonth(), 1); // 1st day of month
+      start = new Date(today.getFullYear(), today.getMonth(), 1); // 1st day of current month
       start.setHours(0, 0, 0, 0);
-      end = new Date(today.getFullYear(), today.getMonth() + 1, 0); // last day of month
+      end = new Date(today); // today
       end.setHours(23, 59, 59, 999);
     }
 
@@ -230,6 +230,7 @@ module.exports.getResumeAnalysis = getResumeAnalysis;
 
 
 
+
 const gettotalResumeAnalysis = async (req, res) => {
   try {
     const { teamManagerId } = req.params;
@@ -326,13 +327,13 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 
     const now = new Date();
 
-    // Default range: entire current month if fromDate/toDate not provided
+    // Default range: from 1st of current month to today if fromDate/toDate not provided
     const startDate = fromDate
       ? new Date(fromDate)
       : new Date(now.getFullYear(), now.getMonth(), 1); // first day of current month
     const endDate = toDate
       ? new Date(toDate)
-      : new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of current month
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate()); // today
 
     startDate.setHours(0, 0, 0, 0);
     endDate.setHours(23, 59, 59, 999);
@@ -416,8 +417,6 @@ const getResumeAnalysisPerCoSheet = async (req, res) => {
 };
 
 module.exports.getResumeAnalysisPerCoSheet = getResumeAnalysisPerCoSheet;
-
-
 
 // 🔹 Endpoint: Get Resume Totals Per FollowUpBy (global, all users)
 const getFollowUpResumeTotals = async (req, res) => {
