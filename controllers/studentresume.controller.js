@@ -784,34 +784,21 @@ const getUserTargetAnalysis = async (req, res) => {
       return res.status(404).json({ success: false, error: "User not found" });
 
     const userName = user.name.trim();
+
     const now = new Date();
 
-    // ---------------------------
-    //  DATE RANGE FIX (CONSISTENT FOR ALL)
-    // ---------------------------
-    let startDate;
-    let endDate;
-
-    if (fromDate && toDate) {
-      startDate = new Date(fromDate);
-      endDate = new Date(toDate);
-    } else if (fromDate && !toDate) {
-      startDate = new Date(fromDate);
-      endDate = new Date(fromDate);
-    } else if (!fromDate && toDate) {
-      startDate = new Date(toDate);
-      endDate = new Date(toDate);
-    } else {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      endDate = new Date(now);
-    }
-
+    // Default range: from 1st of current month to today if fromDate/toDate not provided
+    let startDate = fromDate
+      ? new Date(fromDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
     startDate.setHours(0, 0, 0, 0);
+
+    let endDate = toDate
+      ? new Date(toDate)
+      : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     endDate.setHours(23, 59, 59, 999);
 
-    // ---------------------------
-    // RESUMES & COLLEGES
-    // ---------------------------
+    // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
     const resumes = await model.StudentResume.findAll({
       where: {
         interviewedBy: userName,
@@ -825,16 +812,14 @@ const getUserTargetAnalysis = async (req, res) => {
     });
 
     const collegeSet = new Set();
-    resumes.forEach(r => {
+    resumes.forEach((r) => {
       if (r.collegeName) collegeSet.add(r.collegeName);
     });
 
     const collegesAchieved = collegeSet.size;
     const resumesAchieved = resumes.length;
 
-    // ---------------------------
-    // SELECTED COUNT
-    // ---------------------------
+    // RESUME SELECTED COUNT — same logic as fetchMasterSheetTargets
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: userName,
@@ -843,13 +828,25 @@ const getUserTargetAnalysis = async (req, res) => {
       },
     });
 
-    // ---------------------------
-    //  TARGETS (NOW CORRECTLY DATE-BOUND)
-    // ---------------------------
+    //  FIX: TARGET DATE RANGE LOGIC
+    let targetStartDate;
+    let targetEndDate;
+
+    if (fromDate || toDate) {
+      targetStartDate = startDate;
+      targetEndDate = endDate;
+    } else {
+      targetStartDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      targetEndDate = new Date(now);
+      targetStartDate.setHours(0, 0, 0, 0);
+      targetEndDate.setHours(23, 59, 59, 999);
+    }
+
+    // Fetch target data (FIXED)
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
-        targetDate: { [Op.between]: [startDate, endDate] },
+        targetDate: { [Op.between]: [targetStartDate, targetEndDate] },
       },
       attributes: [
         [fn("SUM", col("collegeTarget")), "collegeTarget"],
@@ -871,7 +868,7 @@ const getUserTargetAnalysis = async (req, res) => {
         collegeTarget: Number(targetData.collegeTarget),
         collegesAchieved,
         interviewsTarget: Number(targetData.interviewsTarget),
-        interviewsAchieved: resumesAchieved,
+        interviewsAchieved: resumes.length,
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved,
         resumeDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
