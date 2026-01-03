@@ -943,7 +943,7 @@ const sendMailToStudent = async (req, res) => {
 };
 module.exports.sendMailToStudent = sendMailToStudent;
 
-// ✅ USER RESUMES ACHIEVED
+//  USER RESUMES ACHIEVED (SELECTED ONLY, INTERVIEW DATE BASED)
 const getUserResumesAchieved = async (req, res) => {
   try {
     const { fromDate, toDate, teamManagerId } = req.query;
@@ -956,26 +956,31 @@ const getUserResumesAchieved = async (req, res) => {
       attributes: ["name"],
       raw: true,
     });
-    if (!manager) return res.status(404).json({ success: false, error: "Manager not found" });
+    if (!manager)
+      return res.status(404).json({ success: false, error: "Manager not found" });
 
     const fullName = manager.name.trim();
 
-    // Date filter
+    // Date filter (INTERVIEW DATE)
     let dateFilter = {};
     if (fromDate && toDate) {
       const startDate = new Date(fromDate);
+      startDate.setHours(0, 0, 0, 0);
+
       const endDate = new Date(toDate);
-      dateFilter = { resumeDate: { [Op.between]: [startDate, endDate] } };
+      endDate.setHours(23, 59, 59, 999);
+
+      dateFilter = {
+        Dateofonboarding: { [Op.between]: [startDate, endDate] },
+      };
     }
 
-    // Fetch resumes with FundsAuditStudents
+    // Fetch ONLY SELECTED resumes for individual manager
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
-        [Op.or]: [
-          { followupBy: { [Op.iLike]: fullName } },
-          { followupBy: { [Op.iLike]: fullName } },
-        ],
+        interviewedBy: fullName,
+        finalSelectionStatus: "Selected",
         ...dateFilter,
       },
       include: [
@@ -1000,18 +1005,17 @@ const getUserResumesAchieved = async (req, res) => {
           ],
         },
       ],
-      order: [["createdAt", "ASC"]],
-      raw: false, // Must be false to include associations
-      nest: true, // Keep nested structure
+      order: [["Dateofonboarding", "ASC"]],
+      raw: false,
+      nest: true,
     });
 
-    // Fetch all managers for reference
+    // Fetch all managers (UNCHANGED)
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
     });
 
-    // Return response in the same format
     return res.json({
       success: true,
       resumesAchieved: resumes.length,
@@ -1025,6 +1029,7 @@ const getUserResumesAchieved = async (req, res) => {
 };
 
 module.exports.getUserResumesAchieved = getUserResumesAchieved;
+
 
 
 const getUserInterviewsAchieved = async (req, res) => {
