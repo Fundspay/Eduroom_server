@@ -285,15 +285,19 @@ const getCoSheetsWithCounts = async (req, res) => {
     if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
     const today = new Date();
+
     const formatLocalDate = date =>
       `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
         date.getDate()
       ).padStart(2, "0")}`;
 
+    //  DEFAULT = CURRENT MONTH TILL TODAY
     if (!fromDate && !toDate) {
-      fromDate = formatLocalDate(today);
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromDate = formatLocalDate(firstDayOfMonth);
       toDate = formatLocalDate(today);
     }
+
     if (fromDate && !toDate) toDate = fromDate;
     if (!fromDate && toDate) fromDate = toDate;
 
@@ -312,7 +316,7 @@ const getCoSheetsWithCounts = async (req, res) => {
 
     const managerName = manager.name;
 
-    // Filter CoSheets by connectedBy (name) instead of id
+    // Filter CoSheets by connectedBy (name)
     const data = await model.CoSheet.findAll({
       where: {
         connectedBy: managerName,
@@ -374,6 +378,7 @@ const getCoSheetsWithCounts = async (req, res) => {
 };
 
 module.exports.getCoSheetsWithCounts = getCoSheetsWithCounts;
+
 
 
 
