@@ -123,7 +123,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    //  Generate dates array correctly with server timezone (fix 31st Dec issue)
+    // Generate dates array correctly with server timezone
     const formatDate = (date) => {
       const d = new Date(date);
       const offset = d.getTimezoneOffset() * 60000; // minutes to ms
@@ -209,8 +209,6 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
-
-
 
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
