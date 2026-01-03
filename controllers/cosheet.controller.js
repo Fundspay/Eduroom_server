@@ -236,6 +236,62 @@ const getCoSheetByManager = async (req, res) => {
 
 module.exports.getCoSheetByManager = getCoSheetByManager;
 
+// Get single CoSheet filtered by manager and callResponse = "Not Answered"
+const getCoSheetByManagerCNA = async (req, res) => {
+  try {
+    let { managerName } = req.params; // Frontend sends manager name
+    let { fromDate, toDate } = req.query; // Optional date range
+
+    if (!managerName) return ReE(res, "managerName is required", 400);
+
+    managerName = managerName.trim().toLowerCase(); // Trim & lowercase for consistent matching
+
+    // ---------------------------
+    // Date handling (default = current month till today)
+    // ---------------------------
+    const today = new Date();
+    let from, to;
+
+    if (fromDate && toDate) {
+      from = new Date(fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(toDate);
+      to.setHours(23, 59, 59, 999);
+    } else {
+      from = new Date(today.getFullYear(), today.getMonth(), 1); // first day of current month
+      from.setHours(0, 0, 0, 0);
+
+      to = new Date(today);
+      to.setHours(23, 59, 59, 999);
+    }
+
+    // Fetch CoSheet records where connectedBy matches manager name, callResponse = "Not Answered", and within date range
+    const records = await model.CoSheet.findAll({
+      where: {
+        connectedBy: { [Op.iLike]: managerName }, // Case-insensitive match
+        callResponse: { [Op.iLike]: "Not Answered" }, // Case-insensitive
+        dateOfConnect: { [Op.between]: [from, to] } // Date range filter
+      },
+      order: [["dateOfConnect", "ASC"]] // Optional: order by date
+    });
+
+    return ReS(res, {
+      success: true,
+      count: records.length,
+      data: records,
+      message: records.length
+        ? `Found ${records.length} "Not Answered" CoSheet records for manager ${managerName} between ${from.toISOString().split("T")[0]} and ${to.toISOString().split("T")[0]}`
+        : "No 'Not Answered' CoSheet records found for this manager in the given date range"
+    }, 200);
+
+  } catch (error) {
+    console.error("CoSheet Fetch By Manager Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getCoSheetByManagerCNA = getCoSheetByManagerCNA;
 
 
 const sendJDToCollege = async (req, res) => {
