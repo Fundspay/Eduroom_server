@@ -652,3 +652,52 @@ const getCoSheetsWithJDSent = async (req, res) => {
 
 module.exports.getCoSheetsWithJDSent = getCoSheetsWithJDSent;
 
+
+const getColleges = async (req, res) => {
+  try {
+    const { state, city } = req.query;
+
+    if (!state) {
+      return res.status(400).json({
+        success: false,
+        message: "state is required",
+      });
+    }
+
+    let query = `
+      SELECT DISTINCT "collegeName"
+      FROM "CoSheets"
+      WHERE "state" = $1
+    `;
+
+    const replacements = [state];
+
+    if (city) {
+      query += ` AND "city" = $2`;
+      replacements.push(city);
+    }
+
+    query += ` ORDER BY "collegeName"`;
+
+    const data = await sequelize.query(query, {
+      replacements,
+      type: sequelize.QueryTypes.SELECT,
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: data.length,
+      data,
+    });
+  } catch (error) {
+    console.error("Error fetching colleges:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+module.exports.getColleges = getColleges;
+
+

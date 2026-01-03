@@ -19,4 +19,6 @@ router.get("/internship-type-colleges/:teamManagerId", cosheetController.getInte
 // Delete CoSheet
 router.delete("/cosheet/:id", cosheetController.deleteCoSheet);
 
+router.get("/colleges", cosheetController.getColleges);
+
 module.exports = router;
