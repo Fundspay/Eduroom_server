@@ -122,7 +122,7 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["registration", "activeStatus"], // removed "businessTask" from here
+            include: ["businessTask", "registration", "activeStatus"],
           },
         },
       ],
@@ -206,7 +206,6 @@ const getBdSheet = async (req, res) => {
 
 module.exports.getBdSheet = getBdSheet;
 
-
 const getBdSheetByCategory = async (req, res) => {
   try {
     const { managerId, category } = req.query;
@@ -245,7 +244,7 @@ const getBdSheetByCategory = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask", "registration", "activeStatus"],
+            include: ["businessTask", "registration", "activeStatus"], // keep as is
           },
           order: [["id", "DESC"]],
         },
@@ -265,7 +264,6 @@ const getBdSheetByCategory = async (req, res) => {
             where: { phoneNumber: s.mobileNumber },
             attributes: [
               "subscriptionWallet",
-              "subscriptiondeductedWallet",
               "id",            // << added
               "collegeName",   // << added
             ],
@@ -273,8 +271,7 @@ const getBdSheetByCategory = async (req, res) => {
 
           if (user) {
             const wallet = parseInt(user.subscriptionWallet || 0, 10);
-            const deducted = parseInt(user.subscriptiondeductedWallet || 0, 10);
-            businessTask = wallet + deducted;
+            businessTask = wallet; // only subscriptionWallet
 
             // << NEW FIELDS >>
             s.userId = user.id;
@@ -344,6 +341,7 @@ const getBdSheetByCategory = async (req, res) => {
 };
 
 module.exports.getBdSheetByCategory = getBdSheetByCategory;
+
 
 
 const getDashboardStats = async (req, res) => {
