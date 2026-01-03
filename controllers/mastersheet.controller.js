@@ -44,7 +44,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 
       managers = [manager];
       managerIdFilter = { teamManagerId };
-      managerNameFilter = manager.name.trim(); // will be used for connectedBy
+      managerNameFilter = manager.name.trim();
     } else {
       managers = await model.TeamManager.findAll({
         attributes: ["id", "name"],
@@ -52,7 +52,7 @@ var fetchMasterSheetTargets = async function (req, res) {
       });
     }
 
-    // ✅ JD Sent count based on connectedBy
+    // Correct JD Sent count based on date range and connectedBy
     const jdSentCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
@@ -123,8 +123,14 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Generate dates array
-    const formatDate = (date) => date.toISOString().split("T")[0];
+    //  Generate dates array correctly with server timezone (fix 31st Dec issue)
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const offset = d.getTimezoneOffset() * 60000; // minutes to ms
+      const localDate = new Date(d.getTime() - offset);
+      return localDate.toISOString().split("T")[0];
+    };
+
     const dateList = [];
     for (let d = new Date(sDate.getTime()); d <= eDate; d.setDate(d.getDate() + 1)) {
       const current = new Date(d.getTime()); // clone
@@ -203,6 +209,7 @@ var fetchMasterSheetTargets = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
+
 
 
 
