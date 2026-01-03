@@ -91,29 +91,31 @@ const getResumeAnalysis = async (req, res) => {
     ];
 
     /* =======================
-       FOLLOW-UP DATE RANGE (UNCHANGED)
+       DATE RANGE LOGIC (DEFAULT TO CURRENT MONTH)
+    ======================= */
+    let start, end;
+
+    if (fromDate && toDate) {
+      start = new Date(fromDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(toDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      const today = new Date();
+      start = new Date(today.getFullYear(), today.getMonth(), 1); // 1st day of month
+      start.setHours(0, 0, 0, 0);
+      end = new Date(today.getFullYear(), today.getMonth() + 1, 0); // last day of month
+      end.setHours(23, 59, 59, 999);
+    }
+
+    /* =======================
+       FOLLOW-UP WHERE
     ======================= */
     const followUpWhere = {
       followUpBy: managerName,
       followUpResponse: { [Op.in]: validResponses },
+      followUpDate: { [Op.between]: [start, end] },
     };
-
-    if (fromDate && toDate) {
-      const start = new Date(fromDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-
-      followUpWhere.followUpDate = { [Op.between]: [start, end] };
-    } else {
-      const today = new Date();
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-
-      followUpWhere.followUpDate = { [Op.between]: [start, end] };
-    }
 
     const data = await model.CoSheet.findAll({
       where: followUpWhere,
@@ -129,29 +131,13 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     /* =======================
-       RESUME COUNT (UNCHANGED)
+       RESUME COUNT
     ======================= */
     const resumeWhere = {
       followUpBy: managerName,
       followUpResponse: "resumes received",
+      resumeDate: { [Op.between]: [start, end] },
     };
-
-    if (fromDate && toDate) {
-      const start = new Date(fromDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-
-      resumeWhere.resumeDate = { [Op.between]: [start, end] };
-    } else {
-      const today = new Date();
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-
-      resumeWhere.resumeDate = { [Op.between]: [start, end] };
-    }
 
     const resumeData = await model.CoSheet.findAll({
       where: resumeWhere,
@@ -160,26 +146,12 @@ const getResumeAnalysis = async (req, res) => {
     });
 
     /* =======================
-       TARGETS (FIXED – DATE BASED)
+       TARGETS
     ======================= */
-    const targetWhere = { teamManagerId };
-
-    if (fromDate && toDate) {
-      const start = new Date(fromDate);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(toDate);
-      end.setHours(23, 59, 59, 999);
-
-      targetWhere.targetDate = { [Op.between]: [start, end] };
-    } else {
-      const today = new Date();
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-
-      targetWhere.targetDate = { [Op.between]: [start, end] };
-    }
+    const targetWhere = {
+      teamManagerId,
+      targetDate: { [Op.between]: [start, end] },
+    };
 
     const targets = await model.MyTarget.findAll({
       where: targetWhere,
@@ -198,7 +170,7 @@ const getResumeAnalysis = async (req, res) => {
     );
 
     /* =======================
-       CALCULATIONS (UNCHANGED)
+       CALCULATIONS
     ======================= */
     let totalAchievedFollowUps = 0;
     let totalAchievedResumes = Number(resumeData[0]?.resumeCount || 0);
@@ -255,7 +227,6 @@ const getResumeAnalysis = async (req, res) => {
 };
 
 module.exports.getResumeAnalysis = getResumeAnalysis;
-
 
 
 
