@@ -3,13 +3,13 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const model = require("../models");
 const { Op, fn, col } = require("sequelize");
 
-var fetchMasterSheetTargets = async function (req, res) {
+const fetchMasterSheetTargets = async (req, res) => {
   try {
     let { teamManagerId, startDate, endDate, month } = req.query;
-
     const today = new Date();
     let sDate, eDate;
 
+    // Determine date range
     if (month) {
       const [year, mon] = month.split("-");
       sDate = new Date(year, mon - 1, 1);
@@ -22,23 +22,21 @@ var fetchMasterSheetTargets = async function (req, res) {
       eDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     }
 
-    // Keep full day range for DB queries
     sDate.setHours(0, 0, 0, 0);
     eDate.setHours(23, 59, 59, 999);
 
+    // Manager filter
     let managers = [];
     let managerIdFilter = {};
     let managerNameFilter = null;
 
     if (teamManagerId) {
       teamManagerId = parseInt(teamManagerId, 10);
-
       const manager = await model.TeamManager.findOne({
         attributes: ["id", "name"],
         where: { id: teamManagerId },
         raw: true,
       });
-
       if (!manager) return ReE(res, "Invalid teamManagerId", 400);
 
       managers = [manager];
@@ -51,19 +49,63 @@ var fetchMasterSheetTargets = async function (req, res) {
       });
     }
 
-    const jdSentCount = await model.CoSheet.count({
+    // Helper function to normalize date to YYYY-MM-DD
+    const formatDate = (date) => date.toISOString().split("T")[0];
+
+    // Build date list
+    const dateList = [];
+    for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
+      const current = new Date(d);
+      dateList.push({
+        date: formatDate(current),
+        day: current.toLocaleDateString("en-US", { weekday: "long" }),
+        jds: 0,
+        calls: 0,
+        followUps: 0,
+        resumetarget: 0,
+        collegeTarget: 0,
+        interviewsTarget: 0,
+        resumesReceivedTarget: 0,
+      });
+    }
+
+    // ✅ Correct JD count per day
+    const jdCountsByDate = await model.CoSheet.findAll({
       where: {
-        ...managerIdFilter,
-        detailedResponse: "Send JD",
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
+        detailedResponse: { [Op.iLike]: "Send JD" },
         dateOfConnect: { [Op.between]: [sDate, eDate] },
       },
+      attributes: [
+        [fn("DATE", col("dateOfConnect")), "date"],
+        [fn("COUNT", col("id")), "jdCount"],
+      ],
+      group: ["date"],
+      raw: true,
     });
 
+    // Map JD counts into dateList
+    dateList.forEach((d) => {
+      const jdForDay = jdCountsByDate.find((j) => j.date === d.date);
+      if (jdForDay) d.jds = Number(jdForDay.jdCount);
+    });
+
+    // ✅ Use your existing logic for calls, followUps, resumes, totals, etc.
     const callResponseCount = await model.CoSheet.count({
       where: {
         ...(managerNameFilter ? { connectedBy: managerNameFilter } : {}),
         callResponse: { [Op.ne]: null },
         dateOfConnect: { [Op.between]: [sDate, eDate] },
+      },
+    });
+
+    const followUpsCount = await model.CoSheet.count({
+      where: {
+        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
+        followUpResponse: {
+          [Op.in]: ["sending in 1-2 days", "delayed", "no response", "unprofessional", "resumes received"],
+        },
+        resumeDate: { [Op.between]: [sDate, eDate] },
       },
     });
 
@@ -73,10 +115,9 @@ var fetchMasterSheetTargets = async function (req, res) {
         followUpResponse: "resumes received",
         resumeDate: { [Op.between]: [sDate, eDate] },
       },
-      attributes: [[model.Sequelize.fn("SUM", model.Sequelize.col("resumeCount")), "resumeCountSum"]],
+      attributes: [[fn("SUM", col("resumeCount")), "resumeCountSum"]],
       raw: true,
     });
-
     const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
     const resumes = await model.StudentResume.findAll({
@@ -97,22 +138,6 @@ var fetchMasterSheetTargets = async function (req, res) {
     const collegesAchieved = collegeSet.size;
     const resumesAchieved = resumes.length;
 
-    const followUpsCount = await model.CoSheet.count({
-      where: {
-        ...(managerNameFilter ? { followUpBy: managerNameFilter } : {}),
-        followUpResponse: {
-          [Op.in]: [
-            "sending in 1-2 days",
-            "delayed",
-            "no response",
-            "unprofessional",
-            "resumes received",
-          ],
-        },
-        resumeDate: { [Op.between]: [sDate, eDate] },
-      },
-    });
-
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
@@ -121,84 +146,38 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Create array of dates with only YYYY-MM-DD
-    const dateList = [];
-    for (let d = new Date(sDate); d <= eDate; d.setDate(d.getDate() + 1)) {
-      const current = new Date(d);
-      dateList.push({
-        date: current.toISOString().split("T")[0], // YYYY-MM-DD only
-        day: current.toLocaleDateString("en-US", { weekday: "long" }),
-        jds: 0,
-        calls: 0,
-        followUps: 0,
-        resumetarget: 0,
-        collegeTarget: 0,
-        interviewsTarget: 0,
-        resumesReceivedTarget: 0,
-      });
-    }
-
-    const existingTargets = await model.MyTarget.findAll({
-      where: {
-        ...managerIdFilter,
-        targetDate: { [Op.between]: [sDate, eDate] },
-      },
-    });
-
-    // Merge logic
-    const merged = dateList.map((d) => {
-      const matchedTargets = existingTargets.filter((t) => {
-        const tDateStr = new Date(t.targetDate).toISOString().split("T")[0];
-        return tDateStr === d.date;
-      });
-
-      return {
-        ...d,
-        jds: matchedTargets.reduce((s, t) => s + (t.jds || 0), 0),
-        calls: matchedTargets.reduce((s, t) => s + (t.calls || 0), 0),
-        followUps: matchedTargets.reduce((s, t) => s + (t.followUps || 0), 0),
-        resumetarget: matchedTargets.reduce((s, t) => s + (t.resumetarget || 0), 0),
-        collegeTarget: matchedTargets.reduce((s, t) => s + (t.collegeTarget || 0), 0),
-        interviewsTarget: matchedTargets.reduce((s, t) => s + (t.interviewsTarget || 0), 0),
-        resumesReceivedTarget: matchedTargets.reduce((s, t) => s + (t.resumesReceivedTarget || 0), 0),
-      };
-    });
-
+    // Totals
     const totals = {
-      jds: merged.reduce((s, t) => s + t.jds, 0),
-      calls: merged.reduce((s, t) => s + t.calls, 0),
-      followUps: merged.reduce((s, t) => s + t.followUps, 0),
-      resumetarget: merged.reduce((s, t) => s + t.resumetarget, 0),
-      collegeTarget: merged.reduce((s, t) => s + t.collegeTarget, 0),
-      interviewsTarget: merged.reduce((s, t) => s + t.interviewsTarget, 0),
-      resumesReceivedTarget: merged.reduce((s, t) => s + t.resumesReceivedTarget, 0),
+      jds: dateList.reduce((s, t) => s + t.jds, 0),
+      calls: callResponseCount,
+      followUps: followUpsCount,
+      resumetarget: 0,
+      collegeTarget: 0,
+      interviewsTarget: 0,
+      resumesReceivedTarget: resumeReceivedSum,
     };
 
-    return ReS(
-      res,
-      {
-        success: true,
-        jdSentCount,
-        callResponseCount,
-        resumeReceivedSum,
-        followUpsCount,
-        resumeSelectedCount,
-        collegesAchieved,
-        resumesAchieved,
-        managers,
-        dates: merged,
-        totals,
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      jdSentCount: totals.jds,
+      callResponseCount: totals.calls,
+      resumeReceivedSum,
+      followUpsCount: totals.followUps,
+      resumeSelectedCount,
+      collegesAchieved,
+      resumesAchieved,
+      managers,
+      dates: dateList,
+      totals,
+    }, 200);
+
   } catch (error) {
+    console.error(error);
     return ReE(res, error.message, 500);
   }
 };
 
 module.exports.fetchMasterSheetTargets = fetchMasterSheetTargets;
-
-
 
 var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
   try {
