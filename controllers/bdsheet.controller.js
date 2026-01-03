@@ -367,14 +367,24 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // Date handling
+    // Date handling (DEFAULT = CURRENT MONTH TILL TODAY)
     // ---------------------------
     let fromDate = null;
     let toDate = null;
 
     if (startDate && endDate) {
       fromDate = new Date(startDate);
+      fromDate.setHours(0, 0, 0, 0);
+
       toDate = new Date(endDate);
+      toDate.setHours(23, 59, 59, 999);
+    } else {
+      const today = new Date();
+
+      fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromDate.setHours(0, 0, 0, 0);
+
+      toDate = new Date(today);
       toDate.setHours(23, 59, 59, 999);
     }
 
@@ -384,9 +394,7 @@ const getDashboardStats = async (req, res) => {
     const bdTargetData = await model.BdTarget.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
-        ...(fromDate && toDate
-          ? { targetDate: { [Op.between]: [fromDate, toDate] } }
-          : {}),
+        targetDate: { [Op.between]: [fromDate, toDate] },
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
@@ -402,19 +410,17 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 2️⃣ BdSheet + StudentResume (DATE FILTER)
+    // 2️⃣ BdSheet + StudentResume
     // ---------------------------
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         ...(managerId ? { teamManagerId: managerId } : {}),
-        ...(fromDate && toDate
-          ? { startDate: { [Op.between]: [fromDate, toDate] } }
-          : {}),
+        startDate: { [Op.between]: [fromDate, toDate] },
       },
       attributes: ["activeStatus"],
       include: [
         {
-          model: model.StudentResume, // ✅ FIXED
+          model: model.StudentResume,
           attributes: ["mobileNumber"],
           required: true,
         },
@@ -428,7 +434,7 @@ const getDashboardStats = async (req, res) => {
     ).length;
 
     // ---------------------------
-    // 3️⃣ ACHIEVED ACCOUNTS (businessTask logic)
+    // 3️⃣ ACHIEVED ACCOUNTS
     // ---------------------------
     let totalAccountsSheet = 0;
 
@@ -472,8 +478,8 @@ const getDashboardStats = async (req, res) => {
       },
       appliedFilters: {
         managerId: managerId || "ALL",
-        startDate,
-        endDate,
+        startDate: fromDate,
+        endDate: toDate,
       },
     });
 
@@ -484,6 +490,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
