@@ -122,7 +122,7 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask", "registration", "activeStatus"],
+            include: ["registration", "activeStatus"], // removed "businessTask" from here
           },
         },
       ],
@@ -205,7 +205,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
-
 
 
 const getBdSheetByCategory = async (req, res) => {
