@@ -209,8 +209,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
       attributes: ["subscriptionWallet"]
     });
 
-    const achievedBusinessTask =
-      parseInt(user?.subscriptionWallet || 0, 10) || 0;
+    const achievedBusinessTask = parseInt(user?.subscriptionWallet || 0, 10) || 0;
 
     // Fetch day-wise analysis data
     const analysisDays = await model.analysis1.findAll({
@@ -244,6 +243,15 @@ var fetchStoredCoursesByUser = async function (req, res) {
 
     const today = new Date();
 
+    // Create a map to ensure business_task is consistent across all records
+    const taskMap = {};
+    courses.forEach(c => {
+      const key = `${c.user_id}_${c.course_id}`;
+      if (c.business_task !== null && c.business_task !== undefined) {
+        taskMap[key] = Number(c.business_task);
+      }
+    });
+
     const coursesWithDaysLeft = courses.map(c => {
       const endDate = c.end_date ? new Date(c.end_date) : null;
       const diffTime = endDate
@@ -254,10 +262,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
         ? Math.max(Math.floor(diffTime / (1000 * 60 * 60 * 24)), 0)
         : null;
 
-      const business_task =
-        c.business_task !== null && c.business_task !== undefined
-          ? Number(c.business_task)
-          : 0;
+      const key = `${c.user_id}_${c.course_id}`;
 
       return {
         user_id: c.user_id,
@@ -266,10 +271,10 @@ var fetchStoredCoursesByUser = async function (req, res) {
         start_date: c.start_date,
         end_date: c.end_date,
         daysLeft,
-        business_task,
+        business_task: taskMap[key] || 0,
         achieved_business_task: achievedBusinessTask,
         current_category: currentCategory,
-        work_status_percentage: workStatusPercentage //  NEW FIELD
+        work_status_percentage: workStatusPercentage
       };
     });
 
@@ -289,6 +294,7 @@ var fetchStoredCoursesByUser = async function (req, res) {
 };
 
 module.exports.fetchStoredCoursesByUser = fetchStoredCoursesByUser;
+
 
 
 var updateStoredCourse = async function (req, res) {
