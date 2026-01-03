@@ -692,7 +692,7 @@ const getColleges = async (req, res) => {
   }
 };
 
-module.exports = { getColleges };
+module.exports.getColleges = getColleges;
 
 
 
