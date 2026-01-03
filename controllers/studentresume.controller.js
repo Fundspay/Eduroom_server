@@ -961,19 +961,7 @@ const getUserResumesAchieved = async (req, res) => {
 
     const fullName = manager.name.trim();
 
-    // Date filter (INTERVIEW DATE)
-    let dateFilter = {};
-    if (fromDate && toDate) {
-      const startDate = new Date(fromDate);
-      startDate.setHours(0, 0, 0, 0);
-
-      const endDate = new Date(toDate);
-      endDate.setHours(23, 59, 59, 999);
-
-      dateFilter = {
-        Dateofonboarding: { [Op.between]: [startDate, endDate] },
-      };
-    }
+    // ❌ DATE RANGE REMOVED — SHOW ALL SELECTED
 
     // Fetch ONLY SELECTED resumes for individual manager
     const resumes = await model.StudentResume.findAll({
@@ -981,7 +969,6 @@ const getUserResumesAchieved = async (req, res) => {
         teamManagerId,
         interviewedBy: fullName,
         finalSelectionStatus: "Selected",
-        ...dateFilter,
       },
       include: [
         {
