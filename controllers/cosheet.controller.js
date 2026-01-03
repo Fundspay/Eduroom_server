@@ -266,7 +266,9 @@ const getCoSheetByManagerCNA = async (req, res) => {
       to.setHours(23, 59, 59, 999);
     }
 
-    // Fetch CoSheet records where connectedBy matches manager name, callResponse = "Not Answered", and within date range
+    // ---------------------------
+    // Fetch CoSheet records
+    // ---------------------------
     const records = await model.CoSheet.findAll({
       where: {
         connectedBy: { [Op.iLike]: managerName }, // Case-insensitive match
@@ -276,12 +278,23 @@ const getCoSheetByManagerCNA = async (req, res) => {
       order: [["dateOfConnect", "ASC"]] // Optional: order by date
     });
 
+    // ---------------------------
+    // Format local date for message
+    // ---------------------------
+    const formatLocalDate = (date) => {
+      const d = new Date(date);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    };
+
     return ReS(res, {
       success: true,
       count: records.length,
       data: records,
       message: records.length
-        ? `Found ${records.length} "Not Answered" CoSheet records for manager ${managerName} between ${from.toISOString().split("T")[0]} and ${to.toISOString().split("T")[0]}`
+        ? `Found ${records.length} "Not Answered" CoSheet records for manager ${managerName} between ${formatLocalDate(from)} and ${formatLocalDate(to)}`
         : "No 'Not Answered' CoSheet records found for this manager in the given date range"
     }, 200);
 
@@ -292,6 +305,7 @@ const getCoSheetByManagerCNA = async (req, res) => {
 };
 
 module.exports.getCoSheetByManagerCNA = getCoSheetByManagerCNA;
+
 
 
 const sendJDToCollege = async (req, res) => {
