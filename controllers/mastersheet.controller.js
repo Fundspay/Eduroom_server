@@ -247,7 +247,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       const managerName = manager.name.trim();
       const managerId = manager.id;
 
-      //  Corrected: use managerName instead of undefined managerNameFilter
+      // JD Sent count
       const jdSentCount = await model.CoSheet.count({
         where: {
           connectedBy: managerName,
@@ -256,7 +256,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
-      //  Filter calls by connectedBy
+      // Call response count
       const callResponseCount = await model.CoSheet.count({
         where: {
           connectedBy: managerName,
@@ -265,6 +265,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
+      // Resume received sum
       const resumeData = await model.CoSheet.findAll({
         where: {
           teamManagerId: managerId,
@@ -276,19 +277,25 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
       });
       const resumeReceivedSum = Number(resumeData[0]?.resumeCountSum || 0);
 
+      // FIXED: Fetch resumes exactly like first function
       const resumes = await model.StudentResume.findAll({
         where: {
-          teamManagerId: managerId,
-          resumeDate: { [Op.between]: [sDate, eDate] },
+          interviewedBy: managerName,
+          [Op.or]: [
+            { Dateofonboarding: { [Op.between]: [sDate, eDate] } },
+            { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
+          ],
         },
-        attributes: ["collegeName"],
+        attributes: ["collegeName", "Dateofonboarding", "updatedAt"],
         raw: true,
       });
 
+      // Unique colleges using Set
       const collegeSet = new Set();
       resumes.forEach((r) => r.collegeName && collegeSet.add(r.collegeName));
       const collegesAchieved = collegeSet.size;
 
+      // Follow-ups count
       const followUpsCount = await model.CoSheet.count({
         where: {
           teamManagerId: managerId,
@@ -297,6 +304,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
+      // Resume selected count
       const resumeSelectedCount = await model.StudentResume.count({
         where: {
           interviewedBy: managerName,
@@ -305,6 +313,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         },
       });
 
+      // Fetch targets
       const targetData = await model.MyTarget.findAll({
         where: {
           teamManagerId: managerId,
@@ -332,6 +341,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
         resumesReceivedTarget: 0,
       };
 
+      // Percentage calculation
       const percentage = {
         jds: Number(target.jds) > 0 ? parseFloat(((jdSentCount / target.jds) * 100).toFixed(2)) : 0,
         calls: Number(target.calls) > 0 ? parseFloat(((callResponseCount / target.calls) * 100).toFixed(2)) : 0,
@@ -388,6 +398,7 @@ var fetchMasterSheetTargetsForAllManagers = async function (req, res) {
 };
 
 module.exports.fetchMasterSheetTargetsForAllManagers = fetchMasterSheetTargetsForAllManagers;
+
 
 
 
