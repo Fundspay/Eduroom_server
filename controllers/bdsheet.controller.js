@@ -407,6 +407,7 @@ const getDashboardStats = async (req, res) => {
 
     // ---------------------------
     // 4️⃣ BD SHEET (DATE-RANGE BASED COUNTS)
+    // Only consider BdSheets that have a valid StudentResume
     // ---------------------------
     const bdSheets = await model.BdSheet.findAll({
       where: {
@@ -414,23 +415,19 @@ const getDashboardStats = async (req, res) => {
         startDate: { [Op.between]: [fromDate, toDate] },
       },
       attributes: ["id", "studentResumeId", "activeStatus"],
+      include: [
+        {
+          model: model.StudentResume,
+          required: true, // Only include valid student resumes
+          attributes: ["mobileNumber"],
+        },
+      ],
       order: [["id", "DESC"]],
     });
 
-    // Deduplicate by studentResumeId (latest record only)
-    const latestByStudent = new Map();
+    const totalInterns = bdSheets.length;
 
-    bdSheets.forEach(sheet => {
-      if (!latestByStudent.has(sheet.studentResumeId)) {
-        latestByStudent.set(sheet.studentResumeId, sheet);
-      }
-    });
-
-    const uniqueSheets = Array.from(latestByStudent.values());
-
-    const totalInterns = uniqueSheets.length;
-
-    const totalActiveInterns = uniqueSheets.filter(
+    const totalActiveInterns = bdSheets.filter(
       s => s.activeStatus?.toLowerCase() === "active"
     ).length;
 
@@ -439,15 +436,10 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     let totalAccountsSheet = 0;
 
-    const studentIds = uniqueSheets.map(s => s.studentResumeId);
-
-    const students = await model.StudentResume.findAll({
-      where: { id: { [Op.in]: studentIds } },
-      attributes: ["mobileNumber"],
-    });
-
     const mobileNumbers = [
-      ...new Set(students.map(s => s.mobileNumber).filter(Boolean)),
+      ...new Set(
+        bdSheets.map(s => s.StudentResume?.mobileNumber).filter(Boolean)
+      ),
     ];
 
     if (mobileNumbers.length) {
@@ -489,6 +481,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
