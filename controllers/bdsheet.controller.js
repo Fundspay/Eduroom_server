@@ -406,28 +406,43 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 4️⃣ BD SHEET + STUDENT RESUME
+    // 4️⃣ INTERNS COUNT (MATCH getBdSheet LOGIC)
     // ---------------------------
-    const bdSheetData = await model.BdSheet.findAll({
+
+    let managerName = null;
+    if (managerId) {
+      const manager = await model.TeamManager.findByPk(managerId, {
+        attributes: ["name"],
+      });
+      managerName = manager?.name || "__invalid__";
+    }
+
+    const students = await model.StudentResume.findAll({
       where: {
-        ...(managerId ? { teamManagerId: managerId } : {}),
-        startDate: { [Op.between]: [fromDate, toDate] },
+        ...(managerName ? { alloted: managerName } : {}),
       },
-      attributes: ["activeStatus"],
+      attributes: ["id", "mobileNumber"],
       include: [
         {
-          model: model.StudentResume,
-          attributes: ["mobileNumber"],
-          required: true,
+          model: model.BdSheet,
+          required: false,
+          attributes: ["id", "activeStatus"],
         },
       ],
     });
 
-    const totalInterns = bdSheetData.length;
+    const totalInterns = students.length;
 
-    const totalActiveInterns = bdSheetData.filter(
-      s => s.activeStatus?.toLowerCase() === "active"
-    ).length;
+    let totalActiveInterns = 0;
+
+    students.forEach(student => {
+      if (Array.isArray(student.BdSheet) && student.BdSheet.length) {
+        const latestSheet = student.BdSheet.sort((a, b) => b.id - a.id)[0];
+        if (latestSheet?.activeStatus?.toLowerCase() === "active") {
+          totalActiveInterns++;
+        }
+      }
+    });
 
     // ---------------------------
     // 5️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
@@ -436,8 +451,8 @@ const getDashboardStats = async (req, res) => {
 
     const mobileNumbers = [
       ...new Set(
-        bdSheetData
-          .map(s => s.StudentResume?.mobileNumber)
+        students
+          .map(s => s.mobileNumber)
           .filter(Boolean)
       ),
     ];
@@ -481,6 +496,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
