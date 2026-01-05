@@ -407,7 +407,7 @@ const getDashboardStats = async (req, res) => {
 
     // ---------------------------
     // 4️⃣ BD SHEET (DATE-RANGE BASED COUNTS)
-    // Only consider BdSheets that have a valid StudentResume
+    // Only valid StudentResume and deduplicate by studentResumeId
     // ---------------------------
     const bdSheets = await model.BdSheet.findAll({
       where: {
@@ -418,16 +418,26 @@ const getDashboardStats = async (req, res) => {
       include: [
         {
           model: model.StudentResume,
-          required: true, // Only include valid student resumes
+          required: true, // only valid StudentResume
           attributes: ["mobileNumber"],
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    const totalInterns = bdSheets.length;
+    // Deduplicate by studentResumeId (latest record only)
+    const latestByStudent = new Map();
+    bdSheets.forEach(sheet => {
+      if (!latestByStudent.has(sheet.studentResumeId)) {
+        latestByStudent.set(sheet.studentResumeId, sheet);
+      }
+    });
 
-    const totalActiveInterns = bdSheets.filter(
+    const uniqueSheets = Array.from(latestByStudent.values());
+
+    const totalInterns = uniqueSheets.length;
+
+    const totalActiveInterns = uniqueSheets.filter(
       s => s.activeStatus?.toLowerCase() === "active"
     ).length;
 
@@ -437,9 +447,7 @@ const getDashboardStats = async (req, res) => {
     let totalAccountsSheet = 0;
 
     const mobileNumbers = [
-      ...new Set(
-        bdSheets.map(s => s.StudentResume?.mobileNumber).filter(Boolean)
-      ),
+      ...new Set(uniqueSheets.map(s => s.StudentResume.mobileNumber).filter(Boolean)),
     ];
 
     if (mobileNumbers.length) {
