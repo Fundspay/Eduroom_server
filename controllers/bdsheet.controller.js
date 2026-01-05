@@ -406,55 +406,48 @@ const getDashboardStats = async (req, res) => {
     });
 
     // ---------------------------
-    // 4️⃣ INTERNS COUNT (MATCH getBdSheet LOGIC)
+    // 4️⃣ BD SHEET (DATE-RANGE BASED COUNTS)
     // ---------------------------
-
-    let managerName = null;
-    if (managerId) {
-      const manager = await model.TeamManager.findByPk(managerId, {
-        attributes: ["name"],
-      });
-      managerName = manager?.name || "__invalid__";
-    }
-
-    const students = await model.StudentResume.findAll({
+    const bdSheets = await model.BdSheet.findAll({
       where: {
-        ...(managerName ? { alloted: managerName } : {}),
+        ...(managerId ? { teamManagerId: managerId } : {}),
+        startDate: { [Op.between]: [fromDate, toDate] },
       },
-      attributes: ["id", "mobileNumber"],
-      include: [
-        {
-          model: model.BdSheet,
-          required: false,
-          attributes: ["id", "activeStatus"],
-        },
-      ],
+      attributes: ["id", "studentResumeId", "activeStatus"],
+      order: [["id", "DESC"]],
     });
 
-    const totalInterns = students.length;
+    // Deduplicate by studentResumeId (latest record only)
+    const latestByStudent = new Map();
 
-    let totalActiveInterns = 0;
-
-    students.forEach(student => {
-      if (Array.isArray(student.BdSheet) && student.BdSheet.length) {
-        const latestSheet = student.BdSheet.sort((a, b) => b.id - a.id)[0];
-        if (latestSheet?.activeStatus?.toLowerCase() === "active") {
-          totalActiveInterns++;
-        }
+    bdSheets.forEach(sheet => {
+      if (!latestByStudent.has(sheet.studentResumeId)) {
+        latestByStudent.set(sheet.studentResumeId, sheet);
       }
     });
+
+    const uniqueSheets = Array.from(latestByStudent.values());
+
+    const totalInterns = uniqueSheets.length;
+
+    const totalActiveInterns = uniqueSheets.filter(
+      s => s.activeStatus?.toLowerCase() === "active"
+    ).length;
 
     // ---------------------------
     // 5️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
     // ---------------------------
     let totalAccountsSheet = 0;
 
+    const studentIds = uniqueSheets.map(s => s.studentResumeId);
+
+    const students = await model.StudentResume.findAll({
+      where: { id: { [Op.in]: studentIds } },
+      attributes: ["mobileNumber"],
+    });
+
     const mobileNumbers = [
-      ...new Set(
-        students
-          .map(s => s.mobileNumber)
-          .filter(Boolean)
-      ),
+      ...new Set(students.map(s => s.mobileNumber).filter(Boolean)),
     ];
 
     if (mobileNumbers.length) {
