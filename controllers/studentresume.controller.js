@@ -855,6 +855,9 @@ const getUserTargetAnalysis = async (req, res) => {
       registeredCount: registeredDatesMap[date] || 0, // zero if none registered
     }));
 
+    // TOTAL REGISTRATION COUNT
+    const registrationCount = Object.values(registeredDatesMap).reduce((a, b) => a + b, 0);
+
     // FIX: TARGET DATE RANGE LOGIC
     let targetStartDate;
     let targetEndDate;
@@ -901,6 +904,7 @@ const getUserTargetAnalysis = async (req, res) => {
         resumeDates, // now includes count and registeredCount per date
         interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
         resumeSelectedCount,
+        registrationCount, // total registration count
       },
     ];
 
@@ -915,6 +919,7 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
+
 
 
 
