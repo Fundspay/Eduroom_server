@@ -122,7 +122,13 @@ const getBdSheet = async (req, res) => {
           model: model.BdSheet,
           required: false,
           attributes: {
-            include: ["businessTask", "registration", "activeStatus"],
+            include: [
+              "businessTask",
+              "registration",
+              "activeStatus",
+              "startDate", // FIX (this is why it was missing)
+              "endDate",
+            ],
           },
         },
       ],
@@ -133,12 +139,12 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        //  ALWAYS PICK LATEST BdSheet
+        // ALWAYS PICK LATEST BdSheet
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
 
-        //  Fetch user for wallet + userId + collegeName
+        // Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
@@ -151,7 +157,7 @@ const getBdSheet = async (req, res) => {
           });
 
           if (user) {
-            //  ONLY subscriptionWallet is used now
+            // ONLY subscriptionWallet is used now
             const businessTask = parseInt(user.subscriptionWallet || 0, 10);
             s.businessTask = businessTask;
 
@@ -205,6 +211,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 const getBdSheetByCategory = async (req, res) => {
   try {
