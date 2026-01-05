@@ -798,7 +798,7 @@ const getUserTargetAnalysis = async (req, res) => {
       : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     endDate.setHours(23, 59, 59, 999);
 
-    // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
+    // RESUMES & COLLEGES COUNT
     const resumes = await model.StudentResume.findAll({
       where: {
         interviewedBy: userName,
@@ -819,16 +819,29 @@ const getUserTargetAnalysis = async (req, res) => {
     const collegesAchieved = collegeSet.size;
     const resumesAchieved = resumes.length;
 
-    // RESUME SELECTED COUNT — same logic as fetchMasterSheetTargets
-    const resumeSelectedCount = await model.StudentResume.count({
+    // RESUME SELECTED COUNT PER DATE
+    const selectedResumes = await model.StudentResume.findAll({
       where: {
         interviewedBy: userName,
         finalSelectionStatus: "Selected",
         Dateofonboarding: { [Op.between]: [startDate, endDate] },
       },
+      attributes: ["Dateofonboarding", "updatedAt"],
+      raw: true,
     });
 
-    //  FIX: TARGET DATE RANGE LOGIC
+    const resumeSelectedByDate = {};
+    selectedResumes.forEach((r) => {
+      const date = (r.Dateofonboarding || r.updatedAt).toISOString().split("T")[0]; // YYYY-MM-DD
+      if (!resumeSelectedByDate[date]) resumeSelectedByDate[date] = 0;
+      resumeSelectedByDate[date]++;
+    });
+
+    const resumeSelectedCountDates = Object.entries(resumeSelectedByDate).map(
+      ([date, count]) => ({ date, count })
+    );
+
+    // FIX: TARGET DATE RANGE LOGIC
     let targetStartDate;
     let targetEndDate;
 
@@ -842,7 +855,7 @@ const getUserTargetAnalysis = async (req, res) => {
       targetEndDate.setHours(23, 59, 59, 999);
     }
 
-    // Fetch target data (FIXED)
+    // Fetch target data
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -871,9 +884,8 @@ const getUserTargetAnalysis = async (req, res) => {
         interviewsAchieved: resumes.length,
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved,
-        resumeDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
-        interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
-        resumeSelectedCount,
+        // New field: resume selected per date
+        resumeSelectedPerDate: resumeSelectedCountDates,
       },
     ];
 
