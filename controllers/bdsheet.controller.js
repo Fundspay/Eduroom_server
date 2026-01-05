@@ -425,16 +425,18 @@ const getDashboardStats = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
-    // Deduplicate by studentResumeId (latest record only)
+    // Deduplicate by studentResumeId (latest BdSheet only)
     const latestByStudent = new Map();
     bdSheets.forEach(sheet => {
-      if (!latestByStudent.has(sheet.studentResumeId)) {
-        latestByStudent.set(sheet.studentResumeId, sheet);
-      }
+      // ✅ Only actual BdSheet rows are counted now
+      latestByStudent.set(sheet.studentResumeId, sheet);
     });
 
     const uniqueSheets = Array.from(latestByStudent.values());
 
+    // ---------------------------
+    // totalInterns & totalActiveInterns
+    // ---------------------------
     const totalInterns = uniqueSheets.length;
 
     const totalActiveInterns = uniqueSheets.filter(
@@ -489,8 +491,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
-
 
 
 
