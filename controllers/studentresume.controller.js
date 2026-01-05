@@ -798,7 +798,7 @@ const getUserTargetAnalysis = async (req, res) => {
       : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     endDate.setHours(23, 59, 59, 999);
 
-    // RESUMES & COLLEGES COUNT — same as fetchMasterSheetTargets
+    // RESUMES & COLLEGES COUNT
     const resumes = await model.StudentResume.findAll({
       where: {
         interviewedBy: userName,
@@ -819,7 +819,7 @@ const getUserTargetAnalysis = async (req, res) => {
     const collegesAchieved = collegeSet.size;
     const resumesAchieved = resumes.length;
 
-    // RESUME SELECTED COUNT — same logic as fetchMasterSheetTargets
+    // RESUME SELECTED COUNT
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: userName,
@@ -828,7 +828,23 @@ const getUserTargetAnalysis = async (req, res) => {
       },
     });
 
-    //  FIX: TARGET DATE RANGE LOGIC
+    // ---------------------------
+    // Count of resumes per date
+    // ---------------------------
+    const resumeDatesMap = {};
+    resumes.forEach((r) => {
+      const date = (r.Dateofonboarding || r.updatedAt).toISOString().split("T")[0]; // YYYY-MM-DD
+      if (!resumeDatesMap[date]) resumeDatesMap[date] = 0;
+      resumeDatesMap[date]++;
+    });
+
+    // Replace resumeDates array with per-date count
+    const resumeDates = Object.entries(resumeDatesMap).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    // FIX: TARGET DATE RANGE LOGIC
     let targetStartDate;
     let targetEndDate;
 
@@ -842,7 +858,7 @@ const getUserTargetAnalysis = async (req, res) => {
       targetEndDate.setHours(23, 59, 59, 999);
     }
 
-    // Fetch target data (FIXED)
+    // Fetch target data
     const targets = await model.MyTarget.findAll({
       where: {
         teamManagerId,
@@ -871,7 +887,7 @@ const getUserTargetAnalysis = async (req, res) => {
         interviewsAchieved: resumes.length,
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved,
-        resumeDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
+        resumeDates, // Now contains count per date
         interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
         resumeSelectedCount,
       },
