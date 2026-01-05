@@ -807,10 +807,11 @@ const getUserTargetAnalysis = async (req, res) => {
           { Dateofonboarding: null, updatedAt: { [Op.between]: [startDate, endDate] } },
         ],
       },
-      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt"],
+      attributes: ["collegeName", "resumeDate", "Dateofonboarding", "updatedAt", "finalSelectionStatus", "isRegistered"],
       raw: true,
     });
 
+    // Colleges achieved
     const collegeSet = new Set();
     resumes.forEach((r) => {
       if (r.collegeName) collegeSet.add(r.collegeName);
@@ -819,7 +820,7 @@ const getUserTargetAnalysis = async (req, res) => {
     const collegesAchieved = collegeSet.size;
     const resumesAchieved = resumes.length;
 
-    // RESUME SELECTED COUNT
+    // TOTAL RESUME SELECTED COUNT
     const resumeSelectedCount = await model.StudentResume.count({
       where: {
         interviewedBy: userName,
@@ -828,20 +829,30 @@ const getUserTargetAnalysis = async (req, res) => {
       },
     });
 
-    // ---------------------------
-    // Count of resumes per date
-    // ---------------------------
+    // PER-DATE COUNTS FOR SELECTED RESUMES AND REGISTERED
+    const selectedResumes = resumes.filter(r => r.finalSelectionStatus === "Selected");
+
     const resumeDatesMap = {};
-    resumes.forEach((r) => {
-      const date = (r.Dateofonboarding || r.updatedAt).toISOString().split("T")[0]; // YYYY-MM-DD
+    const registeredDatesMap = {};
+
+    selectedResumes.forEach((r) => {
+      const date = (r.Dateofonboarding || r.updatedAt).toISOString().split("T")[0];
+
+      // Selected count
       if (!resumeDatesMap[date]) resumeDatesMap[date] = 0;
       resumeDatesMap[date]++;
+
+      // Registered count
+      if (r.isRegistered) {
+        if (!registeredDatesMap[date]) registeredDatesMap[date] = 0;
+        registeredDatesMap[date]++;
+      }
     });
 
-    // Replace resumeDates array with per-date count
     const resumeDates = Object.entries(resumeDatesMap).map(([date, count]) => ({
       date,
       count,
+      registeredCount: registeredDatesMap[date] || 0, // zero if none registered
     }));
 
     // FIX: TARGET DATE RANGE LOGIC
@@ -887,7 +898,7 @@ const getUserTargetAnalysis = async (req, res) => {
         interviewsAchieved: resumes.length,
         resumesReceivedTarget: Number(targetData.resumesReceivedTarget),
         resumesAchieved,
-        resumeDates, // Now contains count per date
+        resumeDates, // now includes count and registeredCount per date
         interviewDates: resumes.map(r => r.Dateofonboarding || r.updatedAt),
         resumeSelectedCount,
       },
@@ -904,8 +915,6 @@ const getUserTargetAnalysis = async (req, res) => {
 };
 
 module.exports.getUserTargetAnalysis = getUserTargetAnalysis;
-
-
 
 
 
