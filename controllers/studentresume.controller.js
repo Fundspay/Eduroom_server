@@ -991,14 +991,16 @@ const getUserResumesAchieved = async (req, res) => {
 
     const fullName = manager.name.trim();
 
-    // ❌ DATE RANGE REMOVED — SHOW ALL SELECTED
+    //  DATE RANGE REMOVED — SHOW ALL SELECTED
 
-    // Fetch ONLY SELECTED resumes for individual manager
+    // Fetch ONLY SELECTED resumes for individual manager (CASE HANDLED)
     const resumes = await model.StudentResume.findAll({
       where: {
         teamManagerId,
         interviewedBy: fullName,
-        finalSelectionStatus: "Selected",
+        finalSelectionStatus: {
+          [Op.in]: ["Selected", "selected"],
+        },
       },
       include: [
         {
