@@ -358,8 +358,9 @@ const getDashboardStats = async (req, res) => {
     // ---------------------------
     // 1️⃣ Manager Validation
     // ---------------------------
+    let manager;
     if (managerId) {
-      const manager = await model.TeamManager.findByPk(managerId);
+      manager = await model.TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
     }
 
@@ -419,24 +420,23 @@ const getDashboardStats = async (req, res) => {
         {
           model: model.StudentResume,
           required: true, // only valid StudentResume
-          attributes: ["mobileNumber"],
+          attributes: ["mobileNumber", "alloted"], // 🔹 include alloted field
+          ...(managerId ? { where: { alloted: manager.name } } : {}), // 🔹 filter like getBdSheet
         },
       ],
       order: [["id", "DESC"]],
     });
 
-    // Deduplicate by studentResumeId (latest BdSheet only)
+    // Deduplicate by studentResumeId (latest record only)
     const latestByStudent = new Map();
     bdSheets.forEach(sheet => {
-      // ✅ Only actual BdSheet rows are counted now
-      latestByStudent.set(sheet.studentResumeId, sheet);
+      if (!latestByStudent.has(sheet.studentResumeId)) {
+        latestByStudent.set(sheet.studentResumeId, sheet);
+      }
     });
 
     const uniqueSheets = Array.from(latestByStudent.values());
 
-    // ---------------------------
-    // totalInterns & totalActiveInterns
-    // ---------------------------
     const totalInterns = uniqueSheets.length;
 
     const totalActiveInterns = uniqueSheets.filter(
@@ -491,6 +491,7 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
+
 
 
 
