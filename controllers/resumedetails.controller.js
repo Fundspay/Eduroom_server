@@ -653,7 +653,7 @@ module.exports.getAllPendingFollowUps = getAllPendingFollowUps;
 const sendFollowUpEmail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body } = req.body;
+    const { cc, bcc, body, subject } = req.body;
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
@@ -662,7 +662,10 @@ const sendFollowUpEmail = async (req, res) => {
       return ReE(res, "No email found for this college", 400);
     }
 
-    const subject = `Reconfirmation of Live Project Process – FundsAudit`;
+    const finalSubject =
+      subject && subject.trim().length > 0
+        ? subject
+        : `Reconfirmation of Live Project Process – FundsAudit`;
 
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Mam"},</p>
@@ -686,7 +689,7 @@ const sendFollowUpEmail = async (req, res) => {
 
     const mailResponse = await sendhrMail(
       record.emailId,
-      subject,
+      finalSubject,
       html,
       [],
       cc,
@@ -701,7 +704,11 @@ const sendFollowUpEmail = async (req, res) => {
       followupemailsent: true
     });
 
-    return ReS(res, { success: true, message: "Follow-up email sent successfully" }, 200);
+    return ReS(
+      res,
+      { success: true, message: "Follow-up email sent successfully" },
+      200
+    );
   } catch (error) {
     console.error("Send FollowUp Email Error:", error);
     return ReE(res, error.message, 500);
@@ -709,4 +716,5 @@ const sendFollowUpEmail = async (req, res) => {
 };
 
 module.exports.sendFollowUpEmail = sendFollowUpEmail;
+
 
