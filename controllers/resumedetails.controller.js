@@ -677,7 +677,7 @@ const sendFollowUpEmail = async (req, res) => {
 
       <p>Pooja M. Shedge<br/>
       Branch Manager – Pune<br/>
-      +91 8421034535 | +91 7420861507<br/>
+      +91 8421034535 | +91 9322509539<br/>
       Pune, Maharashtra<br/>
       <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
       <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
