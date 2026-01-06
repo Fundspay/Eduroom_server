@@ -554,8 +554,7 @@ module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid;
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body, attachment } = req.body;
-
+    const { cc, bcc, body, attachment, subject } = req.body; 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
 
@@ -610,8 +609,10 @@ const sendJDToCollege = async (req, res) => {
       ];
     }
 
-    // SUBJECT UPDATED (NO JD / ATTACHMENT HINT)
-    const subject = `Collaboration Proposal – FundsAudit`;
+    const finalSubject =
+      subject && subject.trim().length > 0
+        ? subject
+        : `Collaboration Proposal – FundsAudit`;
 
     const html = `
       <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
@@ -640,7 +641,7 @@ const sendJDToCollege = async (req, res) => {
 
     const mailResponse = await sendhrMail(
       record.emailId,
-      subject,
+      finalSubject,
       html,
       attachments,
       cc,
@@ -667,6 +668,7 @@ const sendJDToCollege = async (req, res) => {
 };
 
 module.exports.sendJDToCollege = sendJDToCollege;
+
 
 
 
