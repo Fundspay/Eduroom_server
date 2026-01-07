@@ -1405,64 +1405,32 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
     }
 
     // -----------------------------
-    // 1️⃣ Date handling
+    // 1️⃣ External API (ACHIEVED COUNT)
     // -----------------------------
-    const fromDate = new Date(from);
-    fromDate.setHours(0, 0, 0, 0);
+    const paymentApiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getTotalPayments?from_date=${from}&to_date=${to}`;
+    const response = await axios.get(paymentApiUrl);
 
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
+    const payments = response.data.payments || [];
 
-    // -----------------------------
-    // 2️⃣ Fetch BdSheet + StudentResume (ALL MANAGERS)
-    // -----------------------------
-    const sheets = await model.BdSheet.findAll({
-      where: {
-        startDate: { [Op.between]: [fromDate, toDate] },
-      },
-      attributes: ["startDate"],
-      include: [
-        {
-          model: model.StudentResume,
-          attributes: ["mobileNumber"],
-          required: true,
-        },
-      ],
-    });
+    const daily = payments.map((p) => ({
+      date: p.date,
+      accountsAchieved: Number(p.total_count) || 0,
+      accountsTarget: 0, // 👈 will be filled next
+    }));
+
+    const totalAccountsAchieved = daily.reduce(
+      (sum, d) => sum + d.accountsAchieved,
+      0
+    );
 
     // -----------------------------
-    // 3️⃣ Build date-wise achieved
-    //     (✔ ONLY subscriptionWallet)
-    // -----------------------------
-    const achievedByDate = {};
-
-    for (const sheet of sheets) {
-      const dateKey = new Date(sheet.startDate)
-        .toISOString()
-        .split("T")[0];
-
-      const mobile = sheet.StudentResume?.mobileNumber;
-      if (!mobile) continue;
-
-      const user = await model.User.findOne({
-        where: { phoneNumber: mobile },
-        attributes: ["subscriptionWallet"],
-      });
-
-      if (!user) continue;
-
-      const achieved = Number(user.subscriptionWallet || 0);
-
-      achievedByDate[dateKey] =
-        (achievedByDate[dateKey] || 0) + achieved;
-    }
-
-    // -----------------------------
-    // 4️⃣ Fetch BD Targets (ALL MANAGERS, DATE-WISE)
+    // 2️⃣ BD TARGET (DATE WISE – ALL MANAGERS)
     // -----------------------------
     const bdTargets = await model.BdTarget.findAll({
       where: {
-        targetDate: { [Op.between]: [fromDate, toDate] },
+        targetDate: {
+          [Op.between]: [from, to],
+        },
       },
       attributes: [
         "targetDate",
@@ -1472,55 +1440,25 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
       raw: true,
     });
 
+    // Create date -> target map
     const targetByDate = {};
-    bdTargets.forEach(t => {
-      const dateKey = new Date(t.targetDate)
-        .toISOString()
-        .split("T")[0];
-
-      targetByDate[dateKey] = Number(t.accounts || 0);
+    bdTargets.forEach((t) => {
+      const date = new Date(t.targetDate).toISOString().slice(0, 10);
+      targetByDate[date] = Number(t.accounts) || 0;
     });
 
-    // -----------------------------
-    // 5️⃣ Generate full date range
-    // -----------------------------
-    const dateRange = [];
-    let current = new Date(fromDate);
-
-    while (current <= toDate) {
-      dateRange.push(current.toISOString().split("T")[0]);
-      current.setDate(current.getDate() + 1);
-    }
-
-    // -----------------------------
-    // 6️⃣ Merge achieved + target
-    // -----------------------------
-    const daily = dateRange.map(date => {
-      const accountsAchieved = achievedByDate[date] || 0;
-      const accountsTarget = targetByDate[date] || 0;
-
-      return {
-        date,
-        accountsAchieved,
-        accountsTarget,
-      };
+    // Merge target into daily achieved
+    daily.forEach((d) => {
+      d.accountsTarget = targetByDate[d.date] || 0;
     });
 
-    // -----------------------------
-    // 7️⃣ Totals
-    // -----------------------------
-    const totalAccountsAchieved = daily.reduce(
-      (sum, d) => sum + d.accountsAchieved,
-      0
-    );
-
-    const totalAccountsTarget = daily.reduce(
-      (sum, d) => sum + d.accountsTarget,
+    const totalAccountsTarget = Object.values(targetByDate).reduce(
+      (sum, v) => sum + v,
       0
     );
 
     // -----------------------------
-    // 8️⃣ Final Response
+    // 3️⃣ Final Response
     // -----------------------------
     return res.status(200).json({
       success: true,
@@ -1533,9 +1471,8 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
         difference: totalAccountsAchieved - totalAccountsTarget,
       },
     });
-
   } catch (error) {
-    console.error("Accounts vs Target Summary Error:", error);
+    console.error("Error:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
