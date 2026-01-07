@@ -37,6 +37,7 @@ const collegeConnectProgress = async (managerId, date) => {
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId },
+    targetDate: date, 
     attributes: ["calls"], // strictly use calls
     order: [["targetDate", "DESC"]], // get latest target if multiple
   });
