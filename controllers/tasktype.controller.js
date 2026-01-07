@@ -36,10 +36,8 @@ const collegeConnectProgress = async (managerId, date) => {
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId },
-    targetDate: date, 
-    attributes: ["calls"], // strictly use calls
-    order: [["targetDate", "DESC"]], // get latest target if multiple
+    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
+    attributes: ["calls"], 
   });
 
   const target = targetRow ? Number(targetRow.calls) : 0;
@@ -57,9 +55,8 @@ const jdSendProgress = async (managerId, date) => {
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId },
+    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
     attributes: ["jds"],
-    order: [["targetDate", "DESC"]],
   });
 
   const target = targetRow ? Number(targetRow.jds) : 0;
@@ -81,9 +78,8 @@ const followUpProgress = async (managerId, date) => {
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId },
+    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
     attributes: ["followUps"],
-    order: [["targetDate", "DESC"]],
   });
 
   const target = targetRow ? Number(targetRow.followUps) : 0;
@@ -102,9 +98,8 @@ const resumeReceivedProgress = async (managerId, date) => {
     })) || 0;
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId },
-    attributes: ["resumes"], // assuming resumes target
-    order: [["targetDate", "DESC"]],
+    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
+    attributes: ["resumes"], 
   });
 
   const target = targetRow ? Number(targetRow.resumes) : 0;
