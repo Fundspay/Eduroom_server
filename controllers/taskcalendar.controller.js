@@ -104,19 +104,31 @@ var upsertTaskForDay = async function (req, res) {
 
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
-    //   if (!task.taskType || !task.title) {
-    //     return ReE(res, "taskType and title are required to add task", 400);
-    //   }
-
       const newTask = {
         taskId: getNextTaskId(tasks),
-        taskType: task.taskType || null, 
+        taskType: task.taskType || null,
         title: task.title,
         mode: task.mode || "MANUAL",
         progress: task.progress ?? null,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
+
+      // SYSTEM task → calculate progress
+      if (newTask.mode === "SYSTEM" && newTask.taskType) {
+        const { calculateSystemTaskProgress } =
+          require("./tasktype.controller");
+
+        const r = await calculateSystemTaskProgress({
+          taskType: newTask.taskType,
+          managerId,
+          date,
+        });
+
+        newTask.progress = r.progress ?? null;
+        newTask.target = r.target ?? 0;
+        newTask.achieved = r.achieved ?? 0;
+      }
 
       tasks.push(newTask);
     }
@@ -129,13 +141,10 @@ var upsertTaskForDay = async function (req, res) {
         return ReE(res, "Task not found for update", 404);
       }
 
-      // Update ONLY provided fields
       tasks[index] = {
         ...tasks[index],
         ...Object.fromEntries(
-          Object.entries(task).filter(
-            ([key]) => key !== "taskId"
-          )
+          Object.entries(task).filter(([key]) => key !== "taskId")
         ),
       };
     }
@@ -158,16 +167,13 @@ var upsertTaskForDay = async function (req, res) {
       dayProgress,
     });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        date,
-        tasks,
-        dayProgress,
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      date,
+      tasks,
+      dayProgress,
+    }, 200);
+
   } catch (error) {
     console.error("Error upserting task:", error);
     return ReE(res, error.message, 500);
@@ -175,6 +181,7 @@ var upsertTaskForDay = async function (req, res) {
 };
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
+
 
 // GET task for a specific date
 var getTaskForDate = async function (req, res) {
