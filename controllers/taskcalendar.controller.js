@@ -220,13 +220,64 @@ var getTaskForDate = async function (req, res) {
     });
 
     // If no record exists, return empty tasks and null progress
-    const response = {
-      date,
-      tasks: record ? record.tasks : [],
-      dayProgress: record ? record.dayProgress : null,
-    };
+    if (!record) {
+      return ReS(res, {
+        success: true,
+        date,
+        tasks: [],
+        dayProgress: null,
+      }, 200);
+    }
 
-    return ReS(res, { success: true, ...response }, 200);
+    let tasks = Array.isArray(record.tasks) ? [...record.tasks] : [];
+
+    //  Recalculate SYSTEM tasks
+    const { calculateSystemTaskProgress } =
+      require("./tasktype.controller");
+
+    for (let i = 0; i < tasks.length; i++) {
+      if (tasks[i].mode === "SYSTEM" && tasks[i].taskType) {
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[i].taskType,
+          managerId,
+          date,
+        });
+
+        tasks[i] = {
+          ...tasks[i],
+          progress: r.progress ?? null,
+          target: r.target ?? 0,
+          achieved: r.achieved ?? 0,
+        };
+      }
+    }
+
+    //  Recalculate day progress
+    const validProgress = tasks
+      .map(t => t.progress)
+      .filter(p => p !== null && p !== undefined);
+
+    const dayProgress =
+      validProgress.length > 0
+        ? Math.round(
+            validProgress.reduce((a, b) => a + b, 0) /
+              validProgress.length
+          )
+        : null;
+
+    // Persist updated values
+    await record.update({
+      tasks,
+      dayProgress,
+    });
+
+    return ReS(res, {
+      success: true,
+      date,
+      tasks,
+      dayProgress,
+    }, 200);
+
   } catch (error) {
     console.error("Error fetching task for date:", error);
     return ReE(res, error.message, 500);

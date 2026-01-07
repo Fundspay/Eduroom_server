@@ -55,7 +55,7 @@ const jdSendProgress = async (managerId, date) => {
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
+    where: { teamManagerId: managerId, targetDate: date }, 
     attributes: ["jds"],
   });
 
