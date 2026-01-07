@@ -31,7 +31,7 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
  * Target comes strictly from `calls` column
  */
 const collegeConnectProgress = async (managerId, date) => {
-  const achieved = await model.CoSheet.count({
+  const achieved = await model.CoSheets.count({
     where: { teamManagerId: managerId, dateOfConnect: date },
   });
 
