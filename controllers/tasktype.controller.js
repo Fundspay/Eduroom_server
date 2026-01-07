@@ -28,6 +28,7 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
 
 /**
  * HR – COLLEGE CONNECT
+ * Target comes strictly from `calls` column
  */
 const collegeConnectProgress = async (managerId, date) => {
   const achieved = await model.CoSheet.count({
@@ -36,10 +37,11 @@ const collegeConnectProgress = async (managerId, date) => {
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId },
-    attributes: ["calls"],
+    attributes: ["calls"], // strictly use calls
+    order: [["targetDate", "DESC"]], // get latest target if multiple
   });
 
-  const target = targetRow ? targetRow.calls : 0;
+  const target = targetRow ? Number(targetRow.calls) : 0;
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
@@ -56,9 +58,10 @@ const jdSendProgress = async (managerId, date) => {
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId },
     attributes: ["jds"],
+    order: [["targetDate", "DESC"]],
   });
 
-  const target = targetRow ? targetRow.jds : 0;
+  const target = targetRow ? Number(targetRow.jds) : 0;
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
@@ -69,15 +72,20 @@ const jdSendProgress = async (managerId, date) => {
  */
 const followUpProgress = async (managerId, date) => {
   const achieved = await model.CoSheets.count({
-    where: { teamManagerId: managerId, resumeDate: date, followUpResponse: { [Op.ne]: null } },
+    where: {
+      teamManagerId: managerId,
+      resumeDate: date,
+      followUpResponse: { [Op.ne]: null },
+    },
   });
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId },
-    attributes: ["followUps"], // assuming you have followUps in MyTarget
+    attributes: ["followUps"],
+    order: [["targetDate", "DESC"]],
   });
 
-  const target = targetRow ? targetRow.followUps : 0;
+  const target = targetRow ? Number(targetRow.followUps) : 0;
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
@@ -87,16 +95,18 @@ const followUpProgress = async (managerId, date) => {
  * HR – RESUME RECEIVED
  */
 const resumeReceivedProgress = async (managerId, date) => {
-  const achieved = await model.CoSheets.sum("resumeCount", {
-    where: { teamManagerId: managerId, resumeDate: date },
-  }) || 0;
+  const achieved =
+    (await model.CoSheets.sum("resumeCount", {
+      where: { teamManagerId: managerId, resumeDate: date },
+    })) || 0;
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId },
-    attributes: ["resumes"], // assuming you have resumes target
+    attributes: ["resumes"], // assuming resumes target
+    order: [["targetDate", "DESC"]],
   });
 
-  const target = targetRow ? targetRow.resumes : 0;
+  const target = targetRow ? Number(targetRow.resumes) : 0;
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
