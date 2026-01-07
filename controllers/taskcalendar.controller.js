@@ -175,3 +175,37 @@ var upsertTaskForDay = async function (req, res) {
 };
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
+
+// GET task for a specific date
+var getTaskForDate = async function (req, res) {
+  try {
+    const { managerId, date } = req.query;
+
+    if (!managerId || !date) {
+      return ReE(res, "managerId and date are required", 400);
+    }
+
+    // Fetch the day record
+    const record = await model.TaskCalendarDay.findOne({
+      where: {
+        teamManagerId: managerId,
+        taskDate: date,
+        isDeleted: false,
+      },
+    });
+
+    // If no record exists, return empty tasks and null progress
+    const response = {
+      date,
+      tasks: record ? record.tasks : [],
+      dayProgress: record ? record.dayProgress : null,
+    };
+
+    return ReS(res, { success: true, ...response }, 200);
+  } catch (error) {
+    console.error("Error fetching task for date:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getTaskForDate = getTaskForDate;

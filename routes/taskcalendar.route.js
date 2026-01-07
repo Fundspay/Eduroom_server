@@ -11,4 +11,6 @@ router.get("/calendar", taskCalendarController.getTaskCalendar);
 // Example: POST /task-calendar/upsert
 router.post("/upsert", taskCalendarController.upsertTaskForDay);
 
+router.get("/daytask", taskCalendarController.getTaskForDate);
+
 module.exports = router;
