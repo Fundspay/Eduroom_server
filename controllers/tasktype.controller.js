@@ -43,7 +43,7 @@ const collegeConnectProgress = async (managerId, date) => {
 
   const achieved = await model.CoSheet.count({
     where: {
-      teamManagerId: managerId,
+      connectedBy: managerId,
       dateOfConnect: { [Op.between]: [start, end] },
     },
   });
