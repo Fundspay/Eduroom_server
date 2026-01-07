@@ -3,6 +3,8 @@
 const model = require("../models");
 const { ReE, ReS } = require("../utils/util.service");
 const { Op } = require("sequelize");
+const { calculateSystemTaskProgress } = require("./tasktype.controller");
+
 
 // GET month-wise calendar
 var getTaskCalendar = async function (req, res) {
@@ -141,12 +143,28 @@ var upsertTaskForDay = async function (req, res) {
         return ReE(res, "Task not found for update", 404);
       }
 
+      // Merge incoming fields
       tasks[index] = {
         ...tasks[index],
         ...Object.fromEntries(
           Object.entries(task).filter(([key]) => key !== "taskId")
         ),
       };
+
+      // Recalculate SYSTEM task progress
+      if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
+        const { calculateSystemTaskProgress } = require("./tasktype.controller");
+
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[index].taskType,
+          managerId,
+          date,
+        });
+
+        tasks[index].progress = r.progress ?? null;
+        tasks[index].target = r.target ?? 0;
+        tasks[index].achieved = r.achieved ?? 0;
+      }
     }
 
     // ---------------- DAY PROGRESS ----------------
