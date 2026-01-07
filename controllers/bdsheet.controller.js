@@ -886,7 +886,7 @@ const getTargetVsAchieved = async (req, res) => {
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
     // ---------------------------
-    // 2️⃣ Date handling
+    // 2️⃣ Date handling (local)
     // ---------------------------
     const fromDate = new Date(from);
     fromDate.setHours(0, 0, 0, 0);
@@ -919,9 +919,8 @@ const getTargetVsAchieved = async (req, res) => {
     const achievedByDate = {};
 
     for (const sheet of sheets) {
-      const dateKey = new Date(sheet.startDate)
-        .toISOString()
-        .split("T")[0];
+      // Use local date string
+      const dateKey = sheet.startDate.toLocaleDateString("en-CA"); // yyyy-mm-dd
 
       const mobile = sheet.StudentResume?.mobileNumber;
       if (!mobile) continue;
@@ -952,22 +951,19 @@ const getTargetVsAchieved = async (req, res) => {
 
     const targetByDate = {};
     targets.forEach(t => {
-      const dateKey = new Date(t.targetDate)
-        .toISOString()
-        .split("T")[0];
-
+      const dateKey = t.targetDate.toLocaleDateString("en-CA");
       targetByDate[dateKey] =
         (targetByDate[dateKey] || 0) + Number(t.accounts || 0);
     });
 
     // ---------------------------
-    // 6️⃣ Generate full date range
+    // 6️⃣ Generate full date range (local)
     // ---------------------------
     const dateRange = [];
     let current = new Date(fromDate);
 
     while (current <= toDate) {
-      dateRange.push(current.toISOString().split("T")[0]);
+      dateRange.push(current.toLocaleDateString("en-CA"));
       current.setDate(current.getDate() + 1);
     }
 
@@ -983,10 +979,7 @@ const getTargetVsAchieved = async (req, res) => {
         target,
         achieved,
         difference: achieved - target,
-        percentage:
-          target > 0
-            ? ((achieved / target) * 100).toFixed(2)
-            : 0,
+        percentage: target > 0 ? ((achieved / target) * 100).toFixed(2) : "0.00",
       };
     });
 
@@ -996,11 +989,8 @@ const getTargetVsAchieved = async (req, res) => {
     const totalTarget = dateWise.reduce((s, d) => s + d.target, 0);
     const totalAchieved = dateWise.reduce((s, d) => s + d.achieved, 0);
     const totalDifference = totalAchieved - totalTarget;
-
     const totalPercentage =
-      totalTarget > 0
-        ? ((totalAchieved / totalTarget) * 100).toFixed(2)
-        : 0;
+      totalTarget > 0 ? ((totalAchieved / totalTarget) * 100).toFixed(2) : "0.00";
 
     return ReS(res, {
       success: true,
