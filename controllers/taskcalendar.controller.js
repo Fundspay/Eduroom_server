@@ -104,13 +104,13 @@ var upsertTaskForDay = async function (req, res) {
 
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
-      if (!task.taskType || !task.title) {
-        return ReE(res, "taskType and title are required to add task", 400);
-      }
+    //   if (!task.taskType || !task.title) {
+    //     return ReE(res, "taskType and title are required to add task", 400);
+    //   }
 
       const newTask = {
         taskId: getNextTaskId(tasks),
-        taskType: task.taskType,
+        taskType: task.taskType || null, 
         title: task.title,
         mode: task.mode || "MANUAL",
         progress: task.progress ?? null,
