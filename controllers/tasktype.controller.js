@@ -1,7 +1,7 @@
 "use strict";
 
 const model = require("../models");
-const { Op, fn, col } = require("sequelize");
+const { Op } = require("sequelize");
 
 /**
  * MAIN ENTRY
@@ -27,17 +27,30 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
 };
 
 /**
+ * Utility: day range
+ */
+const getDayRange = (date) => {
+  const start = new Date(`${date}T00:00:00.000Z`);
+  const end = new Date(`${date}T23:59:59.999Z`);
+  return { start, end };
+};
+
+/**
  * HR – COLLEGE CONNECT
- * Target comes strictly from `calls` column
  */
 const collegeConnectProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
   const achieved = await model.CoSheet.count({
-    where: { teamManagerId: managerId, dateOfConnect: date },
+    where: {
+      teamManagerId: managerId,
+      dateOfConnect: { [Op.between]: [start, end] },
+    },
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
-    attributes: ["calls"], 
+    where: { teamManagerId: managerId, targetDate: date },
+    attributes: ["calls"],
   });
 
   const target = targetRow ? Number(targetRow.calls) : 0;
@@ -50,12 +63,17 @@ const collegeConnectProgress = async (managerId, date) => {
  * HR – JD SEND
  */
 const jdSendProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
   const achieved = await model.CoSheet.count({
-    where: { teamManagerId: managerId, jdSentAt: date },
+    where: {
+      teamManagerId: managerId,
+      jdSentAt: { [Op.between]: [start, end] },
+    },
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId, targetDate: date }, 
+    where: { teamManagerId: managerId, targetDate: date },
     attributes: ["jds"],
   });
 
@@ -69,16 +87,18 @@ const jdSendProgress = async (managerId, date) => {
  * HR – FOLLOW UP
  */
 const followUpProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
   const achieved = await model.CoSheets.count({
     where: {
       teamManagerId: managerId,
-      resumeDate: date,
+      resumeDate: { [Op.between]: [start, end] },
       followUpResponse: { [Op.ne]: null },
     },
   });
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
+    where: { teamManagerId: managerId, targetDate: date },
     attributes: ["followUps"],
   });
 
@@ -92,14 +112,19 @@ const followUpProgress = async (managerId, date) => {
  * HR – RESUME RECEIVED
  */
 const resumeReceivedProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
   const achieved =
     (await model.CoSheets.sum("resumeCount", {
-      where: { teamManagerId: managerId, resumeDate: date },
+      where: {
+        teamManagerId: managerId,
+        resumeDate: { [Op.between]: [start, end] },
+      },
     })) || 0;
 
   const targetRow = await model.MyTarget.findOne({
-    where: { teamManagerId: managerId, targetDate: date }, // <--- fixed
-    attributes: ["resumes"], 
+    where: { teamManagerId: managerId, targetDate: date },
+    attributes: ["resumes"],
   });
 
   const target = targetRow ? Number(targetRow.resumes) : 0;
