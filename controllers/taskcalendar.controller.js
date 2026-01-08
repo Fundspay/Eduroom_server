@@ -114,7 +114,6 @@ var upsertTaskForDay = async function (req, res) {
       return ReE(res, "managerId, date and task are required", 400);
     }
 
-    // Find or create day row
     const [dayRecord] = await model.TaskCalendarDay.findOrCreate({
       where: {
         teamManagerId: managerId,
@@ -136,14 +135,11 @@ var upsertTaskForDay = async function (req, res) {
         taskId: getNextTaskId(tasks),
         taskType: task.taskType || null,
         title: task.title,
-        // Auto-pick default mode based on taskType if not provided
         mode: task.mode || defaultModeByTaskType[task.taskType] || "MANUAL",
-        progress: task.progress ?? null,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
 
-      // SYSTEM task → calculate progress
       if (newTask.mode === "SYSTEM" && newTask.taskType) {
         const { calculateSystemTaskProgress } =
           require("./tasktype.controller");
@@ -154,9 +150,14 @@ var upsertTaskForDay = async function (req, res) {
           date,
         });
 
-        newTask.progress = r.progress ?? null;
-        newTask.target = r.target ?? 0;
-        newTask.achieved = r.achieved ?? 0;
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
+        newTask.achieved = achieved;
+        newTask.target = target;
+        newTask.progress = `${achieved}/${target}`;
+        newTask.result =
+          target > 0 ? Math.round((achieved / target) * 100) : 0;
       }
 
       tasks.push(newTask);
@@ -170,19 +171,17 @@ var upsertTaskForDay = async function (req, res) {
         return ReE(res, "Task not found for update", 404);
       }
 
-      // Merge incoming fields
       tasks[index] = {
         ...tasks[index],
         ...Object.fromEntries(
           Object.entries(task).filter(([key]) => key !== "taskId")
         ),
-        // Auto-set mode if not provided
         mode: task.mode || defaultModeByTaskType[tasks[index].taskType] || "MANUAL",
       };
 
-      // Recalculate SYSTEM task progress
       if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
-        const { calculateSystemTaskProgress } = require("./tasktype.controller");
+        const { calculateSystemTaskProgress } =
+          require("./tasktype.controller");
 
         const r = await calculateSystemTaskProgress({
           taskType: tasks[index].taskType,
@@ -190,22 +189,27 @@ var upsertTaskForDay = async function (req, res) {
           date,
         });
 
-        tasks[index].progress = r.progress ?? null;
-        tasks[index].target = r.target ?? 0;
-        tasks[index].achieved = r.achieved ?? 0;
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
+        tasks[index].achieved = achieved;
+        tasks[index].target = target;
+        tasks[index].progress = `${achieved}/${target}`;
+        tasks[index].result =
+          target > 0 ? Math.round((achieved / target) * 100) : 0;
       }
     }
 
     // ---------------- DAY PROGRESS ----------------
-    const validProgress = tasks
-      .map(t => t.progress)
-      .filter(p => p !== null && p !== undefined);
+    const validResults = tasks
+      .map(t => t.result)
+      .filter(r => r !== null && r !== undefined);
 
     const dayProgress =
-      validProgress.length > 0
+      validResults.length > 0
         ? Math.round(
-            validProgress.reduce((a, b) => a + b, 0) /
-              validProgress.length
+            validResults.reduce((a, b) => a + b, 0) /
+              validResults.length
           )
         : null;
 
@@ -230,7 +234,7 @@ var upsertTaskForDay = async function (req, res) {
 module.exports.upsertTaskForDay = upsertTaskForDay;
 
 
-// GET task for a specific date
+
 var getTaskForDate = async function (req, res) {
   try {
     const { managerId, date } = req.query;
@@ -239,7 +243,6 @@ var getTaskForDate = async function (req, res) {
       return ReE(res, "managerId and date are required", 400);
     }
 
-    // Fetch the day record
     const record = await model.TaskCalendarDay.findOne({
       where: {
         teamManagerId: managerId,
@@ -248,7 +251,6 @@ var getTaskForDate = async function (req, res) {
       },
     });
 
-    // If no record exists, return empty tasks and null progress
     if (!record) {
       return ReS(res, {
         success: true,
@@ -260,7 +262,6 @@ var getTaskForDate = async function (req, res) {
 
     let tasks = Array.isArray(record.tasks) ? [...record.tasks] : [];
 
-    //  Recalculate SYSTEM tasks
     const { calculateSystemTaskProgress } =
       require("./tasktype.controller");
 
@@ -272,29 +273,31 @@ var getTaskForDate = async function (req, res) {
           date,
         });
 
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
         tasks[i] = {
           ...tasks[i],
-          progress: r.progress ?? null,
-          target: r.target ?? 0,
-          achieved: r.achieved ?? 0,
+          achieved,
+          target,
+          progress: `${achieved}/${target}`,
+          result: target > 0 ? Math.round((achieved / target) * 100) : 0,
         };
       }
     }
 
-    //  Recalculate day progress
-    const validProgress = tasks
-      .map(t => t.progress)
-      .filter(p => p !== null && p !== undefined);
+    const validResults = tasks
+      .map(t => t.result)
+      .filter(r => r !== null && r !== undefined);
 
     const dayProgress =
-      validProgress.length > 0
+      validResults.length > 0
         ? Math.round(
-            validProgress.reduce((a, b) => a + b, 0) /
-              validProgress.length
+            validResults.reduce((a, b) => a + b, 0) /
+              validResults.length
           )
         : null;
 
-    // Persist updated values
     await record.update({
       tasks,
       dayProgress,
@@ -314,3 +317,4 @@ var getTaskForDate = async function (req, res) {
 };
 
 module.exports.getTaskForDate = getTaskForDate;
+
