@@ -24,6 +24,9 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
     case "HR [SELECTED-COLLAGES]":
       return await selectedCollegesProgress(managerId, date);
 
+    case "HR [SELECTION]":
+      return await hrSelectionProgress(managerId, date);
+
     default:
       return { progress: 0, achieved: 0, target: 0 };
   }
@@ -176,7 +179,6 @@ const resumeReceivedProgress = async (managerId, date) => {
 
 /**
  * HR – SELECTED COLLEGES
- * NEW TASK TYPE
  */
 const selectedCollegesProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
@@ -187,7 +189,6 @@ const selectedCollegesProgress = async (managerId, date) => {
 
   const managerName = manager ? manager.name : null;
 
-  // Achieved = unique colleges from StudentResume
   let achieved = 0;
   if (managerName) {
     const resumes = await model.StudentResume.findAll({
@@ -210,13 +211,50 @@ const selectedCollegesProgress = async (managerId, date) => {
     achieved = uniqueColleges.size;
   }
 
-  // Target = sum of collegeTarget from MyTarget
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["collegeTarget"],
   });
 
   const target = targetRow ? Number(targetRow.collegeTarget) : 0;
+
+  const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+
+  return { achieved, target, progress };
+};
+
+/**
+ * HR – SELECTION (NEW TASK)
+ * Achieved = selected resumes count
+ * Target = resumesReceivedTarget from MyTarget
+ */
+const hrSelectionProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
+  const manager = await model.TeamManager.findByPk(managerId, {
+    attributes: ["name"],
+  });
+
+  const managerName = manager ? manager.name : null;
+
+  // Achieved = count of selected resumes
+  const achieved = managerName
+    ? await model.StudentResume.count({
+        where: {
+          interviewedBy: managerName,
+          finalSelectionStatus: "Selected",
+          Dateofonboarding: { [Op.between]: [start, end] },
+        },
+      })
+    : 0;
+
+  // Target = resumesReceivedTarget from MyTarget
+  const targetRow = await model.MyTarget.findOne({
+    where: { teamManagerId: managerId, targetDate: date },
+    attributes: ["resumesReceivedTarget"],
+  });
+
+  const target = targetRow ? Number(targetRow.resumesReceivedTarget) : 0;
 
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
