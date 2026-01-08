@@ -41,15 +41,24 @@ const getDayRange = (date) => {
 const collegeConnectProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
-  //  Achieved = total number of calls (rows) for that day
-  const achieved = await model.CoSheet.count({
-    where: {
-      teamManagerId: managerId,
-      dateOfConnect: {
-        [Op.between]: [start, end],
-      },
-    },
+  // 🔹 get manager name from managerId
+  const manager = await model.TeamManager.findByPk(managerId, {
+    attributes: ["name"],
   });
+
+  const managerName = manager ? manager.name : null;
+
+  // 🔹 Achieved = total calls done by this manager (connectedBy)
+  const achieved = managerName
+    ? await model.CoSheet.count({
+        where: {
+          connectedBy: managerName,
+          dateOfConnect: {
+            [Op.between]: [start, end],
+          },
+        },
+      })
+    : 0;
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
