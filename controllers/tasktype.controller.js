@@ -27,7 +27,7 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
     case "HR [SELECTION]":
       return await hrSelectionProgress(managerId, date);
 
-    // 🔹 NEW BD TASKS
+    // 🔹 BD TASKS
     case "BD [INTERNS ALLOCATED]":
       return await bdInternsAllocatedProgress(managerId, date);
 
@@ -35,6 +35,17 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
       return await bdInternsActiveProgress(managerId, date);
 
     case "BD [ACCOUNTS]":
+      return await bdAccountsProgress(managerId, date);
+
+    // 🔹 NEW: BD DAY TASKS (DAY 0 → DAY 7)
+    case "BD [DAY 0]":
+    case "BD [DAY 1]":
+    case "BD [DAY 2]":
+    case "BD [DAY 3]":
+    case "BD [DAY 4]":
+    case "BD [DAY 5]":
+    case "BD [DAY 6]":
+    case "BD [DAY 7]":
       return await bdAccountsProgress(managerId, date);
 
     default:
