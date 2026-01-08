@@ -116,7 +116,6 @@ const taskWeightageRules = {
   6: [40, 20, 15, 10, 10, 5],              // Rule 6: 6 tasks
 };
 
-// ---------------- UPSERT TASK FOR DAY ----------------
 var upsertTaskForDay = async function (req, res) {
   try {
     const { managerId, date, task } = req.body;
@@ -146,14 +145,19 @@ var upsertTaskForDay = async function (req, res) {
       if (newTask.mode === "SYSTEM" && newTask.taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
         const r = await calculateSystemTaskProgress({ taskType: newTask.taskType, managerId, date });
-
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
-
         newTask.achieved = achieved;
         newTask.target = target;
         newTask.progress = `${achieved}/${target}`;
         newTask.result = target > 0 ? Math.round((achieved / target) * 100) : 0;
+      } else if (newTask.mode === "MANUAL" && task.progress !== undefined) {
+        let parsedResult = parseFloat(task.progress.toString().replace("%", ""));
+        if (isNaN(parsedResult)) parsedResult = 0;
+        newTask.result = parsedResult;
+        newTask.achieved = 0;
+        newTask.target = 0;
+        newTask.progress = task.progress.toString();
       }
 
       tasks.push(newTask);
@@ -173,26 +177,33 @@ var upsertTaskForDay = async function (req, res) {
       if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
         const r = await calculateSystemTaskProgress({ taskType: tasks[index].taskType, managerId, date });
-
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
-
         tasks[index].achieved = achieved;
         tasks[index].target = target;
         tasks[index].progress = `${achieved}/${target}`;
         tasks[index].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
+      } else if (tasks[index].mode === "MANUAL" && task.progress !== undefined) {
+        let parsedResult = parseFloat(task.progress.toString().replace("%", ""));
+        if (isNaN(parsedResult)) parsedResult = 0;
+        tasks[index].result = parsedResult;
+        tasks[index].achieved = 0;
+        tasks[index].target = 0;
+        tasks[index].progress = task.progress.toString();
       }
     }
 
     // ---------------- DAY PROGRESS WITH WEIGHTAGE ----------------
     const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
-    const numTasks = validResults.length;
-    const weightages = taskWeightageRules[numTasks] || [];
+
+    // Only consider first 6 tasks for weightage
+    const numTasksForWeightage = Math.min(validResults.length, 6);
+    const weightages = taskWeightageRules[numTasksForWeightage] || [];
 
     let dayProgress = null;
     if (validResults.length && weightages.length) {
       dayProgress = 0;
-      for (let i = 0; i < validResults.length; i++) {
+      for (let i = 0; i < numTasksForWeightage; i++) {
         const weight = weightages[i] ?? 0;
         dayProgress += (validResults[i] * weight) / 100;
       }
@@ -210,6 +221,7 @@ var upsertTaskForDay = async function (req, res) {
 };
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
+
 
 // ---------------- GET TASK FOR DATE ----------------
 var getTaskForDate = async function (req, res) {
