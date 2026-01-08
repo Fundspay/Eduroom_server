@@ -112,12 +112,20 @@ const followUpProgress = async (managerId, date) => {
 
   const managerName = manager ? manager.name : null;
 
+  const validResponses = [
+    "sending in 1-2 days",
+    "delayed",
+    "no response",
+    "unprofessional",
+    "resumes received",
+  ];
+
   const achieved = managerName
     ? await model.CoSheets.count({
         where: {
-          connectedBy: managerName,
-          resumeDate: { [Op.between]: [start, end] },
-          followUpResponse: { [Op.ne]: null },
+          followUpBy: managerName,
+          followUpResponse: { [Op.in]: validResponses },
+          followUpDate: { [Op.between]: [start, end] },
         },
       })
     : 0;
@@ -132,6 +140,7 @@ const followUpProgress = async (managerId, date) => {
 
   return { achieved, target, progress };
 };
+
 
 /**
  * HR – RESUME RECEIVED
