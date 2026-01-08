@@ -883,10 +883,12 @@ const getTargetVsAchieved = async (req, res) => {
     // 1️⃣ Manager validation
     // ---------------------------
     const manager = await model.TeamManager.findByPk(managerId);
-    if (!manager) return ReE(res, "Team Manager not found", 404);
+    if (!manager) {
+      return ReE(res, "Team Manager not found", 404);
+    }
 
     // ---------------------------
-    // 2️⃣ Date handling (local)
+    // 2️⃣ Date handling (LOCAL)
     // ---------------------------
     const fromDate = new Date(from);
     fromDate.setHours(0, 0, 0, 0);
@@ -900,7 +902,9 @@ const getTargetVsAchieved = async (req, res) => {
     const sheets = await model.BdSheet.findAll({
       where: {
         teamManagerId: managerId,
-        startDate: { [Op.between]: [fromDate, toDate] },
+        startDate: {
+          [Op.between]: [fromDate, toDate],
+        },
       },
       attributes: ["startDate"],
       include: [
@@ -914,13 +918,14 @@ const getTargetVsAchieved = async (req, res) => {
 
     // ---------------------------
     // 4️⃣ Build date-wise achieved
-    //     (✔ ONLY subscriptionWallet)
     // ---------------------------
     const achievedByDate = {};
 
     for (const sheet of sheets) {
-      // Use local date string
-      const dateKey = sheet.startDate.toLocaleDateString("en-CA"); // yyyy-mm-dd
+      if (!sheet.startDate) continue;
+
+      // ✅ SAFE: convert string → Date
+      const dateKey = new Date(sheet.startDate).toLocaleDateString("en-CA");
 
       const mobile = sheet.StudentResume?.mobileNumber;
       if (!mobile) continue;
@@ -932,10 +937,10 @@ const getTargetVsAchieved = async (req, res) => {
 
       if (!user) continue;
 
-      const businessTask = Number(user.subscriptionWallet || 0);
+      const achievedValue = Number(user.subscriptionWallet || 0);
 
       achievedByDate[dateKey] =
-        (achievedByDate[dateKey] || 0) + businessTask;
+        (achievedByDate[dateKey] || 0) + achievedValue;
     }
 
     // ---------------------------
@@ -944,20 +949,26 @@ const getTargetVsAchieved = async (req, res) => {
     const targets = await model.BdTarget.findAll({
       where: {
         teamManagerId: managerId,
-        targetDate: { [Op.between]: [fromDate, toDate] },
+        targetDate: {
+          [Op.between]: [fromDate, toDate],
+        },
       },
       attributes: ["targetDate", "accounts"],
     });
 
     const targetByDate = {};
-    targets.forEach(t => {
-      const dateKey = t.targetDate.toLocaleDateString("en-CA");
+
+    for (const t of targets) {
+      if (!t.targetDate) continue;
+
+      const dateKey = new Date(t.targetDate).toLocaleDateString("en-CA");
+
       targetByDate[dateKey] =
         (targetByDate[dateKey] || 0) + Number(t.accounts || 0);
-    });
+    }
 
     // ---------------------------
-    // 6️⃣ Generate full date range (local)
+    // 6️⃣ Generate full date range
     // ---------------------------
     const dateRange = [];
     let current = new Date(fromDate);
@@ -979,18 +990,21 @@ const getTargetVsAchieved = async (req, res) => {
         target,
         achieved,
         difference: achieved - target,
-        percentage: target > 0 ? ((achieved / target) * 100).toFixed(2) : "0.00",
+        percentage:
+          target > 0 ? ((achieved / target) * 100).toFixed(2) : "0.00",
       };
     });
 
     // ---------------------------
     // 8️⃣ Totals
     // ---------------------------
-    const totalTarget = dateWise.reduce((s, d) => s + d.target, 0);
-    const totalAchieved = dateWise.reduce((s, d) => s + d.achieved, 0);
+    const totalTarget = dateWise.reduce((sum, d) => sum + d.target, 0);
+    const totalAchieved = dateWise.reduce((sum, d) => sum + d.achieved, 0);
     const totalDifference = totalAchieved - totalTarget;
     const totalPercentage =
-      totalTarget > 0 ? ((totalAchieved / totalTarget) * 100).toFixed(2) : "0.00";
+      totalTarget > 0
+        ? ((totalAchieved / totalTarget) * 100).toFixed(2)
+        : "0.00";
 
     return ReS(res, {
       success: true,
@@ -1004,7 +1018,8 @@ const getTargetVsAchieved = async (req, res) => {
     });
 
   } catch (err) {
-    console.error("Target vs Achieved Error:", err);
+    console.error(" Target vs Achieved Error:", err);
+    console.error(" STACK:", err.stack);
     return ReE(res, err.message, 500);
   }
 };
