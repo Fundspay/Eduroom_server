@@ -1326,6 +1326,52 @@ const getBdTlLeaderboard = async (req, res) => {
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
 
 
+const upsertBdSheetLinkByTL = async (req, res) => {
+  try {
+    const { tlName, link } = req.body;
+
+    if (!tlName) return ReE(res, "tlName is required", 400);
+    if (!link) return ReE(res, "link is required", 400);
+
+    // Find the TeamManager by name
+    const manager = await model.TeamManager.findOne({
+      where: { name: tlName },
+    });
+
+    if (!manager) return ReE(res, "TeamManager not found", 404);
+
+    // Try to find existing BdSheet for this TL (teamManager)
+    let sheet = await model.BdSheet.findOne({
+      where: { teamManagerId: manager.id },
+    });
+
+    if (sheet) {
+      // Update existing link
+      sheet.link = link;
+      await sheet.save();
+    } else {
+      // Create new BdSheet row with link
+      sheet = await model.BdSheet.create({
+        teamManagerId: manager.id,
+        tlAllocated: tlName,
+        link,
+        activeStatus: "active", // default
+      });
+    }
+
+    return ReS(res, {
+      success: true,
+      message: "BdSheet link upserted successfully by TL name",
+      sheet,
+    });
+  } catch (err) {
+    console.error("Upsert BdSheet Link by TL Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.upsertBdSheetLinkByTL = upsertBdSheetLinkByTL;
+
 
 
 
