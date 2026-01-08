@@ -80,7 +80,7 @@ const jdSendProgress = async (managerId, date) => {
 
       //  only count if JD was actually sent
       detailedResponse: {
-        [Op.iLike]: "%send jd%",
+        [Op.iLike]: "%Send JD%",
       },
     },
   });
