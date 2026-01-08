@@ -157,7 +157,7 @@ const resumeReceivedProgress = async (managerId, date) => {
 
   // 🔹 Achieved = total resumes received by this manager
   const achieved = managerName
-    ? (await model.CoSheets.sum("resumeCount", {
+    ? (await model.CoSheet.sum("resumeCount", {
         where: {
           connectedBy: managerName,
           followUpResponse: "resumes received", // <-- added filter
