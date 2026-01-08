@@ -110,12 +110,13 @@ const defaultModeByTaskType = {
 const taskWeightageRules = {
   1: [100],                               // Rule 4: 1 task
   2: [70, 30],                            // Rule 3: 2 tasks
-  3: [70, 30, 0],                          // Rule 2: 3 tasks (extra task ignored in formula per your table)
-  4: [60, 30, 10, 0],                      // Rule 1: 4 tasks
-  5: [50, 20, 15, 10, 5],                  // Rule 5: 5 tasks
-  6: [40, 20, 15, 10, 10, 5],              // Rule 6: 6 tasks
+  3: [70, 30, 0],                         // Rule 2: 3 tasks
+  4: [60, 30, 10, 0],                     // Rule 1: 4 tasks
+  5: [50, 20, 15, 10, 5],                 // Rule 5: 5 tasks
+  6: [40, 20, 15, 10, 10, 5],             // Rule 6: 6 tasks
 };
 
+// ---------------- UPSERT TASK FOR DAY ----------------
 var upsertTaskForDay = async function (req, res) {
   try {
     const { managerId, date, task } = req.body;
@@ -197,15 +198,16 @@ var upsertTaskForDay = async function (req, res) {
     const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
 
     // Only consider first 6 tasks for weightage
-    const numTasksForWeightage = Math.min(validResults.length, 6);
+    const resultsToConsider = validResults.slice(0, 6);
+    const numTasksForWeightage = resultsToConsider.length;
     const weightages = taskWeightageRules[numTasksForWeightage] || [];
 
     let dayProgress = null;
-    if (validResults.length && weightages.length) {
+    if (resultsToConsider.length && weightages.length) {
       dayProgress = 0;
       for (let i = 0; i < numTasksForWeightage; i++) {
         const weight = weightages[i] ?? 0;
-        dayProgress += (validResults[i] * weight) / 100;
+        dayProgress += (resultsToConsider[i] * weight) / 100;
       }
       dayProgress = Math.round(dayProgress);
     }
@@ -221,7 +223,6 @@ var upsertTaskForDay = async function (req, res) {
 };
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
-
 
 // ---------------- GET TASK FOR DATE ----------------
 var getTaskForDate = async function (req, res) {
@@ -297,6 +298,7 @@ var getTaskForDate = async function (req, res) {
 };
 
 module.exports.getTaskForDate = getTaskForDate;
+
 
 
 
