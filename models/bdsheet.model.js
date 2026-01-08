@@ -6,7 +6,7 @@ module.exports = (sequelize, Sequelize) => {
       id: { type: Sequelize.BIGINT, autoIncrement: true, primaryKey: true },
 
       // FK → StudentResume
-      studentResumeId: { type: Sequelize.BIGINT, allowNull: true },
+      studentResumeId: { type: Sequelize.BIGINT, allowNull: false },
 
       // ADDED (THIS WAS MISSING)
       teamManagerId: {
