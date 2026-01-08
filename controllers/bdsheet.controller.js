@@ -1193,7 +1193,7 @@ const getBdTlLeaderboard = async (req, res) => {
           teamManagerId: manager.id,
           startDate: { [Op.between]: [fromDate, toDate] },
         },
-        attributes: ["activeStatus"],
+        attributes: ["activeStatus", "link"], // fetch link column
         include: [
           {
             model: model.StudentResume,
@@ -1210,7 +1210,7 @@ const getBdTlLeaderboard = async (req, res) => {
             tlAllocated: manager.name,
             startDate: { [Op.between]: [fromDate, toDate] },
           },
-          attributes: ["activeStatus"],
+          attributes: ["activeStatus", "link"], // fetch link column
           include: [
             {
               model: model.StudentResume,
@@ -1280,6 +1280,9 @@ const getBdTlLeaderboard = async (req, res) => {
       // ---------------------------
       // PUSH RESULT
       // ---------------------------
+      // For the new "one link per TL", we just take the first non-null link (or null)
+      const tlLink = sheets.find(s => s.link)?.link || null;
+
       leaderboardData.push({
         tlName: manager.name,
         mobileNumber: manager.mobileNumber,
@@ -1290,6 +1293,7 @@ const getBdTlLeaderboard = async (req, res) => {
         accounts: achievedAccounts,
         accountsTarget,
         efficiency,
+        link: tlLink, // single link per TL
       });
     }
 
@@ -1320,6 +1324,8 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
+
+
 
 
 
