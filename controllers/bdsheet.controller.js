@@ -1340,30 +1340,23 @@ const upsertBdSheetLinkByTL = async (req, res) => {
 
     if (!manager) return ReE(res, "TeamManager not found", 404);
 
-    // Try to find existing BdSheet for this TL (teamManager)
-    let sheet = await model.BdSheet.findOne({
+    // Find existing BdSheet for this TL (teamManager)
+    const sheet = await model.BdSheet.findOne({
       where: { teamManagerId: manager.id },
     });
 
-    if (sheet) {
-      // Update existing link
-      sheet.link = link;
-      await sheet.save();
-    } else {
-      // Create new BdSheet row with link
-      // Provide a dummy studentResumeId to satisfy NOT NULL constraint
-      sheet = await model.BdSheet.create({
-        teamManagerId: manager.id,
-        tlAllocated: tlName,
-        link,
-        activeStatus: "active", // default
-        studentResumeId: 0, // dummy value to avoid NOT NULL violation
-      });
+    if (!sheet) {
+      // If no BdSheet exists, just return error (do not create)
+      return ReE(res, "No BdSheet found for this TL. Cannot create new.", 404);
     }
+
+    // Update existing link
+    sheet.link = link;
+    await sheet.save();
 
     return ReS(res, {
       success: true,
-      message: "BdSheet link upserted successfully by TL name",
+      message: "BdSheet link updated successfully by TL name",
       sheet,
     });
   } catch (err) {
