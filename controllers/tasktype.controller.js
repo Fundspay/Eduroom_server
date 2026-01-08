@@ -9,16 +9,16 @@ const { Op } = require("sequelize");
  */
 const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
   switch (taskType) {
-    case "COLLEGE_CONNECT":
+    case "HR [COLLEGE CONNECT]":
       return await collegeConnectProgress(managerId, date);
 
-    case "JD_SEND":
+    case "HR [JD SEND]":
       return await jdSendProgress(managerId, date);
 
-    case "FOLLOW_UP":
+    case "HR [FOLLOW UP]":
       return await followUpProgress(managerId, date);
 
-    case "RESUME_RECEIVED":
+    case "HR [RESUME RECEVIED]":
       return await resumeReceivedProgress(managerId, date);
 
     case "HR [SELECTED-COLLAGES]":
@@ -28,7 +28,7 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
       return await hrSelectionProgress(managerId, date);
 
     // 🔹 BD TASKS
-    case "BD [INTERNS ALLOCATED]":
+    case "HR [ALLOTMENT]":
       return await bdInternsAllocatedProgress(managerId, date);
 
     case "BD [INTERNS ACTIVE]":

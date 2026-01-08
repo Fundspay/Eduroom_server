@@ -82,10 +82,10 @@ const getNextTaskId = (tasks = []) => {
  */
 // Mapping of default modes by taskType
 const defaultModeByTaskType = {
-  "COLLEGE_CONNECT": "SYSTEM",
-  "JD_SEND": "SYSTEM",
-  "FOLLOW_UP": "SYSTEM",
-  "RESUME_RECEIVED": "SYSTEM",
+  "HR [COLLEGE CONNECT]": "SYSTEM",
+  "HR [JD SEND]": "SYSTEM",
+  "HR [FOLLOW UP]": "SYSTEM",
+  "HR [RESUME RECEVIED]": "SYSTEM",
   "HR [SELECTED-COLLAGES]": "SYSTEM",
   "HR [SELECTION]": "SYSTEM",
 
