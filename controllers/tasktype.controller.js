@@ -168,10 +168,10 @@ const resumeReceivedProgress = async (managerId, date) => {
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
-    attributes: ["resumes"],
+    attributes: ["resumetarget"],
   });
 
-  const target = targetRow ? Number(targetRow.resumes) : 0;
+  const target = targetRow ? Number(targetRow.resumetarget) : 0;
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
