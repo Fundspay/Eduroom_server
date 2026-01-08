@@ -73,10 +73,14 @@ const collegeConnectProgress = async (managerId, date) => {
 const jdSendProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
+   const manager = await model.TeamManager.findByPk(managerId, {
+    attributes: ["name"],
+  });
+  const managerName = manager ? manager.name : null;
   const achieved = await model.CoSheet.count({
     where: {
-      teamManagerId: managerId,
-      jdSentAt: { [Op.between]: [start, end] },
+      connectedBy: managerName,
+      dateOfConnect: { [Op.between]: [start, end] },
 
       //  only count if JD was actually sent
       detailedResponse: {
