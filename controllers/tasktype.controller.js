@@ -121,7 +121,7 @@ const followUpProgress = async (managerId, date) => {
   ];
 
   const achieved = managerName
-    ? await model.CoSheets.count({
+    ? await model.CoSheet.count({
         where: {
           followUpBy: managerName,
           followUpResponse: { [Op.in]: validResponses },
