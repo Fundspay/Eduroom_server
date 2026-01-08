@@ -20,12 +20,31 @@ module.exports = (sequelize, Sequelize) => {
       password: { type: Sequelize.STRING, allowNull: false },
       lastLoginAt: { type: Sequelize.DATE, allowNull: true },
       lastLogoutAt: { type: Sequelize.DATE, allowNull: true },
-      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
-      isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
-
+      isActive: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      isDeleted: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+      link: {
+        type: Sequelize.STRING, // or Sequelize.TEXT if URLs can be long
+        allowNull: true,
+      },
       // 🔹 Sequelize Defaults
-      createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
-      updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+      createdAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
+      updatedAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
     },
     {
       tableName: "TeamManagers",
@@ -40,7 +59,6 @@ module.exports = (sequelize, Sequelize) => {
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
       constraints: true,
-
     });
   };
 

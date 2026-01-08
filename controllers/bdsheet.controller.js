@@ -1175,7 +1175,7 @@ const getBdTlLeaderboard = async (req, res) => {
     toDate.setHours(23, 59, 59, 999);
 
     const teamManagers = await model.TeamManager.findAll({
-      attributes: ["id", "name", "mobileNumber"],
+      attributes: ["id", "name", "mobileNumber", "link"], // fetch TL link directly
     });
 
     if (!teamManagers.length) {
@@ -1193,7 +1193,7 @@ const getBdTlLeaderboard = async (req, res) => {
           teamManagerId: manager.id,
           startDate: { [Op.between]: [fromDate, toDate] },
         },
-        attributes: ["activeStatus", "link"], // fetch link column
+        attributes: ["activeStatus", "link"],
         include: [
           {
             model: model.StudentResume,
@@ -1210,7 +1210,7 @@ const getBdTlLeaderboard = async (req, res) => {
             tlAllocated: manager.name,
             startDate: { [Op.between]: [fromDate, toDate] },
           },
-          attributes: ["activeStatus", "link"], // fetch link column
+          attributes: ["activeStatus", "link"],
           include: [
             {
               model: model.StudentResume,
@@ -1280,8 +1280,8 @@ const getBdTlLeaderboard = async (req, res) => {
       // ---------------------------
       // PUSH RESULT
       // ---------------------------
-      // For the new "one link per TL", we just take the first non-null link (or null)
-      const tlLink = sheets.find(s => s.link)?.link || null;
+      // Take the link directly from TeamManager (updated via upsert API)
+      const tlLink = manager.link || null;
 
       leaderboardData.push({
         tlName: manager.name,
@@ -1293,7 +1293,7 @@ const getBdTlLeaderboard = async (req, res) => {
         accounts: achievedAccounts,
         accountsTarget,
         efficiency,
-        link: tlLink, // single link per TL
+        link: tlLink, // use TeamManager link
       });
     }
 
@@ -1326,6 +1326,7 @@ const getBdTlLeaderboard = async (req, res) => {
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
 
 
+
 const upsertBdSheetLinkByTL = async (req, res) => {
   try {
     const { tlName, link } = req.body;
@@ -1340,32 +1341,23 @@ const upsertBdSheetLinkByTL = async (req, res) => {
 
     if (!manager) return ReE(res, "TeamManager not found", 404);
 
-    // Find existing BdSheet for this TL (teamManager)
-    const sheet = await model.BdSheet.findOne({
-      where: { teamManagerId: manager.id },
-    });
-
-    if (!sheet) {
-      // If no BdSheet exists, just return error (do not create)
-      return ReE(res, "No BdSheet found for this TL. Cannot create new.", 404);
-    }
-
-    // Update existing link
-    sheet.link = link;
-    await sheet.save();
+    // Update the link in TeamManager directly
+    manager.link = link; // ensure 'link' field exists in TeamManager model
+    await manager.save();
 
     return ReS(res, {
       success: true,
-      message: "BdSheet link updated successfully by TL name",
-      sheet,
+      message: "TL link updated successfully in TeamManager",
+      manager,
     });
   } catch (err) {
-    console.error("Upsert BdSheet Link by TL Error:", err);
+    console.error("Upsert TL Link Error:", err);
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.upsertBdSheetLinkByTL = upsertBdSheetLinkByTL;
+
 
 
 const getAccountTargetVsAchieved = async (req, res) => {
