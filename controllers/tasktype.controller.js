@@ -41,21 +41,17 @@ const getDayRange = (date) => {
 const collegeConnectProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
-  // 🔹 get manager name from managerId
   const manager = await model.TeamManager.findByPk(managerId, {
     attributes: ["name"],
   });
 
   const managerName = manager ? manager.name : null;
 
-  // 🔹 Achieved = total calls done by this manager (connectedBy)
   const achieved = managerName
     ? await model.CoSheet.count({
         where: {
           connectedBy: managerName,
-          dateOfConnect: {
-            [Op.between]: [start, end],
-          },
+          dateOfConnect: { [Op.between]: [start, end] },
         },
       })
     : 0;
@@ -71,7 +67,6 @@ const collegeConnectProgress = async (managerId, date) => {
   return { achieved, target, progress };
 };
 
-
 /**
  * HR – JD SEND
  */
@@ -82,6 +77,11 @@ const jdSendProgress = async (managerId, date) => {
     where: {
       teamManagerId: managerId,
       jdSentAt: { [Op.between]: [start, end] },
+
+      //  only count if JD was actually sent
+      detailedResponse: {
+        [Op.iLike]: "%send jd%",
+      },
     },
   });
 
@@ -102,13 +102,21 @@ const jdSendProgress = async (managerId, date) => {
 const followUpProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
-  const achieved = await model.CoSheets.count({
-    where: {
-      teamManagerId: managerId,
-      resumeDate: { [Op.between]: [start, end] },
-      followUpResponse: { [Op.ne]: null },
-    },
+  const manager = await model.TeamManager.findByPk(managerId, {
+    attributes: ["name"],
   });
+
+  const managerName = manager ? manager.name : null;
+
+  const achieved = managerName
+    ? await model.CoSheets.count({
+        where: {
+          connectedBy: managerName,
+          resumeDate: { [Op.between]: [start, end] },
+          followUpResponse: { [Op.ne]: null },
+        },
+      })
+    : 0;
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
@@ -127,13 +135,20 @@ const followUpProgress = async (managerId, date) => {
 const resumeReceivedProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
-  const achieved =
-    (await model.CoSheets.sum("resumeCount", {
-      where: {
-        teamManagerId: managerId,
-        resumeDate: { [Op.between]: [start, end] },
-      },
-    })) || 0;
+  const manager = await model.TeamManager.findByPk(managerId, {
+    attributes: ["name"],
+  });
+
+  const managerName = manager ? manager.name : null;
+
+  const achieved = managerName
+    ? (await model.CoSheets.sum("resumeCount", {
+        where: {
+          connectedBy: managerName,
+          resumeDate: { [Op.between]: [start, end] },
+        },
+      })) || 0
+    : 0;
 
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
