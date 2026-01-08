@@ -1332,7 +1332,6 @@ const upsertBdSheetLinkByTL = async (req, res) => {
     const { tlName, link } = req.body;
 
     if (!tlName) return ReE(res, "tlName is required", 400);
-    if (!link) return ReE(res, "link is required", 400);
 
     // Find the TeamManager by name
     const manager = await model.TeamManager.findOne({
@@ -1341,8 +1340,8 @@ const upsertBdSheetLinkByTL = async (req, res) => {
 
     if (!manager) return ReE(res, "TeamManager not found", 404);
 
-    // Update the link in TeamManager directly
-    manager.link = link; // ensure 'link' field exists in TeamManager model
+    // Update the link (allow null/empty)
+    manager.link = link || null;
     await manager.save();
 
     return ReS(res, {
