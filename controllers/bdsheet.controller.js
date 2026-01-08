@@ -1351,11 +1351,13 @@ const upsertBdSheetLinkByTL = async (req, res) => {
       await sheet.save();
     } else {
       // Create new BdSheet row with link
+      // Provide a dummy studentResumeId to satisfy NOT NULL constraint
       sheet = await model.BdSheet.create({
         teamManagerId: manager.id,
         tlAllocated: tlName,
         link,
         activeStatus: "active", // default
+        studentResumeId: 0, // dummy value to avoid NOT NULL violation
       });
     }
 
@@ -1371,8 +1373,6 @@ const upsertBdSheetLinkByTL = async (req, res) => {
 };
 
 module.exports.upsertBdSheetLinkByTL = upsertBdSheetLinkByTL;
-
-
 
 
 const getAccountTargetVsAchieved = async (req, res) => {
