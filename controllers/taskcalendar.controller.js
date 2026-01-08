@@ -242,12 +242,11 @@ var getTaskForDate = async function (req, res) {
     const { calculateSystemTaskProgress } = require("./tasktype.controller");
 
     for (let i = 0; i < tasks.length; i++) {
+      // ---------------- SYSTEM TASKS ----------------
       if (tasks[i].mode === "SYSTEM" && tasks[i].taskType) {
         const r = await calculateSystemTaskProgress({ taskType: tasks[i].taskType, managerId, date });
-
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
-
         tasks[i] = {
           ...tasks[i],
           achieved,
@@ -256,19 +255,33 @@ var getTaskForDate = async function (req, res) {
           result: target > 0 ? Math.round((achieved / target) * 100) : 0,
         };
       }
+
+      // ---------------- MANUAL TASKS ----------------
+      if (tasks[i].mode === "MANUAL" && tasks[i].progress != null) {
+        let manualResult = tasks[i].progress;
+        if (typeof manualResult === "string" && manualResult.endsWith("%")) {
+          manualResult = parseFloat(manualResult.replace("%", ""));
+        } else {
+          manualResult = parseFloat(manualResult);
+        }
+        tasks[i].result = isNaN(manualResult) ? 0 : manualResult;
+      }
     }
 
     // ---------------- DAY PROGRESS WITH WEIGHTAGE ----------------
     const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
-    const numTasks = validResults.length;
-    const weightages = taskWeightageRules[numTasks] || [];
+
+    // Only consider first 6 tasks for weightage
+    const resultsToConsider = validResults.slice(0, 6);
+    const numTasksForWeightage = resultsToConsider.length;
+    const weightages = taskWeightageRules[numTasksForWeightage] || [];
 
     let dayProgress = null;
-    if (validResults.length && weightages.length) {
+    if (resultsToConsider.length && weightages.length) {
       dayProgress = 0;
-      for (let i = 0; i < validResults.length; i++) {
+      for (let i = 0; i < numTasksForWeightage; i++) {
         const weight = weightages[i] ?? 0;
-        dayProgress += (validResults[i] * weight) / 100;
+        dayProgress += (resultsToConsider[i] * weight) / 100;
       }
       dayProgress = Math.round(dayProgress);
     }
@@ -284,5 +297,6 @@ var getTaskForDate = async function (req, res) {
 };
 
 module.exports.getTaskForDate = getTaskForDate;
+
 
 
