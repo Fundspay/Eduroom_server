@@ -27,10 +27,21 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
     case "HR [SELECTION]":
       return await hrSelectionProgress(managerId, date);
 
+    // 🔹 NEW BD METRICS
+    case "BD [INTERNS ALLOCATED]":
+      return await totalInternsAllocatedProgress(managerId, date);
+
+    case "BD [INTERNS ACTIVE]":
+      return await totalInternsActiveProgress(managerId, date);
+
+    case "BD [ACCOUNTS]":
+      return await totalAccountsProgress(managerId, date);
+
     default:
       return { progress: 0, achieved: 0, target: 0 };
   }
 };
+
 
 /**
  * Utility: day range
@@ -260,6 +271,101 @@ const hrSelectionProgress = async (managerId, date) => {
 
   return { achieved, target, progress };
 };
+
+
+/**
+ * BD – TOTAL INTERNS ALLOCATED (TARGET)
+ */
+const totalInternsAllocatedProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
+  const rows = await model.MyTarget.findAll({
+    where: {
+      teamManagerId: managerId,
+      targetDate: { [Op.between]: [start, end] },
+    },
+    attributes: ["internsAllocated"],
+  });
+
+  const target = rows.reduce(
+    (sum, r) => sum + Number(r.internsAllocated || 0),
+    0
+  );
+
+  return { target };
+};
+
+/**
+ * BD – TOTAL INTERNS ACTIVE (ACHIEVED)
+ */
+const totalInternsActiveProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
+  const sheets = await model.BdSheet.findAll({
+    where: {
+      teamManagerId: managerId,
+      startDate: { [Op.between]: [start, end] },
+      activeStatus: { [Op.iLike]: "active" },
+    },
+    attributes: ["studentResumeId"],
+    order: [["id", "DESC"]],
+  });
+
+  // Deduplicate by studentResumeId
+  const uniqueInterns = new Set();
+  sheets.forEach(s => uniqueInterns.add(s.studentResumeId));
+
+  const achieved = uniqueInterns.size;
+
+  return { achieved };
+};
+
+
+/**
+ * BD – TOTAL ACCOUNTS (ACHIEVED)
+ */
+const totalAccountsProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
+  const sheets = await model.BdSheet.findAll({
+    where: {
+      teamManagerId: managerId,
+      startDate: { [Op.between]: [start, end] },
+    },
+    attributes: ["studentResumeId"],
+    include: [
+      {
+        model: model.StudentResume,
+        required: true,
+        attributes: ["mobileNumber"],
+      },
+    ],
+  });
+
+  const mobileNumbers = [
+    ...new Set(
+      sheets
+        .map(s => s.StudentResume?.mobileNumber)
+        .filter(Boolean)
+    ),
+  ];
+
+  let achieved = 0;
+
+  if (mobileNumbers.length) {
+    const users = await model.User.findAll({
+      where: { phoneNumber: { [Op.in]: mobileNumbers } },
+      attributes: ["subscriptionWallet"],
+    });
+
+    users.forEach(u => {
+      achieved += Number(u.subscriptionWallet || 0);
+    });
+  }
+
+  return { achieved };
+};
+
 
 module.exports = {
   calculateSystemTaskProgress,
