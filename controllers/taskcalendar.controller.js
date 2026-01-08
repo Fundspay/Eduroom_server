@@ -3,6 +3,8 @@
 const model = require("../models");
 const { ReE, ReS } = require("../utils/util.service");
 const { Op } = require("sequelize");
+const { calculateSystemTaskProgress } = require("./tasktype.controller");
+
 
 // GET month-wise calendar
 var getTaskCalendar = async function (req, res) {
@@ -104,19 +106,31 @@ var upsertTaskForDay = async function (req, res) {
 
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
-    //   if (!task.taskType || !task.title) {
-    //     return ReE(res, "taskType and title are required to add task", 400);
-    //   }
-
       const newTask = {
         taskId: getNextTaskId(tasks),
-        taskType: task.taskType || null, 
+        taskType: task.taskType || null,
         title: task.title,
         mode: task.mode || "MANUAL",
         progress: task.progress ?? null,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
+
+      // SYSTEM task → calculate progress
+      if (newTask.mode === "SYSTEM" && newTask.taskType) {
+        const { calculateSystemTaskProgress } =
+          require("./tasktype.controller");
+
+        const r = await calculateSystemTaskProgress({
+          taskType: newTask.taskType,
+          managerId,
+          date,
+        });
+
+        newTask.progress = r.progress ?? null;
+        newTask.target = r.target ?? 0;
+        newTask.achieved = r.achieved ?? 0;
+      }
 
       tasks.push(newTask);
     }
@@ -129,15 +143,28 @@ var upsertTaskForDay = async function (req, res) {
         return ReE(res, "Task not found for update", 404);
       }
 
-      // Update ONLY provided fields
+      // Merge incoming fields
       tasks[index] = {
         ...tasks[index],
         ...Object.fromEntries(
-          Object.entries(task).filter(
-            ([key]) => key !== "taskId"
-          )
+          Object.entries(task).filter(([key]) => key !== "taskId")
         ),
       };
+
+      // Recalculate SYSTEM task progress
+      if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
+        const { calculateSystemTaskProgress } = require("./tasktype.controller");
+
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[index].taskType,
+          managerId,
+          date,
+        });
+
+        tasks[index].progress = r.progress ?? null;
+        tasks[index].target = r.target ?? 0;
+        tasks[index].achieved = r.achieved ?? 0;
+      }
     }
 
     // ---------------- DAY PROGRESS ----------------
@@ -158,16 +185,13 @@ var upsertTaskForDay = async function (req, res) {
       dayProgress,
     });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        date,
-        tasks,
-        dayProgress,
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      date,
+      tasks,
+      dayProgress,
+    }, 200);
+
   } catch (error) {
     console.error("Error upserting task:", error);
     return ReE(res, error.message, 500);
@@ -175,6 +199,7 @@ var upsertTaskForDay = async function (req, res) {
 };
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
+
 
 // GET task for a specific date
 var getTaskForDate = async function (req, res) {
@@ -195,13 +220,64 @@ var getTaskForDate = async function (req, res) {
     });
 
     // If no record exists, return empty tasks and null progress
-    const response = {
-      date,
-      tasks: record ? record.tasks : [],
-      dayProgress: record ? record.dayProgress : null,
-    };
+    if (!record) {
+      return ReS(res, {
+        success: true,
+        date,
+        tasks: [],
+        dayProgress: null,
+      }, 200);
+    }
 
-    return ReS(res, { success: true, ...response }, 200);
+    let tasks = Array.isArray(record.tasks) ? [...record.tasks] : [];
+
+    //  Recalculate SYSTEM tasks
+    const { calculateSystemTaskProgress } =
+      require("./tasktype.controller");
+
+    for (let i = 0; i < tasks.length; i++) {
+      if (tasks[i].mode === "SYSTEM" && tasks[i].taskType) {
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[i].taskType,
+          managerId,
+          date,
+        });
+
+        tasks[i] = {
+          ...tasks[i],
+          progress: r.progress ?? null,
+          target: r.target ?? 0,
+          achieved: r.achieved ?? 0,
+        };
+      }
+    }
+
+    //  Recalculate day progress
+    const validProgress = tasks
+      .map(t => t.progress)
+      .filter(p => p !== null && p !== undefined);
+
+    const dayProgress =
+      validProgress.length > 0
+        ? Math.round(
+            validProgress.reduce((a, b) => a + b, 0) /
+              validProgress.length
+          )
+        : null;
+
+    // Persist updated values
+    await record.update({
+      tasks,
+      dayProgress,
+    });
+
+    return ReS(res, {
+      success: true,
+      date,
+      tasks,
+      dayProgress,
+    }, 200);
+
   } catch (error) {
     console.error("Error fetching task for date:", error);
     return ReE(res, error.message, 500);

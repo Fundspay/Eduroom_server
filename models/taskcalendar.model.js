@@ -67,7 +67,7 @@ module.exports = (sequelize, Sequelize) => {
       indexes: [
         {
           unique: true,
-          fields: ["teamManagerId", "taskDate"], // VERY IMPORTANT
+          fields: ["teamManagerId", "taskDate"],
         },
       ],
     }
