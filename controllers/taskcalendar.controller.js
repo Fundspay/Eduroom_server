@@ -80,6 +80,19 @@ const getNextTaskId = (tasks = []) => {
  * UPSERT task for a manager & date
  * POST /task-calendar/upsert
  */
+// Mapping of default modes by taskType
+const defaultModeByTaskType = {
+  "COLLEGE_CONNECT": "SYSTEM",
+  "JD_SEND": "SYSTEM",
+  "FOLLOW_UP": "SYSTEM",
+  "RESUME_RECEIVED": "SYSTEM",
+  "HR [SELECTED-COLLAGES]": "SYSTEM",
+  "HR [SELECTION]": "SYSTEM",
+  "BD [INTERNS ALLOCATED]": "SYSTEM",
+  "BD [INTERNS ACTIVE]": "SYSTEM",
+  "BD [ACCOUNTS]": "SYSTEM",
+};
+
 var upsertTaskForDay = async function (req, res) {
   try {
     const { managerId, date, task } = req.body;
@@ -110,7 +123,8 @@ var upsertTaskForDay = async function (req, res) {
         taskId: getNextTaskId(tasks),
         taskType: task.taskType || null,
         title: task.title,
-        mode: task.mode || "MANUAL",
+        // Auto-pick default mode based on taskType if not provided
+        mode: task.mode || defaultModeByTaskType[task.taskType] || "MANUAL",
         progress: task.progress ?? null,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
@@ -149,6 +163,8 @@ var upsertTaskForDay = async function (req, res) {
         ...Object.fromEntries(
           Object.entries(task).filter(([key]) => key !== "taskId")
         ),
+        // Auto-set mode if not provided
+        mode: task.mode || defaultModeByTaskType[tasks[index].taskType] || "MANUAL",
       };
 
       // Recalculate SYSTEM task progress
