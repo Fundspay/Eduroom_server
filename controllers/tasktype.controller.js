@@ -1,7 +1,7 @@
 "use strict";
 
 const model = require("../models");
-const { Op, fn, col } = require("sequelize");
+const { Op } = require("sequelize");
 
 /**
  * MAIN ENTRY
@@ -27,21 +27,20 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
     case "HR [SELECTION]":
       return await hrSelectionProgress(managerId, date);
 
-    // 🔹 NEW BD METRICS
+    // 🔹 NEW BD TASKS
     case "BD [INTERNS ALLOCATED]":
-      return await totalInternsAllocatedProgress(managerId, date);
+      return await bdInternsAllocatedProgress(managerId, date);
 
     case "BD [INTERNS ACTIVE]":
-      return await totalInternsActiveProgress(managerId, date);
+      return await bdInternsActiveProgress(managerId, date);
 
     case "BD [ACCOUNTS]":
-      return await totalAccountsProgress(managerId, date);
+      return await bdAccountsProgress(managerId, date);
 
     default:
       return { progress: 0, achieved: 0, target: 0 };
   }
 };
-
 
 /**
  * Utility: day range
@@ -228,16 +227,13 @@ const selectedCollegesProgress = async (managerId, date) => {
   });
 
   const target = targetRow ? Number(targetRow.collegeTarget) : 0;
-
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
 };
 
 /**
- * HR – SELECTION (NEW TASK)
- * Achieved = selected resumes count
- * Target = resumesReceivedTarget from MyTarget
+ * HR – SELECTION
  */
 const hrSelectionProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
@@ -248,7 +244,6 @@ const hrSelectionProgress = async (managerId, date) => {
 
   const managerName = manager ? manager.name : null;
 
-  // Achieved = count of selected resumes
   const achieved = managerName
     ? await model.StudentResume.count({
         where: {
@@ -259,80 +254,88 @@ const hrSelectionProgress = async (managerId, date) => {
       })
     : 0;
 
-  // Target = resumesReceivedTarget from MyTarget
   const targetRow = await model.MyTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["resumesReceivedTarget"],
   });
 
   const target = targetRow ? Number(targetRow.resumesReceivedTarget) : 0;
-
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
 
   return { achieved, target, progress };
 };
 
-
 /**
- * BD – TOTAL INTERNS ALLOCATED (TARGET)
+ * BD – INTERNS ALLOCATED
  */
-const totalInternsAllocatedProgress = async (managerId, date) => {
+const bdInternsAllocatedProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
-  const rows = await model.MyTarget.findAll({
-    where: {
-      teamManagerId: managerId,
-      targetDate: { [Op.between]: [start, end] },
-    },
+  const targetRow = await model.BdTarget.findOne({
+    where: { teamManagerId: managerId, targetDate: date },
     attributes: ["internsAllocated"],
   });
 
-  const target = rows.reduce(
-    (sum, r) => sum + Number(r.internsAllocated || 0),
-    0
-  );
+  const target = targetRow ? Number(targetRow.internsAllocated) : 0;
 
-  return { target };
-};
-
-/**
- * BD – TOTAL INTERNS ACTIVE (ACHIEVED)
- */
-const totalInternsActiveProgress = async (managerId, date) => {
-  const { start, end } = getDayRange(date);
-
-  const sheets = await model.BdSheet.findAll({
+  const achieved = await model.BdSheet.count({
     where: {
       teamManagerId: managerId,
       startDate: { [Op.between]: [start, end] },
-      activeStatus: { [Op.iLike]: "active" },
     },
-    attributes: ["studentResumeId"],
-    order: [["id", "DESC"]],
+    distinct: true,
+    col: "studentResumeId",
   });
 
-  // Deduplicate by studentResumeId
-  const uniqueInterns = new Set();
-  sheets.forEach(s => uniqueInterns.add(s.studentResumeId));
-
-  const achieved = uniqueInterns.size;
-
-  return { achieved };
+  const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  return { achieved, target, progress };
 };
 
+/**
+ * BD – INTERNS ACTIVE
+ */
+const bdInternsActiveProgress = async (managerId, date) => {
+  const { start, end } = getDayRange(date);
+
+  const targetRow = await model.BdTarget.findOne({
+    where: { teamManagerId: managerId, targetDate: date },
+    attributes: ["internsActive"],
+  });
+
+  const target = targetRow ? Number(targetRow.internsActive) : 0;
+
+  const achieved = await model.BdSheet.count({
+    where: {
+      teamManagerId: managerId,
+      activeStatus: "Active",
+      startDate: { [Op.between]: [start, end] },
+    },
+    distinct: true,
+    col: "studentResumeId",
+  });
+
+  const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  return { achieved, target, progress };
+};
 
 /**
- * BD – TOTAL ACCOUNTS (ACHIEVED)
+ * BD – ACCOUNTS
  */
-const totalAccountsProgress = async (managerId, date) => {
+const bdAccountsProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
+
+  const targetRow = await model.BdTarget.findOne({
+    where: { teamManagerId: managerId, targetDate: date },
+    attributes: ["accounts"],
+  });
+
+  const target = targetRow ? Number(targetRow.accounts) : 0;
 
   const sheets = await model.BdSheet.findAll({
     where: {
       teamManagerId: managerId,
       startDate: { [Op.between]: [start, end] },
     },
-    attributes: ["studentResumeId"],
     include: [
       {
         model: model.StudentResume,
@@ -344,14 +347,11 @@ const totalAccountsProgress = async (managerId, date) => {
 
   const mobileNumbers = [
     ...new Set(
-      sheets
-        .map(s => s.StudentResume?.mobileNumber)
-        .filter(Boolean)
+      sheets.map(s => s.StudentResume?.mobileNumber).filter(Boolean)
     ),
   ];
 
   let achieved = 0;
-
   if (mobileNumbers.length) {
     const users = await model.User.findAll({
       where: { phoneNumber: { [Op.in]: mobileNumbers } },
@@ -363,9 +363,9 @@ const totalAccountsProgress = async (managerId, date) => {
     });
   }
 
-  return { achieved };
+  const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  return { achieved, target, progress };
 };
-
 
 module.exports = {
   calculateSystemTaskProgress,
