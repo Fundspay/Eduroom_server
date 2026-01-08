@@ -365,23 +365,25 @@ const getDashboardStats = async (req, res) => {
     }
 
     // ---------------------------
-    // 2️⃣ Date Handling (DEFAULT = CURRENT MONTH → TODAY)
+    // 2️⃣ Date Handling (DEFAULT = CURRENT MONTH 1st → TODAY)
     // ---------------------------
     let fromDate, toDate;
 
     if (startDate && endDate) {
+      // Use provided dates
       fromDate = new Date(startDate);
       fromDate.setHours(0, 0, 0, 0);
 
       toDate = new Date(endDate);
       toDate.setHours(23, 59, 59, 999);
     } else {
+      // Default: current month, 1st day → today
       const today = new Date();
 
-      fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+      fromDate = new Date(today.getFullYear(), today.getMonth(), 1); // 1st day of month
       fromDate.setHours(0, 0, 0, 0);
 
-      toDate = new Date(today);
+      toDate = new Date(today); // today
       toDate.setHours(23, 59, 59, 999);
     }
 
@@ -420,8 +422,8 @@ const getDashboardStats = async (req, res) => {
         {
           model: model.StudentResume,
           required: true, // only valid StudentResume
-          attributes: ["mobileNumber", "alloted"], // 🔹 include alloted field
-          ...(managerId ? { where: { alloted: manager.name } } : {}), // 🔹 filter like getBdSheet
+          attributes: ["mobileNumber", "alloted"],
+          ...(managerId ? { where: { alloted: manager.name } } : {}),
         },
       ],
       order: [["id", "DESC"]],
@@ -436,9 +438,7 @@ const getDashboardStats = async (req, res) => {
     });
 
     const uniqueSheets = Array.from(latestByStudent.values());
-
     const totalInterns = uniqueSheets.length;
-
     const totalActiveInterns = uniqueSheets.filter(
       s => s.activeStatus?.toLowerCase() === "active"
     ).length;
@@ -491,7 +491,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
 
 
 
