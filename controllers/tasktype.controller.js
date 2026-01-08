@@ -148,16 +148,19 @@ const followUpProgress = async (managerId, date) => {
 const resumeReceivedProgress = async (managerId, date) => {
   const { start, end } = getDayRange(date);
 
+  // 🔹 Get manager name from managerId
   const manager = await model.TeamManager.findByPk(managerId, {
     attributes: ["name"],
   });
 
   const managerName = manager ? manager.name : null;
 
+  // 🔹 Achieved = total resumes received by this manager
   const achieved = managerName
     ? (await model.CoSheets.sum("resumeCount", {
         where: {
           connectedBy: managerName,
+          followUpResponse: "resumes received", // <-- added filter
           resumeDate: { [Op.between]: [start, end] },
         },
       })) || 0
@@ -173,6 +176,7 @@ const resumeReceivedProgress = async (managerId, date) => {
 
   return { achieved, target, progress };
 };
+
 
 module.exports = {
   calculateSystemTaskProgress,
