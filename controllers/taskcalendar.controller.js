@@ -88,10 +88,23 @@ const defaultModeByTaskType = {
   "RESUME_RECEIVED": "SYSTEM",
   "HR [SELECTED-COLLAGES]": "SYSTEM",
   "HR [SELECTION]": "SYSTEM",
+
+  // 🔹 BD TASKS
   "BD [INTERNS ALLOCATED]": "SYSTEM",
   "BD [INTERNS ACTIVE]": "SYSTEM",
   "BD [ACCOUNTS]": "SYSTEM",
+
+  // 🔹 BD DAY TASKS (same as BD [ACCOUNTS])
+  "BD [DAY 0]": "SYSTEM",
+  "BD [DAY 1]": "SYSTEM",
+  "BD [DAY 2]": "SYSTEM",
+  "BD [DAY 3]": "SYSTEM",
+  "BD [DAY 4]": "SYSTEM",
+  "BD [DAY 5]": "SYSTEM",
+  "BD [DAY 6]": "SYSTEM",
+  "BD [DAY 7]": "SYSTEM",
 };
+
 
 var upsertTaskForDay = async function (req, res) {
   try {
