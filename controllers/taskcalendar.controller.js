@@ -134,20 +134,29 @@ var upsertTaskForDay = async function (req, res) {
 
     let tasks = Array.isArray(dayRecord.tasks) ? [...dayRecord.tasks] : [];
 
+    const deriveMode = (taskType) =>
+      defaultModeByTaskType[taskType] === "SYSTEM" ? "SYSTEM" : "MANUAL";
+
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
+      const mode = deriveMode(task.taskType);
+
       const newTask = {
         taskId: getNextTaskId(tasks),
         taskType: task.taskType || null,
         title: task.title,
-        mode: task.mode || defaultModeByTaskType[task.taskType] || "MANUAL",
+        mode,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
 
-      if (newTask.mode === "SYSTEM" && newTask.taskType) {
+      if (mode === "SYSTEM" && newTask.taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
-        const r = await calculateSystemTaskProgress({ taskType: newTask.taskType, managerId, date });
+        const r = await calculateSystemTaskProgress({
+          taskType: newTask.taskType,
+          managerId,
+          date,
+        });
 
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
@@ -169,16 +178,24 @@ var upsertTaskForDay = async function (req, res) {
       const index = tasks.findIndex(t => t.taskId === task.taskId);
       if (index === -1) return ReE(res, "Task not found for update", 404);
 
+      const updatedTaskType = task.taskType || tasks[index].taskType;
+      const mode = deriveMode(updatedTaskType);
+
       tasks[index] = {
         ...tasks[index],
         ...Object.fromEntries(Object.entries(task).filter(([k]) => k !== "taskId")),
-        mode: task.mode || defaultModeByTaskType[tasks[index].taskType] || "MANUAL",
+        taskType: updatedTaskType,
+        mode,
       };
 
       // -------- SYSTEM TASK --------
-      if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
+      if (mode === "SYSTEM" && tasks[index].taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
-        const r = await calculateSystemTaskProgress({ taskType: tasks[index].taskType, managerId, date });
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[index].taskType,
+          managerId,
+          date,
+        });
 
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
@@ -189,20 +206,21 @@ var upsertTaskForDay = async function (req, res) {
         tasks[index].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
       }
 
-      // -------- MANUAL TASK (🔥 FIX HERE) --------
-      if (tasks[index].mode === "MANUAL") {
+      // -------- MANUAL TASK --------
+      if (mode === "MANUAL") {
         delete tasks[index].achieved;
         delete tasks[index].target;
 
-        const cleanProgress =
+        const progress =
           task.progress !== undefined
             ? task.progress
-            : (typeof tasks[index].progress === "string" && tasks[index].progress.includes("/"))
-                ? "0"
-                : tasks[index].progress ?? "0";
+            : typeof tasks[index].progress === "string" && tasks[index].progress.includes("/")
+              ? "0"
+              : tasks[index].progress ?? "0";
 
-        tasks[index].progress = cleanProgress;
-        tasks[index].result = parseFloat(cleanProgress) || 0;
+        tasks[index].progress = progress;
+        const val = parseFloat(progress);
+        tasks[index].result = isNaN(val) ? 0 : val;
       }
     }
 
@@ -251,24 +269,32 @@ var getTaskForDate = async function (req, res) {
     const { calculateSystemTaskProgress } = require("./tasktype.controller");
 
     for (let i = 0; i < tasks.length; i++) {
-      if (tasks[i].mode === "SYSTEM" && tasks[i].taskType) {
-        const r = await calculateSystemTaskProgress({ taskType: tasks[i].taskType, managerId, date });
+      const mode = defaultModeByTaskType[tasks[i].taskType] === "SYSTEM" ? "SYSTEM" : "MANUAL";
+      tasks[i].mode = mode;
+
+      if (mode === "SYSTEM" && tasks[i].taskType) {
+        const r = await calculateSystemTaskProgress({
+          taskType: tasks[i].taskType,
+          managerId,
+          date,
+        });
 
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
 
-        tasks[i] = {
-          ...tasks[i],
-          achieved,
-          target,
-          progress: `${achieved}/${target}`,
-          result: target > 0 ? Math.round((achieved / target) * 100) : 0,
-        };
+        tasks[i].achieved = achieved;
+        tasks[i].target = target;
+        tasks[i].progress = `${achieved}/${target}`;
+        tasks[i].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
       }
 
-      if (tasks[i].mode === "MANUAL") {
+      if (mode === "MANUAL") {
+        delete tasks[i].achieved;
+        delete tasks[i].target;
+
         const val = parseFloat(tasks[i].progress);
         tasks[i].result = isNaN(val) ? 0 : val;
+        tasks[i].progress = tasks[i].progress ?? "0";
       }
     }
 
@@ -296,6 +322,7 @@ var getTaskForDate = async function (req, res) {
 };
 
 module.exports.getTaskForDate = getTaskForDate;
+
 
 
 
