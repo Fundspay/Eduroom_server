@@ -138,21 +138,21 @@ var upsertTaskForDay = async function (req, res) {
 
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
-      const mode = task.mode || defaultModeByTaskType[task.taskType] || "MANUAL";
+      const taskType = task.taskType || null;
+      const mode = defaultModeByTaskType[taskType] ? "SYSTEM" : "MANUAL";
 
       const newTask = {
         taskId: getNextTaskId(tasks),
-        taskType: task.taskType || null,
+        taskType,
         title: task.title,
         mode,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
 
-      // -------- SYSTEM --------
-      if (mode === "SYSTEM" && newTask.taskType) {
+      if (mode === "SYSTEM" && taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
-        const r = await calculateSystemTaskProgress({ taskType: newTask.taskType, managerId, date });
+        const r = await calculateSystemTaskProgress({ taskType, managerId, date });
 
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
@@ -161,14 +161,10 @@ var upsertTaskForDay = async function (req, res) {
         newTask.target = target;
         newTask.progress = `${achieved}/${target}`;
         newTask.result = target > 0 ? Math.round((achieved / target) * 100) : 0;
-      }
-
-      // -------- MANUAL --------
-      if (mode === "MANUAL") {
-        const progress = task.progress ?? "0";
-        const parsed = parseFloat(progress.toString().replace("%", ""));
-        newTask.progress = progress.toString();
-        newTask.result = isNaN(parsed) ? 0 : parsed;
+      } else {
+        // MANUAL DEFAULTS
+        newTask.progress = task.progress ?? "0";
+        newTask.result = parseFloat(newTask.progress) || 0;
       }
 
       tasks.push(newTask);
@@ -177,19 +173,21 @@ var upsertTaskForDay = async function (req, res) {
     // ---------------- UPDATE TASK ----------------
     if (task.taskId) {
       const index = tasks.findIndex(t => t.taskId === task.taskId);
-      if (index === -1) return ReE(res, "Task not found for update", 404);
+      if (index === -1) return ReE(res, "Task not found", 404);
 
-      const mode = tasks[index].mode;
+      const taskType = task.taskType ?? tasks[index].taskType;
+      const mode = defaultModeByTaskType[taskType] ? "SYSTEM" : "MANUAL";
 
       tasks[index] = {
         ...tasks[index],
-        ...Object.fromEntries(Object.entries(task).filter(([k]) => !["taskId", "achieved", "target"].includes(k))),
+        ...task,
+        taskType,
+        mode,
       };
 
-      // -------- SYSTEM --------
-      if (mode === "SYSTEM" && tasks[index].taskType) {
+      if (mode === "SYSTEM") {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
-        const r = await calculateSystemTaskProgress({ taskType: tasks[index].taskType, managerId, date });
+        const r = await calculateSystemTaskProgress({ taskType, managerId, date });
 
         const achieved = r.achieved ?? 0;
         const target = r.target ?? 0;
@@ -198,29 +196,28 @@ var upsertTaskForDay = async function (req, res) {
         tasks[index].target = target;
         tasks[index].progress = `${achieved}/${target}`;
         tasks[index].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
-      }
-
-      // -------- MANUAL --------
-      if (mode === "MANUAL" && task.progress !== undefined) {
-        const parsed = parseFloat(task.progress.toString().replace("%", ""));
-        tasks[index].progress = task.progress.toString();
-        tasks[index].result = isNaN(parsed) ? 0 : parsed;
-
-        // 🔥 ENSURE NO SYSTEM FIELDS EXIST
+      } else {
+        //  REMOVE SYSTEM FIELDS COMPLETELY
         delete tasks[index].achieved;
         delete tasks[index].target;
+
+        tasks[index].progress = task.progress ?? tasks[index].progress ?? "0";
+        tasks[index].result = parseFloat(tasks[index].progress) || 0;
       }
     }
 
     // ---------------- DAY PROGRESS ----------------
-    const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
-    const resultsToConsider = validResults.slice(0, 6);
+    const results = tasks.map(t => t.result).filter(r => r !== undefined);
+    const resultsToConsider = results.slice(0, 6);
     const weightages = taskWeightageRules[resultsToConsider.length] || [];
 
     let dayProgress = null;
-    if (resultsToConsider.length) {
+    if (weightages.length) {
       dayProgress = Math.round(
-        resultsToConsider.reduce((sum, r, i) => sum + (r * (weightages[i] || 0)) / 100, 0)
+        resultsToConsider.reduce(
+          (sum, r, i) => sum + (r * (weightages[i] || 0)) / 100,
+          0
+        )
       );
     }
 
@@ -229,10 +226,11 @@ var upsertTaskForDay = async function (req, res) {
     return ReS(res, { success: true, date, tasks, dayProgress }, 200);
 
   } catch (error) {
-    console.error("Error upserting task:", error);
+    console.error(error);
     return ReE(res, error.message, 500);
   }
 };
+
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
 
