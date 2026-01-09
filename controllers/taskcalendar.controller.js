@@ -46,9 +46,13 @@ var getTaskCalendar = async function (req, res) {
       const date = `${month}-${String(day).padStart(2, "0")}`;
       const record = recordMap[date];
 
+      const dayName = new Date(date).toLocaleDateString("en-US", {
+        weekday: "short",
+      });
+
       calendar.push({
         date,
-        tasks: record ? record.tasks : [],
+        day: dayName,
         dayProgress: record ? record.dayProgress : null,
       });
     }
@@ -61,6 +65,7 @@ var getTaskCalendar = async function (req, res) {
 };
 
 module.exports.getTaskCalendar = getTaskCalendar;
+
 
 /**
  * Generate next small taskId (t1, t2...)
