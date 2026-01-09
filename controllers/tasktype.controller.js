@@ -21,7 +21,7 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
     case "HR [RESUME RECEVIED]":
       return await resumeReceivedProgress(managerId, date);
 
-    case "HR [SELECTED-COLLAGES]":
+    case "HR [SELECTED-COLLEGES]":
       return await selectedCollegesProgress(managerId, date);
 
     case "HR [SELECTION]":

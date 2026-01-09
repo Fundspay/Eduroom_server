@@ -91,7 +91,7 @@ const defaultModeByTaskType = {
   "HR [JD SEND]": "SYSTEM",
   "HR [FOLLOW UP]": "SYSTEM",
   "HR [RESUME RECEVIED]": "SYSTEM",
-  "HR [SELECTED-COLLAGES]": "SYSTEM",
+  "HR [SELECTED-COLLEGES]": "SYSTEM",
   "HR [SELECTION]": "SYSTEM",
 
   // 🔹 BD TASKS
