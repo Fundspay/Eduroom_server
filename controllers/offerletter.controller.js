@@ -676,14 +676,11 @@ const listAllUsers = async (req, res) => {
 
     const response = [];
 
-    // Counters for overall course completion
     let totalCourses = 0;
     let completedCourses = 0;
 
     for (const user of users) {
       const courseDetails = [];
-
-      // per-user counters
       let userTotalCourses = 0;
       let userCompletedCourses = 0;
 
@@ -695,7 +692,9 @@ const listAllUsers = async (req, res) => {
             courseId,
             courseName: course ? course.name : null,
             duration: course ? course.duration : null,
-            businessTarget: user.businessTargets?.[courseId]?.target || (course ? course.businessTarget : null),
+            businessTarget:
+              user.businessTargets?.[courseId]?.target ||
+              (course ? course.businessTarget : null),
             offerMessage: user.businessTargets?.[courseId]?.offerMessage || null,
             domainName: course && course.Domain ? course.Domain.name : null,
             status,
@@ -703,45 +702,37 @@ const listAllUsers = async (req, res) => {
             endDate: user.courseDates?.[courseId]?.endDate || null
           });
 
-
-          // update per-user counters
           userTotalCourses++;
           if (status === "completed") userCompletedCourses++;
 
-          // update global counters
           totalCourses++;
           if (status === "completed") completedCourses++;
         }
       }
 
-      // per-user course completion percent
       const userCourseCompletionPercent =
         userTotalCourses > 0
           ? ((userCompletedCourses / userTotalCourses) * 100).toFixed(2)
           : "0.00";
 
       const internshipIssued =
-        user.InternshipCertificates && user.InternshipCertificates.length > 0
+        user.InternshipCertificates?.length > 0
           ? user.InternshipCertificates.some(cert => cert.isIssued)
           : null;
 
       const teamManager = user.teamManager
         ? {
-          id: user.teamManager.id,
-          name: user.teamManager.name,
-          internshipStatus: user.teamManager.internshipStatus
-        }
+            id: user.teamManager.id,
+            name: user.teamManager.name,
+            internshipStatus: user.teamManager.internshipStatus
+          }
         : null;
 
       const offerLetterSent =
-        user.OfferLetters && user.OfferLetters.length > 0
-          ? user.OfferLetters[0].issent
-          : false;
+        user.OfferLetters?.length > 0 ? user.OfferLetters[0].issent : false;
 
       const offerLetterFile =
-        user.OfferLetters && user.OfferLetters.length > 0
-          ? user.OfferLetters[0].fileUrl
-          : null;
+        user.OfferLetters?.length > 0 ? user.OfferLetters[0].fileUrl : null;
 
       const queryInfo =
         queryInfoByUser[user.id] || {
@@ -754,7 +745,13 @@ const listAllUsers = async (req, res) => {
         ? moment(user.createdAt).format("YYYY-MM-DD HH:mm:ss")
         : null;
 
+      // 🔧 FIXED: always-sync source-of-truth fields
       const fieldsToUpdate = {
+        userName: `${user.firstName} ${user.lastName}`,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        collegeName: user.collegeName ?? null,
+
         subscriptionWallet: user.subscriptionWallet,
         subscriptionLeft: user.subscriptionLeft,
         selected: user.selected || null,
@@ -768,6 +765,9 @@ const listAllUsers = async (req, res) => {
         queryCount: queryInfo.queryCount,
         registeredAt: createdAtFormatted,
         courseCompletionPercent: userCourseCompletionPercent,
+
+        teamManager: teamManager ? teamManager.name : null,
+        internshipStatus: teamManager ? teamManager.internshipStatus : null
       };
 
       let statusRecord = await Status.findOne({ where: { userId: user.id } });
@@ -777,13 +777,7 @@ const listAllUsers = async (req, res) => {
       } else {
         statusRecord = await Status.create({
           userId: user.id,
-          userName: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          collegeName: user.collegeName,
-          ...fieldsToUpdate,
-          teamManager: teamManager ? teamManager.name : null,
-          internshipStatus: teamManager ? teamManager.internshipStatus : null
+          ...fieldsToUpdate
         });
 
         await user.update({ statusId: statusRecord.id });
@@ -795,9 +789,10 @@ const listAllUsers = async (req, res) => {
       });
     }
 
-    // Overall course completion percentage
     const courseCompletionPercent =
-      totalCourses > 0 ? ((completedCourses / totalCourses) * 100).toFixed(2) : "0.00";
+      totalCourses > 0
+        ? ((completedCourses / totalCourses) * 100).toFixed(2)
+        : "0.00";
 
     return ReS(
       res,
@@ -821,6 +816,7 @@ const listAllUsers = async (req, res) => {
 };
 
 module.exports.listAllUsers = listAllUsers;
+
 
 /**
  * Automatically generate and send offer letters to latest 500 users with started courses.
