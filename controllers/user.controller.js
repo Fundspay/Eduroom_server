@@ -526,6 +526,7 @@ const updateUser = async (req, res) => {
       "city",
       "referralCode",
       "referralLink",
+      "pfLink"
     ];
 
     const updatedFields = {};
