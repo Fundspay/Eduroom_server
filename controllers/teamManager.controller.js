@@ -122,7 +122,6 @@ const getAllTeamManagers = async (req, res) => {
 module.exports.getAllTeamManagers = getAllTeamManagers;
 
 
-// ✅ Update Team Manager
 var updateTeamManager = async function (req, res) {
     try {
         const { managerId } = req.params;
@@ -130,9 +129,9 @@ var updateTeamManager = async function (req, res) {
 
         if (!managerId) return ReE(res, "managerId is required", 400);
 
-        // Find manager
+        // Find manager (FIXED: using primary key `id`)
         const manager = await model.TeamManager.findOne({
-            where: { managerId, isDeleted: false }
+            where: { id: managerId, isDeleted: false }
         });
 
         if (!manager) return ReE(res, "Manager not found", 404);
@@ -172,6 +171,7 @@ var updateTeamManager = async function (req, res) {
 };
 
 module.exports.updateTeamManager = updateTeamManager;
+
 
 
 
