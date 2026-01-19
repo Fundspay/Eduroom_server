@@ -12,7 +12,8 @@ var upsertScoreSheet = async (req, res) => {
         portfoliolink,
         videolink,
         comment,
-        manager, // manager NAME from frontend
+        manager,      // manager ID
+        managerName,  // manager NAME (plain text)
         score1,
         score2,
         score3,
@@ -24,21 +25,6 @@ var upsertScoreSheet = async (req, res) => {
             (score1 ?? 0) +
             (score2 ?? 0) +
             (score3 ?? 0);
-
-        // 🔹 Resolve manager name → id
-        let managerId = null;
-
-        if (manager) {
-            const managerRecord = await model.TeamManager.findOne({
-                where: { name: manager },
-            });
-
-            if (!managerRecord) {
-                return ReE(res, "Manager not found", 400);
-            }
-
-            managerId = managerRecord.id;
-        }
 
         let scoreSheet;
 
@@ -59,7 +45,8 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: managerId,
+                manager: manager || null,           // ID only
+                managerName: managerName || null,   // text only
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
@@ -74,7 +61,8 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: managerId,
+                manager: manager || null,           // ID only
+                managerName: managerName || null,   // text only
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
@@ -91,6 +79,7 @@ var upsertScoreSheet = async (req, res) => {
 module.exports.upsertScoreSheet = upsertScoreSheet;
 
 
+
 var getScoreSheet = async (req, res) => {
     try {
         const { managerid } = req.params;
@@ -101,18 +90,7 @@ var getScoreSheet = async (req, res) => {
 
         const scoreSheets = await model.ScoreSheet.findAll({
             where: whereCondition,
-            include: [
-                {
-                    model: model.TeamManager,
-                    attributes: ["id", "name"],
-                },
-            ],
         });
-
-        const formattedScoreSheets = scoreSheets.map((s) => ({
-            ...s.toJSON(),
-            managerName: s.TeamManager ? s.TeamManager.name : null,
-        }));
 
         const managers = await model.TeamManager.findAll({
             attributes: ["id", "name", "email", "mobileNumber"],
@@ -122,7 +100,7 @@ var getScoreSheet = async (req, res) => {
         return ReS(
             res,
             {
-                scoresheets: formattedScoreSheets || [],
+                scoresheets: scoreSheets || [],
                 managers: managers || [],
             },
             200
@@ -133,3 +111,4 @@ var getScoreSheet = async (req, res) => {
 };
 
 module.exports.getScoreSheet = getScoreSheet;
+

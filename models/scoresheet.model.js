@@ -12,8 +12,11 @@ module.exports = (sequelize, Sequelize) => {
       videolink: { type: Sequelize.TEXT, allowNull: true },
       comment: { type: Sequelize.TEXT, allowNull: true },
 
-      // 🔹 Manager reference
+      // 🔹 Manager reference (ID)
       manager: { type: Sequelize.BIGINT, allowNull: true },
+
+      // 🔹 Manager name (DENORMALIZED for frontend use)
+      managerName: { type: Sequelize.STRING, allowNull: true },
 
       score1: { type: Sequelize.INTEGER, allowNull: true },
       score2: { type: Sequelize.INTEGER, allowNull: true },
