@@ -2,7 +2,7 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
-//  Upsert ScoreSheet (total score auto-calculated)
+// Upsert ScoreSheet (total score auto-calculated)
 var upsertScoreSheet = async (req, res) => {
     const {
         id,
@@ -43,7 +43,7 @@ var upsertScoreSheet = async (req, res) => {
         let scoreSheet;
 
         if (id) {
-            // Update existing record
+            // 🔹 Update existing record
             scoreSheet = await model.ScoreSheet.findOne({
                 where: { id },
             });
@@ -66,7 +66,7 @@ var upsertScoreSheet = async (req, res) => {
                 totalscore: totalScore,
             });
         } else {
-            // Create new record
+            // 🔹 Create new record
             scoreSheet = await model.ScoreSheet.create({
                 session: session || null,
                 department: department || null,
@@ -89,6 +89,7 @@ var upsertScoreSheet = async (req, res) => {
 };
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
+
 
 var getScoreSheet = async (req, res) => {
     try {
