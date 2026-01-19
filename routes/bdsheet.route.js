@@ -17,7 +17,7 @@ router.get('/target-vs-achieved', bdsheetController.getTargetVsAchieved);
 router.get('/bd-tl-leaderboard', bdsheetController.getBdTlLeaderboard);
 router.get('/account-target-vs-achieved', bdsheetController.getAccountTargetVsAchieved);
 router.get("/payments-vs-target", bdsheetController.getAccountsCountWithTargetSummary );
-router.post("/youtubelink", bdsheetController.upsertBdSheetLinkByTL)
+// router.post("/youtubelink", bdsheetController.upsertBdSheetLinkByTL)
 
 
 module.exports = router;
