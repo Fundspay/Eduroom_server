@@ -526,6 +526,7 @@ const updateUser = async (req, res) => {
       "city",
       "referralCode",
       "referralLink",
+      "pfLink"
     ];
 
     const updatedFields = {};
@@ -1027,6 +1028,7 @@ const fetchSingleUserById = async (req, res) => {
       TotalSubscriptions: totalSubscriptions,
       InternshipStatus: userData.internshipStatus || null,
       TeamManager: finalTeamManager,
+      PfLink: userData.pfLink || null
     };
 
     return ReS(res, { success: true, data: filteredData }, 200);

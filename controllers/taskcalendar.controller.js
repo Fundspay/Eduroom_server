@@ -46,9 +46,13 @@ var getTaskCalendar = async function (req, res) {
       const date = `${month}-${String(day).padStart(2, "0")}`;
       const record = recordMap[date];
 
+      const dayName = new Date(date).toLocaleDateString("en-US", {
+        weekday: "short",
+      });
+
       calendar.push({
         date,
-        tasks: record ? record.tasks : [],
+        day: dayName,
         dayProgress: record ? record.dayProgress : null,
       });
     }
@@ -61,6 +65,7 @@ var getTaskCalendar = async function (req, res) {
 };
 
 module.exports.getTaskCalendar = getTaskCalendar;
+
 
 /**
  * Generate next small taskId (t1, t2...)
@@ -80,6 +85,40 @@ const getNextTaskId = (tasks = []) => {
  * UPSERT task for a manager & date
  * POST /task-calendar/upsert
  */
+
+const defaultModeByTaskType = {
+  "HR [COLLEGE CONNECT]": "SYSTEM",
+  "HR [JD SEND]": "SYSTEM",
+  "HR [FOLLOW UP]": "SYSTEM",
+  "HR [RESUME RECEVIED]": "SYSTEM",
+  "HR [SELECTED-COLLEGES]": "SYSTEM",
+  "HR [SELECTION]": "SYSTEM",
+
+  "BD [INTERNS ALLOCATED]": "SYSTEM",
+  "BD [INTERNS ACTIVE]": "SYSTEM",
+  "BD [ACCOUNTS]": "SYSTEM",
+
+  "BD [DAY 0]": "SYSTEM",
+  "BD [DAY 1]": "SYSTEM",
+  "BD [DAY 2]": "SYSTEM",
+  "BD [DAY 3]": "SYSTEM",
+  "BD [DAY 4]": "SYSTEM",
+  "BD [DAY 5]": "SYSTEM",
+  "BD [DAY 6]": "SYSTEM",
+  "BD [DAY 7]": "SYSTEM",
+};
+
+// ---------------- TASK WEIGHTAGE RULES ----------------
+const taskWeightageRules = {
+  1: [100],
+  2: [70, 30],
+  3: [70, 30, 0],
+  4: [60, 30, 10, 0],
+  5: [50, 20, 15, 10, 5],
+  6: [40, 20, 15, 10, 10, 5],
+};
+
+// ---------------- UPSERT TASK FOR DAY ----------------
 var upsertTaskForDay = async function (req, res) {
   try {
     const { managerId, date, task } = req.body;
@@ -88,48 +127,47 @@ var upsertTaskForDay = async function (req, res) {
       return ReE(res, "managerId, date and task are required", 400);
     }
 
-    // Find or create day row
     const [dayRecord] = await model.TaskCalendarDay.findOrCreate({
-      where: {
-        teamManagerId: managerId,
-        taskDate: date,
-      },
-      defaults: {
-        tasks: [],
-        dayProgress: null,
-      },
+      where: { teamManagerId: managerId, taskDate: date },
+      defaults: { tasks: [], dayProgress: null },
     });
 
-    let tasks = Array.isArray(dayRecord.tasks)
-      ? [...dayRecord.tasks]
-      : [];
+    let tasks = Array.isArray(dayRecord.tasks) ? [...dayRecord.tasks] : [];
+
+    const deriveMode = (taskType) =>
+      defaultModeByTaskType[taskType] === "SYSTEM" ? "SYSTEM" : "MANUAL";
 
     // ---------------- ADD TASK ----------------
     if (!task.taskId) {
+      const mode = deriveMode(task.taskType);
+
       const newTask = {
         taskId: getNextTaskId(tasks),
         taskType: task.taskType || null,
         title: task.title,
-        mode: task.mode || "MANUAL",
-        progress: task.progress ?? null,
+        mode,
         status: task.status || "NORMAL",
         order: tasks.length + 1,
       };
 
-      // SYSTEM task → calculate progress
-      if (newTask.mode === "SYSTEM" && newTask.taskType) {
-        const { calculateSystemTaskProgress } =
-          require("./tasktype.controller");
-
+      if (mode === "SYSTEM" && newTask.taskType) {
+        const { calculateSystemTaskProgress } = require("./tasktype.controller");
         const r = await calculateSystemTaskProgress({
           taskType: newTask.taskType,
           managerId,
           date,
         });
 
-        newTask.progress = r.progress ?? null;
-        newTask.target = r.target ?? 0;
-        newTask.achieved = r.achieved ?? 0;
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
+        newTask.achieved = achieved;
+        newTask.target = target;
+        newTask.progress = `${achieved}/${target}`;
+        newTask.result = target > 0 ? Math.round((achieved / target) * 100) : 0;
+      } else {
+        newTask.progress = "0";
+        newTask.result = 0;
       }
 
       tasks.push(newTask);
@@ -138,59 +176,71 @@ var upsertTaskForDay = async function (req, res) {
     // ---------------- UPDATE TASK ----------------
     if (task.taskId) {
       const index = tasks.findIndex(t => t.taskId === task.taskId);
+      if (index === -1) return ReE(res, "Task not found for update", 404);
 
-      if (index === -1) {
-        return ReE(res, "Task not found for update", 404);
-      }
+      const updatedTaskType = task.taskType || tasks[index].taskType;
+      const mode = deriveMode(updatedTaskType);
 
-      // Merge incoming fields
       tasks[index] = {
         ...tasks[index],
-        ...Object.fromEntries(
-          Object.entries(task).filter(([key]) => key !== "taskId")
-        ),
+        ...Object.fromEntries(Object.entries(task).filter(([k]) => k !== "taskId")),
+        taskType: updatedTaskType,
+        mode,
       };
 
-      // Recalculate SYSTEM task progress
-      if (tasks[index].mode === "SYSTEM" && tasks[index].taskType) {
+      // -------- SYSTEM TASK --------
+      if (mode === "SYSTEM" && tasks[index].taskType) {
         const { calculateSystemTaskProgress } = require("./tasktype.controller");
-
         const r = await calculateSystemTaskProgress({
           taskType: tasks[index].taskType,
           managerId,
           date,
         });
 
-        tasks[index].progress = r.progress ?? null;
-        tasks[index].target = r.target ?? 0;
-        tasks[index].achieved = r.achieved ?? 0;
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
+        tasks[index].achieved = achieved;
+        tasks[index].target = target;
+        tasks[index].progress = `${achieved}/${target}`;
+        tasks[index].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
+      }
+
+      // -------- MANUAL TASK --------
+      if (mode === "MANUAL") {
+        delete tasks[index].achieved;
+        delete tasks[index].target;
+
+        const progress =
+          task.progress !== undefined
+            ? task.progress
+            : typeof tasks[index].progress === "string" && tasks[index].progress.includes("/")
+              ? "0"
+              : tasks[index].progress ?? "0";
+
+        tasks[index].progress = progress;
+        const val = parseFloat(progress);
+        tasks[index].result = isNaN(val) ? 0 : val;
       }
     }
 
     // ---------------- DAY PROGRESS ----------------
-    const validProgress = tasks
-      .map(t => t.progress)
-      .filter(p => p !== null && p !== undefined);
+    const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
+    const resultsToConsider = validResults.slice(0, 6);
+    const weightages = taskWeightageRules[resultsToConsider.length] || [];
 
-    const dayProgress =
-      validProgress.length > 0
-        ? Math.round(
-            validProgress.reduce((a, b) => a + b, 0) /
-              validProgress.length
-          )
-        : null;
+    let dayProgress = null;
+    if (resultsToConsider.length) {
+      dayProgress = 0;
+      for (let i = 0; i < resultsToConsider.length; i++) {
+        dayProgress += (resultsToConsider[i] * (weightages[i] || 0)) / 100;
+      }
+      dayProgress = Math.round(dayProgress);
+    }
 
-    await dayRecord.update({
-      tasks,
-      dayProgress,
-    });
+    await dayRecord.update({ tasks, dayProgress });
 
-    return ReS(res, {
-      success: true,
-      date,
-      tasks,
-      dayProgress,
-    }, 200);
+    return ReS(res, { success: true, date, tasks, dayProgress }, 200);
 
   } catch (error) {
     console.error("Error upserting task:", error);
@@ -200,83 +250,70 @@ var upsertTaskForDay = async function (req, res) {
 
 module.exports.upsertTaskForDay = upsertTaskForDay;
 
-
-// GET task for a specific date
+// ---------------- GET TASK FOR DATE ----------------
 var getTaskForDate = async function (req, res) {
   try {
     const { managerId, date } = req.query;
 
-    if (!managerId || !date) {
-      return ReE(res, "managerId and date are required", 400);
-    }
+    if (!managerId || !date) return ReE(res, "managerId and date are required", 400);
 
-    // Fetch the day record
     const record = await model.TaskCalendarDay.findOne({
-      where: {
-        teamManagerId: managerId,
-        taskDate: date,
-        isDeleted: false,
-      },
+      where: { teamManagerId: managerId, taskDate: date, isDeleted: false },
     });
 
-    // If no record exists, return empty tasks and null progress
     if (!record) {
-      return ReS(res, {
-        success: true,
-        date,
-        tasks: [],
-        dayProgress: null,
-      }, 200);
+      return ReS(res, { success: true, date, tasks: [], dayProgress: null }, 200);
     }
 
     let tasks = Array.isArray(record.tasks) ? [...record.tasks] : [];
-
-    //  Recalculate SYSTEM tasks
-    const { calculateSystemTaskProgress } =
-      require("./tasktype.controller");
+    const { calculateSystemTaskProgress } = require("./tasktype.controller");
 
     for (let i = 0; i < tasks.length; i++) {
-      if (tasks[i].mode === "SYSTEM" && tasks[i].taskType) {
+      const mode = defaultModeByTaskType[tasks[i].taskType] === "SYSTEM" ? "SYSTEM" : "MANUAL";
+      tasks[i].mode = mode;
+
+      if (mode === "SYSTEM" && tasks[i].taskType) {
         const r = await calculateSystemTaskProgress({
           taskType: tasks[i].taskType,
           managerId,
           date,
         });
 
-        tasks[i] = {
-          ...tasks[i],
-          progress: r.progress ?? null,
-          target: r.target ?? 0,
-          achieved: r.achieved ?? 0,
-        };
+        const achieved = r.achieved ?? 0;
+        const target = r.target ?? 0;
+
+        tasks[i].achieved = achieved;
+        tasks[i].target = target;
+        tasks[i].progress = `${achieved}/${target}`;
+        tasks[i].result = target > 0 ? Math.round((achieved / target) * 100) : 0;
+      }
+
+      if (mode === "MANUAL") {
+        delete tasks[i].achieved;
+        delete tasks[i].target;
+
+        const val = parseFloat(tasks[i].progress);
+        tasks[i].result = isNaN(val) ? 0 : val;
+        tasks[i].progress = tasks[i].progress ?? "0";
       }
     }
 
-    //  Recalculate day progress
-    const validProgress = tasks
-      .map(t => t.progress)
-      .filter(p => p !== null && p !== undefined);
+    const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
+    const resultsToConsider = validResults.slice(0, 6);
+    const weightages = taskWeightageRules[resultsToConsider.length] || [];
 
-    const dayProgress =
-      validProgress.length > 0
-        ? Math.round(
-            validProgress.reduce((a, b) => a + b, 0) /
-              validProgress.length
-          )
-        : null;
+    let dayProgress = null;
+    if (resultsToConsider.length) {
+      dayProgress = 0;
+      for (let i = 0; i < resultsToConsider.length; i++) {
+        dayProgress += (resultsToConsider[i] * (weightages[i] || 0)) / 100;
+      }
+      dayProgress = Math.round(dayProgress);
+    }
 
-    // Persist updated values
-    await record.update({
-      tasks,
-      dayProgress,
-    });
+    await record.update({ tasks, dayProgress });
 
-    return ReS(res, {
-      success: true,
-      date,
-      tasks,
-      dayProgress,
-    }, 200);
+    return ReS(res, { success: true, date, tasks, dayProgress }, 200);
 
   } catch (error) {
     console.error("Error fetching task for date:", error);
@@ -285,3 +322,9 @@ var getTaskForDate = async function (req, res) {
 };
 
 module.exports.getTaskForDate = getTaskForDate;
+
+
+
+
+
+

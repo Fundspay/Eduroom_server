@@ -60,6 +60,12 @@ module.exports = (sequelize, Sequelize) => {
       incentiveAmounts: { type: Sequelize.JSON, allowNull: true },
       deductionAmounts: { type: Sequelize.JSON, allowNull: true },
 
+      link: {
+  type: Sequelize.STRING, // or Sequelize.TEXT if URLs can be long
+  allowNull: true,
+}
+,
+
       createdAt: {
         type: Sequelize.DATE,
         allowNull: false,
