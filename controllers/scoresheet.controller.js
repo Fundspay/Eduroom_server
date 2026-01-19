@@ -21,10 +21,11 @@ var upsertScoreSheet = async (req, res) => {
 
     try {
         // 🔹 Auto calculate average total score (divided by 3)
-        const totalScore =
+        const totalScore = Math.round(
             ((score1 ?? 0) +
              (score2 ?? 0) +
-             (score3 ?? 0)) / 3;
+             (score3 ?? 0)) / 3
+        );
 
         let scoreSheet;
 
@@ -77,6 +78,7 @@ var upsertScoreSheet = async (req, res) => {
 };
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
+
 
 
 var getScoreSheet = async (req, res) => {
