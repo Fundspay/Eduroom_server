@@ -351,47 +351,193 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 
 
+// const getDashboardStats = async (req, res) => {
+//   try {
+//     const { managerId, startDate, endDate } = req.query;
+
+//     // ---------------------------
+//     // 1️⃣ Manager Validation
+//     // ---------------------------
+//     let manager;
+//     if (managerId) {
+//       manager = await model.TeamManager.findByPk(managerId);
+//       if (!manager) return ReE(res, "Team Manager not found", 404);
+//     }
+
+//     // ---------------------------
+//     // 2️⃣ Date Handling (DEFAULT = CURRENT MONTH → TODAY)
+//     // ---------------------------
+//     let fromDate, toDate;
+
+//     if (startDate && endDate) {
+//       fromDate = new Date(startDate);
+//       fromDate.setHours(0, 0, 0, 0);
+
+//       toDate = new Date(endDate);
+//       toDate.setHours(23, 59, 59, 999);
+//     } else {
+//       const today = new Date();
+
+//       fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
+//       fromDate.setHours(0, 0, 0, 0);
+
+//       toDate = new Date(today);
+//       toDate.setHours(23, 59, 59, 999);
+//     }
+
+//     // ---------------------------
+//     // 3️⃣ BD TARGET (TARGET NUMBERS)
+//     // ---------------------------
+//     const bdTargetData = await model.BdTarget.findAll({
+//       where: {
+//         ...(managerId ? { teamManagerId: managerId } : {}),
+//         targetDate: { [Op.between]: [fromDate, toDate] },
+//       },
+//       attributes: ["internsAllocated", "internsActive", "accounts"],
+//     });
+
+//     let totalInternsAllocated = 0;
+//     let totalInternsActive = 0;
+//     let totalAccountsTarget = 0;
+
+//     bdTargetData.forEach(t => {
+//       totalInternsAllocated += Number(t.internsAllocated || 0);
+//       totalInternsActive += Number(t.internsActive || 0);
+//       totalAccountsTarget += Number(t.accounts || 0);
+//     });
+
+//     // ---------------------------
+//     // 4️⃣ BD SHEET (DATE-RANGE BASED COUNTS)
+//     // Only valid StudentResume and deduplicate by studentResumeId
+//     // ---------------------------
+//     const bdSheets = await model.BdSheet.findAll({
+//       where: {
+//         ...(managerId ? { teamManagerId: managerId } : {}),
+//         startDate: { [Op.between]: [fromDate, toDate] },
+//       },
+//       attributes: ["id", "studentResumeId", "activeStatus"],
+//       include: [
+//         {
+//           model: model.StudentResume,
+//           required: true, // only valid StudentResume
+//           attributes: ["mobileNumber", "alloted"], // 🔹 include alloted field
+//           ...(managerId ? { where: { alloted: manager.name } } : {}), // 🔹 filter like getBdSheet
+//         },
+//       ],
+//       order: [["id", "DESC"]],
+//     });
+
+//     // Deduplicate by studentResumeId (latest record only)
+//     const latestByStudent = new Map();
+//     bdSheets.forEach(sheet => {
+//       if (!latestByStudent.has(sheet.studentResumeId)) {
+//         latestByStudent.set(sheet.studentResumeId, sheet);
+//       }
+//     });
+
+//     const uniqueSheets = Array.from(latestByStudent.values());
+
+//     const totalInterns = uniqueSheets.length;
+
+//     const totalActiveInterns = uniqueSheets.filter(
+//       s => s.activeStatus?.toLowerCase() === "active"
+//     ).length;
+
+//     // ---------------------------
+//     // 5️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
+//     // ---------------------------
+//     let totalAccountsSheet = 0;
+
+//     const mobileNumbers = [
+//       ...new Set(uniqueSheets.map(s => s.StudentResume.mobileNumber).filter(Boolean)),
+//     ];
+
+//     if (mobileNumbers.length) {
+//       const users = await model.User.findAll({
+//         where: { phoneNumber: { [Op.in]: mobileNumbers } },
+//         attributes: ["subscriptionWallet"],
+//       });
+
+//       users.forEach(u => {
+//         totalAccountsSheet += Number(u.subscriptionWallet || 0);
+//       });
+//     }
+
+//     // ---------------------------
+//     // 6️⃣ FINAL RESPONSE
+//     // ---------------------------
+//     return ReS(res, {
+//       bdTarget: {
+//         totalInternsAllocated,
+//         totalInternsActive,
+//         totalAccounts: totalAccountsTarget,
+//       },
+//       bdSheet: {
+//         totalInterns,
+//         totalActiveInterns,
+//         totalAccounts: totalAccountsSheet,
+//       },
+//       appliedFilters: {
+//         managerId: managerId || "ALL",
+//         startDate: fromDate.toLocaleDateString("en-CA"),
+//         endDate: toDate.toLocaleDateString("en-CA"),
+//       },
+//     });
+
+//   } catch (err) {
+//     console.error("Dashboard Stats Error:", err);
+//     return ReE(res, err.message, 500);
+//   }
+// };
+
+// module.exports.getDashboardStats = getDashboardStats;
+
+
+
 const getDashboardStats = async (req, res) => {
   try {
-    const { managerId, startDate, endDate } = req.query;
+    const managerId = req.query.managerId;
+    const { startDate, endDate } = req.query;
 
     // ---------------------------
-    // 1️⃣ Manager Validation
+    // Manager Filter
     // ---------------------------
-    let manager;
+    let teamManagerName = null;
+
     if (managerId) {
-      manager = await model.TeamManager.findByPk(managerId);
+      const manager = await TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
+      teamManagerName = manager.name;
     }
 
     // ---------------------------
-    // 2️⃣ Date Handling (DEFAULT = CURRENT MONTH → TODAY)
+    // DATE FILTER (BdTarget)
     // ---------------------------
-    let fromDate, toDate;
-
+    let targetDateFilter = {};
     if (startDate && endDate) {
-      fromDate = new Date(startDate);
-      fromDate.setHours(0, 0, 0, 0);
-
-      toDate = new Date(endDate);
-      toDate.setHours(23, 59, 59, 999);
-    } else {
-      const today = new Date();
-
-      fromDate = new Date(today.getFullYear(), today.getMonth(), 1);
-      fromDate.setHours(0, 0, 0, 0);
-
-      toDate = new Date(today);
-      toDate.setHours(23, 59, 59, 999);
+      targetDateFilter = {
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("targetDate")),
+            "<=",
+            endDate
+          ),
+        ],
+      };
     }
 
     // ---------------------------
-    // 3️⃣ BD TARGET (TARGET NUMBERS)
+    // 1️⃣ BdTarget (TARGET DATA)
     // ---------------------------
-    const bdTargetData = await model.BdTarget.findAll({
+    const bdTargetData = await BdTarget.findAll({
       where: {
-        ...(managerId ? { teamManagerId: managerId } : {}),
-        targetDate: { [Op.between]: [fromDate, toDate] },
+        ...(teamManagerName ? { teamManagerId: managerId } : {}),
+        ...(startDate && endDate ? targetDateFilter : {}),
       },
       attributes: ["internsAllocated", "internsActive", "accounts"],
     });
@@ -400,71 +546,92 @@ const getDashboardStats = async (req, res) => {
     let totalInternsActive = 0;
     let totalAccountsTarget = 0;
 
-    bdTargetData.forEach(t => {
-      totalInternsAllocated += Number(t.internsAllocated || 0);
-      totalInternsActive += Number(t.internsActive || 0);
-      totalAccountsTarget += Number(t.accounts || 0);
+    bdTargetData.forEach((row) => {
+      totalInternsAllocated += Number(row.internsAllocated) || 0;
+      totalInternsActive += Number(row.internsActive) || 0;
+      totalAccountsTarget += Number(row.accounts) || 0;
     });
 
     // ---------------------------
-    // 4️⃣ BD SHEET (DATE-RANGE BASED COUNTS)
-    // Only valid StudentResume and deduplicate by studentResumeId
+    // DATE FILTER (BdSheet)
     // ---------------------------
-    const bdSheets = await model.BdSheet.findAll({
-      where: {
-        ...(managerId ? { teamManagerId: managerId } : {}),
-        startDate: { [Op.between]: [fromDate, toDate] },
-      },
-      attributes: ["id", "studentResumeId", "activeStatus"],
-      include: [
-        {
-          model: model.StudentResume,
-          required: true, // only valid StudentResume
-          attributes: ["mobileNumber", "alloted"], // 🔹 include alloted field
-          ...(managerId ? { where: { alloted: manager.name } } : {}), // 🔹 filter like getBdSheet
-        },
-      ],
-      order: [["id", "DESC"]],
-    });
-
-    // Deduplicate by studentResumeId (latest record only)
-    const latestByStudent = new Map();
-    bdSheets.forEach(sheet => {
-      if (!latestByStudent.has(sheet.studentResumeId)) {
-        latestByStudent.set(sheet.studentResumeId, sheet);
-      }
-    });
-
-    const uniqueSheets = Array.from(latestByStudent.values());
-
-    const totalInterns = uniqueSheets.length;
-
-    const totalActiveInterns = uniqueSheets.filter(
-      s => s.activeStatus?.toLowerCase() === "active"
-    ).length;
-
-    // ---------------------------
-    // 5️⃣ ACHIEVED ACCOUNTS (✔ ONLY subscriptionWallet)
-    // ---------------------------
-    let totalAccountsSheet = 0;
-
-    const mobileNumbers = [
-      ...new Set(uniqueSheets.map(s => s.StudentResume.mobileNumber).filter(Boolean)),
-    ];
-
-    if (mobileNumbers.length) {
-      const users = await model.User.findAll({
-        where: { phoneNumber: { [Op.in]: mobileNumbers } },
-        attributes: ["subscriptionWallet"],
-      });
-
-      users.forEach(u => {
-        totalAccountsSheet += Number(u.subscriptionWallet || 0);
-      });
+    let sheetDateFilter = {};
+    if (startDate && endDate) {
+      sheetDateFilter = {
+        [Op.and]: [
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            ">=",
+            startDate
+          ),
+          Sequelize.where(
+            Sequelize.fn("DATE", Sequelize.col("startDate")),
+            "<=",
+            endDate
+          ),
+        ],
+      };
     }
 
     // ---------------------------
-    // 6️⃣ FINAL RESPONSE
+    // 2️⃣ BdSheet (INTERNS DATA)
+    // ---------------------------
+    const bdSheetData = await BdSheet.findAll({
+      where: {
+        ...(teamManagerName ? { teamManagerId: managerId } : {}),
+        ...(startDate && endDate ? sheetDateFilter : {}),
+      },
+      attributes: ["activeStatus"],
+    });
+
+    const totalInterns = bdSheetData.length;
+    const totalActiveInterns = bdSheetData.filter(
+      row => row.activeStatus?.toLowerCase() === "active"
+    ).length;
+
+    // ---------------------------
+    // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
+    // ---------------------------
+    let userIds = [];
+
+    if (teamManagerName) {
+      const statuses = await Status.findAll({
+        where: { teamManager: teamManagerName },
+        attributes: ["userId"],
+      });
+      userIds = statuses.map(s => s.userId);
+    }
+
+    let totalAccountsSheet = 0;
+
+    if (userIds.length && startDate && endDate) {
+      const fromDate = new Date(startDate);
+      const toDate = new Date(endDate);
+      toDate.setHours(23, 59, 59, 999); // ✅ FULL DAY FIX
+
+      const accountsResult = await FundsAudit.sequelize.query(
+        `
+        SELECT COUNT(DISTINCT "userId") AS achieved_accounts
+        FROM "FundsAudits"
+        WHERE "userId" IN (:userIds)
+          AND "hasPaid" = true
+          AND "dateOfPayment" BETWEEN :start AND :end
+        `,
+        {
+          replacements: {
+            userIds,
+            start: fromDate,
+            end: toDate,
+          },
+          type: FundsAudit.sequelize.QueryTypes.SELECT,
+        }
+      );
+
+      totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
+    }
+
+    // ---------------------------
+    // FINAL RESPONSE (UNCHANGED)
     // ---------------------------
     return ReS(res, {
       bdTarget: {
@@ -474,13 +641,13 @@ const getDashboardStats = async (req, res) => {
       },
       bdSheet: {
         totalInterns,
-        totalActiveInterns,
         totalAccounts: totalAccountsSheet,
+        totalActiveInterns,
       },
       appliedFilters: {
         managerId: managerId || "ALL",
-        startDate: fromDate.toLocaleDateString("en-CA"),
-        endDate: toDate.toLocaleDateString("en-CA"),
+        startDate,
+        endDate,
       },
     });
 
@@ -491,9 +658,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
-
-
 
 // HARD-CODED RANGES (not stored in DB)
 const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100","101-200","201-300","301-400","401-500","501-600","601+"];
