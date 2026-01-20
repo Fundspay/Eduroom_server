@@ -83,15 +83,143 @@ const upsertBdSheet = async (req, res) => {
 module.exports.upsertBdSheet = upsertBdSheet;
 
 
+// const getBdSheet = async (req, res) => {
+//   try {
+//     const { resumeId, managerId } = req.query;
+
+//     let whereCondition = {};
+
+//     if (resumeId) {
+//       whereCondition.id = resumeId;
+//     }
+
+//     if (managerId) {
+//       const manager = await model.TeamManager.findOne({
+//         where: { id: managerId },
+//         attributes: ["name"],
+//       });
+
+//       if (manager && manager.name) {
+//         whereCondition.alloted = manager.name;
+//       } else {
+//         whereCondition.alloted = "__invalid__";
+//       }
+//     }
+
+//     const data = await model.StudentResume.findAll({
+//       where: whereCondition,
+//       attributes: [
+//         "id",
+//         "sr",
+//         "studentName",
+//         "mobileNumber",
+//         "emailId",
+//         "domain",
+//         "collegeName",
+//       ],
+//       include: [
+//         {
+//           model: model.BdSheet,
+//           required: false,
+//           attributes: {
+//             include: [
+//               "businessTask",
+//               "registration",
+//               "activeStatus",
+//               "startDate", // FIX (this is why it was missing)
+//               "endDate",
+//             ],
+//           },
+//         },
+//       ],
+//       order: [["id", "DESC"]],
+//     });
+
+//     const formattedData = await Promise.all(
+//       data.map(async (student) => {
+//         const s = student.toJSON();
+
+//         // ALWAYS PICK LATEST BdSheet
+//         if (Array.isArray(s.BdSheet)) {
+//           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
+//         }
+
+//         // Fetch user for wallet + userId + collegeName
+//         if (s.mobileNumber) {
+//           const user = await model.User.findOne({
+//             where: { phoneNumber: s.mobileNumber },
+//             attributes: [
+//               "subscriptionWallet",
+//               "subscriptiondeductedWallet",
+//               "id",
+//               "collegeName",
+//             ],
+//           });
+
+//           if (user) {
+//             // ONLY subscriptionWallet is used now
+//             const businessTask = parseInt(user.subscriptionWallet || 0, 10);
+//             s.businessTask = businessTask;
+
+//             s.userId = user.id;
+//             s.collegeName = user.collegeName;
+
+//             if (!businessTask || businessTask === 0) s.category = "not working";
+//             else if (businessTask >= 1 && businessTask <= 5)
+//               s.category = "Starter";
+//             else if (businessTask >= 6 && businessTask <= 10)
+//               s.category = "Basic";
+//             else if (businessTask >= 11 && businessTask <= 15)
+//               s.category = "Bronze";
+//             else if (businessTask >= 16 && businessTask <= 20)
+//               s.category = "Silver";
+//             else if (businessTask >= 21 && businessTask <= 25)
+//               s.category = "Gold";
+//             else if (businessTask >= 26 && businessTask <= 35)
+//               s.category = "Diamond";
+//             else if (businessTask >= 36 && businessTask <= 70)
+//               s.category = "Platinum";
+//           }
+//         }
+
+//         if (s.BdSheet && s.BdSheet.registration) {
+//           s.registration = s.BdSheet.registration;
+//         }
+
+//         if (s.BdSheet) {
+//           delete s.BdSheet.registration;
+//         }
+
+//         return s;
+//       })
+//     );
+
+//     const managers = await model.TeamManager.findAll({
+//       attributes: ["id", "name", "email"],
+//       raw: true,
+//     });
+
+//     return ReS(res, {
+//       count: formattedData.length,
+//       data: formattedData,
+//       managers: managers,
+//     });
+//   } catch (err) {
+//     console.log("GET BD SHEET ERROR:", err);
+//     return ReE(res, err.message, 500);
+//   }
+// };
+
+// module.exports.getBdSheet = getBdSheet;
+
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
 
     let whereCondition = {};
 
-    if (resumeId) {
-      whereCondition.id = resumeId;
-    }
+    if (resumeId) whereCondition.id = resumeId;
 
     if (managerId) {
       const manager = await model.TeamManager.findOne({
@@ -99,11 +227,7 @@ const getBdSheet = async (req, res) => {
         attributes: ["name"],
       });
 
-      if (manager && manager.name) {
-        whereCondition.alloted = manager.name;
-      } else {
-        whereCondition.alloted = "__invalid__";
-      }
+      whereCondition.alloted = manager?.name || "__invalid__";
     }
 
     const data = await model.StudentResume.findAll({
@@ -121,15 +245,12 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: {
-            include: [
-              "businessTask",
-              "registration",
-              "activeStatus",
-              "startDate", // FIX (this is why it was missing)
-              "endDate",
-            ],
-          },
+          attributes: [
+            "registration",
+            "activeStatus",
+            "startDate",
+            "endDate",
+          ],
         },
       ],
       order: [["id", "DESC"]],
@@ -139,56 +260,53 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // ALWAYS PICK LATEST BdSheet
+        // Pick latest BdSheet
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
 
-        // Fetch user for wallet + userId + collegeName
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
-            attributes: [
-              "subscriptionWallet",
-              "subscriptiondeductedWallet",
-              "id",
-              "collegeName",
-            ],
+            attributes: ["id", "collegeName"],
           });
 
           if (user) {
-            // ONLY subscriptionWallet is used now
-            const businessTask = parseInt(user.subscriptionWallet || 0, 10);
-            s.businessTask = businessTask;
-
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            if (!businessTask || businessTask === 0) s.category = "not working";
-            else if (businessTask >= 1 && businessTask <= 5)
-              s.category = "Starter";
-            else if (businessTask >= 6 && businessTask <= 10)
-              s.category = "Basic";
-            else if (businessTask >= 11 && businessTask <= 15)
-              s.category = "Bronze";
-            else if (businessTask >= 16 && businessTask <= 20)
-              s.category = "Silver";
-            else if (businessTask >= 21 && businessTask <= 25)
-              s.category = "Gold";
-            else if (businessTask >= 26 && businessTask <= 35)
-              s.category = "Diamond";
-            else if (businessTask >= 36 && businessTask <= 70)
-              s.category = "Platinum";
+            // ✅ FUNDS AUDIT ACCOUNT CALCULATION
+            const payments = await model.FundsAudit.findAll({
+              where: {
+                userId: user.id,
+                hasPaid: true,
+              },
+              attributes: ["dateOfPayment"],
+              order: [["dateOfPayment", "ASC"]],
+            });
+
+            s.accountsAchieved = payments.length;
+            s.hasPaid = payments.length > 0;
+            s.firstPaymentDate = payments[0]?.dateOfPayment || null;
+            s.lastPaymentDate =
+              payments[payments.length - 1]?.dateOfPayment || null;
+
+            // Category (ACCOUNT-BASED)
+            if (payments.length === 0) s.category = "not working";
+            else if (payments.length <= 5) s.category = "Starter";
+            else if (payments.length <= 10) s.category = "Basic";
+            else if (payments.length <= 15) s.category = "Bronze";
+            else if (payments.length <= 20) s.category = "Silver";
+            else if (payments.length <= 25) s.category = "Gold";
+            else if (payments.length <= 35) s.category = "Diamond";
+            else s.category = "Platinum";
           }
         }
 
-        if (s.BdSheet && s.BdSheet.registration) {
+        if (s.BdSheet?.registration) {
           s.registration = s.BdSheet.registration;
         }
-
-        if (s.BdSheet) {
-          delete s.BdSheet.registration;
-        }
+        if (s.BdSheet) delete s.BdSheet.registration;
 
         return s;
       })
@@ -202,10 +320,10 @@ const getBdSheet = async (req, res) => {
     return ReS(res, {
       count: formattedData.length,
       data: formattedData,
-      managers: managers,
+      managers,
     });
   } catch (err) {
-    console.log("GET BD SHEET ERROR:", err);
+    console.error("GET BD SHEET ERROR:", err);
     return ReE(res, err.message, 500);
   }
 };
