@@ -471,6 +471,11 @@ var updatePersonalInfo = async function (req, res) {
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
+    // 🔐 If password is being updated, hash it
+    if (updateFields.password) {
+      updateFields.password = await bcrypt.hash(updateFields.password, 10);
+    }
+
     // Remove undefined fields to avoid validation errors
     Object.keys(updateFields).forEach(
       key => updateFields[key] === undefined && delete updateFields[key]
@@ -486,6 +491,7 @@ var updatePersonalInfo = async function (req, res) {
 };
 
 module.exports.updatePersonalInfo = updatePersonalInfo;
+
 
 // ✅ Fetch Single User
 var fetchSingleUser = async (req, res) => {
