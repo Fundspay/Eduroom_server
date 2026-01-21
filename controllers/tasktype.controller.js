@@ -330,32 +330,30 @@ const bdAccountsProgress = async (managerId, date) => {
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["accounts"],
   });
-
   const target = targetRow ? Number(targetRow.accounts) : 0;
 
-  // Get all users assigned to this manager
+  // Fetch users actually assigned to this manager
   const users = await model.User.findAll({
     where: { assignedTeamManager: managerId },
     attributes: ["id"],
   });
-
   const userIds = users.map(u => u.id);
 
   let achieved = 0;
   if (userIds.length) {
-    const result = await model.FundsAudit.sequelize.query(
-      `
-      SELECT COALESCE(SUM(f."amountPaid"),0) AS achieved
-      FROM "FundsAudits" f
-      WHERE f."userId" IN (:userIds)
-        AND f."hasPaid" = true
-        AND TO_CHAR(f."dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
-      `,
-      {
-        replacements: { userIds, date },
-        type: model.FundsAudit.sequelize.QueryTypes.SELECT,
-      }
-    );
+    // Use BETWEEN for date safety
+    const start = new Date(`${date}T00:00:00.000Z`);
+    const end = new Date(`${date}T23:59:59.999Z`);
+
+    const result = await model.FundsAudit.findAll({
+      where: {
+        userId: { [Op.in]: userIds },
+        hasPaid: true,
+        dateOfPayment: { [Op.between]: [start, end] },
+      },
+      attributes: [[model.FundsAudit.sequelize.fn("SUM", model.FundsAudit.sequelize.col("amountPaid")), "achieved"]],
+      raw: true,
+    });
 
     achieved = parseFloat(result[0]?.achieved || 0);
   }
@@ -364,7 +362,5 @@ const bdAccountsProgress = async (managerId, date) => {
 
   return { achieved, target, progress };
 };
-
-
 
 module.exports.calculateSystemTaskProgress = calculateSystemTaskProgress;
