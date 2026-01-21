@@ -1105,32 +1105,27 @@ const getTargetVsAchieved = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
 
-    if (!managerId) {
-      return ReE(res, "managerId is required", 400);
-    }
+    if (!managerId) return ReE(res, "managerId is required", 400);
 
-    // ✅ DEFAULT TO CURRENT MONTH
+    // -------------------- DEFAULT DATES --------------------
     if (!from || !to) {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
       from = firstDay.toISOString().split("T")[0];
       to = lastDay.toISOString().split("T")[0];
     }
 
-    // ✅ Manager
+    // -------------------- MANAGER --------------------
     const manager = await TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
-
     const teamManagerName = manager.name;
 
-    // ✅ Users under manager
+    // -------------------- USERS UNDER MANAGER --------------------
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
       attributes: ["userId"],
     });
-
     const userIds = statuses.map(s => s.userId);
 
     if (!userIds.length) {
@@ -1138,82 +1133,68 @@ const getTargetVsAchieved = async (req, res) => {
         success: true,
         totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
         dateWise: [],
-        appliedFilters: { managerId, from, to }
-      }, 200);
+        appliedFilters: { managerId, from, to },
+      });
     }
 
-    // ✅ Date range
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999);
-
-    // 🔥 FIXED: TIMEZONE-SAFE DATE-WISE ACHIEVED COUNT
-    const achievedResults = await FundsAudit.sequelize.query(
-      `
-      SELECT 
-        TO_CHAR(f."dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS paid_date,
-        COUNT(*) AS achieved
-      FROM "FundsAudits" f
-      WHERE f."userId" IN (:userIds)
-        AND f."hasPaid" = true
-        AND f."dateOfPayment" BETWEEN :from AND :to
-      GROUP BY paid_date
-      ORDER BY paid_date;
-      `,
-      {
-        replacements: { userIds, from: fromDate, to: toDate },
-        type: FundsAudit.sequelize.QueryTypes.SELECT
-      }
-    );
-
-    // Map achieved
-    const dayWiseAchieved = {};
-    achievedResults.forEach(r => {
-      dayWiseAchieved[r.paid_date] = Number(r.achieved);
+    // -------------------- FETCH ALL FUNDS --------------------
+    const funds = await FundsAudit.findAll({
+      where: {
+        userId: userIds,
+        hasPaid: true,
+        dateOfPayment: {
+          [Op.between]: [new Date(from + "T00:00:00Z"), new Date(to + "T23:59:59Z")],
+        },
+      },
+      attributes: ["dateOfPayment"],
+      raw: true,
     });
 
-    // ✅ Targets
+    // -------------------- DATE-WISE ACHIEVED --------------------
+    const dayWiseAchieved = {};
+    funds.forEach(f => {
+      const day = f.dateOfPayment.toISOString().split("T")[0];
+      dayWiseAchieved[day] = (dayWiseAchieved[day] || 0) + 1;
+    });
+
+    // -------------------- TARGETS --------------------
     const targets = await BdTarget.findAll({
       where: {
         teamManagerId: managerId,
-        targetDate: { [Op.between]: [fromDate, toDate] }
+        targetDate: { [Op.between]: [from, to] },
       },
+      attributes: ["targetDate", "accounts"],
+      raw: true,
     });
 
-    // Date range generator
+    // -------------------- GENERATE DATE RANGE --------------------
     const getDateRange = (from, to) => {
       const dates = [];
       let current = new Date(from);
       const end = new Date(to);
-
       while (current <= end) {
         dates.push(current.toISOString().split("T")[0]);
         current.setDate(current.getDate() + 1);
       }
       return dates;
     };
+    const allDates = getDateRange(from, to);
 
-    const allDates = getDateRange(fromDate, toDate);
-
-    // Date-wise comparison
+    // -------------------- DATE-WISE COMPARISON --------------------
     const dateWiseComparison = allDates.map(date => {
-      const targetRow = targets.find(
-        t => new Date(t.targetDate).toISOString().split("T")[0] === date
-      );
-
+      const targetRow = targets.find(t => t.targetDate === date);
       const target = targetRow ? Number(targetRow.accounts) : 0;
       const achieved = dayWiseAchieved[date] || 0;
-
       return {
         date,
         target,
         achieved,
         difference: achieved - target,
-        percentage: target > 0 ? ((achieved / target) * 100).toFixed(2) : 0
+        percentage: target > 0 ? Number(((achieved / target) * 100).toFixed(2)) : 0,
       };
     });
 
-    // Totals
+    // -------------------- TOTALS --------------------
     const totalTarget = dateWiseComparison.reduce((s, d) => s + d.target, 0);
     const totalAchieved = dateWiseComparison.reduce((s, d) => s + d.achieved, 0);
 
@@ -1223,28 +1204,17 @@ const getTargetVsAchieved = async (req, res) => {
         target: totalTarget,
         achieved: totalAchieved,
         difference: totalAchieved - totalTarget,
-        percentage: totalTarget > 0
-          ? Number(((totalAchieved / totalTarget) * 100).toFixed(2))
-          : 0
+        percentage: totalTarget > 0 ? Number(((totalAchieved / totalTarget) * 100).toFixed(2)) : 0,
       },
       dateWise: dateWiseComparison,
-      appliedFilters: {
-        managerId,
-        managerName: teamManagerName,
-        from,
-        to
-      }
+      appliedFilters: { managerId, managerName: teamManagerName, from, to },
     });
-
   } catch (err) {
     console.error("Target vs Achieved Error:", err);
     return ReE(res, err.message, 500);
   }
 };
-
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
-
-
 // const getTargetVsAchieved = async (req, res) => {
 //   try {
 //     const { managerId, from, to } = req.query;
