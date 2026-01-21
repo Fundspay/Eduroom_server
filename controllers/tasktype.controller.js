@@ -325,59 +325,51 @@ const bdInternsActiveProgress = async (managerId, date) => {
  * BD – ACCOUNTS
  */
 const bdAccountsProgress = async (managerId, date) => {
-  console.log(`\n[DEBUG] bdAccountsProgress called -> managerId: ${managerId}, date: ${date}`);
+  console.log("[DEBUG] bdAccountsProgress called -> managerId:", managerId, "date:", date);
 
-  // ✅ 1️⃣ Fetch target for the day
+  // 1️⃣ Get target accounts
   const targetRow = await model.BdTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["accounts"],
   });
+
   const target = targetRow ? Number(targetRow.accounts) : 0;
   console.log("[DEBUG] Target accounts:", target);
 
-  // ✅ 2️⃣ Get all users assigned to this manager
-  const users = await model.User.findAll({
-    where: { assignedTeamManager: managerId },
-    attributes: ["id", "firstName", "lastName", "email"],
+  // 2️⃣ Get all users under this manager via Status table
+  const statuses = await model.Status.findAll({
+    where: { teamManager: managerId }, // match dashboard logic
+    attributes: ["userId"],
   });
-  const userIds = users.map(u => u.id);
-  console.log("[DEBUG] Assigned users IDs:", userIds);
 
-  let achieved = 0;
+  const userIds = statuses.map(s => s.userId);
+  console.log("[DEBUG] Assigned users IDs via Status table:", userIds);
 
-  if (userIds.length > 0) {
-    // Define day start & end in UTC to avoid timezone issues
-    const startDateTime = new Date(`${date}T00:00:00.000Z`);
-    const endDateTime = new Date(`${date}T23:59:59.999Z`);
-
-    // ✅ 3️⃣ Sum all payments for users on that day
-    const result = await model.FundsAudit.findAll({
-      where: {
-        userId: { [Op.in]: userIds },
-        hasPaid: true,
-        dateOfPayment: { [Op.between]: [startDateTime, endDateTime] },
-      },
-      attributes: [
-        [
-          model.FundsAudit.sequelize.fn(
-            "SUM",
-            model.FundsAudit.sequelize.col("amountPaid")
-          ),
-          "achieved",
-        ],
-      ],
-      raw: true,
-    });
-
-    achieved = parseFloat(result[0]?.achieved || 0);
-    console.log("[DEBUG] Achieved accounts (sum of amountPaid):", achieved);
-  } else {
+  if (!userIds.length) {
     console.log("[DEBUG] No users assigned to this manager.");
+    return { achieved: 0, target, progress: 0 };
   }
 
-  // ✅ 4️⃣ Calculate progress %
+  // 3️⃣ Calculate achieved via FundsAudit
+  const result = await model.FundsAudit.sequelize.query(
+    `
+    SELECT COUNT(*) AS achieved
+    FROM "FundsAudits"
+    WHERE "userId" IN (:userIds)
+      AND "hasPaid" = true
+      AND TO_CHAR("dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
+    `,
+    {
+      replacements: { userIds, date },
+      type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+    }
+  );
+
+  const achieved = parseInt(result[0]?.achieved || 0);
+  console.log("[DEBUG] Achieved accounts:", achieved);
+
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
-  console.log(`[DEBUG] Progress: ${progress}%`);
+  console.log("[DEBUG] Progress:", progress + "%");
 
   return { achieved, target, progress };
 };
