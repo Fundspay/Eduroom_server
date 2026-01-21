@@ -3,7 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
-const { TeamManager, BdTarget , Status,FundsAudit,BdSheet,Statuses } = require("../models");
+const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses } = require("../models");
 
 const upsertBdSheet = async (req, res) => {
   try {
@@ -217,7 +217,10 @@ const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
 
-    let whereCondition = {};
+    // ---------------------------
+    // BUILD WHERE CONDITION
+    // ---------------------------
+    const whereCondition = {};
     if (resumeId) whereCondition.id = resumeId;
 
     if (managerId) {
@@ -228,6 +231,9 @@ const getBdSheet = async (req, res) => {
       whereCondition.alloted = manager?.name || "__invalid__";
     }
 
+    // ---------------------------
+    // FETCH STUDENT RESUMES WITH LATEST BDSHEET
+    // ---------------------------
     const data = await model.StudentResume.findAll({
       where: whereCondition,
       attributes: [
@@ -243,26 +249,29 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: [
-            "registration",
-            "activeStatus",
-            "startDate",
-            "endDate",
-          ],
+          attributes: ["id", "registration", "activeStatus", "startDate", "endDate"],
         },
       ],
       order: [["id", "DESC"]],
     });
 
+    // ---------------------------
+    // FORMAT EACH STUDENT
+    // ---------------------------
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
 
         // Pick latest BdSheet
-        if (Array.isArray(s.BdSheet)) {
-          s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
+        if (Array.isArray(s.BdSheet) && s.BdSheet.length > 0) {
+          s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0];
+        } else {
+          s.BdSheet = null;
         }
 
+        // ---------------------------
+        // FUNDS AUDIT DATA (PAID ONLY)
+        // ---------------------------
         if (s.mobileNumber) {
           const user = await model.User.findOne({
             where: { phoneNumber: s.mobileNumber },
@@ -273,11 +282,11 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // -----------------------------
-            // ✅ FUNDS AUDIT ACCOUNT CALCULATION (ALL-TIME)
-            // -----------------------------
             const payments = await model.FundsAudit.findAll({
-              where: { userId: user.id },
+              where: {
+                userId: user.id,
+                hasPaid: true, // ✅ only paid
+              },
               attributes: ["dateOfPayment"],
               order: [["dateOfPayment", "ASC"]],
             });
@@ -285,11 +294,10 @@ const getBdSheet = async (req, res) => {
             const totalAccounts = payments.length;
 
             s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // shows exact total accounts
+            s.businessTask = totalAccounts;
             s.hasPaid = totalAccounts > 0;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
             s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
-
             s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
 
             // Category based on totalAccounts
@@ -304,6 +312,7 @@ const getBdSheet = async (req, res) => {
           }
         }
 
+        // Move registration from BdSheet to top-level
         if (s.BdSheet?.registration) {
           s.registration = s.BdSheet.registration;
         }
@@ -313,6 +322,9 @@ const getBdSheet = async (req, res) => {
       })
     );
 
+    // ---------------------------
+    // FETCH ALL MANAGERS
+    // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
@@ -323,6 +335,7 @@ const getBdSheet = async (req, res) => {
       data: formattedData,
       managers,
     });
+
   } catch (err) {
     console.error("GET BD SHEET ERROR:", err);
     return ReE(res, err.message, 500);
@@ -625,7 +638,7 @@ const getDashboardStats = async (req, res) => {
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       // Get last day of current month
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       // Format dates properly to get YYYY-MM-DD
       const formatDate = (date) => {
         const year = date.getFullYear();
@@ -633,7 +646,7 @@ const getDashboardStats = async (req, res) => {
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
       };
-      
+
       startDate = formatDate(firstDay);  // Will be "2026-01-01"
       endDate = formatDate(lastDay);      // Will be "2026-01-31"
     }
@@ -824,7 +837,7 @@ const getDashboardStats = async (req, res) => {
 
 module.exports.getDashboardStats = getDashboardStats;
 // HARD-CODED RANGES (not stored in DB)
-const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100","101-200","201-300","301-400","401-500","501-600","601+"];
+const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100", "101-200", "201-300", "301-400", "401-500", "501-600", "601+"];
 
 // -----------------------------
 // UPSERT RANGE AMOUNTS
@@ -1102,7 +1115,7 @@ const getTargetVsAchieved = async (req, res) => {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       from = firstDay.toISOString().split('T')[0];
       to = lastDay.toISOString().split('T')[0];
     }
@@ -1145,9 +1158,9 @@ const getTargetVsAchieved = async (req, res) => {
       GROUP BY DATE(f."dateOfPayment")
       ORDER BY DATE(f."dateOfPayment");
       `,
-      { 
-        replacements: { userIds, from: fromDate, to: toDate }, 
-        type: FundsAudit.sequelize.QueryTypes.SELECT 
+      {
+        replacements: { userIds, from: fromDate, to: toDate },
+        type: FundsAudit.sequelize.QueryTypes.SELECT
       }
     );
 
@@ -1201,11 +1214,11 @@ const getTargetVsAchieved = async (req, res) => {
 
     return ReS(res, {
       success: true,
-      totals: { 
-        target: totalTarget, 
-        achieved: totalAchieved, 
-        difference: totalDifference, 
-        percentage: parseFloat(totalPercentage) 
+      totals: {
+        target: totalTarget,
+        achieved: totalAchieved,
+        difference: totalDifference,
+        percentage: parseFloat(totalPercentage)
       },
       dateWise: dateWiseComparison,
       appliedFilters: {
@@ -1380,7 +1393,7 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
 // module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
 
- const getBdTlLeaderboard = async (req, res) => {
+const getBdTlLeaderboard = async (req, res) => {
   try {
     let { from, to } = req.query;
 
@@ -1389,7 +1402,7 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
+
       from = firstDay.toISOString().split('T')[0];
       to = lastDay.toISOString().split('T')[0];
     }
