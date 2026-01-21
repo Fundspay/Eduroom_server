@@ -275,7 +275,7 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ✅ FUNDS AUDIT ACCOUNT CALCULATION
+            // ✅ FIXED ACCOUNT CALCULATION (UNIQUE USER)
             const payments = await model.FundsAudit.findAll({
               where: {
                 userId: user.id,
@@ -285,21 +285,18 @@ const getBdSheet = async (req, res) => {
               order: [["dateOfPayment", "ASC"]],
             });
 
-            s.accountsAchieved = payments.length;
-            s.hasPaid = payments.length > 0;
+            const hasAccount = payments.length > 0;
+
+            // 🔒 RESPONSE KEYS UNCHANGED
+            s.accountsAchieved = hasAccount ? 1 : 0;
+            s.hasPaid = hasAccount;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
             s.lastPaymentDate =
               payments[payments.length - 1]?.dateOfPayment || null;
 
-            // Category (ACCOUNT-BASED)
-            if (payments.length === 0) s.category = "not working";
-            else if (payments.length <= 5) s.category = "Starter";
-            else if (payments.length <= 10) s.category = "Basic";
-            else if (payments.length <= 15) s.category = "Bronze";
-            else if (payments.length <= 20) s.category = "Silver";
-            else if (payments.length <= 25) s.category = "Gold";
-            else if (payments.length <= 35) s.category = "Diamond";
-            else s.category = "Platinum";
+            // ✅ CATEGORY (ACCOUNT BASED, SAME KEY)
+            if (!hasAccount) s.category = "not working";
+            else s.category = "Starter";
           }
         }
 
