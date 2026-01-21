@@ -212,10 +212,6 @@ module.exports.upsertBdSheet = upsertBdSheet;
 
 // module.exports.getBdSheet = getBdSheet;
 
-
-
-const { Op } = require('sequelize'); // Add this at the top of your file
-
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
