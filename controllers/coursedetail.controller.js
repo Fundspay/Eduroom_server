@@ -1403,7 +1403,7 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // ✅ Get achieved count from FundsAudits table (correct source)
+    // ✅ Get achieved count from FundsAudits table
     const fundsCount = await FundsAudit.count({
       where: {
         userId: userId,
@@ -1411,28 +1411,31 @@ const getBusinessUserTarget = async (req, res) => {
       }
     });
 
-    // Optional: Still call API for reference/logging but don't use it
+    // Optional: Call referral API for logging/comparison (doesn't overwrite DB)
     if (user.referralCode) {
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
         const registeredUsers = apiResponse.data?.registered_users || [];
         const apiCount = registeredUsers.filter(u => u.has_paid).length;
-        console.log(`API count: ${apiCount}, FundsAudit count: ${fundsCount}`);
+        console.log(`Referral API count: ${apiCount}, FundsAudit count: ${fundsCount}`);
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
     }
 
-    // ✅ Use FundsAudits count as the source of truth
-    const subscriptionWallet = fundsCount;
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-    const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
+    const subscriptionLeft = Math.max(fundsCount - alreadyDeducted, 0);
 
-    // Update user
-    user.subscriptionWallet = subscriptionWallet;
-    user.subscriptionLeft = subscriptionLeft;
-    await user.save();
+    // ✅ Only update DB if subscriptionWallet differs from calculated fundsCount
+    if (user.subscriptionWallet !== fundsCount) {
+      user.subscriptionWallet = fundsCount;
+      user.subscriptionLeft = subscriptionLeft;
+      await user.save();
+      console.log(`Updated subscriptionWallet from DB value to latest FundsAudit count.`);
+    } else {
+      console.log(`DB subscriptionWallet is already correct, no update needed.`);
+    }
 
     return ReS(
       res,
@@ -1440,10 +1443,10 @@ const getBusinessUserTarget = async (req, res) => {
         success: true,
         data: {
           userId: user.id,
-          businessTarget: subscriptionWallet,
-          achievedCount: subscriptionWallet,
+          businessTarget: user.subscriptionWallet, // current DB value
+          achievedCount: fundsCount,               // latest FundsAudit count
           totalDeducted: alreadyDeducted,
-          subscriptionWallet,
+          subscriptionWallet: user.subscriptionWallet,
           subscriptionLeft,
         },
       },
@@ -1454,6 +1457,7 @@ const getBusinessUserTarget = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
 
 const getCourseStatus = async (req, res) => {
