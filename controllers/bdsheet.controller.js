@@ -1109,53 +1109,56 @@ const getTargetVsAchieved = async (req, res) => {
       return ReE(res, "managerId is required", 400);
     }
 
-    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    // ✅ DEFAULT TO CURRENT MONTH
     if (!from || !to) {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-      from = firstDay.toISOString().split('T')[0];
-      to = lastDay.toISOString().split('T')[0];
+      from = firstDay.toISOString().split("T")[0];
+      to = lastDay.toISOString().split("T")[0];
     }
 
-    // ✅ Find manager
+    // ✅ Manager
     const manager = await TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
     const teamManagerName = manager.name;
 
-    // ✅ Get all users under this manager
+    // ✅ Users under manager
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
       attributes: ["userId"],
     });
+
     const userIds = statuses.map(s => s.userId);
 
-    // If no users, return empty
-    if (!userIds.length) return ReS(res, {
-      success: true,
-      totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
-      dateWise: [],
-      appliedFilters: { managerId, from, to }
-    }, 200);
+    if (!userIds.length) {
+      return ReS(res, {
+        success: true,
+        totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
+        dateWise: [],
+        appliedFilters: { managerId, from, to }
+      }, 200);
+    }
 
-    // ✅ Adjust dates: make 'to' cover the full day
+    // ✅ Date range
     const fromDate = new Date(from);
     const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999); // include full day
+    toDate.setHours(23, 59, 59, 999);
 
-    // ✅ FIXED: Fetch day-wise achieved counts from FundsAudit (COUNT ALL PAYMENTS, NOT DISTINCT USERS)
+    // 🔥 FIXED: TIMEZONE-SAFE DATE-WISE ACHIEVED COUNT
     const achievedResults = await FundsAudit.sequelize.query(
       `
-      SELECT DATE(f."dateOfPayment") AS paid_date,
-             COUNT(*) AS achieved
+      SELECT 
+        TO_CHAR(f."dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS paid_date,
+        COUNT(*) AS achieved
       FROM "FundsAudits" f
       WHERE f."userId" IN (:userIds)
         AND f."hasPaid" = true
         AND f."dateOfPayment" BETWEEN :from AND :to
-      GROUP BY DATE(f."dateOfPayment")
-      ORDER BY DATE(f."dateOfPayment");
+      GROUP BY paid_date
+      ORDER BY paid_date;
       `,
       {
         replacements: { userIds, from: fromDate, to: toDate },
@@ -1163,11 +1166,13 @@ const getTargetVsAchieved = async (req, res) => {
       }
     );
 
-    // Build achieved map
+    // Map achieved
     const dayWiseAchieved = {};
-    achievedResults.forEach(r => dayWiseAchieved[r.paid_date] = parseInt(r.achieved));
+    achievedResults.forEach(r => {
+      dayWiseAchieved[r.paid_date] = Number(r.achieved);
+    });
 
-    // ✅ Fetch targets from BdTarget
+    // ✅ Targets
     const targets = await BdTarget.findAll({
       where: {
         teamManagerId: managerId,
@@ -1175,49 +1180,52 @@ const getTargetVsAchieved = async (req, res) => {
       },
     });
 
-    // Generate full date range
+    // Date range generator
     const getDateRange = (from, to) => {
-      const result = [];
+      const dates = [];
       let current = new Date(from);
       const end = new Date(to);
+
       while (current <= end) {
-        const yyyy = current.getFullYear();
-        const mm = String(current.getMonth() + 1).padStart(2, "0");
-        const dd = String(current.getDate()).padStart(2, "0");
-        result.push(`${yyyy}-${mm}-${dd}`);
+        dates.push(current.toISOString().split("T")[0]);
         current.setDate(current.getDate() + 1);
       }
-      return result;
+      return dates;
     };
+
     const allDates = getDateRange(fromDate, toDate);
 
-    // Build date-wise comparison
+    // Date-wise comparison
     const dateWiseComparison = allDates.map(date => {
-      const target = targets.find(t => new Date(t.targetDate).toISOString().split("T")[0] === date);
-      const targetCount = target ? target.accounts : 0;
-      const achievedCount = dayWiseAchieved[date] || 0;
+      const targetRow = targets.find(
+        t => new Date(t.targetDate).toISOString().split("T")[0] === date
+      );
+
+      const target = targetRow ? Number(targetRow.accounts) : 0;
+      const achieved = dayWiseAchieved[date] || 0;
+
       return {
         date,
-        target: targetCount,
-        achieved: achievedCount,
-        difference: achievedCount - targetCount,
-        percentage: targetCount > 0 ? ((achievedCount / targetCount) * 100).toFixed(2) : 0
+        target,
+        achieved,
+        difference: achieved - target,
+        percentage: target > 0 ? ((achieved / target) * 100).toFixed(2) : 0
       };
     });
 
     // Totals
-    const totalTarget = dateWiseComparison.reduce((sum, d) => sum + d.target, 0);
-    const totalAchieved = dateWiseComparison.reduce((sum, d) => sum + d.achieved, 0);
-    const totalDifference = totalAchieved - totalTarget;
-    const totalPercentage = totalTarget > 0 ? ((totalAchieved / totalTarget) * 100).toFixed(2) : 0;
+    const totalTarget = dateWiseComparison.reduce((s, d) => s + d.target, 0);
+    const totalAchieved = dateWiseComparison.reduce((s, d) => s + d.achieved, 0);
 
     return ReS(res, {
       success: true,
       totals: {
         target: totalTarget,
         achieved: totalAchieved,
-        difference: totalDifference,
-        percentage: parseFloat(totalPercentage)
+        difference: totalAchieved - totalTarget,
+        percentage: totalTarget > 0
+          ? Number(((totalAchieved / totalTarget) * 100).toFixed(2))
+          : 0
       },
       dateWise: dateWiseComparison,
       appliedFilters: {
@@ -1235,6 +1243,7 @@ const getTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
+
 
 // const getTargetVsAchieved = async (req, res) => {
 //   try {
