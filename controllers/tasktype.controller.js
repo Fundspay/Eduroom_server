@@ -324,6 +324,7 @@ const bdInternsActiveProgress = async (managerId, date) => {
 /**
  * BD – ACCOUNTS
  */
+// BD – ACCOUNTS
 const bdAccountsProgress = async (managerId, date) => {
   const targetRow = await model.BdTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
@@ -332,18 +333,19 @@ const bdAccountsProgress = async (managerId, date) => {
 
   const target = targetRow ? Number(targetRow.accounts) : 0;
 
-  // 1️⃣ Get all users under this manager
-  const statuses = await model.Status.findAll({
-    where: { teamManager: managerId },
-    attributes: ["userId"],
+  // Get all users assigned to this manager
+  const users = await model.User.findAll({
+    where: { assignedTeamManager: managerId },
+    attributes: ["id"],
   });
-  const userIds = statuses.map(s => s.userId);
+
+  const userIds = users.map(u => u.id);
 
   let achieved = 0;
   if (userIds.length) {
     const result = await model.FundsAudit.sequelize.query(
       `
-      SELECT COUNT(*) AS achieved
+      SELECT COALESCE(SUM(f."amountPaid"),0) AS achieved
       FROM "FundsAudits" f
       WHERE f."userId" IN (:userIds)
         AND f."hasPaid" = true
@@ -355,7 +357,7 @@ const bdAccountsProgress = async (managerId, date) => {
       }
     );
 
-    achieved = parseInt(result[0]?.achieved || 0);
+    achieved = parseFloat(result[0]?.achieved || 0);
   }
 
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
@@ -363,6 +365,6 @@ const bdAccountsProgress = async (managerId, date) => {
   return { achieved, target, progress };
 };
 
-module.exports = {
-  calculateSystemTaskProgress,
-};
+
+
+module.exports.calculateSystemTaskProgress = calculateSystemTaskProgress;
