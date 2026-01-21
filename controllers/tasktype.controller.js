@@ -324,41 +324,60 @@ const bdInternsActiveProgress = async (managerId, date) => {
 /**
  * BD – ACCOUNTS
  */
-// BD – ACCOUNTS
 const bdAccountsProgress = async (managerId, date) => {
+  console.log(`\n[DEBUG] bdAccountsProgress called -> managerId: ${managerId}, date: ${date}`);
+
+  // ✅ 1️⃣ Fetch target for the day
   const targetRow = await model.BdTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["accounts"],
   });
   const target = targetRow ? Number(targetRow.accounts) : 0;
+  console.log("[DEBUG] Target accounts:", target);
 
-  // Fetch users actually assigned to this manager
+  // ✅ 2️⃣ Get all users assigned to this manager
   const users = await model.User.findAll({
     where: { assignedTeamManager: managerId },
-    attributes: ["id"],
+    attributes: ["id", "firstName", "lastName", "email"],
   });
   const userIds = users.map(u => u.id);
+  console.log("[DEBUG] Assigned users IDs:", userIds);
 
   let achieved = 0;
-  if (userIds.length) {
-    // Use BETWEEN for date safety
-    const start = new Date(`${date}T00:00:00.000Z`);
-    const end = new Date(`${date}T23:59:59.999Z`);
 
+  if (userIds.length > 0) {
+    // Define day start & end in UTC to avoid timezone issues
+    const startDateTime = new Date(`${date}T00:00:00.000Z`);
+    const endDateTime = new Date(`${date}T23:59:59.999Z`);
+
+    // ✅ 3️⃣ Sum all payments for users on that day
     const result = await model.FundsAudit.findAll({
       where: {
         userId: { [Op.in]: userIds },
         hasPaid: true,
-        dateOfPayment: { [Op.between]: [start, end] },
+        dateOfPayment: { [Op.between]: [startDateTime, endDateTime] },
       },
-      attributes: [[model.FundsAudit.sequelize.fn("SUM", model.FundsAudit.sequelize.col("amountPaid")), "achieved"]],
+      attributes: [
+        [
+          model.FundsAudit.sequelize.fn(
+            "SUM",
+            model.FundsAudit.sequelize.col("amountPaid")
+          ),
+          "achieved",
+        ],
+      ],
       raw: true,
     });
 
     achieved = parseFloat(result[0]?.achieved || 0);
+    console.log("[DEBUG] Achieved accounts (sum of amountPaid):", achieved);
+  } else {
+    console.log("[DEBUG] No users assigned to this manager.");
   }
 
+  // ✅ 4️⃣ Calculate progress %
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+  console.log(`[DEBUG] Progress: ${progress}%`);
 
   return { achieved, target, progress };
 };
