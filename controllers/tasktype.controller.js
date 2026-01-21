@@ -11,29 +11,22 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
   switch (taskType) {
     case "HR [COLLEGE CONNECT]":
       return await collegeConnectProgress(managerId, date);
-
     case "HR [JD SEND]":
       return await jdSendProgress(managerId, date);
-
     case "HR [FOLLOW UP]":
       return await followUpProgress(managerId, date);
-
     case "HR [RESUME RECEVIED]":
       return await resumeReceivedProgress(managerId, date);
-
     case "HR [SELECTED-COLLEGES]":
       return await selectedCollegesProgress(managerId, date);
-
     case "HR [SELECTION]":
       return await hrSelectionProgress(managerId, date);
 
     // 🔹 BD TASKS
     case "HR [ALLOTMENT]":
       return await bdInternsAllocatedProgress(managerId, date);
-
     case "BD [INTERNS ACTIVE]":
       return await bdInternsActiveProgress(managerId, date);
-
     case "BD [ACCOUNTS]":
       return await bdAccountsProgress(managerId, date);
 
@@ -52,7 +45,6 @@ const calculateSystemTaskProgress = async ({ taskType, managerId, date }) => {
       return { progress: 0, achieved: 0, target: 0 };
   }
 };
-
 /**
  * Utility: day range
  */
@@ -333,8 +325,6 @@ const bdInternsActiveProgress = async (managerId, date) => {
  * BD – ACCOUNTS
  */
 const bdAccountsProgress = async (managerId, date) => {
-  const { start, end } = getDayRange(date);
-
   const targetRow = await model.BdTarget.findOne({
     where: { teamManagerId: managerId, targetDate: date },
     attributes: ["accounts"],
@@ -342,39 +332,34 @@ const bdAccountsProgress = async (managerId, date) => {
 
   const target = targetRow ? Number(targetRow.accounts) : 0;
 
-  const sheets = await model.BdSheet.findAll({
-    where: {
-      teamManagerId: managerId,
-      startDate: { [Op.between]: [start, end] },
-    },
-    include: [
-      {
-        model: model.StudentResume,
-        required: true,
-        attributes: ["mobileNumber"],
-      },
-    ],
+  // 1️⃣ Get all users under this manager
+  const statuses = await model.Status.findAll({
+    where: { teamManager: managerId },
+    attributes: ["userId"],
   });
-
-  const mobileNumbers = [
-    ...new Set(
-      sheets.map(s => s.StudentResume?.mobileNumber).filter(Boolean)
-    ),
-  ];
+  const userIds = statuses.map(s => s.userId);
 
   let achieved = 0;
-  if (mobileNumbers.length) {
-    const users = await model.User.findAll({
-      where: { phoneNumber: { [Op.in]: mobileNumbers } },
-      attributes: ["subscriptionWallet"],
-    });
+  if (userIds.length) {
+    const result = await model.FundsAudit.sequelize.query(
+      `
+      SELECT COUNT(*) AS achieved
+      FROM "FundsAudits" f
+      WHERE f."userId" IN (:userIds)
+        AND f."hasPaid" = true
+        AND TO_CHAR(f."dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
+      `,
+      {
+        replacements: { userIds, date },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+      }
+    );
 
-    users.forEach(u => {
-      achieved += Number(u.subscriptionWallet || 0);
-    });
+    achieved = parseInt(result[0]?.achieved || 0);
   }
 
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
+
   return { achieved, target, progress };
 };
 
