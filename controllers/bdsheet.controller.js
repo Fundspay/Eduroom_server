@@ -1347,8 +1347,17 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
  const getBdTlLeaderboard = async (req, res) => {
   try {
-    const { from, to } = req.query;
-    if (!from || !to) return ReE(res, "from, to are required", 400);
+    let { from, to } = req.query;
+
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    if (!from || !to) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      from = firstDay.toISOString().split('T')[0];
+      to = lastDay.toISOString().split('T')[0];
+    }
 
     const teamManagers = await TeamManager.findAll({
       attributes: ["id", "name", "mobileNumber"],
@@ -1388,7 +1397,7 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // Achieved accounts using dateOfPayment
+      // ✅ FIXED: Achieved accounts using total payments (not distinct users)
       const statuses = await Status.findAll({
         where: { teamManager: manager.name },
         attributes: ["userId"],
@@ -1398,16 +1407,14 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
       let achievedAccounts = 0;
 
       if (userIds.length) {
+        // ✅ CHANGED: COUNT(*) instead of COUNT(DISTINCT "userId")
         const accountsResult = await FundsAudit.sequelize.query(
           `
-          SELECT DATE("dateOfPayment") AS paid_date,
-                 COUNT(DISTINCT "userId") AS unique_paid_users
+          SELECT COUNT(*) AS total_payments
           FROM "FundsAudits"
           WHERE "userId" IN (:userIds)
             AND "hasPaid" = true
             AND "dateOfPayment" BETWEEN :from AND :to
-          GROUP BY DATE("dateOfPayment")
-          ORDER BY DATE("dateOfPayment");
           `,
           {
             replacements: { userIds, from: fromDate, to: toDate },
@@ -1415,14 +1422,11 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
           }
         );
 
-        achievedAccounts = accountsResult.reduce(
-          (sum, row) => sum + parseInt(row.unique_paid_users || 0),
-          0
-        );
+        achievedAccounts = parseInt(accountsResult[0]?.total_payments || 0);
       }
 
       // ---------------------------
-      // Targets from BdTarget (UPDATED LOGIC)
+      // Targets from BdTarget
       // ---------------------------
       const bdTargetData = await BdTarget.findAll({
         where: {
@@ -1438,7 +1442,7 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
 
       bdTargetData.forEach((row) => {
         internsAllocated += Number(row.internsAllocated) || 0;
-        internsActive += Number(row.internsActive) || 0; // Correct column now
+        internsActive += Number(row.internsActive) || 0;
         accountsTarget += Number(row.accounts) || 0;
       });
 
@@ -1472,6 +1476,10 @@ module.exports.getTargetVsAchieved = getTargetVsAchieved;
       success: true,
       leaderboard: rankedData,
       totalManagers: rankedData.length,
+      appliedFilters: {
+        from,
+        to,
+      },
     });
 
   } catch (err) {
