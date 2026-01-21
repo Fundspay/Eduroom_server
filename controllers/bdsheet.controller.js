@@ -1081,10 +1081,20 @@ module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
 
 const getTargetVsAchieved = async (req, res) => {
   try {
-    const { managerId, from, to } = req.query;
+    let { managerId, from, to } = req.query;
 
-    if (!managerId || !from || !to) {
-      return ReE(res, "managerId, from, and to are required", 400);
+    if (!managerId) {
+      return ReE(res, "managerId is required", 400);
+    }
+
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    if (!from || !to) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      from = firstDay.toISOString().split('T')[0];
+      to = lastDay.toISOString().split('T')[0];
     }
 
     // ✅ Find manager
@@ -1104,7 +1114,8 @@ const getTargetVsAchieved = async (req, res) => {
     if (!userIds.length) return ReS(res, {
       success: true,
       totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
-      dateWise: []
+      dateWise: [],
+      appliedFilters: { managerId, from, to }
     }, 200);
 
     // ✅ Adjust dates: make 'to' cover the full day
@@ -1112,11 +1123,11 @@ const getTargetVsAchieved = async (req, res) => {
     const toDate = new Date(to);
     toDate.setHours(23, 59, 59, 999); // include full day
 
-    // ✅ Fetch day-wise achieved counts from FundsAudit (using dateOfPayment)
+    // ✅ FIXED: Fetch day-wise achieved counts from FundsAudit (COUNT ALL PAYMENTS, NOT DISTINCT USERS)
     const achievedResults = await FundsAudit.sequelize.query(
       `
       SELECT DATE(f."dateOfPayment") AS paid_date,
-             COUNT(DISTINCT f."userId") AS achieved
+             COUNT(*) AS achieved
       FROM "FundsAudits" f
       WHERE f."userId" IN (:userIds)
         AND f."hasPaid" = true
@@ -1124,7 +1135,10 @@ const getTargetVsAchieved = async (req, res) => {
       GROUP BY DATE(f."dateOfPayment")
       ORDER BY DATE(f."dateOfPayment");
       `,
-      { replacements: { userIds, from: fromDate, to: toDate }, type: FundsAudit.sequelize.QueryTypes.SELECT }
+      { 
+        replacements: { userIds, from: fromDate, to: toDate }, 
+        type: FundsAudit.sequelize.QueryTypes.SELECT 
+      }
     );
 
     // Build achieved map
@@ -1177,8 +1191,19 @@ const getTargetVsAchieved = async (req, res) => {
 
     return ReS(res, {
       success: true,
-      totals: { target: totalTarget, achieved: totalAchieved, difference: totalDifference, percentage: totalPercentage },
-      dateWise: dateWiseComparison
+      totals: { 
+        target: totalTarget, 
+        achieved: totalAchieved, 
+        difference: totalDifference, 
+        percentage: parseFloat(totalPercentage) 
+      },
+      dateWise: dateWiseComparison,
+      appliedFilters: {
+        managerId,
+        managerName: teamManagerName,
+        from,
+        to
+      }
     });
 
   } catch (err) {
