@@ -214,6 +214,8 @@ module.exports.upsertBdSheet = upsertBdSheet;
 
 
 
+const { Op } = require('sequelize'); // Add this at the top of your file
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -292,43 +294,39 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // 🔍 DEBUG LOGGING - Remove after finding the issue
-            console.log(`\n=== DEBUG for ${s.studentName} ===`);
-            console.log(`Mobile from Resume: ${s.mobileNumber}`);
-            console.log(`User ID found: ${user.id}`);
-            console.log(`User Phone in DB: ${user.phoneNumber}`);
-
-            // ✅ FULL ACCOUNT CALCULATION (exact number of FundsAudit entries)
-            const payments = await model.FundsAudit.findAll({
+            // ✅ COUNT ALL FUNDSAUDITS ENTRIES (both paid and unpaid)
+            const payments = await model.FundsAudits.findAll({
               where: {
                 userId: user.id,
-                hasPaid: true,
+                // REMOVED: hasPaid: true  ← This now counts ALL entries
               },
-              attributes: ["id", "userId", "dateOfPayment"],
+              attributes: ["id", "userId", "dateOfPayment", "hasPaid"],
               order: [["dateOfPayment", "ASC"]],
             });
 
-            console.log(`Total Payments Found: ${payments.length}`);
-            if (payments.length > 0) {
-              console.log("Payment IDs:", payments.map(p => p.id));
-              console.log("Payment Dates:", payments.map(p => p.dateOfPayment));
-            }
-
             const totalAccounts = payments.length;
+            const paidAccounts = payments.filter(p => p.hasPaid).length;
+            const unpaidAccounts = payments.filter(p => !p.hasPaid).length;
 
-            s.accountsAchieved = totalAccounts;  // exact count
-            s.businessTask = totalAccounts;      // exact count
-            s.hasPaid = totalAccounts > 0;
-            s.firstPaymentDate = payments[0]?.dateOfPayment || null;
-            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
+            s.accountsAchieved = totalAccounts;      // total count (paid + unpaid)
+            s.businessTask = totalAccounts;          // total count (paid + unpaid)
+            s.paidAccounts = paidAccounts;           // only paid count
+            s.unpaidAccounts = unpaidAccounts;       // only unpaid count
+            s.hasPaid = paidAccounts > 0;
+            
+            // Get first and last payment dates (only from paid entries)
+            const paidPayments = payments.filter(p => p.hasPaid && p.dateOfPayment);
+            s.firstPaymentDate = paidPayments[0]?.dateOfPayment || null;
+            s.lastPaymentDate = paidPayments[paidPayments.length - 1]?.dateOfPayment || null;
 
-            // Optional: store date-wise info for debug
+            // Store date-wise info for debug
             s.dateWiseAccounts = payments.map(p => ({ 
               id: p.id,
-              date: p.dateOfPayment 
+              date: p.dateOfPayment,
+              paid: p.hasPaid
             }));
 
-            // Category based on totalAccounts
+            // Category based on TOTAL accounts (including unpaid)
             if (totalAccounts === 0) s.category = "not working";
             else if (totalAccounts <= 5) s.category = "Starter";
             else if (totalAccounts <= 10) s.category = "Basic";
@@ -338,13 +336,11 @@ const getBdSheet = async (req, res) => {
             else if (totalAccounts <= 35) s.category = "Diamond";
             else s.category = "Platinum";
           } else {
-            // 🔍 DEBUG - User not found
-            console.log(`\n⚠️ NO USER FOUND for ${s.studentName}`);
-            console.log(`Searched with phone variations:`, uniquePhones);
-            
             // Set defaults when user not found
             s.accountsAchieved = 0;
             s.businessTask = 0;
+            s.paidAccounts = 0;
+            s.unpaidAccounts = 0;
             s.hasPaid = false;
             s.category = "not working";
           }
@@ -376,6 +372,7 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
+
 
 const getBdSheetByCategory = async (req, res) => {
   try {
