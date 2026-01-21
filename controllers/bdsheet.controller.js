@@ -1104,8 +1104,7 @@ module.exports.getBdSheetByDateRange = getBdSheetByDateRange;
 const getTargetVsAchieved = async (req, res) => {
   try {
     let { managerId, from, to } = req.query;
-
-    console.log("[DEBUG] Incoming params -> managerId:", managerId, "from:", from, "to:", to);
+    console.log("[DEBUG] Incoming params ->", { managerId, from, to });
 
     if (!managerId) return ReE(res, "managerId is required", 400);
 
@@ -1116,8 +1115,8 @@ const getTargetVsAchieved = async (req, res) => {
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       from = firstDay.toISOString().split("T")[0];
       to = lastDay.toISOString().split("T")[0];
-      console.log("[DEBUG] Default dates applied -> from:", from, "to:", to);
     }
+    console.log("[DEBUG] Date range ->", { from, to });
 
     // -------------------- MANAGER --------------------
     const manager = await TeamManager.findByPk(managerId);
@@ -1129,13 +1128,12 @@ const getTargetVsAchieved = async (req, res) => {
     const statuses = await Status.findAll({
       where: { teamManager: teamManagerName },
       attributes: ["userId"],
-      raw: true
+      raw: true,
     });
     const userIds = statuses.map(s => s.userId);
     console.log("[DEBUG] User IDs under manager:", userIds);
 
     if (!userIds.length) {
-      console.log("[DEBUG] No users assigned to this manager.");
       return ReS(res, {
         success: true,
         totals: { target: 0, achieved: 0, difference: 0, percentage: 0 },
@@ -1144,7 +1142,7 @@ const getTargetVsAchieved = async (req, res) => {
       });
     }
 
-    // -------------------- FETCH ALL FUNDS --------------------
+    // -------------------- FETCH FUNDS AUDIT --------------------
     const fromDate = new Date(from + "T00:00:00Z");
     const toDate = new Date(to + "T23:59:59Z");
     console.log("[DEBUG] Date range for FundsAudit ->", fromDate, "to", toDate);
@@ -1155,10 +1153,10 @@ const getTargetVsAchieved = async (req, res) => {
         hasPaid: true,
         dateOfPayment: { [Op.between]: [fromDate, toDate] },
       },
-      attributes: ["userId", "dateOfPayment", "amountPaid"],
-      raw: true
+      attributes: ["userId", "dateOfPayment"], // ✅ removed amountPaid
+      raw: true,
     });
-    console.log("[DEBUG] Total funds records fetched:", funds.length);
+    console.log("[DEBUG] Total paid entries fetched:", funds.length);
 
     // -------------------- DATE-WISE ACHIEVED --------------------
     const dayWiseAchieved = {};
@@ -1166,18 +1164,18 @@ const getTargetVsAchieved = async (req, res) => {
       const day = new Date(f.dateOfPayment).toISOString().split("T")[0];
       dayWiseAchieved[day] = (dayWiseAchieved[day] || 0) + 1;
     });
-    console.log("[DEBUG] Day-wise achieved counts:", dayWiseAchieved);
+    console.log("[DEBUG] Day-wise achieved ->", dayWiseAchieved);
 
-    // -------------------- TARGETS --------------------
+    // -------------------- FETCH TARGETS --------------------
     const targets = await BdTarget.findAll({
       where: {
         teamManagerId: managerId,
         targetDate: { [Op.between]: [from, to] },
       },
       attributes: ["targetDate", "accounts"],
-      raw: true
+      raw: true,
     });
-    console.log("[DEBUG] Targets fetched:", targets);
+    console.log("[DEBUG] Targets fetched ->", targets);
 
     // -------------------- GENERATE DATE RANGE --------------------
     const getDateRange = (from, to) => {
@@ -1191,16 +1189,13 @@ const getTargetVsAchieved = async (req, res) => {
       return dates;
     };
     const allDates = getDateRange(from, to);
-    console.log("[DEBUG] All dates in range:", allDates);
+    console.log("[DEBUG] All dates in range ->", allDates);
 
     // -------------------- DATE-WISE COMPARISON --------------------
     const dateWiseComparison = allDates.map(date => {
       const targetRow = targets.find(t => t.targetDate === date);
       const target = targetRow ? Number(targetRow.accounts) : 0;
       const achieved = dayWiseAchieved[date] || 0;
-
-      console.log(`[DEBUG] Date: ${date}, Target: ${target}, Achieved: ${achieved}`);
-
       return {
         date,
         target,
@@ -1209,11 +1204,11 @@ const getTargetVsAchieved = async (req, res) => {
         percentage: target > 0 ? Number(((achieved / target) * 100).toFixed(2)) : 0,
       };
     });
+    console.log("[DEBUG] Date-wise comparison ->", dateWiseComparison);
 
     // -------------------- TOTALS --------------------
     const totalTarget = dateWiseComparison.reduce((s, d) => s + d.target, 0);
     const totalAchieved = dateWiseComparison.reduce((s, d) => s + d.achieved, 0);
-    console.log("[DEBUG] Totals -> Target:", totalTarget, "Achieved:", totalAchieved);
 
     return ReS(res, {
       success: true,
