@@ -212,12 +212,12 @@ module.exports.upsertBdSheet = upsertBdSheet;
 
 // module.exports.getBdSheet = getBdSheet;
 
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
 
     let whereCondition = {};
-
     if (resumeId) whereCondition.id = resumeId;
 
     if (managerId) {
@@ -225,7 +225,6 @@ const getBdSheet = async (req, res) => {
         where: { id: managerId },
         attributes: ["name"],
       });
-
       whereCondition.alloted = manager?.name || "__invalid__";
     }
 
@@ -255,8 +254,6 @@ const getBdSheet = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
-    console.log("Total students found:", data.length); // Debug log
-
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
@@ -267,96 +264,43 @@ const getBdSheet = async (req, res) => {
         }
 
         if (s.mobileNumber) {
-          // Create phone number variations to handle different formats
-          const cleanPhone = s.mobileNumber.toString().replace(/\s/g, '').replace('+91', '').replace('+', '');
-          const phoneVariations = [
-            s.mobileNumber,
-            cleanPhone,
-            `+91${cleanPhone}`,
-            `91${cleanPhone}`,
-          ];
-
-          // Remove duplicates
-          const uniquePhones = [...new Set(phoneVariations)];
-
           const user = await model.User.findOne({
-            where: { 
-              phoneNumber: {
-                [Op.in]: uniquePhones
-              }
-            },
-            attributes: ["id", "collegeName", "phoneNumber"],
+            where: { phoneNumber: s.mobileNumber },
+            attributes: ["id", "collegeName"],
           });
 
           if (user) {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            try {
-              // ✅ TRY BOTH MODEL NAMES
-              const FundsAuditModel = model.FundsAudits || model.FundsAudit;
-              
-              if (!FundsAuditModel) {
-                console.error("FundsAudit/FundsAudits model not found!");
-                throw new Error("FundsAudit model not available");
-              }
+            // -----------------------------
+            // ✅ FUNDS AUDIT ACCOUNT CALCULATION (ALL-TIME)
+            // -----------------------------
+            const payments = await model.FundsAudit.findAll({
+              where: { userId: user.id },
+              attributes: ["dateOfPayment"],
+              order: [["dateOfPayment", "ASC"]],
+            });
 
-              const payments = await FundsAuditModel.findAll({
-                where: {
-                  userId: user.id,
-                },
-                attributes: ["id", "userId", "dateOfPayment", "hasPaid"],
-                order: [["dateOfPayment", "ASC"]],
-              });
+            const totalAccounts = payments.length;
 
-              const totalAccounts = payments.length;
-              const paidAccounts = payments.filter(p => p.hasPaid).length;
-              const unpaidAccounts = payments.filter(p => !p.hasPaid).length;
+            s.accountsAchieved = totalAccounts;
+            s.businessTask = totalAccounts; // shows exact total accounts
+            s.hasPaid = totalAccounts > 0;
+            s.firstPaymentDate = payments[0]?.dateOfPayment || null;
+            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
 
-              s.accountsAchieved = totalAccounts;
-              s.businessTask = totalAccounts;
-              s.paidAccounts = paidAccounts;
-              s.unpaidAccounts = unpaidAccounts;
-              s.hasPaid = paidAccounts > 0;
-              
-              const paidPayments = payments.filter(p => p.hasPaid && p.dateOfPayment);
-              s.firstPaymentDate = paidPayments[0]?.dateOfPayment || null;
-              s.lastPaymentDate = paidPayments[paidPayments.length - 1]?.dateOfPayment || null;
+            s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
 
-              s.dateWiseAccounts = payments.map(p => ({ 
-                id: p.id,
-                date: p.dateOfPayment,
-                paid: p.hasPaid
-              }));
-
-              // Category based on TOTAL accounts
-              if (totalAccounts === 0) s.category = "not working";
-              else if (totalAccounts <= 5) s.category = "Starter";
-              else if (totalAccounts <= 10) s.category = "Basic";
-              else if (totalAccounts <= 15) s.category = "Bronze";
-              else if (totalAccounts <= 20) s.category = "Silver";
-              else if (totalAccounts <= 25) s.category = "Gold";
-              else if (totalAccounts <= 35) s.category = "Diamond";
-              else s.category = "Platinum";
-
-            } catch (paymentError) {
-              console.error(`Error fetching payments for user ${user.id}:`, paymentError);
-              // Set defaults on error
-              s.accountsAchieved = 0;
-              s.businessTask = 0;
-              s.paidAccounts = 0;
-              s.unpaidAccounts = 0;
-              s.hasPaid = false;
-              s.category = "not working";
-            }
-          } else {
-            // Set defaults when user not found
-            s.accountsAchieved = 0;
-            s.businessTask = 0;
-            s.paidAccounts = 0;
-            s.unpaidAccounts = 0;
-            s.hasPaid = false;
-            s.category = "not working";
+            // Category based on totalAccounts
+            if (totalAccounts === 0) s.category = "not working";
+            else if (totalAccounts <= 5) s.category = "Starter";
+            else if (totalAccounts <= 10) s.category = "Basic";
+            else if (totalAccounts <= 15) s.category = "Bronze";
+            else if (totalAccounts <= 20) s.category = "Silver";
+            else if (totalAccounts <= 25) s.category = "Gold";
+            else if (totalAccounts <= 35) s.category = "Diamond";
+            else s.category = "Platinum";
           }
         }
 
@@ -368,8 +312,6 @@ const getBdSheet = async (req, res) => {
         return s;
       })
     );
-
-    console.log("Formatted data count:", formattedData.length); // Debug log
 
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
@@ -383,12 +325,13 @@ const getBdSheet = async (req, res) => {
     });
   } catch (err) {
     console.error("GET BD SHEET ERROR:", err);
-    console.error("Error stack:", err.stack);
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getBdSheet = getBdSheet;
+
+
 const getBdSheetByCategory = async (req, res) => {
   try {
     const { managerId, category } = req.query;
