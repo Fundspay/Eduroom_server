@@ -217,7 +217,7 @@ const getBdSheet = async (req, res) => {
     const { resumeId, managerId } = req.query;
 
     // ---------------------------
-    // BUILD FILTER
+    // BUILD WHERE CONDITION
     // ---------------------------
     const whereCondition = {};
     if (resumeId) whereCondition.id = resumeId;
@@ -231,7 +231,7 @@ const getBdSheet = async (req, res) => {
     }
 
     // ---------------------------
-    // FETCH STUDENTS + BDSHEET
+    // FETCH STUDENT RESUMES WITH LATEST BDSHEET
     // ---------------------------
     const data = await model.StudentResume.findAll({
       where: whereCondition,
@@ -255,13 +255,13 @@ const getBdSheet = async (req, res) => {
     });
 
     // ---------------------------
-    // FORMAT DATA
+    // FORMAT EACH STUDENT
     // ---------------------------
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // Latest BdSheet
+        // Pick latest BdSheet
         if (Array.isArray(s.BdSheet) && s.BdSheet.length > 0) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0];
         } else {
@@ -269,7 +269,7 @@ const getBdSheet = async (req, res) => {
         }
 
         // ---------------------------
-        // USER + REAL SUBSCRIPTIONS
+        // FUNDS AUDIT DATA (PAID ONLY)
         // ---------------------------
         if (s.mobileNumber) {
           const user = await model.User.findOne({
@@ -281,58 +281,37 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            /**
-             * ✅ REAL SUBSCRIPTIONS ONLY
-             * - Paid OR
-             * - Unpaid but subscription created (wallet entry)
-             */
-            const subscriptions = await model.FundsAudit.findAll({
+            const payments = await model.FundsAudit.findAll({
               where: {
                 userId: user.id,
-                [Op.or]: [
-                  { hasPaid: true },
-                  { dateOfPayment: { [Op.ne]: null } }
-                ]
+                hasPaid: true, // ✅ only paid
               },
-              attributes: ["dateOfPayment", "hasPaid"],
-              order: [["createdAt", "ASC"]],
+              attributes: ["dateOfPayment"],
+              order: [["dateOfPayment", "ASC"]],
             });
 
-            const achievedCount = subscriptions.length;
-            const paidCount = subscriptions.filter(s => s.hasPaid).length;
+            const totalAccounts = payments.length;
 
-            // ---------------------------
-            // WALLET-BASED METRICS
-            // ---------------------------
-            s.accountsAchieved = achievedCount;   // ✅ FIXED
-            s.businessTask = achievedCount;
-            s.paidAccounts = paidCount;
-            s.unpaidAccounts = achievedCount - paidCount;
+            s.accountsAchieved = totalAccounts;
+            s.businessTask = totalAccounts;
+            s.hasPaid = totalAccounts > 0;
+            s.firstPaymentDate = payments[0]?.dateOfPayment || null;
+            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
+            s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
 
-            s.firstPaymentDate = subscriptions[0]?.dateOfPayment || null;
-            s.lastPaymentDate =
-              subscriptions[achievedCount - 1]?.dateOfPayment || null;
-
-            s.dateWiseAccounts = subscriptions.map(p => ({
-              date: p.dateOfPayment,
-              hasPaid: p.hasPaid,
-            }));
-
-            // ---------------------------
-            // CATEGORY (BASED ON ACHIEVED)
-            // ---------------------------
-            if (achievedCount === 0) s.category = "not working";
-            else if (achievedCount <= 5) s.category = "Starter";
-            else if (achievedCount <= 10) s.category = "Basic";
-            else if (achievedCount <= 15) s.category = "Bronze";
-            else if (achievedCount <= 20) s.category = "Silver";
-            else if (achievedCount <= 25) s.category = "Gold";
-            else if (achievedCount <= 35) s.category = "Diamond";
+            // Category based on totalAccounts
+            if (totalAccounts === 0) s.category = "not working";
+            else if (totalAccounts <= 5) s.category = "Starter";
+            else if (totalAccounts <= 10) s.category = "Basic";
+            else if (totalAccounts <= 15) s.category = "Bronze";
+            else if (totalAccounts <= 20) s.category = "Silver";
+            else if (totalAccounts <= 25) s.category = "Gold";
+            else if (totalAccounts <= 35) s.category = "Diamond";
             else s.category = "Platinum";
           }
         }
 
-        // Flatten registration
+        // Move registration from BdSheet to top-level
         if (s.BdSheet?.registration) {
           s.registration = s.BdSheet.registration;
         }
@@ -343,7 +322,7 @@ const getBdSheet = async (req, res) => {
     );
 
     // ---------------------------
-    // MANAGERS
+    // FETCH ALL MANAGERS
     // ---------------------------
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
