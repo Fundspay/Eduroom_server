@@ -212,7 +212,6 @@ module.exports.upsertBdSheet = upsertBdSheet;
 
 // module.exports.getBdSheet = getBdSheet;
 
-
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -270,7 +269,7 @@ const getBdSheet = async (req, res) => {
         }
 
         // ---------------------------
-        // USER + SUBSCRIPTION WALLET
+        // USER + REAL SUBSCRIPTIONS
         // ---------------------------
         if (s.mobileNumber) {
           const user = await model.User.findOne({
@@ -282,25 +281,37 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ✅ WALLET LOGIC (NO hasPaid FILTER)
+            /**
+             * ✅ REAL SUBSCRIPTIONS ONLY
+             * - Paid OR
+             * - Unpaid but subscription created (wallet entry)
+             */
             const subscriptions = await model.FundsAudit.findAll({
-              where: { userId: user.id },
+              where: {
+                userId: user.id,
+                [Op.or]: [
+                  { hasPaid: true },
+                  { dateOfPayment: { [Op.ne]: null } }
+                ]
+              },
               attributes: ["dateOfPayment", "hasPaid"],
               order: [["createdAt", "ASC"]],
             });
 
-            const totalSubscriptions = subscriptions.length;
+            const achievedCount = subscriptions.length;
             const paidCount = subscriptions.filter(s => s.hasPaid).length;
 
-            // 🔥 THIS IS WHAT YOU WANTED
-            s.accountsAchieved = totalSubscriptions; // wallet-based
-            s.businessTask = totalSubscriptions;
+            // ---------------------------
+            // WALLET-BASED METRICS
+            // ---------------------------
+            s.accountsAchieved = achievedCount;   // ✅ FIXED
+            s.businessTask = achievedCount;
             s.paidAccounts = paidCount;
-            s.unpaidAccounts = totalSubscriptions - paidCount;
+            s.unpaidAccounts = achievedCount - paidCount;
 
             s.firstPaymentDate = subscriptions[0]?.dateOfPayment || null;
             s.lastPaymentDate =
-              subscriptions[totalSubscriptions - 1]?.dateOfPayment || null;
+              subscriptions[achievedCount - 1]?.dateOfPayment || null;
 
             s.dateWiseAccounts = subscriptions.map(p => ({
               date: p.dateOfPayment,
@@ -308,20 +319,20 @@ const getBdSheet = async (req, res) => {
             }));
 
             // ---------------------------
-            // CATEGORY (BASED ON WALLET COUNT)
+            // CATEGORY (BASED ON ACHIEVED)
             // ---------------------------
-            if (totalSubscriptions === 0) s.category = "not working";
-            else if (totalSubscriptions <= 5) s.category = "Starter";
-            else if (totalSubscriptions <= 10) s.category = "Basic";
-            else if (totalSubscriptions <= 15) s.category = "Bronze";
-            else if (totalSubscriptions <= 20) s.category = "Silver";
-            else if (totalSubscriptions <= 25) s.category = "Gold";
-            else if (totalSubscriptions <= 35) s.category = "Diamond";
+            if (achievedCount === 0) s.category = "not working";
+            else if (achievedCount <= 5) s.category = "Starter";
+            else if (achievedCount <= 10) s.category = "Basic";
+            else if (achievedCount <= 15) s.category = "Bronze";
+            else if (achievedCount <= 20) s.category = "Silver";
+            else if (achievedCount <= 25) s.category = "Gold";
+            else if (achievedCount <= 35) s.category = "Diamond";
             else s.category = "Platinum";
           }
         }
 
-        // Registration flattening
+        // Flatten registration
         if (s.BdSheet?.registration) {
           s.registration = s.BdSheet.registration;
         }
