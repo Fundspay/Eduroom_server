@@ -618,14 +618,24 @@ const getDashboardStats = async (req, res) => {
     const managerId = req.query.managerId;
     let { startDate, endDate } = req.query;
 
-    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED (FIXED)
     if (!startDate || !endDate) {
       const now = new Date();
+      // Get first day of current month
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      // Get last day of current month
       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       
-      startDate = firstDay.toISOString().split('T')[0]; // YYYY-MM-DD
-      endDate = lastDay.toISOString().split('T')[0];     // YYYY-MM-DD
+      // Format dates properly to get YYYY-MM-DD
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      startDate = formatDate(firstDay);  // Will be "2026-01-01"
+      endDate = formatDate(lastDay);      // Will be "2026-01-31"
     }
 
     // ---------------------------
