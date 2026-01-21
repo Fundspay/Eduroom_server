@@ -213,6 +213,7 @@ module.exports.upsertBdSheet = upsertBdSheet;
 // module.exports.getBdSheet = getBdSheet;
 
 
+
 const getBdSheet = async (req, res) => {
   try {
     const { resumeId, managerId } = req.query;
@@ -266,14 +267,36 @@ const getBdSheet = async (req, res) => {
         }
 
         if (s.mobileNumber) {
+          // Create phone number variations to handle different formats
+          const cleanPhone = s.mobileNumber.toString().replace(/\s/g, '').replace('+91', '').replace('+', '');
+          const phoneVariations = [
+            s.mobileNumber,
+            cleanPhone,
+            `+91${cleanPhone}`,
+            `91${cleanPhone}`,
+          ];
+
+          // Remove duplicates
+          const uniquePhones = [...new Set(phoneVariations)];
+
           const user = await model.User.findOne({
-            where: { phoneNumber: s.mobileNumber },
-            attributes: ["id", "collegeName"],
+            where: { 
+              phoneNumber: {
+                [Op.in]: uniquePhones
+              }
+            },
+            attributes: ["id", "collegeName", "phoneNumber"],
           });
 
           if (user) {
             s.userId = user.id;
             s.collegeName = user.collegeName;
+
+            // 🔍 DEBUG LOGGING - Remove after finding the issue
+            console.log(`\n=== DEBUG for ${s.studentName} ===`);
+            console.log(`Mobile from Resume: ${s.mobileNumber}`);
+            console.log(`User ID found: ${user.id}`);
+            console.log(`User Phone in DB: ${user.phoneNumber}`);
 
             // ✅ FULL ACCOUNT CALCULATION (exact number of FundsAudit entries)
             const payments = await model.FundsAudit.findAll({
@@ -281,9 +304,15 @@ const getBdSheet = async (req, res) => {
                 userId: user.id,
                 hasPaid: true,
               },
-              attributes: ["dateOfPayment"],
+              attributes: ["id", "userId", "dateOfPayment"],
               order: [["dateOfPayment", "ASC"]],
             });
+
+            console.log(`Total Payments Found: ${payments.length}`);
+            if (payments.length > 0) {
+              console.log("Payment IDs:", payments.map(p => p.id));
+              console.log("Payment Dates:", payments.map(p => p.dateOfPayment));
+            }
 
             const totalAccounts = payments.length;
 
@@ -294,7 +323,10 @@ const getBdSheet = async (req, res) => {
             s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
 
             // Optional: store date-wise info for debug
-            s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
+            s.dateWiseAccounts = payments.map(p => ({ 
+              id: p.id,
+              date: p.dateOfPayment 
+            }));
 
             // Category based on totalAccounts
             if (totalAccounts === 0) s.category = "not working";
@@ -305,6 +337,16 @@ const getBdSheet = async (req, res) => {
             else if (totalAccounts <= 25) s.category = "Gold";
             else if (totalAccounts <= 35) s.category = "Diamond";
             else s.category = "Platinum";
+          } else {
+            // 🔍 DEBUG - User not found
+            console.log(`\n⚠️ NO USER FOUND for ${s.studentName}`);
+            console.log(`Searched with phone variations:`, uniquePhones);
+            
+            // Set defaults when user not found
+            s.accountsAchieved = 0;
+            s.businessTask = 0;
+            s.hasPaid = false;
+            s.category = "not working";
           }
         }
 
@@ -334,7 +376,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
-
 
 const getBdSheetByCategory = async (req, res) => {
   try {
