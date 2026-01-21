@@ -218,7 +218,6 @@ const getBdSheet = async (req, res) => {
     const { resumeId, managerId } = req.query;
 
     let whereCondition = {};
-
     if (resumeId) whereCondition.id = resumeId;
 
     if (managerId) {
@@ -244,12 +243,7 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: [
-            "registration",
-            "activeStatus",
-            "startDate",
-            "endDate",
-          ],
+          attributes: ["registration", "activeStatus", "startDate", "endDate"],
         },
       ],
       order: [["id", "DESC"]],
@@ -274,41 +268,46 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ✅ Correct account calculation: all FundsAudit payments counted
+            // ✅ Get all payments with dates
             const payments = await model.FundsAudit.findAll({
-              where: {
-                userId: user.id,
-                hasPaid: true,
-              },
+              where: { userId: user.id, hasPaid: true },
               attributes: ["dateOfPayment"],
               order: [["dateOfPayment", "ASC"]],
             });
 
             const totalAccounts = payments.length;
+            const dateWiseAccounts = payments.map(p => ({
+              date: p.dateOfPayment,
+            }));
 
-            // 🔒 Keep response format
             s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // Fix for business task
+            s.businessTask = totalAccounts; // same column, now correct
             s.hasPaid = totalAccounts > 0;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
-            s.lastPaymentDate =
-              payments[payments.length - 1]?.dateOfPayment || null;
+            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
+            s.category =
+              totalAccounts === 0
+                ? "not working"
+                : totalAccounts <= 5
+                ? "Starter"
+                : totalAccounts <= 10
+                ? "Basic"
+                : totalAccounts <= 15
+                ? "Bronze"
+                : totalAccounts <= 20
+                ? "Silver"
+                : totalAccounts <= 25
+                ? "Gold"
+                : totalAccounts <= 35
+                ? "Diamond"
+                : "Platinum";
 
-            // Category
-            if (totalAccounts === 0) s.category = "not working";
-            else if (totalAccounts <= 5) s.category = "Starter";
-            else if (totalAccounts <= 10) s.category = "Basic";
-            else if (totalAccounts <= 15) s.category = "Bronze";
-            else if (totalAccounts <= 20) s.category = "Silver";
-            else if (totalAccounts <= 25) s.category = "Gold";
-            else if (totalAccounts <= 35) s.category = "Diamond";
-            else s.category = "Platinum";
+            // ✅ New key: date-wise ledger
+            s.dateWiseAccounts = dateWiseAccounts;
           }
         }
 
-        if (s.BdSheet?.registration) {
-          s.registration = s.BdSheet.registration;
-        }
+        if (s.BdSheet?.registration) s.registration = s.BdSheet.registration;
         if (s.BdSheet) delete s.BdSheet.registration;
 
         return s;
