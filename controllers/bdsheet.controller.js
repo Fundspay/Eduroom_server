@@ -243,7 +243,12 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: ["registration", "activeStatus", "startDate", "endDate"],
+          attributes: [
+            "registration",
+            "activeStatus",
+            "startDate",
+            "endDate",
+          ],
         },
       ],
       order: [["id", "DESC"]],
@@ -268,7 +273,9 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ✅ Get all payments with dates
+            // -----------------------------
+            // ✅ FUNDS AUDIT ACCOUNT CALCULATION
+            // -----------------------------
             const payments = await model.FundsAudit.findAll({
               where: { userId: user.id, hasPaid: true },
               attributes: ["dateOfPayment"],
@@ -276,37 +283,31 @@ const getBdSheet = async (req, res) => {
             });
 
             const totalAccounts = payments.length;
-            const dateWiseAccounts = payments.map(p => ({
-              date: p.dateOfPayment,
-            }));
 
+            // Actual accounts achieved and businessTask
             s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // same column, now correct
+            s.businessTask = totalAccounts; // ✅ now shows actual number
             s.hasPaid = totalAccounts > 0;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
-            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
-            s.category =
-              totalAccounts === 0
-                ? "not working"
-                : totalAccounts <= 5
-                ? "Starter"
-                : totalAccounts <= 10
-                ? "Basic"
-                : totalAccounts <= 15
-                ? "Bronze"
-                : totalAccounts <= 20
-                ? "Silver"
-                : totalAccounts <= 25
-                ? "Gold"
-                : totalAccounts <= 35
-                ? "Diamond"
-                : "Platinum";
+            s.lastPaymentDate =
+              payments[totalAccounts - 1]?.dateOfPayment || null;
 
-            // ✅ New key: date-wise ledger
-            s.dateWiseAccounts = dateWiseAccounts;
+            // Optional: date-wise accounts (if you need to show dates per subscription)
+            s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
+
+            // Category based on totalAccounts
+            if (totalAccounts === 0) s.category = "not working";
+            else if (totalAccounts <= 5) s.category = "Starter";
+            else if (totalAccounts <= 10) s.category = "Basic";
+            else if (totalAccounts <= 15) s.category = "Bronze";
+            else if (totalAccounts <= 20) s.category = "Silver";
+            else if (totalAccounts <= 25) s.category = "Gold";
+            else if (totalAccounts <= 35) s.category = "Diamond";
+            else s.category = "Platinum";
           }
         }
 
+        // Registration info
         if (s.BdSheet?.registration) s.registration = s.BdSheet.registration;
         if (s.BdSheet) delete s.BdSheet.registration;
 
