@@ -226,7 +226,6 @@ const getBdSheet = async (req, res) => {
         where: { id: managerId },
         attributes: ["name"],
       });
-
       whereCondition.alloted = manager?.name || "__invalid__";
     }
 
@@ -260,7 +259,7 @@ const getBdSheet = async (req, res) => {
       data.map(async (student) => {
         const s = student.toJSON();
 
-        // ✅ Pick latest BdSheet
+        // Pick latest BdSheet
         if (Array.isArray(s.BdSheet)) {
           s.BdSheet = s.BdSheet.sort((a, b) => b.id - a.id)[0] || null;
         }
@@ -275,9 +274,7 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ===============================
-            // ✅ ACCOUNT CALCULATION (CORRECT)
-            // ===============================
+            // ✅ Correct account calculation: all FundsAudit payments counted
             const payments = await model.FundsAudit.findAll({
               where: {
                 userId: user.id,
@@ -287,34 +284,17 @@ const getBdSheet = async (req, res) => {
               order: [["dateOfPayment", "ASC"]],
             });
 
-            // 🔢 Date-wise account calculation
-            const dateWiseAccounts = {};
-            payments.forEach(p => {
-              const date = p.dateOfPayment
-                ?.toISOString()
-                ?.split("T")[0];
-
-              if (date) {
-                dateWiseAccounts[date] =
-                  (dateWiseAccounts[date] || 0) + 1;
-              }
-            });
-
             const totalAccounts = payments.length;
 
-            // 🔒 RESPONSE FORMAT UNCHANGED
+            // 🔒 Keep response format
             s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // 🔥 THIS FIXES ZERO ISSUE
+            s.businessTask = totalAccounts; // Fix for business task
             s.hasPaid = totalAccounts > 0;
-
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
             s.lastPaymentDate =
               payments[payments.length - 1]?.dateOfPayment || null;
 
-            // OPTIONAL (safe extra field)
-            s.accountsDateWise = dateWiseAccounts;
-
-            // Category (same logic, now meaningful)
+            // Category
             if (totalAccounts === 0) s.category = "not working";
             else if (totalAccounts <= 5) s.category = "Starter";
             else if (totalAccounts <= 10) s.category = "Basic";
