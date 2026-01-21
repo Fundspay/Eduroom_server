@@ -255,6 +255,8 @@ const getBdSheet = async (req, res) => {
       order: [["id", "DESC"]],
     });
 
+    console.log("Total students found:", data.length); // Debug log
+
     const formattedData = await Promise.all(
       data.map(async (student) => {
         const s = student.toJSON();
@@ -290,47 +292,63 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // ✅ COUNT ALL FUNDSAUDITS ENTRIES (both paid and unpaid)
-            const payments = await model.FundsAudits.findAll({
-              where: {
-                userId: user.id,
-                // REMOVED: hasPaid: true  ← This now counts ALL entries
-              },
-              attributes: ["id", "userId", "dateOfPayment", "hasPaid"],
-              order: [["dateOfPayment", "ASC"]],
-            });
+            try {
+              // ✅ TRY BOTH MODEL NAMES
+              const FundsAuditModel = model.FundsAudits || model.FundsAudit;
+              
+              if (!FundsAuditModel) {
+                console.error("FundsAudit/FundsAudits model not found!");
+                throw new Error("FundsAudit model not available");
+              }
 
-            const totalAccounts = payments.length;
-            const paidAccounts = payments.filter(p => p.hasPaid).length;
-            const unpaidAccounts = payments.filter(p => !p.hasPaid).length;
+              const payments = await FundsAuditModel.findAll({
+                where: {
+                  userId: user.id,
+                },
+                attributes: ["id", "userId", "dateOfPayment", "hasPaid"],
+                order: [["dateOfPayment", "ASC"]],
+              });
 
-            s.accountsAchieved = totalAccounts;      // total count (paid + unpaid)
-            s.businessTask = totalAccounts;          // total count (paid + unpaid)
-            s.paidAccounts = paidAccounts;           // only paid count
-            s.unpaidAccounts = unpaidAccounts;       // only unpaid count
-            s.hasPaid = paidAccounts > 0;
-            
-            // Get first and last payment dates (only from paid entries)
-            const paidPayments = payments.filter(p => p.hasPaid && p.dateOfPayment);
-            s.firstPaymentDate = paidPayments[0]?.dateOfPayment || null;
-            s.lastPaymentDate = paidPayments[paidPayments.length - 1]?.dateOfPayment || null;
+              const totalAccounts = payments.length;
+              const paidAccounts = payments.filter(p => p.hasPaid).length;
+              const unpaidAccounts = payments.filter(p => !p.hasPaid).length;
 
-            // Store date-wise info for debug
-            s.dateWiseAccounts = payments.map(p => ({ 
-              id: p.id,
-              date: p.dateOfPayment,
-              paid: p.hasPaid
-            }));
+              s.accountsAchieved = totalAccounts;
+              s.businessTask = totalAccounts;
+              s.paidAccounts = paidAccounts;
+              s.unpaidAccounts = unpaidAccounts;
+              s.hasPaid = paidAccounts > 0;
+              
+              const paidPayments = payments.filter(p => p.hasPaid && p.dateOfPayment);
+              s.firstPaymentDate = paidPayments[0]?.dateOfPayment || null;
+              s.lastPaymentDate = paidPayments[paidPayments.length - 1]?.dateOfPayment || null;
 
-            // Category based on TOTAL accounts (including unpaid)
-            if (totalAccounts === 0) s.category = "not working";
-            else if (totalAccounts <= 5) s.category = "Starter";
-            else if (totalAccounts <= 10) s.category = "Basic";
-            else if (totalAccounts <= 15) s.category = "Bronze";
-            else if (totalAccounts <= 20) s.category = "Silver";
-            else if (totalAccounts <= 25) s.category = "Gold";
-            else if (totalAccounts <= 35) s.category = "Diamond";
-            else s.category = "Platinum";
+              s.dateWiseAccounts = payments.map(p => ({ 
+                id: p.id,
+                date: p.dateOfPayment,
+                paid: p.hasPaid
+              }));
+
+              // Category based on TOTAL accounts
+              if (totalAccounts === 0) s.category = "not working";
+              else if (totalAccounts <= 5) s.category = "Starter";
+              else if (totalAccounts <= 10) s.category = "Basic";
+              else if (totalAccounts <= 15) s.category = "Bronze";
+              else if (totalAccounts <= 20) s.category = "Silver";
+              else if (totalAccounts <= 25) s.category = "Gold";
+              else if (totalAccounts <= 35) s.category = "Diamond";
+              else s.category = "Platinum";
+
+            } catch (paymentError) {
+              console.error(`Error fetching payments for user ${user.id}:`, paymentError);
+              // Set defaults on error
+              s.accountsAchieved = 0;
+              s.businessTask = 0;
+              s.paidAccounts = 0;
+              s.unpaidAccounts = 0;
+              s.hasPaid = false;
+              s.category = "not working";
+            }
           } else {
             // Set defaults when user not found
             s.accountsAchieved = 0;
@@ -351,6 +369,8 @@ const getBdSheet = async (req, res) => {
       })
     );
 
+    console.log("Formatted data count:", formattedData.length); // Debug log
+
     const managers = await model.TeamManager.findAll({
       attributes: ["id", "name", "email"],
       raw: true,
@@ -363,13 +383,12 @@ const getBdSheet = async (req, res) => {
     });
   } catch (err) {
     console.error("GET BD SHEET ERROR:", err);
+    console.error("Error stack:", err.stack);
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getBdSheet = getBdSheet;
-
-
 const getBdSheetByCategory = async (req, res) => {
   try {
     const { managerId, category } = req.query;
