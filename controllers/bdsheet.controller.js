@@ -218,6 +218,7 @@ const getBdSheet = async (req, res) => {
     const { resumeId, managerId } = req.query;
 
     let whereCondition = {};
+
     if (resumeId) whereCondition.id = resumeId;
 
     if (managerId) {
@@ -225,6 +226,7 @@ const getBdSheet = async (req, res) => {
         where: { id: managerId },
         attributes: ["name"],
       });
+
       whereCondition.alloted = manager?.name || "__invalid__";
     }
 
@@ -273,23 +275,25 @@ const getBdSheet = async (req, res) => {
             s.userId = user.id;
             s.collegeName = user.collegeName;
 
-            // -----------------------------
-            // ✅ FUNDS AUDIT ACCOUNT CALCULATION (ALL-TIME)
-            // -----------------------------
+            // ✅ FULL ACCOUNT CALCULATION (exact number of FundsAudit entries)
             const payments = await model.FundsAudit.findAll({
-              where: { userId: user.id, hasPaid: true },
+              where: {
+                userId: user.id,
+                hasPaid: true,
+              },
               attributes: ["dateOfPayment"],
               order: [["dateOfPayment", "ASC"]],
             });
 
             const totalAccounts = payments.length;
 
-            s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // shows exact total accounts
+            s.accountsAchieved = totalAccounts;  // exact count
+            s.businessTask = totalAccounts;      // exact count
             s.hasPaid = totalAccounts > 0;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
             s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
 
+            // Optional: store date-wise info for debug
             s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
 
             // Category based on totalAccounts
