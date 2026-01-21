@@ -355,23 +355,41 @@ const bdAccountsProgress = async (managerId, date) => {
 
   console.log(`[DEBUG] Assigned users IDs via Status table: ${userIds.length > 0 ? userIds.join(", ") : "NONE"}`);
 
-  // 4️⃣ Calculate achieved accounts
+  // 4️⃣ Calculate achieved accounts (FIXED - No timezone conversion)
   let achieved = 0;
   if (userIds.length > 0) {
-    const result = await model.FundsAudit.sequelize.query(
-      `
-      SELECT COUNT(*) AS achieved
-      FROM "FundsAudits"
-      WHERE "userId" IN (:userIds)
-        AND "hasPaid" = true
-        AND TO_CHAR("dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
-      `,
-      {
-        replacements: { userIds, date },
-        type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+    // ✅ FIX: Use Sequelize ORM instead of raw SQL to avoid timezone issues
+    const startOfDay = new Date(date + "T00:00:00");
+    const endOfDay = new Date(date + "T23:59:59.999");
+
+    const payments = await model.FundsAudit.findAll({
+      where: {
+        userId: userIds,
+        hasPaid: true,
+        dateOfPayment: {
+          [model.Sequelize.Op.between]: [startOfDay, endOfDay]
+        }
+      },
+      attributes: ["dateOfPayment"],
+      raw: true,
+    });
+
+    // Count only payments that match the exact date (without timezone conversion)
+    achieved = payments.filter(p => {
+      let paymentDate;
+      if (typeof p.dateOfPayment === 'string') {
+        paymentDate = p.dateOfPayment.split('T')[0];
+      } else {
+        const d = new Date(p.dateOfPayment);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        paymentDate = `${year}-${month}-${day}`;
       }
-    );
-    achieved = parseInt(result[0]?.achieved || 0);
+      return paymentDate === date;
+    }).length;
+
+    console.log(`[DEBUG] Achieved accounts: ${achieved}`);
   } else {
     console.log("[DEBUG] No users assigned to this manager.");
   }
