@@ -1152,7 +1152,10 @@ const getTargetVsAchieved = async (req, res) => {
         userId: userIds,
         hasPaid: true,
         dateOfPayment: {
-          [Op.between]: [new Date(from + "T00:00:00Z"), new Date(to + "T23:59:59Z")],
+          [Op.between]: [
+            new Date(from + "T00:00:00Z"), 
+            new Date(to + "T23:59:59Z")
+          ],
         },
       },
       attributes: ["dateOfPayment"],
@@ -1160,10 +1163,22 @@ const getTargetVsAchieved = async (req, res) => {
     });
     console.debug("[DEBUG] Total paid entries fetched:", funds.length);
 
-    // -------------------- CALCULATE DAY-WISE ACHIEVED --------------------
+    // -------------------- CALCULATE DAY-WISE ACHIEVED (FIXED) --------------------
     const dayWiseAchieved = {};
     funds.forEach(f => {
-      const day = new Date(f.dateOfPayment).toISOString().split("T")[0];
+      // ✅ FIX: Extract date directly from the timestamp without timezone conversion
+      let day;
+      if (typeof f.dateOfPayment === 'string') {
+        // If it's a string, just take the date part
+        day = f.dateOfPayment.split('T')[0];
+      } else {
+        // If it's a Date object, format it properly without UTC conversion
+        const d = new Date(f.dateOfPayment);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const date = String(d.getDate()).padStart(2, '0');
+        day = `${year}-${month}-${date}`;
+      }
       dayWiseAchieved[day] = (dayWiseAchieved[day] || 0) + 1;
     });
     console.debug("[DEBUG] Day-wise achieved ->", dayWiseAchieved);
@@ -1182,10 +1197,13 @@ const getTargetVsAchieved = async (req, res) => {
     // -------------------- GENERATE ALL DATES --------------------
     const getDateRange = (from, to) => {
       const dates = [];
-      let current = new Date(from);
-      const end = new Date(to);
+      let current = new Date(from + "T00:00:00");
+      const end = new Date(to + "T00:00:00");
       while (current <= end) {
-        dates.push(current.toISOString().split("T")[0]);
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const date = String(current.getDate()).padStart(2, '0');
+        dates.push(`${year}-${month}-${date}`);
         current.setDate(current.getDate() + 1);
       }
       return dates;
