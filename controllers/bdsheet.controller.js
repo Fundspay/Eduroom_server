@@ -274,7 +274,7 @@ const getBdSheet = async (req, res) => {
             s.collegeName = user.collegeName;
 
             // -----------------------------
-            // ✅ FUNDS AUDIT ACCOUNT CALCULATION
+            // ✅ FUNDS AUDIT ACCOUNT CALCULATION (ALL-TIME)
             // -----------------------------
             const payments = await model.FundsAudit.findAll({
               where: { userId: user.id, hasPaid: true },
@@ -284,15 +284,12 @@ const getBdSheet = async (req, res) => {
 
             const totalAccounts = payments.length;
 
-            // Actual accounts achieved and businessTask
             s.accountsAchieved = totalAccounts;
-            s.businessTask = totalAccounts; // ✅ now shows actual number
+            s.businessTask = totalAccounts; // shows exact total accounts
             s.hasPaid = totalAccounts > 0;
             s.firstPaymentDate = payments[0]?.dateOfPayment || null;
-            s.lastPaymentDate =
-              payments[totalAccounts - 1]?.dateOfPayment || null;
+            s.lastPaymentDate = payments[totalAccounts - 1]?.dateOfPayment || null;
 
-            // Optional: date-wise accounts (if you need to show dates per subscription)
             s.dateWiseAccounts = payments.map(p => ({ date: p.dateOfPayment }));
 
             // Category based on totalAccounts
@@ -307,8 +304,9 @@ const getBdSheet = async (req, res) => {
           }
         }
 
-        // Registration info
-        if (s.BdSheet?.registration) s.registration = s.BdSheet.registration;
+        if (s.BdSheet?.registration) {
+          s.registration = s.BdSheet.registration;
+        }
         if (s.BdSheet) delete s.BdSheet.registration;
 
         return s;
