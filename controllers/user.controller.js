@@ -1153,6 +1153,7 @@ const getReferralPaymentStatus = async (req, res) => {
 
     const user = await model.User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
+
     if (!user.referralCode) {
       return ReS(
         res,
@@ -1161,13 +1162,14 @@ const getReferralPaymentStatus = async (req, res) => {
       );
     }
 
-    // 1️⃣ Call external Lambda to get referral payment status
+    // 1️⃣ External API call
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
     const apiResponse = await axios.get(apiUrl);
+
     let modifiedData = { ...apiResponse.data };
 
     const regUsers = Array.isArray(modifiedData.registered_users)
-      ? modifiedData.registered_users.map(u => ({ ...u }))
+      ? modifiedData.registered_users
       : [];
 
     if (regUsers.length === 0) {
@@ -1175,90 +1177,139 @@ const getReferralPaymentStatus = async (req, res) => {
       return ReS(res, { success: true, data: modifiedData }, 200);
     }
 
-    // 2️⃣ Fetch all RaiseQuery rows once
+    // 2️⃣ Fetch RaiseQuery once
     const raiseQueries = await model.RaiseQuery.findAll({
       attributes: ["queryStatus", "isQueryRaised", "phone_number", "email"],
       raw: true,
     });
 
-    // 3️⃣ Normalize registered users with query info
-    const updatedRegisteredUsers = regUsers.map(u => {
-      const cloned = { ...u, isDownloaded: true };
-
+    // 3️⃣ Normalize users + attach query info
+    const normalizedUsers = regUsers.map(u => {
       const rq = raiseQueries.find(
         r =>
-          (r.phone_number && u.phone_number && r.phone_number.trim() === u.phone_number.trim()) ||
-          (r.email && u.email && r.email.trim().toLowerCase() === u.email.trim().toLowerCase())
+          (r.phone_number && u.phone_number &&
+            r.phone_number.trim() === u.phone_number.trim()) ||
+          (r.email && u.email &&
+            r.email.trim().toLowerCase() === u.email.trim().toLowerCase())
       );
 
-      cloned.queryStatus = rq?.queryStatus || "";
-      cloned.isQueryRaised = rq ? rq.isQueryRaised : false;
-      return cloned;
+      return {
+        ...u,
+        isDownloaded: true,
+        queryStatus: rq?.queryStatus || "",
+        isQueryRaised: rq ? rq.isQueryRaised : false,
+      };
     });
 
-    // 🔥 Deduplicate by user_id
-    const seenUserIds = new Set();
-    const deduplicatedUsers = updatedRegisteredUsers.filter(u => {
-      if (seenUserIds.has(u.user_id)) return false;
-      seenUserIds.add(u.user_id);
-      return true;
+    // 4️⃣ Deduplicate API response → prefer has_paid === true
+    const userMap = new Map();
+
+    normalizedUsers.forEach(u => {
+      const existing = userMap.get(u.user_id);
+
+      if (!existing) {
+        userMap.set(u.user_id, u);
+      } else if (!existing.has_paid && u.has_paid) {
+        userMap.set(u.user_id, u);
+      }
     });
 
-    // 4️⃣ Fetch existing registeredUserIds for this user from FundsAudit
-    const existing = await model.FundsAudit.findAll({
+    const deduplicatedUsers = Array.from(userMap.values());
+
+    // 5️⃣ Fetch existing DB records
+    const existingRecords = await model.FundsAudit.findAll({
       where: { userId },
-      attributes: ["registeredUserId"],
+      attributes: ["registeredUserId", "hasPaid"],
       raw: true,
     });
-    const existingIds = new Set(existing.map(e => e.registeredUserId));
 
-    // 5️⃣ Filter out records that already exist in database
-    const newRows = deduplicatedUsers.filter(u => !existingIds.has(u.user_id));
+    const existingMap = new Map(
+      existingRecords.map(r => [r.registeredUserId, r])
+    );
 
-    // 6️⃣ Prepare rows to insert with default reviews
-    const rowsToInsert = newRows.map(u => ({
-      userId,
-      registeredUserId: u.user_id,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      phoneNumber: u.phone_number,
-      email: u.email,
-      dateOfPayment: u.date_of_payment ? new Date(u.date_of_payment) : null,
-      dateOfDownload: u.date_of_download ? new Date(u.date_of_download) : null,
-      hasPaid: u.has_paid,
-      isDownloaded: u.isDownloaded,
-      queryStatus: u.queryStatus || null,
-      isQueryRaised: u.isQueryRaised,
-      occupation: u.occupation || null,
-      managerReview: "Null",
-      userReview: "Null",
-    }));
+    const rowsToInsert = [];
+    const rowsToUpdate = [];
+
+    // 6️⃣ Decide INSERT vs UPDATE
+    deduplicatedUsers.forEach(u => {
+      const existing = existingMap.get(u.user_id);
+
+      if (!existing) {
+        rowsToInsert.push(u);
+      } else if (!existing.hasPaid && u.has_paid === true) {
+        rowsToUpdate.push(u);
+      }
+    });
 
     // 7️⃣ Insert new rows
     if (rowsToInsert.length > 0) {
-      await model.FundsAudit.bulkCreate(rowsToInsert);
+      await model.FundsAudit.bulkCreate(
+        rowsToInsert.map(u => ({
+          userId,
+          registeredUserId: u.user_id,
+          firstName: u.first_name,
+          lastName: u.last_name,
+          phoneNumber: u.phone_number,
+          email: u.email,
+          dateOfPayment: u.date_of_payment
+            ? new Date(u.date_of_payment)
+            : null,
+          dateOfDownload: u.date_of_download
+            ? new Date(u.date_of_download)
+            : null,
+          hasPaid: u.has_paid,
+          isDownloaded: u.isDownloaded,
+          queryStatus: u.queryStatus || null,
+          isQueryRaised: u.isQueryRaised,
+          occupation: u.occupation || null,
+          managerReview: "Null",
+          userReview: "Null",
+        }))
+      );
     }
 
-    // 8️⃣ Fetch actual review data from FundsAudit
+    // 8️⃣ Update existing rows when payment becomes true
+    for (const u of rowsToUpdate) {
+      await model.FundsAudit.update(
+        {
+          hasPaid: true,
+          dateOfPayment: u.date_of_payment
+            ? new Date(u.date_of_payment)
+            : new Date(),
+        },
+        {
+          where: {
+            userId,
+            registeredUserId: u.user_id,
+            hasPaid: false,
+          },
+        }
+      );
+    }
+
+    // 9️⃣ Fetch reviews
     const fundsAuditRecords = await model.FundsAudit.findAll({
-      where: { registeredUserId: deduplicatedUsers.map(u => u.user_id) },
+      where: {
+        registeredUserId: deduplicatedUsers.map(u => u.user_id),
+      },
       attributes: ["registeredUserId", "managerReview", "userReview"],
       raw: true,
     });
 
-    const reviewMap = new Map(fundsAuditRecords.map(r => [r.registeredUserId, r]));
+    const reviewMap = new Map(
+      fundsAuditRecords.map(r => [r.registeredUserId, r])
+    );
 
-    // Merge reviews into response
-    const finalRegisteredUsers = deduplicatedUsers.map(u => {
-      const record = reviewMap.get(u.user_id);
+    // 🔟 Merge reviews into response
+    modifiedData.registered_users = deduplicatedUsers.map(u => {
+      const review = reviewMap.get(u.user_id);
       return {
         ...u,
-        managerReview: record?.managerReview || "not completed",
-        userReview: record?.userReview || "not completed",
+        managerReview: review?.managerReview || "not completed",
+        userReview: review?.userReview || "not completed",
       };
     });
 
-    modifiedData.registered_users = finalRegisteredUsers;
     return ReS(res, { success: true, data: modifiedData }, 200);
 
   } catch (error) {
