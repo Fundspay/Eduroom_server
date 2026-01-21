@@ -616,7 +616,17 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 const getDashboardStats = async (req, res) => {
   try {
     const managerId = req.query.managerId;
-    const { startDate, endDate } = req.query;
+    let { startDate, endDate } = req.query;
+
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      startDate = firstDay.toISOString().split('T')[0]; // YYYY-MM-DD
+      endDate = lastDay.toISOString().split('T')[0];     // YYYY-MM-DD
+    }
 
     // ---------------------------
     // Manager Filter
@@ -710,11 +720,12 @@ const getDashboardStats = async (req, res) => {
 
     // ---------------------------
     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
+    // ✅ FIXED: COUNT TOTAL ENTRIES, NOT DISTINCT USERS
     // ---------------------------
     let userIds = [];
 
     if (teamManagerName) {
-      const statuses = await Status.findAll({
+      const statuses = await Statuses.findAll({
         where: { teamManager: teamManagerName },
         attributes: ["userId"],
       });
@@ -723,14 +734,16 @@ const getDashboardStats = async (req, res) => {
 
     let totalAccountsSheet = 0;
 
-    if (userIds.length && startDate && endDate) {
+    if (userIds.length > 0 && startDate && endDate) {
+      // Manager is selected
       const fromDate = new Date(startDate);
       const toDate = new Date(endDate);
-      toDate.setHours(23, 59, 59, 999); // ✅ FULL DAY FIX
+      toDate.setHours(23, 59, 59, 999);
 
+      // ✅ CHANGED: COUNT(*) instead of COUNT(DISTINCT "userId")
       const accountsResult = await FundsAudit.sequelize.query(
         `
-        SELECT COUNT(DISTINCT "userId") AS achieved_accounts
+        SELECT COUNT(*) AS achieved_accounts
         FROM "FundsAudits"
         WHERE "userId" IN (:userIds)
           AND "hasPaid" = true
@@ -747,10 +760,33 @@ const getDashboardStats = async (req, res) => {
       );
 
       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
+    } else if (!teamManagerName && startDate && endDate) {
+      // No manager selected - count all
+      const fromDate = new Date(startDate);
+      const toDate = new Date(endDate);
+      toDate.setHours(23, 59, 59, 999);
+
+      const accountsResult = await FundsAudit.sequelize.query(
+        `
+        SELECT COUNT(*) AS achieved_accounts
+        FROM "FundsAudits"
+        WHERE "hasPaid" = true
+          AND "dateOfPayment" BETWEEN :start AND :end
+        `,
+        {
+          replacements: {
+            start: fromDate,
+            end: toDate,
+          },
+          type: FundsAudit.sequelize.QueryTypes.SELECT,
+        }
+      );
+
+      totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
     }
 
     // ---------------------------
-    // FINAL RESPONSE (UNCHANGED)
+    // FINAL RESPONSE
     // ---------------------------
     return ReS(res, {
       bdTarget: {
@@ -777,7 +813,6 @@ const getDashboardStats = async (req, res) => {
 };
 
 module.exports.getDashboardStats = getDashboardStats;
-
 // HARD-CODED RANGES (not stored in DB)
 const RANGE_KEYS = ["1-10", "11-20", "21-30", "31-40", "41-50", "51-60", "61-70", "71-80", "81-90", "91-100","101-200","201-300","301-400","401-500","501-600","601+"];
 
