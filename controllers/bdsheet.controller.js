@@ -725,7 +725,7 @@ const getDashboardStats = async (req, res) => {
     let userIds = [];
 
     if (teamManagerName) {
-      const statuses = await Statuses.findAll({
+      const statuses = await Status.findAll({
         where: { teamManager: teamManagerName },
         attributes: ["userId"],
       });
