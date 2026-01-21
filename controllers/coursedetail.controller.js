@@ -1394,7 +1394,6 @@ module.exports.getBusinessTarget = getBusinessTarget;
 // };
 
 // module.exports.getBusinessUserTarget = getBusinessUserTarget;
-
 const getBusinessUserTarget = async (req, res) => {
   try {
     let { userId } = req.params;
@@ -1404,40 +1403,36 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
+    // ✅ Get achieved count from FundsAudits table (correct source)
+    const fundsCount = await FundsAudit.count({
+      where: {
+        userId: userId,
+        hasPaid: true
+      }
+    });
 
-    // Fetch achieved referral count
-    let achievedCount = 0;
+    // Optional: Still call API for reference/logging but don't use it
     if (user.referralCode) {
       try {
-        // Old API call commented out
-        // const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralCount?referral_code=${user.referralCode}`;
-        // const apiResponse = await axios.get(apiUrl);
-        // achievedCount = apiResponse.data?.referral_count?.count || 0;
-
-        // New API call
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
-
-        // Count only registered users who have paid
         const registeredUsers = apiResponse.data?.registered_users || [];
-        achievedCount = registeredUsers.filter(u => u.has_paid).length;
+        const apiCount = registeredUsers.filter(u => u.has_paid).length;
+        console.log(`API count: ${apiCount}, FundsAudit count: ${fundsCount}`);
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
     }
 
-    // Update wallet
+    // ✅ Use FundsAudits count as the source of truth
+    const subscriptionWallet = fundsCount;
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-    const subscriptionWallet = achievedCount; // already a number
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
+    // Update user
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
-
-    // Save wallet AND triggeredTargets at the same time
     await user.save();
-    console.log("User wallet and triggeredTargets saved.");
 
     return ReS(
       res,
@@ -1445,7 +1440,7 @@ const getBusinessUserTarget = async (req, res) => {
         success: true,
         data: {
           userId: user.id,
-          businessTarget,
+          businessTarget: subscriptionWallet,
           achievedCount: subscriptionWallet,
           totalDeducted: alreadyDeducted,
           subscriptionWallet,
@@ -1459,7 +1454,6 @@ const getBusinessUserTarget = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getBusinessUserTarget = getBusinessUserTarget;
 
 const getCourseStatus = async (req, res) => {
