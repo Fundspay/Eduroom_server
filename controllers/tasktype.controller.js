@@ -324,8 +324,11 @@ const bdInternsActiveProgress = async (managerId, date) => {
 /**
  * BD – ACCOUNTS
  */
+/**
+ * BD – ACCOUNTS
+ */
 const bdAccountsProgress = async (managerId, date) => {
-  console.log("[DEBUG] bdAccountsProgress called -> managerId:", managerId, "date:", date);
+  console.log(`[DEBUG] bdAccountsProgress called -> managerId: ${managerId}, date: ${date}`);
 
   // 1️⃣ Get target accounts
   const targetRow = await model.BdTarget.findOne({
@@ -334,42 +337,48 @@ const bdAccountsProgress = async (managerId, date) => {
   });
 
   const target = targetRow ? Number(targetRow.accounts) : 0;
-  console.log("[DEBUG] Target accounts:", target);
+  console.log(`[DEBUG] Target accounts: ${target}`);
 
-  // 2️⃣ Get all users under this manager via Status table
-  const statuses = await model.Status.findAll({
-    where: { teamManager: managerId }, // match dashboard logic
-    attributes: ["userId"],
-  });
+  // 2️⃣ Get manager name
+  const manager = await model.TeamManager.findByPk(managerId);
+  const managerName = manager ? manager.name : null;
 
-  const userIds = statuses.map(s => s.userId);
-  console.log("[DEBUG] Assigned users IDs via Status table:", userIds);
-
-  if (!userIds.length) {
-    console.log("[DEBUG] No users assigned to this manager.");
-    return { achieved: 0, target, progress: 0 };
+  // 3️⃣ Get all users under this manager (via Status table, by manager name)
+  let userIds = [];
+  if (managerName) {
+    const statuses = await model.Status.findAll({
+      where: { teamManager: managerName },
+      attributes: ["userId"],
+    });
+    userIds = statuses.map(s => s.userId);
   }
 
-  // 3️⃣ Calculate achieved via FundsAudit
-  const result = await model.FundsAudit.sequelize.query(
-    `
-    SELECT COUNT(*) AS achieved
-    FROM "FundsAudits"
-    WHERE "userId" IN (:userIds)
-      AND "hasPaid" = true
-      AND TO_CHAR("dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
-    `,
-    {
-      replacements: { userIds, date },
-      type: model.FundsAudit.sequelize.QueryTypes.SELECT,
-    }
-  );
+  console.log(`[DEBUG] Assigned users IDs via Status table: ${userIds.length > 0 ? userIds.join(", ") : "NONE"}`);
 
-  const achieved = parseInt(result[0]?.achieved || 0);
-  console.log("[DEBUG] Achieved accounts:", achieved);
+  // 4️⃣ Calculate achieved accounts
+  let achieved = 0;
+  if (userIds.length > 0) {
+    const result = await model.FundsAudit.sequelize.query(
+      `
+      SELECT COUNT(*) AS achieved
+      FROM "FundsAudits"
+      WHERE "userId" IN (:userIds)
+        AND "hasPaid" = true
+        AND TO_CHAR("dateOfPayment" AT TIME ZONE 'UTC', 'YYYY-MM-DD') = :date
+      `,
+      {
+        replacements: { userIds, date },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT,
+      }
+    );
+    achieved = parseInt(result[0]?.achieved || 0);
+  } else {
+    console.log("[DEBUG] No users assigned to this manager.");
+  }
 
+  // 5️⃣ Calculate progress
   const progress = target > 0 ? Math.round((achieved / target) * 100) : 0;
-  console.log("[DEBUG] Progress:", progress + "%");
+  console.log(`[DEBUG] Progress: ${progress}%`);
 
   return { achieved, target, progress };
 };
