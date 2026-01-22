@@ -9,7 +9,7 @@ model.InternshipStatus = require("../models/status.model.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const { User } = require("../models");
 const { sendMailEduroom } = require("../middleware/eduroommailer.middleware");
-const { sendMailEduroom } = require("../middleware/mailer.middleware.js");
+
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 
 
