@@ -1175,18 +1175,32 @@ const getTargetVsAchieved = async (req, res) => {
     console.debug("[DEBUG] Date range ->", { from, to });
 
     // -------------------- FETCH MANAGER --------------------
-    const manager = await TeamManager.findByPk(managerId);
+    const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
     const teamManagerName = manager.name;
     console.debug("[DEBUG] Manager found ->", teamManagerName);
 
     // -------------------- FETCH USERS UNDER MANAGER --------------------
-    const statuses = await Status.findAll({
-      where: { teamManager: teamManagerName },
-      attributes: ["userId"],
+    // ✅ UPDATED: Use StudentResume instead of Status table
+    const students = await model.StudentResume.findAll({
+      where: { alloted: teamManagerName },
+      attributes: ['mobileNumber'],
       raw: true,
     });
-    const userIds = statuses.map(s => s.userId);
+
+    const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
+    console.debug("[DEBUG] Students found:", students.length);
+    console.debug("[DEBUG] Valid phone numbers:", phoneNumbers.length);
+
+    let userIds = [];
+    if (phoneNumbers.length > 0) {
+      const users = await model.User.findAll({
+        where: { phoneNumber: phoneNumbers },
+        attributes: ['id'],
+        raw: true,
+      });
+      userIds = users.map(u => u.id);
+    }
     console.debug("[DEBUG] User IDs under manager:", userIds);
 
     if (!userIds.length) {
@@ -1199,7 +1213,7 @@ const getTargetVsAchieved = async (req, res) => {
     }
 
     // -------------------- FETCH FUNDS AUDIT --------------------
-    const funds = await FundsAudit.findAll({
+    const funds = await model.FundsAudit.findAll({
       where: {
         userId: userIds,
         hasPaid: true,
@@ -1236,7 +1250,7 @@ const getTargetVsAchieved = async (req, res) => {
     console.debug("[DEBUG] Day-wise achieved ->", dayWiseAchieved);
 
     // -------------------- FETCH TARGETS --------------------
-    const targets = await BdTarget.findAll({
+    const targets = await model.BdTarget.findAll({
       where: {
         teamManagerId: managerId,
         targetDate: { [Op.between]: [from, to] },
@@ -1303,7 +1317,6 @@ const getTargetVsAchieved = async (req, res) => {
 };
 
 module.exports.getTargetVsAchieved = getTargetVsAchieved;
-
 // const getTargetVsAchieved = async (req, res) => {
 //   try {
 //     const { managerId, from, to } = req.query;
