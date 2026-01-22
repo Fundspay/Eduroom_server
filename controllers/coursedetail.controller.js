@@ -9,6 +9,8 @@ model.InternshipStatus = require("../models/status.model.js");
 const { sendMail } = require("../middleware/mailer.middleware");
 const { User } = require("../models");
 const { sendMailEduroom } = require("../middleware/eduroommailer.middleware");
+const { sendMailEduroom } = require("../middleware/mailer.middleware.js");
+const { generateOfferLetter } = require("../utils/offerletter.service.js");
 
 
 
@@ -415,9 +417,9 @@ const evaluateSessionMCQ = async (req, res) => {
       return ReE(res, "userId and answers are required", 400);
     }
 
-    // ✅ Fetch user to check subscription wallet
+    // ✅ Fetch user to check subscription wallet AND email
     const user = await model.User.findByPk(userId, {
-      attributes: ['id', 'subscriptionWallet', 'subscriptiondeductedWallet']
+      attributes: ['id', 'firstName', 'lastName', 'fullName', 'email', 'subscriptionWallet']
     });
 
     if (!user) {
@@ -514,37 +516,92 @@ const evaluateSessionMCQ = async (req, res) => {
         });
 
         if (!existingOfferLetter) {
-          try {
-            // Call the offer letter endpoint internally
-       
-            const baseURL = 'https://eduroom.in';
-            
-            const offerResponse = await axios.post(
-              `${baseURL}/api/v1/offerletter/send/${userId}/${courseId}`,
-              {},
-              {
-                headers: {
-                  'Content-Type': 'application/json',
-                  // Add any auth headers if needed
-                }
-              }
-            );
-
-            offerLetterStatus = {
-              sent: true,
-              message: "Offer letter sent successfully",
-              walletBalance: user.subscriptionWallet,
-              data: offerResponse.data
-            };
-
-            console.log(`✅ Offer letter sent to user ${userId} for course ${courseId}. Wallet: ${newWalletBalance}`);
-          } catch (offerError) {
-            console.error("Error sending offer letter:", offerError.message);
+          // ✅ Check if user has email
+          if (!user.email) {
             offerLetterStatus = {
               sent: false,
-              message: "Failed to send offer letter",
-              error: offerError.message
+              message: "User has no email address"
             };
+          } else {
+            try {
+              // ✅ Fetch course details
+              const course = await model.Course.findByPk(courseId);
+              if (!course) {
+                throw new Error("Course not found");
+              }
+
+              // ✅ Generate offer letter PDF
+              const generatedLetter = await generateOfferLetter(userId, courseId);
+
+              // ✅ Create OfferLetter record in database
+              const offerLetter = await model.OfferLetter.create({
+                userId,
+                courseId,
+                position: course.name || "Intern",
+                startDate: new Date(),
+                location: "Work from Home",
+                fileUrl: generatedLetter.fileUrl,
+                issent: false,
+              });
+
+              // ✅ Build email content
+              const subject = `Your Internship Offer Letter - ${course.name} - Fundsroom InfoTech Pvt Ltd`;
+              const html = `
+                <p>Dear ${user.fullName || user.firstName},</p>
+                <p>Greetings from <b>Eduroom!</b></p>
+
+                <p>
+                  We are pleased to inform you that you have been selected for the
+                  <b>Live Project Internship</b> in <b>${course.name}</b>.
+                </p>
+
+                <h3>Live Project Details:</h3>
+                <p><b>Mode:</b> Online (Virtual)</p>
+                <p><b>Duration:</b> ${course.duration || "[Not Set]"} Days</p>
+                <p><b>Start Date:</b> Find in the Offer Letter</p>
+
+                <p>
+                  Please find your official <b>Offer Letter</b> here:
+                  <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
+                </p>
+
+                <p>For any queries, reach us at <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a></p>
+
+                <br/>
+                <p>Best Regards,<br/>Eduroom HR Team</p>
+              `;
+
+              // ✅ Send email using sendMailEduroom
+              const mailResult = await sendMailEduroom(user.email, subject, html);
+
+              if (mailResult.success) {
+                // ✅ Mark offer letter as sent
+                await offerLetter.update({ issent: true, updatedAt: new Date() });
+
+                offerLetterStatus = {
+                  sent: true,
+                  message: "Offer letter sent successfully",
+                  walletBalance: user.subscriptionWallet,
+                  fileUrl: offerLetter.fileUrl
+                };
+
+                console.log(`✅ Offer letter sent to user ${userId} (${user.email}) for course ${courseId}`);
+              } else {
+                offerLetterStatus = {
+                  sent: false,
+                  message: "Failed to send email",
+                  error: mailResult.error
+                };
+              }
+
+            } catch (offerError) {
+              console.error("Error generating/sending offer letter:", offerError.message);
+              offerLetterStatus = {
+                sent: false,
+                message: "Failed to generate or send offer letter",
+                error: offerError.message
+              };
+            }
           }
         } else {
           offerLetterStatus = {
@@ -585,7 +642,6 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
-
 // const getCaseStudyForSession = async (req, res) => {
 //   try {
 //     const { courseId, coursePreviewId, day, sessionNumber } = req.params;
