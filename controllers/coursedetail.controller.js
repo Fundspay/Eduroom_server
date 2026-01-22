@@ -415,6 +415,15 @@ const evaluateSessionMCQ = async (req, res) => {
       return ReE(res, "userId and answers are required", 400);
     }
 
+    // ✅ Fetch user to check subscription wallet
+    const user = await model.User.findByPk(userId, {
+      attributes: ['id', 'subscriptionWallet', 'offerLetterSent']
+    });
+
+    if (!user) {
+      return ReE(res, "User not found", 404);
+    }
+
     // Fetch session details with MCQs
     const sessionDetail = await model.CourseDetail.findOne({
       where: {
@@ -480,7 +489,7 @@ const evaluateSessionMCQ = async (req, res) => {
       correctMCQs: correctCount,
       totalMCQs: total,
       eligibleForCaseStudy: correctCount === total,
-      answers: results, // store the evaluated answers too
+      answers: results,
     };
 
     // Update DB
@@ -488,6 +497,58 @@ const evaluateSessionMCQ = async (req, res) => {
       { userProgress: progress },
       { where: { id: sessionDetail.id } }
     );
+
+    // ✅ CHECK: If all MCQs are correct AND subscription wallet has balance
+    let offerLetterStatus = null;
+    
+    if (correctCount === total) {
+      // Check if subscription wallet has balance (> 0)
+      if (user.subscriptionWallet && user.subscriptionWallet > 0) {
+        // Check if offer letter was already sent
+        if (!user.offerLetterSent) {
+          try {
+            // Call the offer letter endpoint internally
+            const baseURL =  'https://eduroom.in';
+            
+            const offerResponse = await axios.post(
+              `${baseURL}/api/v1/offerletter/send/${userId}/${courseId}`,
+              {},
+              {
+                headers: {
+                  'Content-Type': 'application/json',
+                  // Add any auth headers if needed
+                }
+              }
+            );
+
+            offerLetterStatus = {
+              sent: true,
+              message: "Offer letter sent successfully",
+              data: offerResponse.data
+            };
+
+            console.log(`✅ Offer letter sent to user ${userId} for course ${courseId}`);
+          } catch (offerError) {
+            console.error("Error sending offer letter:", offerError.message);
+            offerLetterStatus = {
+              sent: false,
+              message: "Failed to send offer letter",
+              error: offerError.message
+            };
+          }
+        } else {
+          offerLetterStatus = {
+            sent: false,
+            message: "Offer letter already sent to this user"
+          };
+        }
+      } else {
+        offerLetterStatus = {
+          sent: false,
+          message: "Subscription wallet is empty. Cannot send offer letter."
+        };
+      }
+    }
 
     return ReS(
       res,
@@ -503,6 +564,7 @@ const evaluateSessionMCQ = async (req, res) => {
           eligibleForCaseStudy: correctCount === total,
           results,
         },
+        offerLetter: offerLetterStatus, // Include offer letter status
       },
       200
     );
