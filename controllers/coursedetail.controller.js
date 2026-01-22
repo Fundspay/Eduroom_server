@@ -417,7 +417,7 @@ const evaluateSessionMCQ = async (req, res) => {
 
     // ✅ Fetch user to check subscription wallet
     const user = await model.User.findByPk(userId, {
-      attributes: ['id', 'subscriptionWallet', 'offerLetterSent']
+      attributes: ['id', 'subscriptionWallet', 'subscriptiondeductedWallet']
     });
 
     if (!user) {
@@ -504,11 +504,20 @@ const evaluateSessionMCQ = async (req, res) => {
     if (correctCount === total) {
       // Check if subscription wallet has balance (> 0)
       if (user.subscriptionWallet && user.subscriptionWallet > 0) {
-        // Check if offer letter was already sent
-        if (!user.offerLetterSent) {
+        
+        // ✅ CHECK: Has offer letter already been sent for THIS course?
+        const existingOfferLetter = await model.OfferLetter.findOne({
+          where: {
+            userId: userId,
+            courseId: courseId
+          }
+        });
+
+        if (!existingOfferLetter) {
           try {
             // Call the offer letter endpoint internally
-            const baseURL =  'https://eduroom.in';
+       
+            const baseURL = 'https://eduroom.in';
             
             const offerResponse = await axios.post(
               `${baseURL}/api/v1/offerletter/send/${userId}/${courseId}`,
@@ -524,10 +533,11 @@ const evaluateSessionMCQ = async (req, res) => {
             offerLetterStatus = {
               sent: true,
               message: "Offer letter sent successfully",
+              walletBalance: user.subscriptionWallet,
               data: offerResponse.data
             };
 
-            console.log(`✅ Offer letter sent to user ${userId} for course ${courseId}`);
+            console.log(`✅ Offer letter sent to user ${userId} for course ${courseId}. Wallet: ${newWalletBalance}`);
           } catch (offerError) {
             console.error("Error sending offer letter:", offerError.message);
             offerLetterStatus = {
@@ -539,7 +549,7 @@ const evaluateSessionMCQ = async (req, res) => {
         } else {
           offerLetterStatus = {
             sent: false,
-            message: "Offer letter already sent to this user"
+            message: "Offer letter already sent for this course"
           };
         }
       } else {
