@@ -3,7 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
-const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses } = require("../models");
+const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses,StudentResume  } = require("../models");
 
 
 
@@ -627,227 +627,10 @@ module.exports.getBdSheetByCategory = getBdSheetByCategory;
 
 
 
-// const getDashboardStats = async (req, res) => {
-//   try {
-//     const managerId = req.query.managerId;
-//     let { startDate, endDate } = req.query;
-
-//     // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED (FIXED)
-//     if (!startDate || !endDate) {
-//       const now = new Date();
-//       // Get first day of current month
-//       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-//       // Get last day of current month
-//       const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-
-//       // Format dates properly to get YYYY-MM-DD
-//       const formatDate = (date) => {
-//         const year = date.getFullYear();
-//         const month = String(date.getMonth() + 1).padStart(2, '0');
-//         const day = String(date.getDate()).padStart(2, '0');
-//         return `${year}-${month}-${day}`;
-//       };
-
-//       startDate = formatDate(firstDay);  // Will be "2026-01-01"
-//       endDate = formatDate(lastDay);      // Will be "2026-01-31"
-//     }
-
-//     // ---------------------------
-//     // Manager Filter
-//     // ---------------------------
-//     let teamManagerName = null;
-
-//     if (managerId) {
-//       const manager = await TeamManager.findByPk(managerId);
-//       if (!manager) return ReE(res, "Team Manager not found", 404);
-//       teamManagerName = manager.name;
-//     }
-
-//     // ---------------------------
-//     // DATE FILTER (BdTarget)
-//     // ---------------------------
-//     let targetDateFilter = {};
-//     if (startDate && endDate) {
-//       targetDateFilter = {
-//         [Op.and]: [
-//           Sequelize.where(
-//             Sequelize.fn("DATE", Sequelize.col("targetDate")),
-//             ">=",
-//             startDate
-//           ),
-//           Sequelize.where(
-//             Sequelize.fn("DATE", Sequelize.col("targetDate")),
-//             "<=",
-//             endDate
-//           ),
-//         ],
-//       };
-//     }
-
-//     // ---------------------------
-//     // 1️⃣ BdTarget (TARGET DATA)
-//     // ---------------------------
-//     const bdTargetData = await BdTarget.findAll({
-//       where: {
-//         ...(teamManagerName ? { teamManagerId: managerId } : {}),
-//         ...(startDate && endDate ? targetDateFilter : {}),
-//       },
-//       attributes: ["internsAllocated", "internsActive", "accounts"],
-//     });
-
-//     let totalInternsAllocated = 0;
-//     let totalInternsActive = 0;
-//     let totalAccountsTarget = 0;
-
-//     bdTargetData.forEach((row) => {
-//       totalInternsAllocated += Number(row.internsAllocated) || 0;
-//       totalInternsActive += Number(row.internsActive) || 0;
-//       totalAccountsTarget += Number(row.accounts) || 0;
-//     });
-
-//     // ---------------------------
-//     // DATE FILTER (BdSheet)
-//     // ---------------------------
-//     let sheetDateFilter = {};
-//     if (startDate && endDate) {
-//       sheetDateFilter = {
-//         [Op.and]: [
-//           Sequelize.where(
-//             Sequelize.fn("DATE", Sequelize.col("startDate")),
-//             ">=",
-//             startDate
-//           ),
-//           Sequelize.where(
-//             Sequelize.fn("DATE", Sequelize.col("startDate")),
-//             "<=",
-//             endDate
-//           ),
-//         ],
-//       };
-//     }
-
-//     // ---------------------------
-//     // 2️⃣ BdSheet (INTERNS DATA)
-//     // ---------------------------
-//     const bdSheetData = await BdSheet.findAll({
-//       where: {
-//         ...(teamManagerName ? { teamManagerId: managerId } : {}),
-//         ...(startDate && endDate ? sheetDateFilter : {}),
-//       },
-//       attributes: ["activeStatus"],
-//     });
-
-//     const totalInterns = bdSheetData.length;
-//     const totalActiveInterns = bdSheetData.filter(
-//       row => row.activeStatus?.toLowerCase() === "active"
-//     ).length;
-
-//     // ---------------------------
-//     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
-//     // ✅ FIXED: COUNT TOTAL ENTRIES, NOT DISTINCT USERS
-//     // ---------------------------
-//     let userIds = [];
-
-//     if (teamManagerName) {
-//       const statuses = await Status.findAll({
-//         where: { teamManager: teamManagerName },
-//         attributes: ["userId"],
-//       });
-//       userIds = statuses.map(s => s.userId);
-//     }
-
-//     let totalAccountsSheet = 0;
-
-//     if (userIds.length > 0 && startDate && endDate) {
-//       // Manager is selected
-//       const fromDate = new Date(startDate);
-//       const toDate = new Date(endDate);
-//       toDate.setHours(23, 59, 59, 999);
-
-//       // ✅ CHANGED: COUNT(*) instead of COUNT(DISTINCT "userId")
-//       const accountsResult = await FundsAudit.sequelize.query(
-//         `
-//         SELECT COUNT(*) AS achieved_accounts
-//         FROM "FundsAudits"
-//         WHERE "userId" IN (:userIds)
-//           AND "hasPaid" = true
-//           AND "dateOfPayment" BETWEEN :start AND :end
-//         `,
-//         {
-//           replacements: {
-//             userIds,
-//             start: fromDate,
-//             end: toDate,
-//           },
-//           type: FundsAudit.sequelize.QueryTypes.SELECT,
-//         }
-//       );
-
-//       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-//     } else if (!teamManagerName && startDate && endDate) {
-//       // No manager selected - count all
-//       const fromDate = new Date(startDate);
-//       const toDate = new Date(endDate);
-//       toDate.setHours(23, 59, 59, 999);
-
-//       const accountsResult = await FundsAudit.sequelize.query(
-//         `
-//         SELECT COUNT(*) AS achieved_accounts
-//         FROM "FundsAudits"
-//         WHERE "hasPaid" = true
-//           AND "dateOfPayment" BETWEEN :start AND :end
-//         `,
-//         {
-//           replacements: {
-//             start: fromDate,
-//             end: toDate,
-//           },
-//           type: FundsAudit.sequelize.QueryTypes.SELECT,
-//         }
-//       );
-
-//       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-//     }
-
-//     // ---------------------------
-//     // FINAL RESPONSE
-//     // ---------------------------
-//     return ReS(res, {
-//       bdTarget: {
-//         totalInternsAllocated,
-//         totalInternsActive,
-//         totalAccounts: totalAccountsTarget,
-//       },
-//       bdSheet: {
-//         totalInterns,
-//         totalAccounts: totalAccountsSheet,
-//         totalActiveInterns,
-//       },
-//       appliedFilters: {
-//         managerId: managerId || "ALL",
-//         startDate,
-//         endDate,
-//       },
-//     });
-
-//   } catch (err) {
-//     console.error("Dashboard Stats Error:", err);
-//     return ReE(res, err.message, 500);
-//   }
-// };
-
-// module.exports.getDashboardStats = getDashboardStats;
-
 const getDashboardStats = async (req, res) => {
   try {
     const managerId = req.query.managerId;
     let { startDate, endDate } = req.query;
-
-    console.log("=== INCOMING REQUEST ===");
-    console.log("Raw query params:", req.query);
-    console.log("Manager ID (raw):", managerId);
-    console.log("Start Date (raw):", startDate);
-    console.log("End Date (raw):", endDate);
 
     // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED (FIXED)
     if (!startDate || !endDate) {
@@ -865,15 +648,9 @@ const getDashboardStats = async (req, res) => {
         return `${year}-${month}-${day}`;
       };
 
-      startDate = formatDate(firstDay);
-      endDate = formatDate(lastDay);
-      
-      console.log("⚠️ No dates provided - using current month defaults");
+      startDate = formatDate(firstDay);  // Will be "2026-01-01"
+      endDate = formatDate(lastDay);      // Will be "2026-01-31"
     }
-
-    console.log("=== FINAL DATE RANGE ===");
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
 
     // ---------------------------
     // Manager Filter
@@ -884,9 +661,6 @@ const getDashboardStats = async (req, res) => {
       const manager = await TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
       teamManagerName = manager.name;
-      console.log("Team Manager found:", teamManagerName);
-    } else {
-      console.log("No manager filter - querying ALL managers");
     }
 
     // ---------------------------
@@ -931,8 +705,6 @@ const getDashboardStats = async (req, res) => {
       totalAccountsTarget += Number(row.accounts) || 0;
     });
 
-    console.log("BdTarget results:", { totalInternsAllocated, totalInternsActive, totalAccountsTarget });
-
     // ---------------------------
     // DATE FILTER (BdSheet)
     // ---------------------------
@@ -970,37 +742,18 @@ const getDashboardStats = async (req, res) => {
       row => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-    console.log("BdSheet results:", { totalInterns, totalActiveInterns });
-
     // ---------------------------
     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
-    // ✅ FIXED: USE StudentResumes INSTEAD OF Status TABLE
+    // ✅ FIXED: COUNT TOTAL ENTRIES, NOT DISTINCT USERS
     // ---------------------------
     let userIds = [];
 
     if (teamManagerName) {
-      // ✅ NEW APPROACH: Get userIds from StudentResumes
-      const students = await StudentResume.findAll({
-        where: { alloted: teamManagerName },
-        attributes: ['mobileNumber'],
+      const statuses = await Status.findAll({
+        where: { teamManager: teamManagerName },
+        attributes: ["userId"],
       });
-
-      const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
-      
-      console.log("=== STUDENT LOOKUP ===");
-      console.log("Students found for", teamManagerName, ":", students.length);
-      console.log("Valid phone numbers:", phoneNumbers.length);
-      
-      if (phoneNumbers.length > 0) {
-        const users = await User.findAll({
-          where: { phoneNumber: phoneNumbers },
-          attributes: ['id'],
-        });
-        
-        userIds = users.map(u => u.id);
-        console.log("Users matched:", userIds.length);
-        console.log("User IDs:", userIds);
-      }
+      userIds = statuses.map(s => s.userId);
     }
 
     let totalAccountsSheet = 0;
@@ -1011,10 +764,7 @@ const getDashboardStats = async (req, res) => {
       const toDate = new Date(endDate);
       toDate.setHours(23, 59, 59, 999);
 
-      console.log("=== FUNDSAUDIT QUERY ===");
-      console.log("Querying with userIds:", userIds);
-      console.log("Date range (JS):", fromDate.toISOString(), "to", toDate.toISOString());
-
+      // ✅ CHANGED: COUNT(*) instead of COUNT(DISTINCT "userId")
       const accountsResult = await FundsAudit.sequelize.query(
         `
         SELECT COUNT(*) AS achieved_accounts
@@ -1034,17 +784,11 @@ const getDashboardStats = async (req, res) => {
       );
 
       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-      
-      console.log("=== QUERY RESULT ===");
-      console.log("Total Achieved Accounts:", totalAccountsSheet);
     } else if (!teamManagerName && startDate && endDate) {
       // No manager selected - count all
       const fromDate = new Date(startDate);
       const toDate = new Date(endDate);
       toDate.setHours(23, 59, 59, 999);
-
-      console.log("=== FUNDSAUDIT QUERY (ALL MANAGERS) ===");
-      console.log("Date range:", fromDate.toISOString(), "to", toDate.toISOString());
 
       const accountsResult = await FundsAudit.sequelize.query(
         `
@@ -1063,17 +807,7 @@ const getDashboardStats = async (req, res) => {
       );
 
       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-      console.log("Total Achieved Accounts (all):", totalAccountsSheet);
-    } else {
-      console.log("⚠️ Skipping FundsAudit query - missing userIds or dates");
     }
-
-    console.log("=== FINAL RESPONSE ===");
-    console.log({
-      bdTarget: { totalInternsAllocated, totalInternsActive, totalAccountsTarget },
-      bdSheet: { totalInterns, totalAccounts: totalAccountsSheet, totalActiveInterns },
-      appliedFilters: { managerId: managerId || "ALL", startDate, endDate }
-    });
 
     // ---------------------------
     // FINAL RESPONSE
