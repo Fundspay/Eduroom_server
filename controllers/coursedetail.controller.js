@@ -1403,39 +1403,36 @@ const getBusinessUserTarget = async (req, res) => {
     const user = await User.findByPk(userId);
     if (!user) return ReE(res, "User not found", 404);
 
-    // ✅ Get achieved count from FundsAudits table
-    const fundsCount = await FundsAudit.count({
-      where: {
-        userId: userId,
-        hasPaid: true
-      }
-    });
+    // Store the old value as businessTarget (before updating)
+    const businessTarget = parseInt(user.subscriptionWallet, 10) || 0;
 
-    // Optional: Call referral API for logging/comparison (doesn't overwrite DB)
+    // Fetch achieved referral count from API
+    let achievedCount = 0;
     if (user.referralCode) {
       try {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
+
+        // Count only registered users who have paid
         const registeredUsers = apiResponse.data?.registered_users || [];
-        const apiCount = registeredUsers.filter(u => u.has_paid).length;
-        console.log(`Referral API count: ${apiCount}, FundsAudit count: ${fundsCount}`);
+        achievedCount = registeredUsers.filter(u => u.has_paid).length;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
     }
 
-    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
-    const subscriptionLeft = Math.max(fundsCount - alreadyDeducted, 0);
+    // Update subscriptionWallet with current paid count
+    user.subscriptionWallet = achievedCount;
 
-    // ✅ Only update DB if subscriptionWallet differs from calculated fundsCount
-    if (user.subscriptionWallet !== fundsCount) {
-      user.subscriptionWallet = fundsCount;
-      user.subscriptionLeft = subscriptionLeft;
-      await user.save();
-      console.log(`Updated subscriptionWallet from DB value to latest FundsAudit count.`);
-    } else {
-      console.log(`DB subscriptionWallet is already correct, no update needed.`);
-    }
+    // Calculate remaining subscription
+    const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
+    const subscriptionLeft = Math.max(achievedCount - alreadyDeducted, 0);
+    
+    user.subscriptionLeft = subscriptionLeft;
+
+    // Save to database
+    await user.save();
+    console.log("User wallet updated:", { subscriptionWallet: achievedCount, subscriptionLeft });
 
     return ReS(
       res,
@@ -1443,10 +1440,10 @@ const getBusinessUserTarget = async (req, res) => {
         success: true,
         data: {
           userId: user.id,
-          businessTarget: user.subscriptionWallet, // current DB value
-          achievedCount: fundsCount,               // latest FundsAudit count
+          businessTarget,
+          achievedCount,
+          subscriptionWallet: achievedCount,
           totalDeducted: alreadyDeducted,
-          subscriptionWallet: user.subscriptionWallet,
           subscriptionLeft,
         },
       },
