@@ -1494,9 +1494,8 @@ const getBdTlLeaderboard = async (req, res) => {
     if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
     // Adjust dates: make 'to' cover the full day
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
-    toDate.setHours(23, 59, 59, 999); // include full day
+    const fromDate = new Date(from + "T00:00:00Z");
+    const toDate = new Date(to + "T23:59:59Z");
 
     const leaderboardData = [];
 
@@ -1525,32 +1524,45 @@ const getBdTlLeaderboard = async (req, res) => {
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // ✅ FIXED: Achieved accounts using total payments (not distinct users)
-      const statuses = await Status.findAll({
-        where: { teamManager: manager.name },
-        attributes: ["userId"],
+      // ✅ UPDATED: Use StudentResume instead of Status table
+      const students = await StudentResume.findAll({
+        where: { alloted: manager.name },
+        attributes: ['mobileNumber'],
+        raw: true,
       });
 
-      const userIds = statuses.map(s => s.userId);
+      const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
+
       let achievedAccounts = 0;
 
-      if (userIds.length) {
-        // ✅ CHANGED: COUNT(*) instead of COUNT(DISTINCT "userId")
-        const accountsResult = await FundsAudit.sequelize.query(
-          `
-          SELECT COUNT(*) AS total_payments
-          FROM "FundsAudits"
-          WHERE "userId" IN (:userIds)
-            AND "hasPaid" = true
-            AND "dateOfPayment" BETWEEN :from AND :to
-          `,
-          {
-            replacements: { userIds, from: fromDate, to: toDate },
-            type: FundsAudit.sequelize.QueryTypes.SELECT,
-          }
-        );
+      if (phoneNumbers.length > 0) {
+        // Get user IDs from phone numbers
+        const users = await User.findAll({
+          where: { phoneNumber: phoneNumbers },
+          attributes: ['id'],
+          raw: true,
+        });
 
-        achievedAccounts = parseInt(accountsResult[0]?.total_payments || 0);
+        const userIds = users.map(u => u.id);
+
+        if (userIds.length > 0) {
+          // ✅ COUNT total payments (not distinct users)
+          const accountsResult = await FundsAudit.sequelize.query(
+            `
+            SELECT COUNT(*) AS total_payments
+            FROM "FundsAudits"
+            WHERE "userId" IN (:userIds)
+              AND "hasPaid" = true
+              AND "dateOfPayment" BETWEEN :from AND :to
+            `,
+            {
+              replacements: { userIds, from: fromDate, to: toDate },
+              type: FundsAudit.sequelize.QueryTypes.SELECT,
+            }
+          );
+
+          achievedAccounts = parseInt(accountsResult[0]?.total_payments || 0);
+        }
       }
 
       // ---------------------------
@@ -1617,7 +1629,6 @@ const getBdTlLeaderboard = async (req, res) => {
 };
 
 module.exports.getBdTlLeaderboard = getBdTlLeaderboard;
-
 // const getBdTlLeaderboard = async (req, res) => {
 //   try {
 //     const { from, to } = req.query;
