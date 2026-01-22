@@ -10,6 +10,7 @@ router.post("/send-report/:userId/:courseId", offerletterController.sendInternsh
 router.get("/users/all", offerletterController.listAllUsers);
 router.post("/certificate/send/:userId", offerletterController.sendCertificate);
 router.post("/send-offer-letters", offerletterController.autoSendOfferLetters);
+router.get("/all", offerletterController.listAllOfferLetters);
 
 module.exports = router;
 

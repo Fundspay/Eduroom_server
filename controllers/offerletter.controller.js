@@ -934,3 +934,24 @@ const autoSendOfferLetters = async (attachPDF = true) => {
   }
 };
 module.exports.autoSendOfferLetters = autoSendOfferLetters;
+
+const listAllOfferLetters = async (req, res) => {
+  try {
+    // Fetch all offer letters
+    const offerLetters = await OfferLetter.findAll({
+      order: [['createdAt', 'DESC']]
+    });
+
+    return ReS(res, {
+      success: true,
+      total: offerLetters.length,
+      offerLetters: offerLetters
+    }, 200);
+
+  } catch (err) {
+    console.error("Error in listAllOfferLetters:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.listAllOfferLetters = listAllOfferLetters;
