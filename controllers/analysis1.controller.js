@@ -61,7 +61,7 @@ var extractAndStoreCourseDates = async function (req, res) {
             work_status: "Not Completed",
             comment: ""
           },
-          { where: { user_id: userId, day_no: 1 } }
+          { where: { user_id: userId } }
         );
       } else {
         // INSERT for new user
