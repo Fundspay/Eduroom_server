@@ -50,6 +50,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           title,
           description,
           youtubeLink,
+          driveLink, // ✅ added driveLink
           duration,
           sessionDuration,
           heading,
@@ -79,6 +80,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               title,
               description: description ?? null,
               youtubeLink: youtubeLink ?? null,
+              driveLink: driveLink ?? null, // ✅ store per session
               duration,
               sessionDuration,
               heading,
@@ -91,6 +93,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               title,
               description: description ?? null,
               youtubeLink: youtubeLink ?? null,
+              driveLink: driveLink ?? null, // ✅ update per session
               duration,
               sessionDuration,
               minBusinessTarget,
@@ -126,7 +129,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                   answer: q.answer,
                   keywords: q.keywords ?? null,
                   caseStudy: q.caseStudy ?? null,
-                  questionNumber: index + 1, // explicit question number
+                  questionNumber: index + 1,
                 },
                 { transaction }
               );
@@ -149,7 +152,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                   answer: q.answer,
                   keywords: q.keywords ?? null,
                   caseStudy: q.caseStudy ?? null,
-                  questionNumber: index + 1, // explicit question number
+                  questionNumber: index + 1,
                 },
                 { transaction }
               );
@@ -175,6 +178,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
           title,
           description: description ?? null,
           youtubeLink: youtubeLink ?? null,
+          driveLink: driveLink ?? null, // ✅ include in response
           duration,
           sessionDuration,
           minBusinessTarget,
@@ -278,6 +282,7 @@ var fetchCourseDetailsByPreview = async (req, res) => {
         "day",
         "sessionNumber",
         "minBusinessTarget",
+        "driveLink", // ✅ added here after minBusinessTarget
         "title",
         "heading",
         "description",
@@ -323,7 +328,9 @@ var fetchCourseDetailsByPreview = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
+
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
+
 
 // ✅ Fetch CourseDetails by coursePreviewId, day, and sessionNumber (GET request)
 var fetchCourseDetailsByDayAndSession = async (req, res) => {
@@ -340,7 +347,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
     if (!coursePreview || coursePreview.isDeleted)
       return ReE(res, "Course Preview not found", 404);
 
-    // Fetch all course details like existing API
+    // Fetch all course details
     const courseDetails = await model.CourseDetail.findAll({
       where: { coursePreviewId, isDeleted: false },
       order: [
@@ -358,6 +365,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
         "duration",
         "sessionDuration",
         "minBusinessTarget",
+        "driveLink", // ✅ added here after minBusinessTarget
         "createdAt",
         "updatedAt",
       ],

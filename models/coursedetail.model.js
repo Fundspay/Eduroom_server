@@ -17,6 +17,7 @@ module.exports = (sequelize, Sequelize) => {
             heading: { type: Sequelize.TEXT, allowNull: true },
             youtubeLink: { type: Sequelize.TEXT, allowNull: true },
             minBusinessTarget:  { type: Sequelize.INTEGER, allowNull: true },
+            driveLink: { type: Sequelize.TEXT, allowNull: true },
             userProgress: { 
                 type: Sequelize.JSON, // e.g., { "eligibleForCaseStudy": true }
                 allowNull: true,
