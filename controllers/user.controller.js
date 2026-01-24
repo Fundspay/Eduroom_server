@@ -1241,7 +1241,7 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     });
 
-    // 7️⃣ Insert new rows
+    // 7️⃣ Insert new rows (occupation stays as is from API)
     if (rowsToInsert.length > 0) {
       await model.FundsAudit.bulkCreate(
         rowsToInsert.map(u => ({
@@ -1261,7 +1261,7 @@ const getReferralPaymentStatus = async (req, res) => {
           isDownloaded: u.isDownloaded,
           queryStatus: u.queryStatus || null,
           isQueryRaised: u.isQueryRaised,
-          occupation: u.occupation || null,
+          occupation: u.occupation || null, // Keep original occupation in DB
           managerReview: "Null",
           userReview: "Null",
         }))
@@ -1300,11 +1300,13 @@ const getReferralPaymentStatus = async (req, res) => {
       fundsAuditRecords.map(r => [r.registeredUserId, r])
     );
 
-    // 🔟 Merge reviews into response
+    // 🔟 Merge reviews into response + RENAME occupation to utr with order_id value
     modifiedData.registered_users = deduplicatedUsers.map(u => {
       const review = reviewMap.get(u.user_id);
+      const { occupation, ...rest } = u; // Remove occupation field
       return {
-        ...u,
+        ...rest,
+        utr: u.order_id || null, // 👈 Rename to utr and show order_id value
         managerReview: review?.managerReview || "not completed",
         userReview: review?.userReview || "not completed",
       };
