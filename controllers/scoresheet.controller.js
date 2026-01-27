@@ -34,23 +34,18 @@ var upsertScoreSheet = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 🔹 DATE SET 1 → remaining days from TODAY
-        let daysremaining = null;
+        // 🔹 DATE SET 1 → remaining days from TODAY (no minus)
+        let daysremaining = 0;
         if (enddate) {
             const end = new Date(enddate);
             end.setHours(0, 0, 0, 0);
             const diffTime = end.getTime() - today.getTime();
-            daysremaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            daysremaining = diffDays > 0 ? diffDays : 0;
         }
 
-        // 🔹 DATE SET 2 → remaining days from TODAY
-        let daysremaining1 = null;
-        if (enddate1) {
-            const end1 = new Date(enddate1);
-            end1.setHours(0, 0, 0, 0);
-            const diffTime = end1.getTime() - today.getTime();
-            daysremaining1 = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        }
+        // 🔹 DATE SET 2 → force NULL for now
+        const daysremaining1 = null;
 
         let scoreSheet;
 
@@ -75,8 +70,8 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 || null,
-                enddate1: enddate1 || null,
+                startdate1: null,
+                enddate1: null,
                 daysremaining1,
             });
         } else {
@@ -96,8 +91,8 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 || null,
-                enddate1: enddate1 || null,
+                startdate1: null,
+                enddate1: null,
                 daysremaining1,
             });
         }
