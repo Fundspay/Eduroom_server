@@ -12,43 +12,52 @@ var upsertScoreSheet = async (req, res) => {
         portfoliolink,
         videolink,
         comment,
-        manager,      // manager ID
-        managerName,  // manager NAME (plain text)
+        manager,      
+        managerName,  
         score1,
         score2,
         score3,
         startdate,
         enddate,
+        startdate1,
+        enddate1,
     } = req.body;
 
     try {
-        // 🔹 Auto calculate average total score (divided by 3)
         const totalScore = Math.round(
             ((score1 ?? 0) +
              (score2 ?? 0) +
              (score3 ?? 0)) / 3
         );
 
-        // 🔹 Calculate days remaining
+        // 🔹 TODAY date
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // 🔹 DATE SET 1 → remaining days from TODAY
         let daysremaining = null;
-        if (startdate && enddate) {
-            const start = new Date(startdate);
+        if (enddate) {
             const end = new Date(enddate);
-            const diffTime = end.getTime() - start.getTime();
+            end.setHours(0, 0, 0, 0);
+            const diffTime = end.getTime() - today.getTime();
             daysremaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        // 🔹 DATE SET 2 → remaining days from TODAY
+        let daysremaining1 = null;
+        if (enddate1) {
+            const end1 = new Date(enddate1);
+            end1.setHours(0, 0, 0, 0);
+            const diffTime = end1.getTime() - today.getTime();
+            daysremaining1 = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
         }
 
         let scoreSheet;
 
         if (id) {
-            // 🔹 Update existing record
-            scoreSheet = await model.ScoreSheet.findOne({
-                where: { id },
-            });
+            scoreSheet = await model.ScoreSheet.findOne({ where: { id } });
 
-            if (!scoreSheet) {
-                return ReE(res, "ScoreSheet not found", 404);
-            }
+            if (!scoreSheet) return ReE(res, "ScoreSheet not found", 404);
 
             await scoreSheet.update({
                 session: session || null,
@@ -57,18 +66,20 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,           // ID only
-                managerName: managerName || null,   // text only
+                manager: manager || null,
+                managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
                 startdate: startdate || null,
                 enddate: enddate || null,
-                daysremaining: daysremaining,
+                daysremaining,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1,
             });
         } else {
-            // 🔹 Create new record
             scoreSheet = await model.ScoreSheet.create({
                 session: session || null,
                 department: department || null,
@@ -76,15 +87,18 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,           // ID only
-                managerName: managerName || null,   // text only
+                manager: manager || null,
+                managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
                 startdate: startdate || null,
                 enddate: enddate || null,
-                daysremaining: daysremaining,
+                daysremaining,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1,
             });
         }
 
