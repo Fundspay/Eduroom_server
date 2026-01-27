@@ -34,14 +34,18 @@ var upsertScoreSheet = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 🔹 DATE SET 1 → remaining days from TODAY (no minus)
+        // 🔹 DATE SET 1 → remaining days from TODAY (safe, never negative)
         let daysremaining = 0;
         if (enddate) {
             const end = new Date(enddate);
-            end.setHours(0, 0, 0, 0);
-            const diffTime = end.getTime() - today.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            daysremaining = diffDays > 0 ? diffDays : 0;
+            if (!isNaN(end.getTime())) {
+                end.setHours(0, 0, 0, 0);
+                const diffTime = end.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                daysremaining = diffDays > 0 ? diffDays : 0;
+            } else {
+                daysremaining = 0;
+            }
         }
 
         let scoreSheet;
@@ -114,7 +118,16 @@ var getScoreSheet = async (req, res) => {
 
         const scoreSheets = await model.ScoreSheet.findAll({
             where: whereCondition,
+            raw: true,
         });
+
+        // 🔹 Force missing fields for frontend
+        const formatted = scoreSheets.map(s => ({
+            ...s,
+            startdate1: s.startdate1 ?? null,
+            enddate1: s.enddate1 ?? null,
+            daysremaining1: s.daysremaining1 ?? null,
+        }));
 
         const managers = await model.TeamManager.findAll({
             attributes: ["id", "name", "email", "mobileNumber"],
@@ -124,7 +137,7 @@ var getScoreSheet = async (req, res) => {
         return ReS(
             res,
             {
-                scoresheets: scoreSheets || [],
+                scoresheets: formatted || [],
                 managers: managers || [],
             },
             200
