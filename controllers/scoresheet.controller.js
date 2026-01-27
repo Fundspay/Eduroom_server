@@ -17,6 +17,8 @@ var upsertScoreSheet = async (req, res) => {
         score1,
         score2,
         score3,
+        startdate,
+        enddate,
     } = req.body;
 
     try {
@@ -26,6 +28,15 @@ var upsertScoreSheet = async (req, res) => {
              (score2 ?? 0) +
              (score3 ?? 0)) / 3
         );
+
+        // 🔹 Calculate days remaining
+        let daysremaining = null;
+        if (startdate && enddate) {
+            const start = new Date(startdate);
+            const end = new Date(enddate);
+            const diffTime = end.getTime() - start.getTime();
+            daysremaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
 
         let scoreSheet;
 
@@ -52,6 +63,9 @@ var upsertScoreSheet = async (req, res) => {
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
+                startdate: startdate || null,
+                enddate: enddate || null,
+                daysremaining: daysremaining,
             });
         } else {
             // 🔹 Create new record
@@ -68,6 +82,9 @@ var upsertScoreSheet = async (req, res) => {
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
+                startdate: startdate || null,
+                enddate: enddate || null,
+                daysremaining: daysremaining,
             });
         }
 
@@ -112,4 +129,3 @@ var getScoreSheet = async (req, res) => {
 };
 
 module.exports.getScoreSheet = getScoreSheet;
-
