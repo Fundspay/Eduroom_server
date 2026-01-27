@@ -7,4 +7,7 @@ router.post("/add", scoresheetController.upsertScoreSheet);
 
 router.get("/list/:managerid", scoresheetController.getScoreSheet);
 
+router.get("/scoresheet/stats/:managerid", scoresheetController.getUserSessionStats);
+
+
 module.exports = router;

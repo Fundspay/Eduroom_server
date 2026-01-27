@@ -148,3 +148,51 @@ var getScoreSheet = async (req, res) => {
 };
 
 module.exports.getScoreSheet = getScoreSheet;
+
+
+
+// 🔹 SESSION STATS BY MANAGER
+var getUserSessionStats = async (req, res) => {
+    try {
+        const { managerid } = req.params;
+
+        if (!managerid) return ReE(res, "managerid is required", 400);
+
+        const sessions = await model.ScoreSheet.findAll({
+            where: { manager: managerid },
+            attributes: ["totalscore"],
+            raw: true,
+        });
+
+        const totalSessions = sessions.length;
+
+        let achievedSessions = 0;
+        let scoreSum = 0;
+
+        sessions.forEach(s => {
+            const score = Number(s.totalscore) || 0;
+            scoreSum += score;
+
+            if (score >= 7) {
+                achievedSessions++;
+            }
+        });
+
+        const overallScore =
+            totalSessions > 0
+                ? Math.round((scoreSum / totalSessions) * 100) / 100
+                : 0;
+
+        return ReS(res, {
+            managerid,
+            totalSessions,
+            achievedSessions,
+            overallScore,
+        }, 200);
+
+    } catch (error) {
+        return ReE(res, error.message, 422);
+    }
+};
+
+module.exports.getUserSessionStats = getUserSessionStats;
