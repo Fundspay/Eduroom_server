@@ -23,6 +23,11 @@ module.exports = (sequelize, Sequelize) => {
       score3: { type: Sequelize.INTEGER, allowNull: true },
       totalscore: { type: Sequelize.INTEGER, allowNull: true },
 
+      // 🔹 NEW COLUMNS
+      startdate: { type: Sequelize.DATEONLY, allowNull: true },
+      enddate: { type: Sequelize.DATEONLY, allowNull: true },
+      daysremaining: { type: Sequelize.INTEGER, allowNull: true },
+
       createdAt: {
         type: Sequelize.DATE,
         allowNull: false,
