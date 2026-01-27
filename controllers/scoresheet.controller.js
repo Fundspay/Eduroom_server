@@ -71,9 +71,9 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 ?? scoreSheet.startdate1,
-                enddate1: enddate1 ?? scoreSheet.enddate1,
-                daysremaining1: scoreSheet.daysremaining1,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1: null,
             });
         } else {
             scoreSheet = await model.ScoreSheet.create({
