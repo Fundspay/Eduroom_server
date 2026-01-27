@@ -13,6 +13,7 @@ router.get ("/byname", fundsauditController.listAllFundsAuditByUser);
 router.get ("/bycollege", fundsauditController.listAllFundsAuditByCollege); 
 router.get ("/count", fundsauditController.getPaidAccountsDayWise); 
 router.put("/fundsaudit/reviews/:registeredUserId", fundsauditController.upsertFundsAuditByRegisteredUser);
+router.get("/fundsaudit", fundsauditController.getAllFundsAuditList);
 
 
 

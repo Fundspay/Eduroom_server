@@ -617,3 +617,106 @@ const upsertFundsAuditByRegisteredUser = async (req, res) => {
 };
 
 module.exports.upsertFundsAuditByRegisteredUser = upsertFundsAuditByRegisteredUser;
+
+
+const getAllFundsAuditList = async (req, res) => {
+  try {
+    console.debug("[DEBUG] Fetching all FundsAudit records...");
+
+    // Fetch ALL FundsAudit records (no filters)
+    const fundsAuditRecords = await model.FundsAudit.findAll({
+      attributes: [
+        'id',
+        'userId',
+        'firstName',
+        'lastName',
+        'phoneNumber',
+        'email',
+        'dateOfPayment',
+        'dateOfDownload',
+        'hasPaid',
+        'isDownloaded',
+        'createdAt',
+        'updatedAt'
+      ],
+      order: [['createdAt', 'DESC']],
+      raw: true
+    });
+
+    console.debug("[DEBUG] Total FundsAudit records fetched:", fundsAuditRecords.length);
+
+    if (fundsAuditRecords.length === 0) {
+      return ReS(res, {
+        success: true,
+        data: [],
+        count: 0
+      });
+    }
+
+    // Get all unique userIds from FundsAudit
+    const userIds = [...new Set(fundsAuditRecords.map(f => f.userId))];
+    console.debug("[DEBUG] Unique user IDs:", userIds.length);
+
+    // Fetch Users to get their phone numbers
+    const users = await model.User.findAll({
+      where: { id: userIds },
+      attributes: ['id', 'phoneNumber'],
+      raw: true
+    });
+
+    // Create userId -> phoneNumber map
+    const userPhoneMap = {};
+    users.forEach(u => {
+      userPhoneMap[u.id] = u.phoneNumber;
+    });
+
+    // Fetch all StudentResumes to get manager allocations
+    const allPhoneNumbers = users.map(u => u.phoneNumber).filter(Boolean);
+    const studentResumes = await model.StudentResume.findAll({
+      where: { mobileNumber: allPhoneNumbers },
+      attributes: ['mobileNumber', 'alloted'],
+      raw: true
+    });
+
+    // Create phoneNumber -> manager map
+    const phoneManagerMap = {};
+    studentResumes.forEach(s => {
+      phoneManagerMap[s.mobileNumber] = s.alloted;
+    });
+
+    console.debug("[DEBUG] Phone-Manager mappings:", Object.keys(phoneManagerMap).length);
+
+    // Format the response with manager information
+    const formattedRecords = fundsAuditRecords.map(record => {
+      const userPhone = userPhoneMap[record.userId];
+      const assignedManager = phoneManagerMap[userPhone] || null;
+
+      return {
+        id: record.id,
+        userId: record.userId,
+        name: `${record.firstName || ''} ${record.lastName || ''}`.trim() || null,
+        phoneNumber: record.phoneNumber,
+        email: record.email,
+        dateOfPayment: record.dateOfPayment,
+        dateOfDownload: record.dateOfDownload,
+        hasPaid: record.hasPaid,
+        isDownloaded: record.isDownloaded,
+        managerName: assignedManager,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt
+      };
+    });
+
+    return ReS(res, {
+      success: true,
+      data: formattedRecords,
+      count: formattedRecords.length
+    });
+
+  } catch (error) {
+    console.error("[ERROR] Get All Funds Audit List:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getAllFundsAuditList = getAllFundsAuditList;
