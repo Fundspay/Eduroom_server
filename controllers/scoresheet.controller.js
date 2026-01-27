@@ -44,9 +44,6 @@ var upsertScoreSheet = async (req, res) => {
             daysremaining = diffDays > 0 ? diffDays : 0;
         }
 
-        // 🔹 DATE SET 2 → force NULL for now
-        const daysremaining1 = null;
-
         let scoreSheet;
 
         if (id) {
@@ -70,9 +67,9 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: null,
-                enddate1: null,
-                daysremaining1,
+                startdate1: startdate1 ?? scoreSheet.startdate1,
+                enddate1: enddate1 ?? scoreSheet.enddate1,
+                daysremaining1: scoreSheet.daysremaining1,
             });
         } else {
             scoreSheet = await model.ScoreSheet.create({
@@ -91,9 +88,9 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: null,
-                enddate1: null,
-                daysremaining1,
+                startdate1: startdate1 ?? null,
+                enddate1: enddate1 ?? null,
+                daysremaining1: null,
             });
         }
 
