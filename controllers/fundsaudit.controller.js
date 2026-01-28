@@ -746,7 +746,8 @@ const getEntriesByDateRange = async (req, res) => {
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    // ✅ FIXED: Use direct SQL query with DATE comparison
+    // ✅ FIXED: Strictly filter - download date must be within range
+    // If payment exists, it can be any date (we just show it)
     const fundsAuditRecords = await model.FundsAudit.sequelize.query(
       `
       SELECT 
@@ -763,9 +764,8 @@ const getEntriesByDateRange = async (req, res) => {
         "createdAt",
         "updatedAt"
       FROM "FundsAudits"
-      WHERE 
-        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
-        OR (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+      WHERE DATE("dateOfDownload") >= :startDate 
+        AND DATE("dateOfDownload") <= :endDate
       ORDER BY "createdAt" DESC
       `,
       {
