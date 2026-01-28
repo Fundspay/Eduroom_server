@@ -27,6 +27,9 @@ module.exports = (sequelize, Sequelize) => {
       startdate: { type: Sequelize.DATEONLY, allowNull: true },
       enddate: { type: Sequelize.DATEONLY, allowNull: true },
       daysremaining: { type: Sequelize.INTEGER, allowNull: true },
+      startdate1: { type: Sequelize.DATEONLY, allowNull: true },
+      enddate1: { type: Sequelize.DATEONLY, allowNull: true },
+      daysremaining1: { type: Sequelize.INTEGER, allowNull: true },
 
       createdAt: {
         type: Sequelize.DATE,
