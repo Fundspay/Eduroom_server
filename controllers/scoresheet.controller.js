@@ -12,43 +12,48 @@ var upsertScoreSheet = async (req, res) => {
         portfoliolink,
         videolink,
         comment,
-        manager,      // manager ID
-        managerName,  // manager NAME (plain text)
+        manager,      
+        managerName,  
         score1,
         score2,
         score3,
         startdate,
         enddate,
+        startdate1,
+        enddate1,
     } = req.body;
 
     try {
-        // 🔹 Auto calculate average total score (divided by 3)
         const totalScore = Math.round(
             ((score1 ?? 0) +
              (score2 ?? 0) +
              (score3 ?? 0)) / 3
         );
 
-        // 🔹 Calculate days remaining
-        let daysremaining = null;
-        if (startdate && enddate) {
-            const start = new Date(startdate);
+        // 🔹 TODAY date
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // 🔹 DATE SET 1 → remaining days from TODAY (safe, never negative)
+        let daysremaining = 0;
+        if (enddate) {
             const end = new Date(enddate);
-            const diffTime = end.getTime() - start.getTime();
-            daysremaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            if (!isNaN(end.getTime())) {
+                end.setHours(0, 0, 0, 0);
+                const diffTime = end.getTime() - today.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                daysremaining = diffDays > 0 ? diffDays : 0;
+            } else {
+                daysremaining = 0;
+            }
         }
 
         let scoreSheet;
 
         if (id) {
-            // 🔹 Update existing record
-            scoreSheet = await model.ScoreSheet.findOne({
-                where: { id },
-            });
+            scoreSheet = await model.ScoreSheet.findOne({ where: { id } });
 
-            if (!scoreSheet) {
-                return ReE(res, "ScoreSheet not found", 404);
-            }
+            if (!scoreSheet) return ReE(res, "ScoreSheet not found", 404);
 
             await scoreSheet.update({
                 session: session || null,
@@ -57,18 +62,20 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,           // ID only
-                managerName: managerName || null,   // text only
+                manager: manager || null,
+                managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
                 startdate: startdate || null,
                 enddate: enddate || null,
-                daysremaining: daysremaining,
+                daysremaining,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1: null,
             });
         } else {
-            // 🔹 Create new record
             scoreSheet = await model.ScoreSheet.create({
                 session: session || null,
                 department: department || null,
@@ -76,15 +83,18 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,           // ID only
-                managerName: managerName || null,   // text only
+                manager: manager || null,
+                managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
                 score3: score3 ?? null,
                 totalscore: totalScore,
                 startdate: startdate || null,
                 enddate: enddate || null,
-                daysremaining: daysremaining,
+                daysremaining,
+                startdate1: startdate1 ?? null,
+                enddate1: enddate1 ?? null,
+                daysremaining1: null,
             });
         }
 
@@ -108,7 +118,16 @@ var getScoreSheet = async (req, res) => {
 
         const scoreSheets = await model.ScoreSheet.findAll({
             where: whereCondition,
+            raw: true,
         });
+
+        // 🔹 Force missing fields for frontend
+        const formatted = scoreSheets.map(s => ({
+            ...s,
+            startdate1: s.startdate1 ?? null,
+            enddate1: s.enddate1 ?? null,
+            daysremaining1: s.daysremaining1 ?? null,
+        }));
 
         const managers = await model.TeamManager.findAll({
             attributes: ["id", "name", "email", "mobileNumber"],
@@ -118,7 +137,7 @@ var getScoreSheet = async (req, res) => {
         return ReS(
             res,
             {
-                scoresheets: scoreSheets || [],
+                scoresheets: formatted || [],
                 managers: managers || [],
             },
             200
@@ -129,3 +148,51 @@ var getScoreSheet = async (req, res) => {
 };
 
 module.exports.getScoreSheet = getScoreSheet;
+
+
+
+// 🔹 SESSION STATS BY MANAGER
+var getUserSessionStats = async (req, res) => {
+    try {
+        const { managerid } = req.params;
+
+        if (!managerid) return ReE(res, "managerid is required", 400);
+
+        const sessions = await model.ScoreSheet.findAll({
+            where: { manager: managerid },
+            attributes: ["totalscore"],
+            raw: true,
+        });
+
+        const totalSessions = sessions.length;
+
+        let achievedSessions = 0;
+        let scoreSum = 0;
+
+        sessions.forEach(s => {
+            const score = Number(s.totalscore) || 0;
+            scoreSum += score;
+
+            if (score >= 7) {
+                achievedSessions++;
+            }
+        });
+
+        const overallScore =
+            totalSessions > 0
+                ? Math.round((scoreSum / totalSessions) * 100) / 100
+                : 0;
+
+        return ReS(res, {
+            managerid,
+            totalSessions,
+            achievedSessions,
+            overallScore,
+        }, 200);
+
+    } catch (error) {
+        return ReE(res, error.message, 422);
+    }
+};
+
+module.exports.getUserSessionStats = getUserSessionStats;
