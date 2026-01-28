@@ -23,7 +23,7 @@ var upsertScoreSheet = async (req, res) => {
     } = req.body;
 
     try {
-        const managerId = manager ? Number(manager) : null; // FIX
+        const managerId = manager ? Number(manager) : null;
 
         const totalScore = Math.round(
             ((score1 ?? 0) + (score2 ?? 0) + (score3 ?? 0)) / 3
@@ -45,11 +45,14 @@ var upsertScoreSheet = async (req, res) => {
             }
         }
 
-        // 🔹 DATE SET 2 (AUTO)
+        // 🔹 DATE SET 2 (FOR startdate1 / enddate1)
         let daysremaining1 = 0;
-        if (enddate1) {
-            const end1 = new Date(enddate1);
-            if (!isNaN(end1.getTime())) {
+        if (startdate1 || enddate1) {
+            const start1 = startdate1 ? new Date(startdate1) : today;
+            const end1 = enddate1 ? new Date(enddate1) : start1;
+
+            if (!isNaN(start1.getTime()) && !isNaN(end1.getTime())) {
+                start1.setHours(0, 0, 0, 0);
                 end1.setHours(0, 0, 0, 0);
                 const diffDays1 = Math.ceil(
                     (end1.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
@@ -64,7 +67,6 @@ var upsertScoreSheet = async (req, res) => {
             scoreSheet = await model.ScoreSheet.findOne({ where: { id } });
             if (!scoreSheet) return ReE(res, "ScoreSheet not found", 404);
 
-            //  THIS WAS FAILING EARLIER — NOW FIXED
             if (managerId) {
                 await model.ScoreSheet.update(
                     {
@@ -127,7 +129,6 @@ var upsertScoreSheet = async (req, res) => {
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
 
-
 var getScoreSheet = async (req, res) => {
     try {
         const { managerid } = req.params;
@@ -141,7 +142,6 @@ var getScoreSheet = async (req, res) => {
             raw: true,
         });
 
-        // 🔹 Force missing fields for frontend
         const formatted = scoreSheets.map(s => ({
             ...s,
             startdate1: s.startdate1 ?? null,
@@ -169,23 +169,15 @@ var getScoreSheet = async (req, res) => {
 
 module.exports.getScoreSheet = getScoreSheet;
 
-
-
 var getUserSessionStats = async (req, res) => {
     try {
         const { managerid } = req.params;
 
         if (!managerid) return ReE(res, "managerid is required", 400);
 
-        // 🔹 FETCH *_1 FIELDS ALSO
         const sessions = await model.ScoreSheet.findAll({
             where: { manager: managerid },
-            attributes: [
-                "totalscore",
-                "startdate1",
-                "enddate1",
-                "daysremaining1",
-            ],
+            attributes: ["totalscore", "startdate1", "enddate1", "daysremaining1"],
             raw: true,
         });
 
@@ -197,10 +189,7 @@ var getUserSessionStats = async (req, res) => {
         sessions.forEach(s => {
             const score = Number(s.totalscore) || 0;
             scoreSum += score;
-
-            if (score >= 7) {
-                achievedSessions++;
-            }
+            if (score >= 7) achievedSessions++;
         });
 
         const overallScore =
@@ -208,7 +197,6 @@ var getUserSessionStats = async (req, res) => {
                 ? Math.round((scoreSum / totalSessions) * 100) / 100
                 : 0;
 
-        // 🔹 TAKE FIRST AVAILABLE RECORD (same behavior as before)
         const firstSession = sessions[0] || {};
 
         return ReS(
@@ -218,8 +206,6 @@ var getUserSessionStats = async (req, res) => {
                 totalSessions,
                 achievedSessions,
                 overallScore,
-
-                //  NOW COMING CORRECTLY
                 startdate1: firstSession.startdate1 ?? null,
                 enddate1: firstSession.enddate1 ?? null,
                 daysremaining1: firstSession.daysremaining1 ?? 0,
@@ -232,4 +218,3 @@ var getUserSessionStats = async (req, res) => {
 };
 
 module.exports.getUserSessionStats = getUserSessionStats;
-
