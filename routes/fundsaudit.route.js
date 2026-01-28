@@ -15,6 +15,7 @@ router.get ("/count", fundsauditController.getPaidAccountsDayWise);
 router.put("/fundsaudit/reviews/:registeredUserId", fundsauditController.upsertFundsAuditByRegisteredUser);
 router.get("/fundsaudit", fundsauditController.getAllFundsAuditList);
 router.get("/datefilterall", fundsauditController.getEntriesByDateRange);
+router.get("/downloads-vs-payments", fundsauditController.getDownloadsVsPayments);
 
 
 
