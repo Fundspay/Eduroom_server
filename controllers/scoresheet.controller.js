@@ -177,9 +177,15 @@ var getUserSessionStats = async (req, res) => {
 
         if (!managerid) return ReE(res, "managerid is required", 400);
 
+        // 🔹 FETCH *_1 FIELDS ALSO
         const sessions = await model.ScoreSheet.findAll({
             where: { manager: managerid },
-            attributes: ["totalscore"],
+            attributes: [
+                "totalscore",
+                "startdate1",
+                "enddate1",
+                "daysremaining1",
+            ],
             raw: true,
         });
 
@@ -202,6 +208,9 @@ var getUserSessionStats = async (req, res) => {
                 ? Math.round((scoreSum / totalSessions) * 100) / 100
                 : 0;
 
+        // 🔹 TAKE FIRST AVAILABLE RECORD (same behavior as before)
+        const firstSession = sessions[0] || {};
+
         return ReS(
             res,
             {
@@ -210,10 +219,10 @@ var getUserSessionStats = async (req, res) => {
                 achievedSessions,
                 overallScore,
 
-                // 🔹 FORCE SAME KEYS FOR FRONTEND
-                startdate1: null,
-                enddate1: null,
-                daysremaining1: 0,
+                //  NOW COMING CORRECTLY
+                startdate1: firstSession.startdate1 ?? null,
+                enddate1: firstSession.enddate1 ?? null,
+                daysremaining1: firstSession.daysremaining1 ?? 0,
             },
             200
         );
