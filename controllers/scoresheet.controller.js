@@ -171,7 +171,6 @@ module.exports.getScoreSheet = getScoreSheet;
 
 
 
-// 🔹 SESSION STATS BY MANAGER
 var getUserSessionStats = async (req, res) => {
     try {
         const { managerid } = req.params;
@@ -203,16 +202,25 @@ var getUserSessionStats = async (req, res) => {
                 ? Math.round((scoreSum / totalSessions) * 100) / 100
                 : 0;
 
-        return ReS(res, {
-            managerid,
-            totalSessions,
-            achievedSessions,
-            overallScore,
-        }, 200);
+        return ReS(
+            res,
+            {
+                managerid,
+                totalSessions,
+                achievedSessions,
+                overallScore,
 
+                // 🔹 FORCE SAME KEYS FOR FRONTEND
+                startdate1: null,
+                enddate1: null,
+                daysremaining1: 0,
+            },
+            200
+        );
     } catch (error) {
         return ReE(res, error.message, 422);
     }
 };
 
 module.exports.getUserSessionStats = getUserSessionStats;
+
