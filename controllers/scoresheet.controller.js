@@ -2,7 +2,6 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
-// Upsert ScoreSheet (total score auto-calculated)
 var upsertScoreSheet = async (req, res) => {
     const {
         id,
@@ -34,17 +33,29 @@ var upsertScoreSheet = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 🔹 DATE SET 1 → remaining days from TODAY (safe, never negative)
+        // 🔹 DATE SET 1
         let daysremaining = 0;
         if (enddate) {
             const end = new Date(enddate);
             if (!isNaN(end.getTime())) {
                 end.setHours(0, 0, 0, 0);
-                const diffTime = end.getTime() - today.getTime();
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                const diffDays = Math.ceil(
+                    (end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                );
                 daysremaining = diffDays > 0 ? diffDays : 0;
-            } else {
-                daysremaining = 0;
+            }
+        }
+
+        // 🔹 DATE SET 2 (COMMON FOR MANAGER)
+        let daysremaining1 = 0;
+        if (enddate1) {
+            const end1 = new Date(enddate1);
+            if (!isNaN(end1.getTime())) {
+                end1.setHours(0, 0, 0, 0);
+                const diffDays1 = Math.ceil(
+                    (end1.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                );
+                daysremaining1 = diffDays1 > 0 ? diffDays1 : 0;
             }
         }
 
@@ -52,9 +63,21 @@ var upsertScoreSheet = async (req, res) => {
 
         if (id) {
             scoreSheet = await model.ScoreSheet.findOne({ where: { id } });
-
             if (!scoreSheet) return ReE(res, "ScoreSheet not found", 404);
 
+            // ✅ UPDATE COMMON DATE SET FOR ALL SESSIONS OF MANAGER
+            if (manager) {
+                await model.ScoreSheet.update(
+                    {
+                        startdate1: startdate1 || null,
+                        enddate1: enddate1 || null,
+                        daysremaining1,
+                    },
+                    { where: { manager } }
+                );
+            }
+
+            // ✅ UPDATE CURRENT SESSION
             await scoreSheet.update({
                 session: session || null,
                 department: department || null,
@@ -71,9 +94,6 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 || null,
-                enddate1: enddate1 || null,
-                daysremaining1: null,
             });
         } else {
             scoreSheet = await model.ScoreSheet.create({
@@ -92,9 +112,9 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 ?? null,
-                enddate1: enddate1 ?? null,
-                daysremaining1: null,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1,
             });
         }
 
@@ -105,8 +125,6 @@ var upsertScoreSheet = async (req, res) => {
 };
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
-
-
 
 var getScoreSheet = async (req, res) => {
     try {
