@@ -2,7 +2,6 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 
-// Upsert ScoreSheet (total score auto-calculated)
 var upsertScoreSheet = async (req, res) => {
     const {
         id,
@@ -34,7 +33,7 @@ var upsertScoreSheet = async (req, res) => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // 🔹 DATE SET 1 → remaining days from TODAY (safe, never negative)
+        // 🔹 DATE SET 1 → remaining days (safe)
         let daysremaining = 0;
         if (enddate) {
             const end = new Date(enddate);
@@ -43,8 +42,18 @@ var upsertScoreSheet = async (req, res) => {
                 const diffTime = end.getTime() - today.getTime();
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 daysremaining = diffDays > 0 ? diffDays : 0;
-            } else {
-                daysremaining = 0;
+            }
+        }
+
+        // 🔹 DATE SET 2 → remaining days (safe)
+        let daysremaining1 = 0;
+        if (enddate1) {
+            const end1 = new Date(enddate1);
+            if (!isNaN(end1.getTime())) {
+                end1.setHours(0, 0, 0, 0);
+                const diffTime1 = end1.getTime() - today.getTime();
+                const diffDays1 = Math.ceil(diffTime1 / (1000 * 60 * 60 * 24));
+                daysremaining1 = diffDays1 > 0 ? diffDays1 : 0;
             }
         }
 
@@ -73,7 +82,7 @@ var upsertScoreSheet = async (req, res) => {
                 daysremaining,
                 startdate1: startdate1 || null,
                 enddate1: enddate1 || null,
-                daysremaining1: null,
+                daysremaining1,
             });
         } else {
             scoreSheet = await model.ScoreSheet.create({
@@ -92,9 +101,9 @@ var upsertScoreSheet = async (req, res) => {
                 startdate: startdate || null,
                 enddate: enddate || null,
                 daysremaining,
-                startdate1: startdate1 ?? null,
-                enddate1: enddate1 ?? null,
-                daysremaining1: null,
+                startdate1: startdate1 || null,
+                enddate1: enddate1 || null,
+                daysremaining1,
             });
         }
 
@@ -105,6 +114,7 @@ var upsertScoreSheet = async (req, res) => {
 };
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
+
 
 
 
