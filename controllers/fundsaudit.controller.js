@@ -746,44 +746,33 @@ const getEntriesByDateRange = async (req, res) => {
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    // Build date filter
-    const fromDate = new Date(startDate + 'T00:00:00');
-    const toDate = new Date(endDate + 'T23:59:59.999');
-
-    // ✅ Fetch ALL FundsAudit records within date range (paid or unpaid)
-    const fundsAuditRecords = await model.FundsAudit.findAll({
-      where: {
-        [Op.or]: [
-          {
-            dateOfPayment: {
-              [Op.between]: [fromDate, toDate]
-            }
-          },
-          {
-            dateOfDownload: {
-              [Op.between]: [fromDate, toDate]
-            }
-          },
-          
-        ]
-      },
-      attributes: [
-        'id',
-        'userId',
-        'firstName',
-        'lastName',
-        'phoneNumber',
-        'email',
-        'dateOfPayment',
-        'dateOfDownload',
-        'hasPaid',
-        'isDownloaded',
-        'createdAt',
-        'updatedAt'
-      ],
-      order: [['createdAt', 'DESC']],
-      raw: true
-    });
+    // ✅ FIXED: Use direct SQL query with DATE comparison
+    const fundsAuditRecords = await model.FundsAudit.sequelize.query(
+      `
+      SELECT 
+        id,
+        "userId",
+        "firstName",
+        "lastName",
+        "phoneNumber",
+        email,
+        "dateOfPayment",
+        "dateOfDownload",
+        "hasPaid",
+        "isDownloaded",
+        "createdAt",
+        "updatedAt"
+      FROM "FundsAudits"
+      WHERE 
+        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+        OR (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+      ORDER BY "createdAt" DESC
+      `,
+      {
+        replacements: { startDate, endDate },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
 
     console.debug("[DEBUG] Total entries in date range:", fundsAuditRecords.length);
 
@@ -872,6 +861,7 @@ const getEntriesByDateRange = async (req, res) => {
 };
 
 module.exports.getEntriesByDateRange = getEntriesByDateRange;
+
 
 const getDownloadsVsPayments = async (req, res) => {
   try {
