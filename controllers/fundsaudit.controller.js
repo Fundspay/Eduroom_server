@@ -873,3 +873,175 @@ const getEntriesByDateRange = async (req, res) => {
 
 module.exports.getEntriesByDateRange = getEntriesByDateRange;
 
+const getDownloadsVsPayments = async (req, res) => {
+  try {
+    let { startDate, endDate } = req.query;
+
+    console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
+
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      startDate = formatDate(firstDay);
+      endDate = formatDate(lastDay);
+    }
+
+    console.debug("[DEBUG] Date range ->", { startDate, endDate });
+
+    // Build date filter
+    const fromDate = new Date(startDate + 'T00:00:00');
+    const toDate = new Date(endDate + 'T23:59:59.999');
+
+    // ✅ TOTAL DOWNLOADS (entries with isDownloaded = true and dateOfDownload in range)
+    const totalDownloads = await model.FundsAudit.count({
+      where: {
+        isDownloaded: true,
+        dateOfDownload: {
+          [Op.between]: [fromDate, toDate]
+        }
+      }
+    });
+
+    // ✅ TOTAL PAYMENTS (entries with hasPaid = true and dateOfPayment in range)
+    const totalPayments = await model.FundsAudit.count({
+      where: {
+        hasPaid: true,
+        dateOfPayment: {
+          [Op.between]: [fromDate, toDate]
+        }
+      }
+    });
+
+    // ✅ DOWNLOADS NOT CONVERTED TO PAYMENTS
+    const downloadsNotPaid = await model.FundsAudit.count({
+      where: {
+        isDownloaded: true,
+        hasPaid: false,
+        dateOfDownload: {
+          [Op.between]: [fromDate, toDate]
+        }
+      }
+    });
+
+    // ✅ DAY-WISE BREAKDOWN
+    const dayWiseData = await model.FundsAudit.sequelize.query(
+      `
+      SELECT 
+        DATE("dateOfDownload") AS download_date,
+        COUNT(CASE WHEN "isDownloaded" = true THEN 1 END) AS downloads,
+        DATE("dateOfPayment") AS payment_date,
+        COUNT(CASE WHEN "hasPaid" = true THEN 1 END) AS payments
+      FROM "FundsAudits"
+      WHERE 
+        ("dateOfDownload" BETWEEN :start AND :end)
+        OR ("dateOfPayment" BETWEEN :start AND :end)
+      GROUP BY DATE("dateOfDownload"), DATE("dateOfPayment")
+      ORDER BY download_date DESC, payment_date DESC
+      `,
+      {
+        replacements: { start: fromDate, end: toDate },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
+
+    // ✅ Better day-wise aggregation
+    const downloadsPerDay = await model.FundsAudit.sequelize.query(
+      `
+      SELECT 
+        DATE("dateOfDownload") AS date,
+        COUNT(*) AS count
+      FROM "FundsAudits"
+      WHERE "isDownloaded" = true
+        AND "dateOfDownload" BETWEEN :start AND :end
+      GROUP BY DATE("dateOfDownload")
+      ORDER BY DATE("dateOfDownload") DESC
+      `,
+      {
+        replacements: { start: fromDate, end: toDate },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
+
+    const paymentsPerDay = await model.FundsAudit.sequelize.query(
+      `
+      SELECT 
+        DATE("dateOfPayment") AS date,
+        COUNT(*) AS count
+      FROM "FundsAudits"
+      WHERE "hasPaid" = true
+        AND "dateOfPayment" BETWEEN :start AND :end
+      GROUP BY DATE("dateOfPayment")
+      ORDER BY DATE("dateOfPayment") DESC
+      `,
+      {
+        replacements: { start: fromDate, end: toDate },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
+
+    // Create day-wise map
+    const dayWiseMap = {};
+    
+    downloadsPerDay.forEach(row => {
+      const date = row.date;
+      if (!dayWiseMap[date]) dayWiseMap[date] = { date, downloads: 0, payments: 0 };
+      dayWiseMap[date].downloads = parseInt(row.count);
+    });
+
+    paymentsPerDay.forEach(row => {
+      const date = row.date;
+      if (!dayWiseMap[date]) dayWiseMap[date] = { date, downloads: 0, payments: 0 };
+      dayWiseMap[date].payments = parseInt(row.count);
+    });
+
+    // Convert to array and sort
+    const dayWiseBreakdown = Object.values(dayWiseMap).sort((a, b) => 
+      new Date(b.date) - new Date(a.date)
+    );
+
+    // ✅ CONVERSION RATE
+    const conversionRate = totalDownloads > 0 
+      ? ((totalPayments / totalDownloads) * 100).toFixed(2)
+      : 0;
+
+    console.debug("[DEBUG] Summary ->", { 
+      totalDownloads, 
+      totalPayments, 
+      downloadsNotPaid, 
+      conversionRate 
+    });
+
+    return ReS(res, {
+      success: true,
+      summary: {
+        totalDownloads,
+        totalPayments,
+        downloadsNotPaid,
+        conversionRate: parseFloat(conversionRate),
+        conversionRateText: `${conversionRate}%`
+      },
+      dayWiseBreakdown,
+      appliedFilters: {
+        startDate,
+        endDate
+      }
+    });
+
+  } catch (error) {
+    console.error("[ERROR] Get Downloads vs Payments:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getDownloadsVsPayments = getDownloadsVsPayments;
+
