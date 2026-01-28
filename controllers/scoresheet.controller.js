@@ -11,8 +11,8 @@ var upsertScoreSheet = async (req, res) => {
         portfoliolink,
         videolink,
         comment,
-        manager,      
-        managerName,  
+        manager,
+        managerName,
         score1,
         score2,
         score3,
@@ -23,13 +23,12 @@ var upsertScoreSheet = async (req, res) => {
     } = req.body;
 
     try {
+        const managerId = manager ? Number(manager) : null; // FIX
+
         const totalScore = Math.round(
-            ((score1 ?? 0) +
-             (score2 ?? 0) +
-             (score3 ?? 0)) / 3
+            ((score1 ?? 0) + (score2 ?? 0) + (score3 ?? 0)) / 3
         );
 
-        // 🔹 TODAY date
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -46,7 +45,7 @@ var upsertScoreSheet = async (req, res) => {
             }
         }
 
-        // 🔹 DATE SET 2 (COMMON FOR MANAGER)
+        // 🔹 DATE SET 2 (AUTO)
         let daysremaining1 = 0;
         if (enddate1) {
             const end1 = new Date(enddate1);
@@ -65,19 +64,18 @@ var upsertScoreSheet = async (req, res) => {
             scoreSheet = await model.ScoreSheet.findOne({ where: { id } });
             if (!scoreSheet) return ReE(res, "ScoreSheet not found", 404);
 
-            // ✅ UPDATE COMMON DATE SET FOR ALL SESSIONS OF MANAGER
-            if (manager) {
+            //  THIS WAS FAILING EARLIER — NOW FIXED
+            if (managerId) {
                 await model.ScoreSheet.update(
                     {
                         startdate1: startdate1 || null,
                         enddate1: enddate1 || null,
                         daysremaining1,
                     },
-                    { where: { manager } }
+                    { where: { manager: managerId } }
                 );
             }
 
-            // ✅ UPDATE CURRENT SESSION
             await scoreSheet.update({
                 session: session || null,
                 department: department || null,
@@ -85,7 +83,7 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,
+                manager: managerId,
                 managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
@@ -103,7 +101,7 @@ var upsertScoreSheet = async (req, res) => {
                 portfoliolink: portfoliolink || null,
                 videolink: videolink || null,
                 comment: comment || null,
-                manager: manager || null,
+                manager: managerId,
                 managerName: managerName || null,
                 score1: score1 ?? null,
                 score2: score2 ?? null,
@@ -125,6 +123,7 @@ var upsertScoreSheet = async (req, res) => {
 };
 
 module.exports.upsertScoreSheet = upsertScoreSheet;
+
 
 var getScoreSheet = async (req, res) => {
     try {
