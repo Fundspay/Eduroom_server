@@ -720,3 +720,156 @@ const getAllFundsAuditList = async (req, res) => {
 };
 
 module.exports.getAllFundsAuditList = getAllFundsAuditList;
+
+const getEntriesByDateRange = async (req, res) => {
+  try {
+    let { startDate, endDate } = req.query;
+
+    console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
+
+    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
+      
+      startDate = formatDate(firstDay);
+      endDate = formatDate(lastDay);
+    }
+
+    console.debug("[DEBUG] Date range ->", { startDate, endDate });
+
+    // Build date filter
+    const fromDate = new Date(startDate + 'T00:00:00');
+    const toDate = new Date(endDate + 'T23:59:59.999');
+
+    // ✅ Fetch ALL FundsAudit records within date range (paid or unpaid)
+    const fundsAuditRecords = await model.FundsAudit.findAll({
+      where: {
+        [Op.or]: [
+          {
+            dateOfPayment: {
+              [Op.between]: [fromDate, toDate]
+            }
+          },
+          {
+            dateOfDownload: {
+              [Op.between]: [fromDate, toDate]
+            }
+          },
+          
+        ]
+      },
+      attributes: [
+        'id',
+        'userId',
+        'firstName',
+        'lastName',
+        'phoneNumber',
+        'email',
+        'dateOfPayment',
+        'dateOfDownload',
+        'hasPaid',
+        'isDownloaded',
+        'createdAt',
+        'updatedAt'
+      ],
+      order: [['createdAt', 'DESC']],
+      raw: true
+    });
+
+    console.debug("[DEBUG] Total entries in date range:", fundsAuditRecords.length);
+
+    if (fundsAuditRecords.length === 0) {
+      return ReS(res, {
+        success: true,
+        data: [],
+        count: 0,
+        appliedFilters: { startDate, endDate }
+      });
+    }
+
+    // Get all unique userIds from FundsAudit
+    const userIds = [...new Set(fundsAuditRecords.map(f => f.userId))];
+    console.debug("[DEBUG] Unique user IDs:", userIds.length);
+
+    // Fetch Users to get their phone numbers
+    const users = await model.User.findAll({
+      where: { id: userIds },
+      attributes: ['id', 'phoneNumber'],
+      raw: true
+    });
+
+    // Create userId -> phoneNumber map
+    const userPhoneMap = {};
+    users.forEach(u => {
+      userPhoneMap[u.id] = u.phoneNumber;
+    });
+
+    // Fetch all StudentResumes to get manager allocations
+    const allPhoneNumbers = users.map(u => u.phoneNumber).filter(Boolean);
+    const studentResumes = await model.StudentResume.findAll({
+      where: { mobileNumber: allPhoneNumbers },
+      attributes: ['mobileNumber', 'alloted'],
+      raw: true
+    });
+
+    // Create phoneNumber -> manager map
+    const phoneManagerMap = {};
+    studentResumes.forEach(s => {
+      phoneManagerMap[s.mobileNumber] = s.alloted;
+    });
+
+    console.debug("[DEBUG] Phone-Manager mappings:", Object.keys(phoneManagerMap).length);
+
+    // Format the response with manager information
+    const formattedRecords = fundsAuditRecords.map(record => {
+      const userPhone = userPhoneMap[record.userId];
+      const assignedManager = phoneManagerMap[userPhone] || null;
+
+      return {
+        id: record.id,
+        userId: record.userId,
+        name: `${record.firstName || ''} ${record.lastName || ''}`.trim() || null,
+        phoneNumber: record.phoneNumber,
+        email: record.email,
+        dateOfPayment: record.dateOfPayment,
+        dateOfDownload: record.dateOfDownload,
+        hasPaid: record.hasPaid,
+        isDownloaded: record.isDownloaded,
+        managerName: assignedManager,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt
+      };
+    });
+
+    // Separate paid and unpaid
+    const paidEntries = formattedRecords.filter(r => r.hasPaid === true);
+    const unpaidEntries = formattedRecords.filter(r => r.hasPaid === false || r.hasPaid === null);
+
+    return ReS(res, {
+      success: true,
+      data: formattedRecords,
+      summary: {
+        total: formattedRecords.length,
+        paid: paidEntries.length,
+        unpaid: unpaidEntries.length
+      },
+      appliedFilters: { startDate, endDate }
+    });
+
+  } catch (error) {
+    console.error("[ERROR] Get Entries By Date Range:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getEntriesByDateRange = getEntriesByDateRange;
+
