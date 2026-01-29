@@ -888,149 +888,127 @@ const getDownloadsVsPayments = async (req, res) => {
       
       startDate = formatDate(now);
       endDate = formatDate(now);
+      console.debug("[DEBUG] Defaulting to today ->", { startDate, endDate });
     }
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    // ✅ FIXED: Use DATE comparisons, not datetime comparisons
+    // ✅ FIXED: Use DATE comparisons consistently
     const startDateObj = new Date(startDate);
     const endDateObj = new Date(endDate);
     endDateObj.setHours(23, 59, 59, 999); // End of day
 
-    // ✅ FIXED: Get ALL filtered records ONCE (same as datefilterall)
-    const allFilteredRecordsQuery = await model.FundsAudit.sequelize.query(
-      `
-      SELECT 
-        id,
-        "isDownloaded",
-        "hasPaid",
-        "dateOfDownload",
-        "dateOfPayment"
-      FROM "FundsAudits"
-      WHERE (
-        (DATE("dateOfDownload") >= DATE(:startDate) AND DATE("dateOfDownload") <= DATE(:endDate))
-        OR
-        (DATE("dateOfPayment") >= DATE(:startDate) AND DATE("dateOfPayment") <= DATE(:endDate))
-      )
-      `,
-      {
-        replacements: { startDate, endDate },
-        type: model.FundsAudit.sequelize.QueryTypes.SELECT
-      }
-    );
+    // ✅ SIMPLIFIED: Get ALL filtered records (same logic as datefilterall)
+    const allFilteredRecordsQuery = await model.FundsAudit.findAll({
+      where: {
+        [Op.or]: [
+          {
+            dateOfDownload: {
+              [Op.between]: [startDateObj, endDateObj]
+            }
+          },
+          {
+            dateOfPayment: {
+              [Op.between]: [startDateObj, endDateObj]
+            }
+          }
+        ]
+      },
+      attributes: ['id', 'isDownloaded', 'hasPaid', 'dateOfDownload', 'dateOfPayment'],
+      raw: true
+    });
 
     const allFilteredRecords = allFilteredRecordsQuery.length;
+    console.debug("[DEBUG] Total filtered records:", allFilteredRecords);
 
-    // ✅ FIXED: Calculate metrics from the SAME dataset
+    // Initialize counters
     let totalDownloads = 0;
     let totalPayments = 0;
     let downloadsNotPaid = 0;
     
-    // Day-wise counters - ONLY for dates in the filter range
+    // Day-wise counters
     const dayWiseMap = {};
 
-    // Create a helper function to check if a date is within range
-    const isDateInRange = (date) => {
-      if (!date) return false;
-      const dateOnly = new Date(date);
-      dateOnly.setHours(0, 0, 0, 0);
-      
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      
-      return dateOnly >= start && dateOnly <= end;
-    };
-
-    // Pre-fill the day-wise map with all dates in range
-    const currentDate = new Date(startDate);
-    const lastDate = new Date(endDate);
-    
-    while (currentDate <= lastDate) {
-      const dateStr = currentDate.toISOString().split('T')[0];
-      dayWiseMap[dateStr] = { date: dateStr, downloads: 0, payments: 0 };
-      currentDate.setDate(currentDate.getDate() + 1);
-    }
-
+    // Process each record
     allFilteredRecordsQuery.forEach(record => {
+      // Determine which date to use for this record
+      let recordDate = null;
+      
+      // Check which date field is within range
+      if (record.dateOfDownload && 
+          new Date(record.dateOfDownload) >= startDateObj && 
+          new Date(record.dateOfDownload) <= endDateObj) {
+        recordDate = new Date(record.dateOfDownload).toISOString().split('T')[0];
+      } else if (record.dateOfPayment && 
+                new Date(record.dateOfPayment) >= startDateObj && 
+                new Date(record.dateOfPayment) <= endDateObj) {
+        recordDate = new Date(record.dateOfPayment).toISOString().split('T')[0];
+      }
+      
+      // If no date in range, skip this record (shouldn't happen)
+      if (!recordDate) {
+        console.warn("[WARN] Record has no date in range:", record.id);
+        return;
+      }
+      
+      // Initialize day in map if not exists
+      if (!dayWiseMap[recordDate]) {
+        dayWiseMap[recordDate] = { date: recordDate, downloads: 0, payments: 0 };
+      }
+      
       // Count downloads
       if (record.isDownloaded === true) {
         totalDownloads++;
-        
-        // Determine which date to use for grouping - MUST BE IN RANGE
-        let groupDate = null;
-        
-        // Check if download date is in range
-        if (record.dateOfDownload && isDateInRange(record.dateOfDownload)) {
-          const downloadDate = new Date(record.dateOfDownload);
-          groupDate = downloadDate.toISOString().split('T')[0];
-        }
-        // If download date not in range, check if payment date is in range
-        else if (record.dateOfPayment && isDateInRange(record.dateOfPayment)) {
-          const paymentDate = new Date(record.dateOfPayment);
-          groupDate = paymentDate.toISOString().split('T')[0];
-        }
-        
-        if (groupDate && dayWiseMap[groupDate]) {
-          dayWiseMap[groupDate].downloads++;
-        }
+        dayWiseMap[recordDate].downloads++;
       }
-
+      
       // Count payments
       if (record.hasPaid === true) {
         totalPayments++;
-        
-        // Determine which date to use for grouping - MUST BE IN RANGE
-        let groupDate = null;
-        
-        // Check if payment date is in range
-        if (record.dateOfPayment && isDateInRange(record.dateOfPayment)) {
-          const paymentDate = new Date(record.dateOfPayment);
-          groupDate = paymentDate.toISOString().split('T')[0];
-        }
-        // If payment date not in range, check if download date is in range
-        else if (record.dateOfDownload && isDateInRange(record.dateOfDownload)) {
-          const downloadDate = new Date(record.dateOfDownload);
-          groupDate = downloadDate.toISOString().split('T')[0];
-        }
-        
-        if (groupDate && dayWiseMap[groupDate]) {
-          dayWiseMap[groupDate].payments++;
-        }
+        dayWiseMap[recordDate].payments++;
       }
-
+      
       // Count downloads not paid
       if (record.isDownloaded === true && record.hasPaid === false) {
         downloadsNotPaid++;
       }
     });
 
-    // Convert dayWiseMap to array, filter out dates with no activity, and sort
+    // Convert dayWiseMap to array and sort
     const dayWiseBreakdown = Object.values(dayWiseMap)
-      .filter(day => day.downloads > 0 || day.payments > 0)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // ✅ FIXED: Conversion Rate
-    const conversionRate = totalDownloads > 0 
-      ? ((totalPayments / totalDownloads) * 100).toFixed(2)
-      : 0;
+    // ✅ Calculate conversion rate using your variable naming convention
+    const todayConversionRate = totalDownloads > 0 
+      ? ((totalPayments / totalDownloads) * 100).toFixed(1)
+      : 0.0;
 
-    console.debug("[DEBUG] Consistent Summary ->", { 
-      allFilteredRecords,
+    // ✅ Verify counts match
+    const dayWiseDownloads = dayWiseBreakdown.reduce((sum, day) => sum + day.downloads, 0);
+    const dayWisePayments = dayWiseBreakdown.reduce((sum, day) => sum + day.payments, 0);
+    
+    const downloadsMatch = totalDownloads === dayWiseDownloads;
+    const paymentsMatch = totalPayments === dayWisePayments;
+    const mathConsistent = (totalPayments + downloadsNotPaid) === totalDownloads;
+
+    if (!downloadsMatch || !paymentsMatch) {
+      console.error("[ERROR] Counts don't match!", {
+        totalDownloads,
+        dayWiseDownloads,
+        totalPayments,
+        dayWisePayments
+      });
+    }
+
+    console.debug("[DEBUG] Final summary ->", { 
       totalDownloads, 
       totalPayments, 
       downloadsNotPaid,
-      conversionRate,
-      dayWiseBreakdownDates: dayWiseBreakdown.map(d => d.date)
+      todayConversionRate,
+      downloadsMatch,
+      paymentsMatch,
+      mathConsistent
     });
-
-    // ✅ VERIFICATION
-    const verification = (totalPayments + downloadsNotPaid) === totalDownloads;
-    if (!verification) {
-      console.warn("[WARNING] Math doesn't add up! Check data consistency.");
-    }
 
     return ReS(res, {
       success: true,
@@ -1039,9 +1017,8 @@ const getDownloadsVsPayments = async (req, res) => {
         totalDownloads,
         totalPayments,
         downloadsNotPaid,
-        conversionRate: parseFloat(conversionRate),
-        conversionRateText: `${conversionRate}%`,
-        verification: verification ? "Data consistent" : "Data inconsistency detected"
+        todayConversionRate: parseFloat(todayConversionRate),
+        todayConversionRateText: `${todayConversionRate}%`
       },
       dayWiseBreakdown,
       appliedFilters: {
