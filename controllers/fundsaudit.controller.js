@@ -797,6 +797,7 @@ const getDownloadsVsPayments = async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
 
+    // ✅ Default to today if not provided
     if (!startDate || !endDate) {
       const today = new Date().toISOString().split('T')[0];
       startDate = today;
@@ -807,6 +808,7 @@ const getDownloadsVsPayments = async (req, res) => {
     const endDateObj = new Date(endDate);
     endDateObj.setHours(23, 59, 59, 999);
 
+    // ✅ Fetch required fields only
     const records = await model.FundsAudit.findAll({
       attributes: [
         'dateOfDownload',
@@ -825,9 +827,12 @@ const getDownloadsVsPayments = async (req, res) => {
 
     records.forEach(r => {
 
-      // DOWNLOAD EVENT
+      /* =======================
+         DOWNLOAD EVENT
+      ======================= */
       if (r.isDownloaded && r.dateOfDownload) {
         const d = new Date(r.dateOfDownload);
+
         if (d >= startDateObj && d <= endDateObj) {
           const day = d.toISOString().split('T')[0];
 
@@ -835,15 +840,25 @@ const getDownloadsVsPayments = async (req, res) => {
           dayWiseMap[day] ??= { date: day, downloads: 0, payments: 0 };
           dayWiseMap[day].downloads++;
 
-          if (!r.hasPaid) {
+          // ✅ Correct unpaid logic: payment must be IN RANGE
+          const paymentInRange =
+            r.hasPaid &&
+            r.dateOfPayment &&
+            new Date(r.dateOfPayment) >= startDateObj &&
+            new Date(r.dateOfPayment) <= endDateObj;
+
+          if (!paymentInRange) {
             downloadsNotPaid++;
           }
         }
       }
 
-      // PAYMENT EVENT
+      /* =======================
+         PAYMENT EVENT
+      ======================= */
       if (r.hasPaid && r.dateOfPayment) {
         const p = new Date(r.dateOfPayment);
+
         if (p >= startDateObj && p <= endDateObj) {
           const day = p.toISOString().split('T')[0];
 
@@ -855,9 +870,11 @@ const getDownloadsVsPayments = async (req, res) => {
 
     });
 
+    // ✅ Sort day-wise data (latest first)
     const dayWiseBreakdown = Object.values(dayWiseMap)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
+    // ✅ Conversion rate
     const conversionRate =
       totalDownloads > 0
         ? ((totalPayments / totalDownloads) * 100).toFixed(1)
@@ -877,7 +894,7 @@ const getDownloadsVsPayments = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
+    console.error('[ERROR] getDownloadsVsPayments:', error);
     return ReE(res, error.message, 500);
   }
 };
