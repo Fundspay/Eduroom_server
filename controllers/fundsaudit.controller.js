@@ -797,18 +797,12 @@ const getDownloadsVsPayments = async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
 
-    // ✅ Default to today if not provided
     if (!startDate || !endDate) {
       const today = new Date().toISOString().split('T')[0];
       startDate = today;
       endDate = today;
     }
 
-    const startDateObj = new Date(startDate);
-    const endDateObj = new Date(endDate);
-    endDateObj.setHours(23, 59, 59, 999);
-
-    // ✅ Fetch required fields only
     const records = await model.FundsAudit.findAll({
       attributes: [
         'dateOfDownload',
@@ -827,25 +821,25 @@ const getDownloadsVsPayments = async (req, res) => {
 
     records.forEach(r => {
 
-      /* =======================
-         DOWNLOAD EVENT
-      ======================= */
+      /* ========= DOWNLOAD ========= */
       if (r.isDownloaded && r.dateOfDownload) {
-        const d = new Date(r.dateOfDownload);
+        const downloadDate = r.dateOfDownload.split('T')[0];
 
-        if (d >= startDateObj && d <= endDateObj) {
-          const day = d.toISOString().split('T')[0];
-
+        if (downloadDate >= startDate && downloadDate <= endDate) {
           totalDownloads++;
-          dayWiseMap[day] ??= { date: day, downloads: 0, payments: 0 };
-          dayWiseMap[day].downloads++;
 
-          // ✅ Correct unpaid logic: payment must be IN RANGE
+          dayWiseMap[downloadDate] ??= {
+            date: downloadDate,
+            downloads: 0,
+            payments: 0
+          };
+          dayWiseMap[downloadDate].downloads++;
+
           const paymentInRange =
             r.hasPaid &&
             r.dateOfPayment &&
-            new Date(r.dateOfPayment) >= startDateObj &&
-            new Date(r.dateOfPayment) <= endDateObj;
+            r.dateOfPayment.split('T')[0] >= startDate &&
+            r.dateOfPayment.split('T')[0] <= endDate;
 
           if (!paymentInRange) {
             downloadsNotPaid++;
@@ -853,28 +847,27 @@ const getDownloadsVsPayments = async (req, res) => {
         }
       }
 
-      /* =======================
-         PAYMENT EVENT
-      ======================= */
+      /* ========= PAYMENT ========= */
       if (r.hasPaid && r.dateOfPayment) {
-        const p = new Date(r.dateOfPayment);
+        const paymentDate = r.dateOfPayment.split('T')[0];
 
-        if (p >= startDateObj && p <= endDateObj) {
-          const day = p.toISOString().split('T')[0];
-
+        if (paymentDate >= startDate && paymentDate <= endDate) {
           totalPayments++;
-          dayWiseMap[day] ??= { date: day, downloads: 0, payments: 0 };
-          dayWiseMap[day].payments++;
+
+          dayWiseMap[paymentDate] ??= {
+            date: paymentDate,
+            downloads: 0,
+            payments: 0
+          };
+          dayWiseMap[paymentDate].payments++;
         }
       }
 
     });
 
-    // ✅ Sort day-wise data (latest first)
     const dayWiseBreakdown = Object.values(dayWiseMap)
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
+      .sort((a, b) => b.date.localeCompare(a.date));
 
-    // ✅ Conversion rate
     const conversionRate =
       totalDownloads > 0
         ? ((totalPayments / totalDownloads) * 100).toFixed(1)
