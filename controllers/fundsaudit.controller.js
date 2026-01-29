@@ -892,8 +892,10 @@ const getDownloadsVsPayments = async (req, res) => {
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    const fromDate = new Date(startDate + 'T00:00:00');
-    const toDate = new Date(endDate + 'T23:59:59.999');
+    // ✅ FIXED: Use DATE comparisons, not datetime comparisons
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    endDateObj.setHours(23, 59, 59, 999); // End of day
 
     // ✅ FIXED: Get ALL filtered records ONCE (same as datefilterall)
     const allFilteredRecordsQuery = await model.FundsAudit.sequelize.query(
@@ -903,13 +905,12 @@ const getDownloadsVsPayments = async (req, res) => {
         "isDownloaded",
         "hasPaid",
         "dateOfDownload",
-        "dateOfPayment",
-        "createdAt"
+        "dateOfPayment"
       FROM "FundsAudits"
       WHERE (
-        (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+        (DATE("dateOfDownload") >= DATE(:startDate) AND DATE("dateOfDownload") <= DATE(:endDate))
         OR
-        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+        (DATE("dateOfPayment") >= DATE(:startDate) AND DATE("dateOfPayment") <= DATE(:endDate))
       )
       `,
       {
@@ -928,9 +929,26 @@ const getDownloadsVsPayments = async (req, res) => {
     // Day-wise counters - ONLY for dates in the filter range
     const dayWiseMap = {};
 
+    // Create a helper function to check if a date is within range
+    const isDateInRange = (date) => {
+      if (!date) return false;
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0);
+      
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      
+      return dateOnly >= start && dateOnly <= end;
+    };
+
     // Pre-fill the day-wise map with all dates in range
-    const currentDate = new Date(fromDate);
-    while (currentDate <= toDate) {
+    const currentDate = new Date(startDate);
+    const lastDate = new Date(endDate);
+    
+    while (currentDate <= lastDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
       dayWiseMap[dateStr] = { date: dateStr, downloads: 0, payments: 0 };
       currentDate.setDate(currentDate.getDate() + 1);
@@ -944,17 +962,15 @@ const getDownloadsVsPayments = async (req, res) => {
         // Determine which date to use for grouping - MUST BE IN RANGE
         let groupDate = null;
         
-        // Check download date first
-        if (record.dateOfDownload && 
-            new Date(record.dateOfDownload) >= fromDate &&
-            new Date(record.dateOfDownload) <= toDate) {
-          groupDate = record.dateOfDownload.toISOString().split('T')[0];
+        // Check if download date is in range
+        if (record.dateOfDownload && isDateInRange(record.dateOfDownload)) {
+          const downloadDate = new Date(record.dateOfDownload);
+          groupDate = downloadDate.toISOString().split('T')[0];
         }
-        // If download date not in range, check payment date
-        else if (record.dateOfPayment && 
-                new Date(record.dateOfPayment) >= fromDate &&
-                new Date(record.dateOfPayment) <= toDate) {
-          groupDate = record.dateOfPayment.toISOString().split('T')[0];
+        // If download date not in range, check if payment date is in range
+        else if (record.dateOfPayment && isDateInRange(record.dateOfPayment)) {
+          const paymentDate = new Date(record.dateOfPayment);
+          groupDate = paymentDate.toISOString().split('T')[0];
         }
         
         if (groupDate && dayWiseMap[groupDate]) {
@@ -969,17 +985,15 @@ const getDownloadsVsPayments = async (req, res) => {
         // Determine which date to use for grouping - MUST BE IN RANGE
         let groupDate = null;
         
-        // Check payment date first
-        if (record.dateOfPayment && 
-            new Date(record.dateOfPayment) >= fromDate &&
-            new Date(record.dateOfPayment) <= toDate) {
-          groupDate = record.dateOfPayment.toISOString().split('T')[0];
+        // Check if payment date is in range
+        if (record.dateOfPayment && isDateInRange(record.dateOfPayment)) {
+          const paymentDate = new Date(record.dateOfPayment);
+          groupDate = paymentDate.toISOString().split('T')[0];
         }
-        // If payment date not in range, check download date
-        else if (record.dateOfDownload && 
-                new Date(record.dateOfDownload) >= fromDate &&
-                new Date(record.dateOfDownload) <= toDate) {
-          groupDate = record.dateOfDownload.toISOString().split('T')[0];
+        // If payment date not in range, check if download date is in range
+        else if (record.dateOfDownload && isDateInRange(record.dateOfDownload)) {
+          const downloadDate = new Date(record.dateOfDownload);
+          groupDate = downloadDate.toISOString().split('T')[0];
         }
         
         if (groupDate && dayWiseMap[groupDate]) {
@@ -1008,10 +1022,11 @@ const getDownloadsVsPayments = async (req, res) => {
       totalDownloads, 
       totalPayments, 
       downloadsNotPaid,
-      conversionRate 
+      conversionRate,
+      dayWiseBreakdownDates: dayWiseBreakdown.map(d => d.date)
     });
 
-    // ✅ VERIFICATION: This should be true
+    // ✅ VERIFICATION
     const verification = (totalPayments + downloadsNotPaid) === totalDownloads;
     if (!verification) {
       console.warn("[WARNING] Math doesn't add up! Check data consistency.");
