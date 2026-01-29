@@ -892,6 +892,9 @@ const getDownloadsVsPayments = async (req, res) => {
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
+    const fromDate = new Date(startDate + 'T00:00:00');
+    const toDate = new Date(endDate + 'T23:59:59.999');
+
     // ✅ FIXED: Get ALL filtered records ONCE (same as datefilterall)
     const allFilteredRecordsQuery = await model.FundsAudit.sequelize.query(
       `
@@ -900,7 +903,8 @@ const getDownloadsVsPayments = async (req, res) => {
         "isDownloaded",
         "hasPaid",
         "dateOfDownload",
-        "dateOfPayment"
+        "dateOfPayment",
+        "createdAt"
       FROM "FundsAudits"
       WHERE (
         (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
@@ -921,29 +925,39 @@ const getDownloadsVsPayments = async (req, res) => {
     let totalPayments = 0;
     let downloadsNotPaid = 0;
     
-    // Day-wise counters
+    // Day-wise counters - ONLY for dates in the filter range
     const dayWiseMap = {};
+
+    // Pre-fill the day-wise map with all dates in range
+    const currentDate = new Date(fromDate);
+    while (currentDate <= toDate) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      dayWiseMap[dateStr] = { date: dateStr, downloads: 0, payments: 0 };
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
     allFilteredRecordsQuery.forEach(record => {
       // Count downloads
       if (record.isDownloaded === true) {
         totalDownloads++;
         
-        // Determine which date to use for grouping
+        // Determine which date to use for grouping - MUST BE IN RANGE
         let groupDate = null;
         
+        // Check download date first
         if (record.dateOfDownload && 
-            new Date(record.dateOfDownload) >= new Date(startDate + 'T00:00:00') &&
-            new Date(record.dateOfDownload) <= new Date(endDate + 'T23:59:59.999')) {
+            new Date(record.dateOfDownload) >= fromDate &&
+            new Date(record.dateOfDownload) <= toDate) {
           groupDate = record.dateOfDownload.toISOString().split('T')[0];
-        } else if (record.dateOfPayment) {
+        }
+        // If download date not in range, check payment date
+        else if (record.dateOfPayment && 
+                new Date(record.dateOfPayment) >= fromDate &&
+                new Date(record.dateOfPayment) <= toDate) {
           groupDate = record.dateOfPayment.toISOString().split('T')[0];
         }
         
-        if (groupDate) {
-          if (!dayWiseMap[groupDate]) {
-            dayWiseMap[groupDate] = { date: groupDate, downloads: 0, payments: 0 };
-          }
+        if (groupDate && dayWiseMap[groupDate]) {
           dayWiseMap[groupDate].downloads++;
         }
       }
@@ -952,21 +966,23 @@ const getDownloadsVsPayments = async (req, res) => {
       if (record.hasPaid === true) {
         totalPayments++;
         
-        // Determine which date to use for grouping
+        // Determine which date to use for grouping - MUST BE IN RANGE
         let groupDate = null;
         
+        // Check payment date first
         if (record.dateOfPayment && 
-            new Date(record.dateOfPayment) >= new Date(startDate + 'T00:00:00') &&
-            new Date(record.dateOfPayment) <= new Date(endDate + 'T23:59:59.999')) {
+            new Date(record.dateOfPayment) >= fromDate &&
+            new Date(record.dateOfPayment) <= toDate) {
           groupDate = record.dateOfPayment.toISOString().split('T')[0];
-        } else if (record.dateOfDownload) {
+        }
+        // If payment date not in range, check download date
+        else if (record.dateOfDownload && 
+                new Date(record.dateOfDownload) >= fromDate &&
+                new Date(record.dateOfDownload) <= toDate) {
           groupDate = record.dateOfDownload.toISOString().split('T')[0];
         }
         
-        if (groupDate) {
-          if (!dayWiseMap[groupDate]) {
-            dayWiseMap[groupDate] = { date: groupDate, downloads: 0, payments: 0 };
-          }
+        if (groupDate && dayWiseMap[groupDate]) {
           dayWiseMap[groupDate].payments++;
         }
       }
@@ -977,8 +993,9 @@ const getDownloadsVsPayments = async (req, res) => {
       }
     });
 
-    // Convert dayWiseMap to array and sort
+    // Convert dayWiseMap to array, filter out dates with no activity, and sort
     const dayWiseBreakdown = Object.values(dayWiseMap)
+      .filter(day => day.downloads > 0 || day.payments > 0)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     // ✅ FIXED: Conversion Rate
@@ -987,11 +1004,10 @@ const getDownloadsVsPayments = async (req, res) => {
       : 0;
 
     console.debug("[DEBUG] Consistent Summary ->", { 
-      allFilteredRecords, // Should match datefilterall's "total"
+      allFilteredRecords,
       totalDownloads, 
       totalPayments, 
       downloadsNotPaid,
-      expectedTotal: totalPayments + (totalDownloads - totalPayments),
       conversionRate 
     });
 
@@ -1004,7 +1020,7 @@ const getDownloadsVsPayments = async (req, res) => {
     return ReS(res, {
       success: true,
       summary: {
-        totalFilteredRecords: allFilteredRecords, // Should equal datefilterall's "total"
+        totalFilteredRecords: allFilteredRecords,
         totalDownloads,
         totalPayments,
         downloadsNotPaid,
