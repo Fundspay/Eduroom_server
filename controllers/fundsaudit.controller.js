@@ -759,6 +759,7 @@ const getEntriesByDateRange = async (req, res) => {
         "dateOfPayment",
         "dateOfDownload",
         "hasPaid",
+        "referrer",
         "isDownloaded",
         "createdAt",
         "updatedAt"
@@ -827,6 +828,7 @@ const getEntriesByDateRange = async (req, res) => {
         dateOfPayment: record.dateOfPayment,
         dateOfDownload: record.dateOfDownload,
         hasPaid: record.hasPaid,
+             referrer: record.referrer,
         isDownloaded: record.isDownloaded,
         managerName: assignedManager,
         createdAt: record.createdAt,
@@ -863,23 +865,64 @@ const getDownloadsVsPayments = async (req, res) => {
 
     console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
 
+    // ✅ Get today's date for today's stats
+    const now = new Date();
+    const formatDate = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    const today = formatDate(now);
+
     // ✅ DEFAULT TO TODAY IF NO DATES PROVIDED
     if (!startDate || !endDate) {
-      const now = new Date();
-      
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      startDate = formatDate(now);
-      endDate = formatDate(now);
+      startDate = today;
+      endDate = today;
     }
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
+    // ========================================
+    // 📊 TODAY'S STATS (Always calculated)
+    // ========================================
+    const todayDownloadsResult = await model.FundsAudit.sequelize.query(
+      `
+      SELECT COUNT(*) AS count
+      FROM "FundsAudits"
+      WHERE "isDownloaded" = true
+        AND DATE("dateOfDownload") = :today
+      `,
+      {
+        replacements: { today },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
+    const todayDownloads = parseInt(todayDownloadsResult[0]?.count || 0);
+
+    const todayPaymentsResult = await model.FundsAudit.sequelize.query(
+      `
+      SELECT COUNT(*) AS count
+      FROM "FundsAudits"
+      WHERE "hasPaid" = true
+        AND DATE("dateOfPayment") = :today
+      `,
+      {
+        replacements: { today },
+        type: model.FundsAudit.sequelize.QueryTypes.SELECT
+      }
+    );
+    const todayPayments = parseInt(todayPaymentsResult[0]?.count || 0);
+
+    const todayConversionRate = todayDownloads > 0 
+      ? ((todayPayments / todayDownloads) * 100).toFixed(1)
+      : '0.0';
+
+    // ========================================
+    // 📊 SELECTED RANGE STATS
+    // ========================================
+    
     // ✅ TOTAL DOWNLOADS in date range
     const downloadsResult = await model.FundsAudit.sequelize.query(
       `
@@ -987,12 +1030,15 @@ const getDownloadsVsPayments = async (req, res) => {
       new Date(b.date) - new Date(a.date)
     );
 
-    // ✅ CONVERSION RATE
+    // ✅ CONVERSION RATE for selected range
     const conversionRate = totalDownloads > 0 
       ? ((totalPayments / totalDownloads) * 100).toFixed(2)
-      : 0;
+      : '0.0';
 
     console.debug("[DEBUG] Summary ->", { 
+      todayDownloads,
+      todayPayments,
+      todayConversionRate,
       totalDownloads, 
       totalPayments, 
       downloadsNotPaid, 
@@ -1001,6 +1047,15 @@ const getDownloadsVsPayments = async (req, res) => {
 
     return ReS(res, {
       success: true,
+      // ✅ TODAY'S STATS (always shown)
+      today: {
+        date: today,
+        downloads: todayDownloads,
+        payments: todayPayments,
+        conversionRate: parseFloat(todayConversionRate),
+        conversionRateText: `${todayConversionRate}%`
+      },
+      // ✅ SELECTED RANGE STATS
       summary: {
         totalDownloads,
         totalPayments,
