@@ -725,144 +725,68 @@ const getEntriesByDateRange = async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
 
-    console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
-
-    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
     if (!startDate || !endDate) {
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-      
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      startDate = formatDate(firstDay);
-      endDate = formatDate(lastDay);
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString().split('T')[0];
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString().split('T')[0];
     }
 
-    console.debug("[DEBUG] Date range ->", { startDate, endDate });
+    const startDateObj = new Date(startDate);
+    const endDateObj = new Date(endDate);
+    endDateObj.setHours(23, 59, 59, 999);
 
-    // ✅ CORRECTED: Filter on BOTH dateOfDownload AND dateOfPayment
-    // Show entries where EITHER download OR payment happened in date range
-    const fundsAuditRecords = await model.FundsAudit.sequelize.query(
-      `
-      SELECT 
-        id,
-        "userId",
-        "firstName",
-        "lastName",
-        "phoneNumber",
-        email,
-        "dateOfPayment",
-        "dateOfDownload",
-        "hasPaid",
-        "referrer",
-        "isDownloaded",
-        "createdAt",
-        "updatedAt"
-      FROM "FundsAudits"
-      WHERE (
-        -- Download happened in date range
-        (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
-        OR
-        -- OR payment happened in date range
-        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
-      )
-      ORDER BY "createdAt" DESC
-      `,
-      {
-        replacements: { startDate, endDate },
-        type: model.FundsAudit.sequelize.QueryTypes.SELECT
-      }
-    );
-
-    console.debug("[DEBUG] Total entries in date range:", fundsAuditRecords.length);
-
-    if (fundsAuditRecords.length === 0) {
-      return ReS(res, {
-        success: true,
-        data: [],
-        count: 0,
-        appliedFilters: { startDate, endDate }
-      });
-    }
-
-    // Get all unique userIds from FundsAudit
-    const userIds = [...new Set(fundsAuditRecords.map(f => f.userId))];
-    console.debug("[DEBUG] Unique user IDs:", userIds.length);
-
-    // Fetch Users to get their phone numbers
-    const users = await model.User.findAll({
-      where: { id: userIds },
-      attributes: ['id', 'phoneNumber'],
+    const records = await model.FundsAudit.findAll({
+      where: {
+        [Op.or]: [
+          { dateOfDownload: { [Op.between]: [startDateObj, endDateObj] } },
+          { dateOfPayment: { [Op.between]: [startDateObj, endDateObj] } }
+        ]
+      },
       raw: true
     });
 
-    // Create userId -> phoneNumber map
-    const userPhoneMap = {};
-    users.forEach(u => {
-      userPhoneMap[u.id] = u.phoneNumber;
-    });
+    const formattedRecords = records.map(r => {
+      const downloadInRange =
+        r.dateOfDownload &&
+        new Date(r.dateOfDownload) >= startDateObj &&
+        new Date(r.dateOfDownload) <= endDateObj;
 
-    // Fetch all StudentResumes to get manager allocations
-    const allPhoneNumbers = users.map(u => u.phoneNumber).filter(Boolean);
-    const studentResumes = await model.StudentResume.findAll({
-      where: { mobileNumber: allPhoneNumbers },
-      attributes: ['mobileNumber', 'alloted'],
-      raw: true
-    });
-
-    // Create phoneNumber -> manager map
-    const phoneManagerMap = {};
-    studentResumes.forEach(s => {
-      phoneManagerMap[s.mobileNumber] = s.alloted;
-    });
-
-    console.debug("[DEBUG] Phone-Manager mappings:", Object.keys(phoneManagerMap).length);
-
-    // Format the response with manager information
-    const formattedRecords = fundsAuditRecords.map(record => {
-      const userPhone = userPhoneMap[record.userId];
-      const assignedManager = phoneManagerMap[userPhone] || null;
+      const paymentInRange =
+        r.dateOfPayment &&
+        new Date(r.dateOfPayment) >= startDateObj &&
+        new Date(r.dateOfPayment) <= endDateObj;
 
       return {
-        id: record.id,
-        userId: record.userId,
-        name: `${record.firstName || ''} ${record.lastName || ''}`.trim() || null,
-        phoneNumber: record.phoneNumber,
-        email: record.email,
-        dateOfPayment: record.dateOfPayment,
-        dateOfDownload: record.dateOfDownload,
-        hasPaid: record.hasPaid,
-        referrer: record.referrer,
-        isDownloaded: record.isDownloaded,
-        managerName: assignedManager,
-        createdAt: record.createdAt,
-        updatedAt: record.updatedAt
+        id: r.id,
+        userId: r.userId,
+        name: `${r.firstName || ''} ${r.lastName || ''}`.trim() || null,
+        phoneNumber: r.phoneNumber,
+        email: r.email,
+        dateOfDownload: downloadInRange ? r.dateOfDownload : null,
+        dateOfPayment: paymentInRange ? r.dateOfPayment : null,
+        isDownloaded: downloadInRange ? r.isDownloaded : false,
+        hasPaid: paymentInRange ? r.hasPaid : false,
+        referrer: r.referrer,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt
       };
     });
-
-    // Separate paid and unpaid
-    const paidEntries = formattedRecords.filter(r => r.hasPaid === true);
-    const unpaidEntries = formattedRecords.filter(r => r.hasPaid === false || r.hasPaid === null);
 
     return ReS(res, {
       success: true,
       data: formattedRecords,
       summary: {
         total: formattedRecords.length,
-        paid: paidEntries.length,
-        unpaid: unpaidEntries.length
+        downloads: formattedRecords.filter(r => r.isDownloaded).length,
+        payments: formattedRecords.filter(r => r.hasPaid).length
       },
       appliedFilters: { startDate, endDate }
     });
 
   } catch (error) {
-    console.error("[ERROR] Get Entries By Date Range:", error);
+    console.error(error);
     return ReE(res, error.message, 500);
   }
 };
@@ -873,162 +797,87 @@ const getDownloadsVsPayments = async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
 
-    console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
-
-    // ✅ DEFAULT TO TODAY IF NO DATES PROVIDED
     if (!startDate || !endDate) {
-      const now = new Date();
-      
-      const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-      };
-      
-      startDate = formatDate(now);
-      endDate = formatDate(now);
-      console.debug("[DEBUG] Defaulting to today ->", { startDate, endDate });
+      const today = new Date().toISOString().split('T')[0];
+      startDate = today;
+      endDate = today;
     }
 
-    console.debug("[DEBUG] Date range ->", { startDate, endDate });
-
-    // ✅ FIXED: Use DATE comparisons consistently
     const startDateObj = new Date(startDate);
     const endDateObj = new Date(endDate);
-    endDateObj.setHours(23, 59, 59, 999); // End of day
+    endDateObj.setHours(23, 59, 59, 999);
 
-    // ✅ SIMPLIFIED: Get ALL filtered records (same logic as datefilterall)
-    const allFilteredRecordsQuery = await model.FundsAudit.findAll({
-      where: {
-        [Op.or]: [
-          {
-            dateOfDownload: {
-              [Op.between]: [startDateObj, endDateObj]
-            }
-          },
-          {
-            dateOfPayment: {
-              [Op.between]: [startDateObj, endDateObj]
-            }
-          }
-        ]
-      },
-      attributes: ['id', 'isDownloaded', 'hasPaid', 'dateOfDownload', 'dateOfPayment'],
+    const records = await model.FundsAudit.findAll({
+      attributes: [
+        'dateOfDownload',
+        'dateOfPayment',
+        'isDownloaded',
+        'hasPaid'
+      ],
       raw: true
     });
 
-    const allFilteredRecords = allFilteredRecordsQuery.length;
-    console.debug("[DEBUG] Total filtered records:", allFilteredRecords);
-
-    // Initialize counters
     let totalDownloads = 0;
     let totalPayments = 0;
     let downloadsNotPaid = 0;
-    
-    // Day-wise counters
+
     const dayWiseMap = {};
 
-    // Process each record
-    allFilteredRecordsQuery.forEach(record => {
-      // Determine which date to use for this record
-      let recordDate = null;
-      
-      // Check which date field is within range
-      if (record.dateOfDownload && 
-          new Date(record.dateOfDownload) >= startDateObj && 
-          new Date(record.dateOfDownload) <= endDateObj) {
-        recordDate = new Date(record.dateOfDownload).toISOString().split('T')[0];
-      } else if (record.dateOfPayment && 
-                new Date(record.dateOfPayment) >= startDateObj && 
-                new Date(record.dateOfPayment) <= endDateObj) {
-        recordDate = new Date(record.dateOfPayment).toISOString().split('T')[0];
+    records.forEach(r => {
+
+      // DOWNLOAD EVENT
+      if (r.isDownloaded && r.dateOfDownload) {
+        const d = new Date(r.dateOfDownload);
+        if (d >= startDateObj && d <= endDateObj) {
+          const day = d.toISOString().split('T')[0];
+
+          totalDownloads++;
+          dayWiseMap[day] ??= { date: day, downloads: 0, payments: 0 };
+          dayWiseMap[day].downloads++;
+
+          if (!r.hasPaid) {
+            downloadsNotPaid++;
+          }
+        }
       }
-      
-      // If no date in range, skip this record (shouldn't happen)
-      if (!recordDate) {
-        console.warn("[WARN] Record has no date in range:", record.id);
-        return;
+
+      // PAYMENT EVENT
+      if (r.hasPaid && r.dateOfPayment) {
+        const p = new Date(r.dateOfPayment);
+        if (p >= startDateObj && p <= endDateObj) {
+          const day = p.toISOString().split('T')[0];
+
+          totalPayments++;
+          dayWiseMap[day] ??= { date: day, downloads: 0, payments: 0 };
+          dayWiseMap[day].payments++;
+        }
       }
-      
-      // Initialize day in map if not exists
-      if (!dayWiseMap[recordDate]) {
-        dayWiseMap[recordDate] = { date: recordDate, downloads: 0, payments: 0 };
-      }
-      
-      // Count downloads
-      if (record.isDownloaded === true) {
-        totalDownloads++;
-        dayWiseMap[recordDate].downloads++;
-      }
-      
-      // Count payments
-      if (record.hasPaid === true) {
-        totalPayments++;
-        dayWiseMap[recordDate].payments++;
-      }
-      
-      // Count downloads not paid
-      if (record.isDownloaded === true && record.hasPaid === false) {
-        downloadsNotPaid++;
-      }
+
     });
 
-    // Convert dayWiseMap to array and sort
     const dayWiseBreakdown = Object.values(dayWiseMap)
       .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // ✅ Calculate conversion rate using your variable naming convention
-    const todayConversionRate = totalDownloads > 0 
-      ? ((totalPayments / totalDownloads) * 100).toFixed(1)
-      : 0.0;
-
-    // ✅ Verify counts match
-    const dayWiseDownloads = dayWiseBreakdown.reduce((sum, day) => sum + day.downloads, 0);
-    const dayWisePayments = dayWiseBreakdown.reduce((sum, day) => sum + day.payments, 0);
-    
-    const downloadsMatch = totalDownloads === dayWiseDownloads;
-    const paymentsMatch = totalPayments === dayWisePayments;
-    const mathConsistent = (totalPayments + downloadsNotPaid) === totalDownloads;
-
-    if (!downloadsMatch || !paymentsMatch) {
-      console.error("[ERROR] Counts don't match!", {
-        totalDownloads,
-        dayWiseDownloads,
-        totalPayments,
-        dayWisePayments
-      });
-    }
-
-    console.debug("[DEBUG] Final summary ->", { 
-      totalDownloads, 
-      totalPayments, 
-      downloadsNotPaid,
-      todayConversionRate,
-      downloadsMatch,
-      paymentsMatch,
-      mathConsistent
-    });
+    const conversionRate =
+      totalDownloads > 0
+        ? ((totalPayments / totalDownloads) * 100).toFixed(1)
+        : '0.0';
 
     return ReS(res, {
       success: true,
       summary: {
-        totalFilteredRecords: allFilteredRecords,
         totalDownloads,
         totalPayments,
         downloadsNotPaid,
-        todayConversionRate: parseFloat(todayConversionRate),
-        todayConversionRateText: `${todayConversionRate}%`
+        conversionRate: parseFloat(conversionRate),
+        conversionRateText: `${conversionRate}%`
       },
       dayWiseBreakdown,
-      appliedFilters: {
-        startDate,
-        endDate
-      }
+      appliedFilters: { startDate, endDate }
     });
 
   } catch (error) {
-    console.error("[ERROR] Get Downloads vs Payments:", error);
+    console.error(error);
     return ReE(res, error.message, 500);
   }
 };
