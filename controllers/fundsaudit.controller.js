@@ -803,6 +803,15 @@ const getDownloadsVsPayments = async (req, res) => {
       endDate = today;
     }
 
+    // ✅ Date normalizer (handles Date + string)
+    const toDateOnly = (val) => {
+      if (!val) return null;
+      if (val instanceof Date) {
+        return val.toISOString().split('T')[0];
+      }
+      return String(val).split('T')[0];
+    };
+
     const records = await model.FundsAudit.findAll({
       attributes: [
         'dateOfDownload',
@@ -823,7 +832,7 @@ const getDownloadsVsPayments = async (req, res) => {
 
       /* ========= DOWNLOAD ========= */
       if (r.isDownloaded && r.dateOfDownload) {
-        const downloadDate = r.dateOfDownload.split('T')[0];
+        const downloadDate = toDateOnly(r.dateOfDownload);
 
         if (downloadDate >= startDate && downloadDate <= endDate) {
           totalDownloads++;
@@ -835,11 +844,12 @@ const getDownloadsVsPayments = async (req, res) => {
           };
           dayWiseMap[downloadDate].downloads++;
 
+          const paymentDate = toDateOnly(r.dateOfPayment);
           const paymentInRange =
             r.hasPaid &&
-            r.dateOfPayment &&
-            r.dateOfPayment.split('T')[0] >= startDate &&
-            r.dateOfPayment.split('T')[0] <= endDate;
+            paymentDate &&
+            paymentDate >= startDate &&
+            paymentDate <= endDate;
 
           if (!paymentInRange) {
             downloadsNotPaid++;
@@ -849,7 +859,7 @@ const getDownloadsVsPayments = async (req, res) => {
 
       /* ========= PAYMENT ========= */
       if (r.hasPaid && r.dateOfPayment) {
-        const paymentDate = r.dateOfPayment.split('T')[0];
+        const paymentDate = toDateOnly(r.dateOfPayment);
 
         if (paymentDate >= startDate && paymentDate <= endDate) {
           totalPayments++;
