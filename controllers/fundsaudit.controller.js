@@ -886,99 +886,27 @@ const getDownloadsVsPayments = async (req, res) => {
         return `${year}-${month}-${day}`;
       };
       
-      // Set both to today's date
       startDate = formatDate(now);
       endDate = formatDate(now);
     }
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    // Build date filter
-    const fromDate = new Date(startDate + 'T00:00:00');
-    const toDate = new Date(endDate + 'T23:59:59.999');
-
-    // ✅ CONSISTENT: TOTAL DOWNLOADS - Downloads within date range
-    const totalDownloads = await model.FundsAudit.count({
-      where: {
-        isDownloaded: true,
-        [Op.or]: [
-          {
-            dateOfDownload: {
-              [Op.between]: [fromDate, toDate]
-            }
-          },
-          {
-            dateOfPayment: {
-              [Op.between]: [fromDate, toDate]
-            }
-          }
-        ]
-      }
-    });
-
-    // ✅ CONSISTENT: TOTAL PAYMENTS - Payments within date range
-    const totalPayments = await model.FundsAudit.count({
-      where: {
-        hasPaid: true,
-        [Op.or]: [
-          {
-            dateOfDownload: {
-              [Op.between]: [fromDate, toDate]
-            }
-          },
-          {
-            dateOfPayment: {
-              [Op.between]: [fromDate, toDate]
-            }
-          }
-        ]
-      }
-    });
-
-    // ✅ CONSISTENT: DOWNLOADS NOT CONVERTED TO PAYMENTS
-    const downloadsNotPaid = await model.FundsAudit.count({
-      where: {
-        isDownloaded: true,
-        hasPaid: false,
-        [Op.or]: [
-          {
-            dateOfDownload: {
-              [Op.between]: [fromDate, toDate]
-            }
-          },
-          {
-            dateOfPayment: {
-              [Op.between]: [fromDate, toDate]
-            }
-          }
-        ]
-      }
-    });
-
-    // ✅ CONSISTENT: Downloads per day - Show either download OR payment in date
-    const downloadsPerDay = await model.FundsAudit.sequelize.query(
+    // ✅ FIXED: Get ALL filtered records ONCE (same as datefilterall)
+    const allFilteredRecordsQuery = await model.FundsAudit.sequelize.query(
       `
       SELECT 
-        date,
-        COUNT(*) as count
-      FROM (
-        SELECT 
-          CASE 
-            WHEN DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate 
-            THEN DATE("dateOfDownload")
-            ELSE DATE("dateOfPayment")
-          END as date
-        FROM "FundsAudits"
-        WHERE "isDownloaded" = true
-          AND (
-            (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
-            OR
-            (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
-          )
-      ) as filtered_data
-      WHERE date IS NOT NULL
-      GROUP BY date
-      ORDER BY date DESC
+        id,
+        "isDownloaded",
+        "hasPaid",
+        "dateOfDownload",
+        "dateOfPayment"
+      FROM "FundsAudits"
+      WHERE (
+        (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+        OR
+        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+      )
       `,
       {
         replacements: { startDate, endDate },
@@ -986,77 +914,103 @@ const getDownloadsVsPayments = async (req, res) => {
       }
     );
 
-    // ✅ CONSISTENT: Payments per day - Show either download OR payment in date
-    const paymentsPerDay = await model.FundsAudit.sequelize.query(
-      `
-      SELECT 
-        date,
-        COUNT(*) as count
-      FROM (
-        SELECT 
-          CASE 
-            WHEN DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate 
-            THEN DATE("dateOfPayment")
-            ELSE DATE("dateOfDownload")
-          END as date
-        FROM "FundsAudits"
-        WHERE "hasPaid" = true
-          AND (
-            (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
-            OR
-            (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
-          )
-      ) as filtered_data
-      WHERE date IS NOT NULL
-      GROUP BY date
-      ORDER BY date DESC
-      `,
-      {
-        replacements: { startDate, endDate },
-        type: model.FundsAudit.sequelize.QueryTypes.SELECT
-      }
-    );
+    const allFilteredRecords = allFilteredRecordsQuery.length;
 
-    // Create day-wise map
-    const dayWiseMap = {};
+    // ✅ FIXED: Calculate metrics from the SAME dataset
+    let totalDownloads = 0;
+    let totalPayments = 0;
+    let downloadsNotPaid = 0;
     
-    downloadsPerDay.forEach(row => {
-      const date = row.date;
-      if (!dayWiseMap[date]) dayWiseMap[date] = { date, downloads: 0, payments: 0 };
-      dayWiseMap[date].downloads = parseInt(row.count);
+    // Day-wise counters
+    const dayWiseMap = {};
+
+    allFilteredRecordsQuery.forEach(record => {
+      // Count downloads
+      if (record.isDownloaded === true) {
+        totalDownloads++;
+        
+        // Determine which date to use for grouping
+        let groupDate = null;
+        
+        if (record.dateOfDownload && 
+            new Date(record.dateOfDownload) >= new Date(startDate + 'T00:00:00') &&
+            new Date(record.dateOfDownload) <= new Date(endDate + 'T23:59:59.999')) {
+          groupDate = record.dateOfDownload.toISOString().split('T')[0];
+        } else if (record.dateOfPayment) {
+          groupDate = record.dateOfPayment.toISOString().split('T')[0];
+        }
+        
+        if (groupDate) {
+          if (!dayWiseMap[groupDate]) {
+            dayWiseMap[groupDate] = { date: groupDate, downloads: 0, payments: 0 };
+          }
+          dayWiseMap[groupDate].downloads++;
+        }
+      }
+
+      // Count payments
+      if (record.hasPaid === true) {
+        totalPayments++;
+        
+        // Determine which date to use for grouping
+        let groupDate = null;
+        
+        if (record.dateOfPayment && 
+            new Date(record.dateOfPayment) >= new Date(startDate + 'T00:00:00') &&
+            new Date(record.dateOfPayment) <= new Date(endDate + 'T23:59:59.999')) {
+          groupDate = record.dateOfPayment.toISOString().split('T')[0];
+        } else if (record.dateOfDownload) {
+          groupDate = record.dateOfDownload.toISOString().split('T')[0];
+        }
+        
+        if (groupDate) {
+          if (!dayWiseMap[groupDate]) {
+            dayWiseMap[groupDate] = { date: groupDate, downloads: 0, payments: 0 };
+          }
+          dayWiseMap[groupDate].payments++;
+        }
+      }
+
+      // Count downloads not paid
+      if (record.isDownloaded === true && record.hasPaid === false) {
+        downloadsNotPaid++;
+      }
     });
 
-    paymentsPerDay.forEach(row => {
-      const date = row.date;
-      if (!dayWiseMap[date]) dayWiseMap[date] = { date, downloads: 0, payments: 0 };
-      dayWiseMap[date].payments = parseInt(row.count);
-    });
+    // Convert dayWiseMap to array and sort
+    const dayWiseBreakdown = Object.values(dayWiseMap)
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    // Convert to array and sort
-    const dayWiseBreakdown = Object.values(dayWiseMap).sort((a, b) => 
-      new Date(b.date) - new Date(a.date)
-    );
-
-    // ✅ CONVERSION RATE (based on filtered data)
+    // ✅ FIXED: Conversion Rate
     const conversionRate = totalDownloads > 0 
       ? ((totalPayments / totalDownloads) * 100).toFixed(2)
       : 0;
 
-    console.debug("[DEBUG] Summary ->", { 
+    console.debug("[DEBUG] Consistent Summary ->", { 
+      allFilteredRecords, // Should match datefilterall's "total"
       totalDownloads, 
       totalPayments, 
-      downloadsNotPaid, 
+      downloadsNotPaid,
+      expectedTotal: totalPayments + (totalDownloads - totalPayments),
       conversionRate 
     });
+
+    // ✅ VERIFICATION: This should be true
+    const verification = (totalPayments + downloadsNotPaid) === totalDownloads;
+    if (!verification) {
+      console.warn("[WARNING] Math doesn't add up! Check data consistency.");
+    }
 
     return ReS(res, {
       success: true,
       summary: {
+        totalFilteredRecords: allFilteredRecords, // Should equal datefilterall's "total"
         totalDownloads,
         totalPayments,
         downloadsNotPaid,
         conversionRate: parseFloat(conversionRate),
-        conversionRateText: `${conversionRate}%`
+        conversionRateText: `${conversionRate}%`,
+        verification: verification ? "Data consistent" : "Data inconsistency detected"
       },
       dayWiseBreakdown,
       appliedFilters: {
