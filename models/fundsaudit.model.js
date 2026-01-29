@@ -17,6 +17,7 @@ module.exports = (sequelize, Sequelize) => {
       isDownloaded: { type: Sequelize.BOOLEAN, allowNull: true },
       queryStatus: { type: Sequelize.STRING, allowNull: true },
       isQueryRaised: { type: Sequelize.BOOLEAN, allowNull: true },
+      referrer: { type: Sequelize.STRING, allowNull: true },
       occupation: { type: Sequelize.STRING, allowNull: true },
       managerReview: { type: Sequelize.STRING, allowNull: true, defaultValue: "Null" },
       userReview: { type: Sequelize.STRING, allowNull: true, defaultValue: " Null" },
