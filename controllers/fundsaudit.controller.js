@@ -746,8 +746,8 @@ const getEntriesByDateRange = async (req, res) => {
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
 
-    // ✅ FIXED: Strictly filter - download date must be within range
-    // If payment exists, it can be any date (we just show it)
+    // ✅ CORRECTED: Filter on BOTH dateOfDownload AND dateOfPayment
+    // Show entries where EITHER download OR payment happened in date range
     const fundsAuditRecords = await model.FundsAudit.sequelize.query(
       `
       SELECT 
@@ -760,12 +760,18 @@ const getEntriesByDateRange = async (req, res) => {
         "dateOfPayment",
         "dateOfDownload",
         "hasPaid",
+        "referrer",
         "isDownloaded",
         "createdAt",
         "updatedAt"
       FROM "FundsAudits"
-      WHERE DATE("dateOfDownload") >= :startDate 
-        AND DATE("dateOfDownload") <= :endDate
+      WHERE (
+        -- Download happened in date range
+        (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+        OR
+        -- OR payment happened in date range
+        (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+      )
       ORDER BY "createdAt" DESC
       `,
       {
@@ -832,6 +838,7 @@ const getEntriesByDateRange = async (req, res) => {
         dateOfPayment: record.dateOfPayment,
         dateOfDownload: record.dateOfDownload,
         hasPaid: record.hasPaid,
+        referrer: record.referrer,
         isDownloaded: record.isDownloaded,
         managerName: assignedManager,
         createdAt: record.createdAt,
@@ -890,49 +897,88 @@ const getDownloadsVsPayments = async (req, res) => {
     const fromDate = new Date(startDate + 'T00:00:00');
     const toDate = new Date(endDate + 'T23:59:59.999');
 
-    // ✅ FIXED: TOTAL DOWNLOADS - Only count downloads within the date range
+    // ✅ CONSISTENT: TOTAL DOWNLOADS - Downloads within date range
     const totalDownloads = await model.FundsAudit.count({
       where: {
         isDownloaded: true,
-        dateOfDownload: {
-          [Op.between]: [fromDate, toDate]
-        }
+        [Op.or]: [
+          {
+            dateOfDownload: {
+              [Op.between]: [fromDate, toDate]
+            }
+          },
+          {
+            dateOfPayment: {
+              [Op.between]: [fromDate, toDate]
+            }
+          }
+        ]
       }
     });
 
-    // ✅ FIXED: TOTAL PAYMENTS - Only count payments within the date range
+    // ✅ CONSISTENT: TOTAL PAYMENTS - Payments within date range
     const totalPayments = await model.FundsAudit.count({
       where: {
         hasPaid: true,
-        dateOfPayment: {
-          [Op.between]: [fromDate, toDate]
-        }
+        [Op.or]: [
+          {
+            dateOfDownload: {
+              [Op.between]: [fromDate, toDate]
+            }
+          },
+          {
+            dateOfPayment: {
+              [Op.between]: [fromDate, toDate]
+            }
+          }
+        ]
       }
     });
 
-    // ✅ FIXED: DOWNLOADS NOT CONVERTED TO PAYMENTS
+    // ✅ CONSISTENT: DOWNLOADS NOT CONVERTED TO PAYMENTS
     const downloadsNotPaid = await model.FundsAudit.count({
       where: {
         isDownloaded: true,
         hasPaid: false,
-        dateOfDownload: {
-          [Op.between]: [fromDate, toDate]
-        }
+        [Op.or]: [
+          {
+            dateOfDownload: {
+              [Op.between]: [fromDate, toDate]
+            }
+          },
+          {
+            dateOfPayment: {
+              [Op.between]: [fromDate, toDate]
+            }
+          }
+        ]
       }
     });
 
-    // ✅ FIXED: Downloads per day - ONLY within date range
+    // ✅ CONSISTENT: Downloads per day - Show either download OR payment in date
     const downloadsPerDay = await model.FundsAudit.sequelize.query(
       `
       SELECT 
-        DATE("dateOfDownload") AS date,
-        COUNT(*) AS count
-      FROM "FundsAudits"
-      WHERE "isDownloaded" = true
-        AND DATE("dateOfDownload") >= :startDate
-        AND DATE("dateOfDownload") <= :endDate
-      GROUP BY DATE("dateOfDownload")
-      ORDER BY DATE("dateOfDownload") DESC
+        date,
+        COUNT(*) as count
+      FROM (
+        SELECT 
+          CASE 
+            WHEN DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate 
+            THEN DATE("dateOfDownload")
+            ELSE DATE("dateOfPayment")
+          END as date
+        FROM "FundsAudits"
+        WHERE "isDownloaded" = true
+          AND (
+            (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+            OR
+            (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+          )
+      ) as filtered_data
+      WHERE date IS NOT NULL
+      GROUP BY date
+      ORDER BY date DESC
       `,
       {
         replacements: { startDate, endDate },
@@ -940,18 +986,30 @@ const getDownloadsVsPayments = async (req, res) => {
       }
     );
 
-    // ✅ FIXED: Payments per day - ONLY within date range
+    // ✅ CONSISTENT: Payments per day - Show either download OR payment in date
     const paymentsPerDay = await model.FundsAudit.sequelize.query(
       `
       SELECT 
-        DATE("dateOfPayment") AS date,
-        COUNT(*) AS count
-      FROM "FundsAudits"
-      WHERE "hasPaid" = true
-        AND DATE("dateOfPayment") >= :startDate
-        AND DATE("dateOfPayment") <= :endDate
-      GROUP BY DATE("dateOfPayment")
-      ORDER BY DATE("dateOfPayment") DESC
+        date,
+        COUNT(*) as count
+      FROM (
+        SELECT 
+          CASE 
+            WHEN DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate 
+            THEN DATE("dateOfPayment")
+            ELSE DATE("dateOfDownload")
+          END as date
+        FROM "FundsAudits"
+        WHERE "hasPaid" = true
+          AND (
+            (DATE("dateOfDownload") >= :startDate AND DATE("dateOfDownload") <= :endDate)
+            OR
+            (DATE("dateOfPayment") >= :startDate AND DATE("dateOfPayment") <= :endDate)
+          )
+      ) as filtered_data
+      WHERE date IS NOT NULL
+      GROUP BY date
+      ORDER BY date DESC
       `,
       {
         replacements: { startDate, endDate },
@@ -979,7 +1037,7 @@ const getDownloadsVsPayments = async (req, res) => {
       new Date(b.date) - new Date(a.date)
     );
 
-    // ✅ CONVERSION RATE
+    // ✅ CONVERSION RATE (based on filtered data)
     const conversionRate = totalDownloads > 0 
       ? ((totalPayments / totalDownloads) * 100).toFixed(2)
       : 0;
