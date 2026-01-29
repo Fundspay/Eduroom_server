@@ -862,18 +862,15 @@ const getEntriesByDateRange = async (req, res) => {
 
 module.exports.getEntriesByDateRange = getEntriesByDateRange;
 
-
 const getDownloadsVsPayments = async (req, res) => {
   try {
     let { startDate, endDate } = req.query;
 
     console.debug("[DEBUG] Incoming params ->", { startDate, endDate });
 
-    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    // ✅ DEFAULT TO TODAY IF NO DATES PROVIDED
     if (!startDate || !endDate) {
       const now = new Date();
-      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
       
       const formatDate = (date) => {
         const year = date.getFullYear();
@@ -882,8 +879,9 @@ const getDownloadsVsPayments = async (req, res) => {
         return `${year}-${month}-${day}`;
       };
       
-      startDate = formatDate(firstDay);
-      endDate = formatDate(lastDay);
+      // Set both to today's date
+      startDate = formatDate(now);
+      endDate = formatDate(now);
     }
 
     console.debug("[DEBUG] Date range ->", { startDate, endDate });
@@ -1016,4 +1014,3 @@ const getDownloadsVsPayments = async (req, res) => {
 };
 
 module.exports.getDownloadsVsPayments = getDownloadsVsPayments;
-
