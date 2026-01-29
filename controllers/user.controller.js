@@ -1144,7 +1144,6 @@ const fetchAllUsers = async (req, res) => {
 
 module.exports.fetchAllUsers = fetchAllUsers;
 
-
 const getReferralPaymentStatus = async (req, res) => {
   try {
     let { userId } = req.params;
@@ -1161,6 +1160,11 @@ const getReferralPaymentStatus = async (req, res) => {
         200
       );
     }
+
+    // Get referrer's full name from the main user (whose referral code we're checking)
+    const referrerFullName = user.fullName 
+      ? user.fullName 
+      : `${user.firstName || ''} ${user.lastName || ''}`.trim();
 
     // 1️⃣ External API call
     const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
@@ -1218,8 +1222,8 @@ const getReferralPaymentStatus = async (req, res) => {
 
     // 5️⃣ Fetch existing DB records
     const existingRecords = await model.FundsAudit.findAll({
-      where: { userId },
-      attributes: ["registeredUserId", "hasPaid"],
+      where: { userId }, // Use the main user's ID
+      attributes: ["registeredUserId", "hasPaid", "referrer"],
       raw: true,
     });
 
@@ -1241,11 +1245,11 @@ const getReferralPaymentStatus = async (req, res) => {
       }
     });
 
-    // 7️⃣ Insert new rows (occupation stays as is from API)
+    // 7️⃣ Insert new rows (with referrer name)
     if (rowsToInsert.length > 0) {
       await model.FundsAudit.bulkCreate(
         rowsToInsert.map(u => ({
-          userId,
+          userId: userId, // Use the main user's ID
           registeredUserId: u.user_id,
           firstName: u.first_name,
           lastName: u.last_name,
@@ -1261,7 +1265,8 @@ const getReferralPaymentStatus = async (req, res) => {
           isDownloaded: u.isDownloaded,
           queryStatus: u.queryStatus || null,
           isQueryRaised: u.isQueryRaised,
-          occupation: u.occupation || null, // Keep original occupation in DB
+          occupation: u.occupation || null,
+          referrer: referrerFullName, // Add the main user's name as referrer
           managerReview: "Null",
           userReview: "Null",
         }))
@@ -1276,10 +1281,14 @@ const getReferralPaymentStatus = async (req, res) => {
           dateOfPayment: u.date_of_payment
             ? new Date(u.date_of_payment)
             : new Date(),
+          // Also update referrer if it's missing in existing record
+          ...(!existingMap.get(u.user_id)?.referrer && {
+            referrer: referrerFullName
+          })
         },
         {
           where: {
-            userId,
+            userId: userId,
             registeredUserId: u.user_id,
             hasPaid: false,
           },
@@ -1287,12 +1296,12 @@ const getReferralPaymentStatus = async (req, res) => {
       );
     }
 
-    // 9️⃣ Fetch reviews
+    // 9️⃣ Fetch reviews and existing referrer data
     const fundsAuditRecords = await model.FundsAudit.findAll({
       where: {
         registeredUserId: deduplicatedUsers.map(u => u.user_id),
       },
-      attributes: ["registeredUserId", "managerReview", "userReview"],
+      attributes: ["registeredUserId", "managerReview", "userReview", "referrer"],
       raw: true,
     });
 
@@ -1306,9 +1315,11 @@ const getReferralPaymentStatus = async (req, res) => {
       const { occupation, ...rest } = u; // Remove occupation field
       return {
         ...rest,
-        utr: u.order_id || null, // 👈 Rename to utr and show order_id value
+        utr: u.order_id || null,
         managerReview: review?.managerReview || "not completed",
         userReview: review?.userReview || "not completed",
+        // Also include referrer in the response if needed
+        referrer: review?.referrer || referrerFullName
       };
     });
 
