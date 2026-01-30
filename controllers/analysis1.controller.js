@@ -44,27 +44,23 @@ var extractAndStoreCourseDates = async function (req, res) {
         }
       }
 
-      //  Check if row exists
       const existingRecord = await model.analysis1.findOne({
         where: { user_id: userId, day_no: 1 }
       });
 
       if (existingRecord) {
-        //  Update existing
+        // FIX: only update course fields
         await model.analysis1.update(
           {
             course_id,
             course_name,
             start_date,
             end_date,
-            business_task,
-            work_status: "Not Completed",
-            comment: ""
+            business_task
           },
           { where: { user_id: userId } }
         );
       } else {
-        // INSERT for new user
         await model.analysis1.create({
           user_id: userId,
           day_no: 1,
