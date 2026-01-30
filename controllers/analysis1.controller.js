@@ -368,10 +368,8 @@ var getUserAnalysis = async function (req, res) {
 
     if (!record) return ReE(res, "Record not found", 404);
 
-    // end_date NOT fetched from DB
     const { start_date, business_task, course_id, course_name } = record;
 
-    //  CALCULATED end_date = start_date + 4 days (5 days total)
     let calculatedEndDate = null;
     if (start_date) {
       calculatedEndDate = new Date(start_date);
@@ -414,7 +412,6 @@ var getUserAnalysis = async function (req, res) {
       "5000 STIPEND"
     ];
 
-    //  10 DAYS LOOP — UNCHANGED
     const totalDays = 10;
 
     const today = new Date();
@@ -471,19 +468,22 @@ var getUserAnalysis = async function (req, res) {
         );
       }
 
-      await model.analysis1.upsert({
-        user_id: userId,
-        day_no: i + 1,
-        course_id: course_id || null,
-        course_name: course_name || null,
-        start_date: start_date || null,
-        end_date: calculatedEndDate || null, // calculated, not fetched
-        daily_target: dailyTarget,
-        percent_of_work: percentOfWork,
-        category: categoryDistribution[i],
-        work_status: workStatus,
-        comment: comment
-      });
+      //  FIX: Only create if not exists (NO OVERWRITE)
+      if (!existingDay) {
+        await model.analysis1.create({
+          user_id: userId,
+          day_no: i + 1,
+          course_id: course_id || null,
+          course_name: course_name || null,
+          start_date: start_date || null,
+          end_date: calculatedEndDate || null,
+          daily_target: dailyTarget,
+          percent_of_work: percentOfWork,
+          category: categoryDistribution[i],
+          work_status: "Not Completed",
+          comment: ""
+        });
+      }
 
       data.push({
         SR: i + 1,
@@ -508,6 +508,7 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
+
 
 
 
