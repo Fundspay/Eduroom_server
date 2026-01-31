@@ -36,7 +36,7 @@ const calculateIncentive = async (req, res) => {
       },
     });
 
-    console.log("ACTIVE INTERNS COUNT:", activeInterns);
+    
 
     // ---------------------------
     // Fetch manager's slab amounts
@@ -173,7 +173,6 @@ const calculateDeduction = async (req, res) => {
       },
     });
 
-    console.log("INACTIVE INTERNS COUNT:", inactiveInterns);
 
     // ---------------------------
     // Fetch manager deduction slabs

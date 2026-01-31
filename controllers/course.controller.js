@@ -67,12 +67,8 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
-      console.log("🟦 UPDATE COURSE REQUEST RECEIVED For Course ID:", req.params.id);
-
       // Store old businessTarget to compare later
       const oldBusinessTarget = course.businessTarget;
-      console.log("Old businessTarget:", oldBusinessTarget);
-      console.log("Incoming businessTarget:", req.body.businessTarget);
 
       // Update the course
       await course.update({
@@ -91,14 +87,14 @@ var updateCourse = async (req, res) => {
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition
       });
 
-      console.log("🟩 Course updated successfully!");
+  
 
       // -----------------------------------------------------
       //  UPDATE Users.businessTargets IF businessTarget CHANGED
       // -----------------------------------------------------
       if (req.body.businessTarget !== undefined && req.body.businessTarget !== oldBusinessTarget) {
 
-        console.log("🔄 BusinessTarget changed → Updating users…");
+       
 
         const newTarget = Number(req.body.businessTarget);
         const users = await model.User.findAll();

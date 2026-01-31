@@ -47,7 +47,7 @@ const upsertBdSheet = async (req, res) => {
         }
       });
 
-      console.log("FIELDS TO UPDATE:", updateFields);
+      
 
       // 🔥 MERGE JSON fields instead of replacing
       ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].forEach((dayKey) => {
@@ -77,7 +77,7 @@ const upsertBdSheet = async (req, res) => {
       data: newSheet,
     });
   } catch (error) {
-    console.log("BD SHEET UPSERT ERROR:", error);
+    
     return ReE(res, error.message, 500);
   }
 };
@@ -632,12 +632,6 @@ const getDashboardStats = async (req, res) => {
     const managerId = req.query.managerId;
     let { startDate, endDate } = req.query;
 
-    console.log("=== INCOMING REQUEST ===");
-    console.log("Raw query params:", req.query);
-    console.log("Manager ID (raw):", managerId);
-    console.log("Start Date (raw):", startDate);
-    console.log("End Date (raw):", endDate);
-
     // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
     if (!startDate || !endDate) {
       const now = new Date();
@@ -654,12 +648,10 @@ const getDashboardStats = async (req, res) => {
       startDate = formatDate(firstDay);
       endDate = formatDate(lastDay);
       
-      console.log("⚠️ No dates provided - using current month defaults");
+  
     }
 
-    console.log("=== FINAL DATE RANGE ===");
-    console.log("Start Date:", startDate);
-    console.log("End Date:", endDate);
+   
 
     // ---------------------------
     // Manager Filter
@@ -670,7 +662,7 @@ const getDashboardStats = async (req, res) => {
       const manager = await model.TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
       teamManagerName = manager.name;
-      console.log("Team Manager found:", teamManagerName);
+      
     } else {
       console.log("No manager filter - querying ALL managers");
     }
@@ -717,7 +709,7 @@ const getDashboardStats = async (req, res) => {
       totalAccountsTarget += Number(row.accounts) || 0;
     });
 
-    console.log("BdTarget results:", { totalInternsAllocated, totalInternsActive, totalAccountsTarget });
+    
 
     // ---------------------------
     // DATE FILTER (BdSheet)
@@ -756,7 +748,7 @@ const getDashboardStats = async (req, res) => {
       row => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-    console.log("BdSheet results:", { totalInterns, totalActiveInterns });
+   
 
     // ---------------------------
     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
@@ -773,9 +765,6 @@ const getDashboardStats = async (req, res) => {
 
       const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
       
-      console.log("=== STUDENT LOOKUP ===");
-      console.log("Students found for", teamManagerName, ":", students.length);
-      console.log("Valid phone numbers:", phoneNumbers.length);
       
       if (phoneNumbers.length > 0) {
         const users = await model.User.findAll({
@@ -784,8 +773,6 @@ const getDashboardStats = async (req, res) => {
         });
         
         userIds = users.map(u => u.id);
-        console.log("Users matched:", userIds.length);
-        console.log("User IDs:", userIds);
       }
     }
 
@@ -797,9 +784,6 @@ const getDashboardStats = async (req, res) => {
       const toDate = new Date(endDate);
       toDate.setHours(23, 59, 59, 999);
 
-      console.log("=== FUNDSAUDIT QUERY ===");
-      console.log("Querying with userIds:", userIds);
-      console.log("Date range (JS):", fromDate.toISOString(), "to", toDate.toISOString());
 
       const accountsResult = await model.FundsAudit.sequelize.query(
         `
@@ -853,13 +837,6 @@ const getDashboardStats = async (req, res) => {
     } else {
       console.log("⚠️ Skipping FundsAudit query - missing userIds or dates");
     }
-
-    console.log("=== FINAL RESPONSE ===");
-    console.log({
-      bdTarget: { totalInternsAllocated, totalInternsActive, totalAccountsTarget },
-      bdSheet: { totalInterns, totalAccounts: totalAccountsSheet, totalActiveInterns },
-      appliedFilters: { managerId: managerId || "ALL", startDate, endDate }
-    });
 
     // ---------------------------
     // FINAL RESPONSE
