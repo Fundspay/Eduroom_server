@@ -42,6 +42,8 @@ router.put("/user/business-info/:id", userController.updateBusinessTarget);
 router.get("/referral/paid-count", userController.getReferralPaidCount);
 router.get("/referral/count", userController.getReferralPaidUsersDateWise);
 
+router.get('/web/:phoneNumber', userController.getReferralDataByPhone);
+
 
 
 module.exports = router;

@@ -1696,4 +1696,39 @@ const getReferralPaidUsersDateWise = async (req, res) => {
 
 module.exports.getReferralPaidUsersDateWise = getReferralPaidUsersDateWise;
 
+var getReferralDataByPhone = async (req, res) => {
+    try {
+        const { phoneNumber } = req.params;
+
+        if (!phoneNumber) {
+            return ReE(res, "Phone number is required", 400);
+        }
+
+        console.log("📞 Calling internal API with phone number:", phoneNumber);
+
+        // Use environment variable or fallback to production URL
+        const baseUrl = process.env.API_BASE_URL || 'https://api.fundsweb.in';
+        const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${phoneNumber}`;
+        
+        const response = await axios.get(apiUrl);
+
+        console.log("✓ Internal API call successful");
+
+        return ReS(res, response.data, 200);
+
+    } catch (error) {
+        console.error("❌ Error calling internal API:", error.message);
+        
+        if (error.response) {
+            return ReE(res, error.response.data.error || error.response.data.message || "Internal API error", error.response.status);
+        } else if (error.request) {
+            return ReE(res, "No response from internal API", 500);
+        } else {
+            return ReE(res, error.message, 500);
+        }
+    }
+};
+
+module.exports.getReferralDataByPhone = getReferralDataByPhone;
+
 
