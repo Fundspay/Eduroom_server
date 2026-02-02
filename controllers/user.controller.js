@@ -1706,29 +1706,38 @@ var getReferralDataByPhone = async (req, res) => {
 
         console.log("📞 Calling internal API with phone number:", phoneNumber);
 
-        // Use environment variable or fallback to production URL
         const baseUrl = process.env.API_BASE_URL || 'https://api.fundsweb.in';
         const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${phoneNumber}`;
-        
-        const response = await axios.get(apiUrl);
 
-        console.log("✓ Internal API call successful");
+        try {
+            const response = await axios.get(apiUrl);
+            console.log("✓ Internal API call successful");
 
-        return ReS(res, response.data, 200);
+            return ReS(res, response.data, 200);
+
+        } catch (apiError) {
+            // 🔥 DO NOT FAIL THE SERVER
+            console.warn("⚠️ Internal API failed, continuing without referral data");
+
+            if (apiError.response) {
+                console.warn("Status:", apiError.response.status);
+                console.warn("Message:", apiError.response.data);
+            } else {
+                console.warn("Error:", apiError.message);
+            }
+
+            // Return empty data + warning instead of error
+            return ReS(res, {
+                data: null,
+                warning: "Referral data not available"
+            }, 200);
+        }
 
     } catch (error) {
-        console.error("❌ Error calling internal API:", error.message);
-        
-        if (error.response) {
-            return ReE(res, error.response.data.error || error.response.data.message || "Internal API error", error.response.status);
-        } else if (error.request) {
-            return ReE(res, "No response from internal API", 500);
-        } else {
-            return ReE(res, error.message, 500);
-        }
+        // Only catch truly unexpected server errors
+        console.error("❌ Unexpected server error:", error.message);
+        return ReE(res, "Server error", 500);
     }
 };
 
 module.exports.getReferralDataByPhone = getReferralDataByPhone;
-
-2642736473
