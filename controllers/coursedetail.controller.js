@@ -592,8 +592,6 @@ const evaluateSessionMCQ = async (req, res) => {
                   walletBalance: user.subscriptionWallet,
                   fileUrl: offerLetter.fileUrl
                 };
-
-                console.log(`✅ Offer letter sent to user ${userId} (${user.email}) for course ${courseId}`);
               } else {
                 offerLetterStatus = {
                   sent: false,

@@ -33,7 +33,6 @@ var extractAndStoreCourseDates = async function (req, res) {
         course_id = firstCourseKey ? parseInt(firstCourseKey) : null;
         course_name = courseData?.courseName || null;
         start_date = courseData?.startDate || null;
-        end_date = courseData?.endDate || null;
 
         if (
           user.businessTargets &&
@@ -48,14 +47,23 @@ var extractAndStoreCourseDates = async function (req, res) {
         where: { user_id: userId, day_no: 1 }
       });
 
+      // ONLY derive end_date for NEW RECORD
+      if (!existingRecord && start_date) {
+        const start = new Date(start_date);
+        const derivedEnd = new Date(start);
+        derivedEnd.setDate(start.getDate() + 4); // total 5 days
+        end_date = derivedEnd;
+      } else if (existingRecord) {
+        // keep whatever is already in DB
+        end_date = existingRecord.end_date;
+      }
+
       if (existingRecord) {
-        // FIX: only update course fields
         await model.analysis1.update(
           {
             course_id,
             course_name,
             start_date,
-            end_date,
             business_task
           },
           { where: { user_id: userId } }
@@ -102,19 +110,22 @@ var extractAndStoreCourseDates = async function (req, res) {
       processed++;
     }
 
-    return ReS(res, {
-      success: true,
-      message: "User course data synced successfully",
-      recordsProcessed: processed,
-      data: responseData
-    }, 200);
-
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "User course data synced successfully",
+        recordsProcessed: processed,
+        data: responseData
+      },
+      200
+    );
   } catch (error) {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.extractAndStoreCourseDates = extractAndStoreCourseDates;
+
 
 
 
