@@ -12,8 +12,6 @@ const { sendMailEduroom } = require("../middleware/eduroommailer.middleware");
 
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
 
-
-
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
 
@@ -85,7 +83,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               sessionDuration,
               heading,
             },
-            { transaction }
+            { transaction },
           );
         } else {
           await currentSessionRow.update(
@@ -99,7 +97,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
               minBusinessTarget,
               heading,
             },
-            { transaction }
+            { transaction },
           );
         }
 
@@ -131,7 +129,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                   caseStudy: q.caseStudy ?? null,
                   questionNumber: index + 1,
                 },
-                { transaction }
+                { transaction },
               );
               incomingIds.push(qId);
             } else {
@@ -154,7 +152,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
                   caseStudy: q.caseStudy ?? null,
                   questionNumber: index + 1,
                 },
-                { transaction }
+                { transaction },
               );
               incomingIds.push(newQ.id);
             }
@@ -162,7 +160,7 @@ const addOrUpdateCourseDetail = async (req, res) => {
 
           // Delete old questions not in payload
           const toDelete = existingQuestions.filter(
-            (q) => !incomingIds.includes(q.id)
+            (q) => !incomingIds.includes(q.id),
           );
           if (toDelete.length > 0) {
             const deleteIds = toDelete.map((q) => q.id);
@@ -208,7 +206,7 @@ const deleteCourseDetail = async (req, res) => {
     return ReE(
       res,
       "Either courseDetailId OR (courseId, day, sessionNumber) is required",
-      400
+      400,
     );
   }
 
@@ -250,7 +248,7 @@ const deleteCourseDetail = async (req, res) => {
         success: true,
         message: "CourseDetail and associated questions deleted successfully",
       },
-      200
+      200,
     );
   } catch (error) {
     await transaction.rollback();
@@ -331,7 +329,6 @@ var fetchCourseDetailsByPreview = async (req, res) => {
 
 module.exports.fetchCourseDetailsByPreview = fetchCourseDetailsByPreview;
 
-
 // ✅ Fetch CourseDetails by coursePreviewId, day, and sessionNumber (GET request)
 var fetchCourseDetailsByDayAndSession = async (req, res) => {
   const { coursePreviewId } = req.params;
@@ -401,7 +398,7 @@ var fetchCourseDetailsByDayAndSession = async (req, res) => {
 
     // Filter by day and sessionNumber
     const filteredDetails = courseDetails.filter(
-      (cd) => cd.day == day && cd.sessionNumber == sessionNumber
+      (cd) => cd.day == day && cd.sessionNumber == sessionNumber,
     );
 
     return ReS(res, { success: true, data: filteredDetails }, 200);
@@ -427,7 +424,14 @@ const evaluateSessionMCQ = async (req, res) => {
 
     // ✅ Fetch user to check subscription wallet AND email
     const user = await model.User.findByPk(userId, {
-      attributes: ['id', 'firstName', 'lastName', 'fullName', 'email', 'subscriptionWallet']
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "fullName",
+        "email",
+        "subscriptionWallet",
+      ],
     });
 
     if (!user) {
@@ -505,22 +509,21 @@ const evaluateSessionMCQ = async (req, res) => {
     // Update DB
     await model.CourseDetail.update(
       { userProgress: progress },
-      { where: { id: sessionDetail.id } }
+      { where: { id: sessionDetail.id } },
     );
 
     // ✅ CHECK: If all MCQs are correct AND subscription wallet has balance
     let offerLetterStatus = null;
-    
+
     if (correctCount === total) {
       // Check if subscription wallet has balance (> 0)
       if (user.subscriptionWallet && user.subscriptionWallet > 0) {
-        
         // ✅ CHECK: Has offer letter already been sent for THIS course?
         const existingOfferLetter = await model.OfferLetter.findOne({
           where: {
             userId: userId,
-            courseId: courseId
-          }
+            courseId: courseId,
+          },
         });
 
         if (!existingOfferLetter) {
@@ -528,7 +531,7 @@ const evaluateSessionMCQ = async (req, res) => {
           if (!user.email) {
             offerLetterStatus = {
               sent: false,
-              message: "User has no email address"
+              message: "User has no email address",
             };
           } else {
             try {
@@ -539,7 +542,10 @@ const evaluateSessionMCQ = async (req, res) => {
               }
 
               // ✅ Generate offer letter PDF
-              const generatedLetter = await generateOfferLetter(userId, courseId);
+              const generatedLetter = await generateOfferLetter(
+                userId,
+                courseId,
+              );
 
               // ✅ Create OfferLetter record in database
               const offerLetter = await model.OfferLetter.create({
@@ -580,45 +586,54 @@ const evaluateSessionMCQ = async (req, res) => {
               `;
 
               // ✅ Send email using sendMailEduroom
-              const mailResult = await sendMailEduroom(user.email, subject, html);
+              const mailResult = await sendMailEduroom(
+                user.email,
+                subject,
+                html,
+              );
 
               if (mailResult.success) {
                 // ✅ Mark offer letter as sent
-                await offerLetter.update({ issent: true, updatedAt: new Date() });
+                await offerLetter.update({
+                  issent: true,
+                  updatedAt: new Date(),
+                });
 
                 offerLetterStatus = {
                   sent: true,
                   message: "Offer letter sent successfully",
                   walletBalance: user.subscriptionWallet,
-                  fileUrl: offerLetter.fileUrl
+                  fileUrl: offerLetter.fileUrl,
                 };
               } else {
                 offerLetterStatus = {
                   sent: false,
                   message: "Failed to send email",
-                  error: mailResult.error
+                  error: mailResult.error,
                 };
               }
-
             } catch (offerError) {
-              console.error("Error generating/sending offer letter:", offerError.message);
+              console.error(
+                "Error generating/sending offer letter:",
+                offerError.message,
+              );
               offerLetterStatus = {
                 sent: false,
                 message: "Failed to generate or send offer letter",
-                error: offerError.message
+                error: offerError.message,
               };
             }
           }
         } else {
           offerLetterStatus = {
             sent: false,
-            message: "Offer letter already sent for this course"
+            message: "Offer letter already sent for this course",
           };
         }
       } else {
         offerLetterStatus = {
           sent: false,
-          message: "Subscription wallet is empty. Cannot send offer letter."
+          message: "Subscription wallet is empty. Cannot send offer letter.",
         };
       }
     }
@@ -639,7 +654,7 @@ const evaluateSessionMCQ = async (req, res) => {
         },
         offerLetter: offerLetterStatus, // Include offer letter status
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Evaluate Session MCQ Error:", error);
@@ -721,7 +736,7 @@ const getCaseStudyForSession = async (req, res) => {
 
     // Ensure we look into all questions for this session row
     const caseStudyQuestion = (sessionDetail.QuestionModels || []).find(
-      (q) => q.caseStudy && q.caseStudy.trim() !== ""
+      (q) => q.caseStudy && q.caseStudy.trim() !== "",
     );
     if (!caseStudyQuestion) {
       return ReS(
@@ -730,7 +745,7 @@ const getCaseStudyForSession = async (req, res) => {
           success: false,
           message: "No Case Study available for this session.",
         },
-        200
+        200,
       );
     }
 
@@ -750,7 +765,7 @@ const getCaseStudyForSession = async (req, res) => {
           },
         },
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get Case Study Error:", error);
@@ -827,7 +842,7 @@ const submitCaseStudyAnswer = async (req, res) => {
             : "You did not pass. Try again.",
         },
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Submit Case Study Answer Error:", error);
@@ -873,7 +888,7 @@ const getSessionStatusPerUser = async (req, res) => {
         totalSessions: sessions.length,
         sessionStatus,
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get Session Status Error:", error);
@@ -1010,7 +1025,7 @@ const getDailyStatusPerUser = async (req, res) => {
         totalMCQs = progress.totalMCQs || 0;
         correctMCQs = progress.correctMCQs || 0;
         sessionCompletionPercentage = totalMCQs
-          ? ((correctMCQs / totalMCQs) * 100)
+          ? (correctMCQs / totalMCQs) * 100
           : 0;
       }
 
@@ -1032,7 +1047,7 @@ const getDailyStatusPerUser = async (req, res) => {
 
       // Prevent duplicate sessions
       const alreadyExists = daysMap[session.day].sessions.some(
-        (s) => s.sessionNumber === session.sessionNumber
+        (s) => s.sessionNumber === session.sessionNumber,
       );
 
       if (!alreadyExists) {
@@ -1045,7 +1060,9 @@ const getDailyStatusPerUser = async (req, res) => {
           totalMCQs,
           caseStudyPercentage,
           sessionDuration: session.sessionDuration || null,
-          sessionCompletionPercentage: Number(sessionCompletionPercentage.toFixed(2)),
+          sessionCompletionPercentage: Number(
+            sessionCompletionPercentage.toFixed(2),
+          ),
           minBusinessTarget: session.minBusinessTarget || null,
         });
       }
@@ -1054,7 +1071,9 @@ const getDailyStatusPerUser = async (req, res) => {
     // --- Build dailyStatus array ---
     const dailyStatus = Object.keys(daysMap).map((dayKey) => {
       const d = daysMap[dayKey];
-      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(2);
+      const dayCompletionPercentage = ((d.completed / d.total) * 100).toFixed(
+        2,
+      );
       return {
         day: Number(dayKey),
         totalSessions: d.total,
@@ -1080,7 +1099,7 @@ const getDailyStatusPerUser = async (req, res) => {
     existingStatuses[String(courseId)] = overallStatus;
     await user.update(
       { courseStatuses: existingStatuses },
-      { fields: ["courseStatuses"] }
+      { fields: ["courseStatuses"] },
     );
     await user.reload();
 
@@ -1097,7 +1116,7 @@ const getDailyStatusPerUser = async (req, res) => {
         },
         dailyStatus,
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get Daily Status Error:", error);
@@ -1109,12 +1128,45 @@ module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
-    const { userId } = req.params;
-    if (!userId) return ReE(res, "userId is required", 400);
+    
+    const { userId } = req.params; 
+    // 🔒 HARD GUARD - yahin DB ko bachana hai
+    if (!userId || userId === "undefined" || isNaN(Number(userId))) {
+      console.warn("⚠️ Invalid userId:", userId);
+
+      return ReS(
+        res,
+        {
+          userId: null,
+          fullName: null,
+          subscriptionWallet: 0,
+          subscriptiondeductedWallet: 0,
+          subscriptionLeft: 0,
+          courses: [],
+        },
+        200,
+      );
+    }
 
     // Fetch user instance
     let user = await model.User.findByPk(userId);
-    if (!user) return ReE(res, "User not found", 404);
+
+    if (!user) {
+      console.warn("⚠️ User not found:", userId);
+
+      return ReS(
+        res,
+        {
+          userId: null,
+          fullName: null,
+          subscriptionWallet: 0,
+          subscriptiondeductedWallet: 0,
+          subscriptionLeft: 0,
+          courses: [],
+        },
+        200,
+      );
+    }
 
     await user.reload();
 
@@ -1134,7 +1186,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
       subscriptionLeft: Math.max(
         (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0),
-        0
+        0,
       ),
       courses: [],
     };
@@ -1157,7 +1209,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       let sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
-        order: [["day", "ASC"], ["sessionNumber", "ASC"]],
+        order: [
+          ["day", "ASC"],
+          ["sessionNumber", "ASC"],
+        ],
       });
 
       // Remove duplicate sessionNumbers per day
@@ -1186,7 +1241,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         let caseStudyPercentage = null;
 
         const latestCaseStudy = await model.CaseStudyResult.findOne({
-          where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
+          where: {
+            userId,
+            courseId,
+            day: session.day,
+            sessionNumber: session.sessionNumber,
+          },
           order: [["createdAt", "DESC"]],
         });
 
@@ -1197,7 +1257,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           totalMCQs = progress.totalMCQs || 0;
           correctMCQs = progress.correctMCQs || 0;
           sessionCompletionPercentage = totalMCQs
-            ? ((correctMCQs / totalMCQs) * 100)
+            ? (correctMCQs / totalMCQs) * 100
             : 0;
         }
 
@@ -1238,7 +1298,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       const dailyStatus = Object.keys(daysMap).map((dayKey) => {
         const d = daysMap[dayKey];
-        const dayCompletionPercentage = ((d.completed / d.total) * 100);
+        const dayCompletionPercentage = (d.completed / d.total) * 100;
         return {
           day: Number(dayKey),
           totalSessions: d.total,
@@ -1251,10 +1311,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
 
       const overallCompletionRate = totalSessions
-        ? ((completedSessions / totalSessions) * 100)
+        ? (completedSessions / totalSessions) * 100
         : 0;
 
-      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
+      const btEntry = normalizedBusinessTargets[courseId] || {
+        target: 0,
+        offerMessage: null,
+      };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
@@ -1262,7 +1325,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       const isBusinessTargetMet =
-        subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
+        subscriptionWallet >= businessTarget ||
+        subscriptiondeductedWallet >= businessTarget;
 
       // Check if all sessions are above 20% threshold
       const allSessionsAboveThreshold = await Promise.all(
@@ -1270,7 +1334,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           let sessionCompletionPercentage = 0;
 
           const latestCaseStudy = await model.CaseStudyResult.findOne({
-            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
+            where: {
+              userId,
+              courseId,
+              day: session.day,
+              sessionNumber: session.sessionNumber,
+            },
             order: [["createdAt", "DESC"]],
           });
 
@@ -1285,21 +1354,26 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           }
 
           return sessionCompletionPercentage >= 20;
-        })
+        }),
       ).then((results) => results.every(Boolean));
 
-      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
-      
+      const existingStatuses = user.courseStatuses
+        ? { ...user.courseStatuses }
+        : {};
+
       // ✅ FIXED: Protect old completed users - cutoff date for new logic
       const NEW_LOGIC_CUTOFF_DATE = new Date("2025-12-27"); // Today's date when fix was deployed
       const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
-      const isOldUser = !courseStartDateStr || new Date(courseStartDateStr) < NEW_LOGIC_CUTOFF_DATE;
-      
+      const isOldUser =
+        !courseStartDateStr ||
+        new Date(courseStartDateStr) < NEW_LOGIC_CUTOFF_DATE;
+
       // If user was already marked "Completed" before the fix, keep them as "Completed"
-      const wasAlreadyCompleted = existingStatuses[String(courseId)] === "Completed";
-      
+      const wasAlreadyCompleted =
+        existingStatuses[String(courseId)] === "Completed";
+
       let overallStatus = "In Progress";
-      
+
       if (wasAlreadyCompleted && isOldUser) {
         // ✅ Preserve old completed status for users who started before today
         overallStatus = "Completed";
@@ -1320,7 +1394,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       });
 
       if (statusRecord && statusRecord.internshipStatus) {
-        const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
+        const normalized = statusRecord.internshipStatus
+          .trim()
+          .toLowerCase()
+          .replace(/[-_]/g, " ");
         if (["terminated"].includes(normalized)) {
           overallStatus = "Terminated";
         } else if (["on hold", "hold", "onhold"].includes(normalized)) {
@@ -1336,12 +1413,14 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus !== "On Hold" &&
         Number(overallCompletionRate) >= 99.99 &&
         subscriptiondeductedWallet >= 1 &&
-        isBusinessTargetMet  // ✅ Added business target check
+        isBusinessTargetMet // ✅ Added business target check
       ) {
         const cutoffDate = new Date("2025-12-10");
         if (!courseStartDateStr || new Date(courseStartDateStr) < cutoffDate) {
           overallStatus = "Completed";
-          console.log(`Special rule applied for user ${user.id}, Mobile App Development`);
+          console.log(
+            `Special rule applied for user ${user.id}, Mobile App Development`,
+          );
         }
       }
 
@@ -1353,7 +1432,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       // Save final course status
       existingStatuses[String(courseId)] = overallStatus;
-      await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
+      await user.update(
+        { courseStatuses: existingStatuses },
+        { fields: ["courseStatuses"] },
+      );
 
       response.courses.push({
         courseId,
@@ -1377,7 +1459,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
   }
 };
 
-module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
+module.exports.getDailyStatusAllCoursesPerUser =
+  getDailyStatusAllCoursesPerUser;
 
 const getBusinessTarget = async (req, res) => {
   try {
@@ -1411,7 +1494,10 @@ const getBusinessTarget = async (req, res) => {
     }
 
     // 4️⃣ Determine businessTarget and offerMessage for this course
-    const btEntry = normalizedBusinessTargets[courseId] || { target: parseInt(course.businessTarget) || 0, offerMessage: null };
+    const btEntry = normalizedBusinessTargets[courseId] || {
+      target: parseInt(course.businessTarget) || 0,
+      offerMessage: null,
+    };
     const businessTarget = btEntry.target || 0;
     const offerMessage = btEntry.offerMessage || null;
 
@@ -1422,7 +1508,7 @@ const getBusinessTarget = async (req, res) => {
         const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
         const apiResponse = await axios.get(apiUrl);
         const registeredUsers = apiResponse.data?.registered_users || [];
-        achievedCount = registeredUsers.filter(u => u.has_paid).length;
+        achievedCount = registeredUsers.filter((u) => u.has_paid).length;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
@@ -1435,7 +1521,10 @@ const getBusinessTarget = async (req, res) => {
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
     // 7️⃣ Update businessTargets JSON with target and offerMessage
-    normalizedBusinessTargets[courseId] = { target: businessTarget, offerMessage };
+    normalizedBusinessTargets[courseId] = {
+      target: businessTarget,
+      offerMessage,
+    };
     user.businessTargets = normalizedBusinessTargets;
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
@@ -1445,23 +1534,26 @@ const getBusinessTarget = async (req, res) => {
     });
 
     // 8️⃣ Send response
-    return ReS(res, {
-      success: true,
-      data: {
-        userId: user.id,
-        courseId,
-        businessTarget,
-        offerMessage,
-        achievedCount: subscriptionWallet,
-        totalDeducted: alreadyDeducted,
-        subscriptionWallet,
-        subscriptionLeft,
-        businessTargets: user.businessTargets,
-        startDate: user.courseDates?.[courseId]?.startDate || null,
-        endDate: user.courseDates?.[courseId]?.endDate || null,
+    return ReS(
+      res,
+      {
+        success: true,
+        data: {
+          userId: user.id,
+          courseId,
+          businessTarget,
+          offerMessage,
+          achievedCount: subscriptionWallet,
+          totalDeducted: alreadyDeducted,
+          subscriptionWallet,
+          subscriptionLeft,
+          businessTargets: user.businessTargets,
+          startDate: user.courseDates?.[courseId]?.startDate || null,
+          endDate: user.courseDates?.[courseId]?.endDate || null,
+        },
       },
-    }, 200);
-
+      200,
+    );
   } catch (error) {
     console.error("Get Business Target Error:", error);
     return ReE(res, error.message, 500);
@@ -1469,7 +1561,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
 
 // const getBusinessUserTarget = async (req, res) => {
 //   try {
@@ -1549,7 +1640,7 @@ const getBusinessUserTarget = async (req, res) => {
 
         // Count only registered users who have paid
         const registeredUsers = apiResponse.data?.registered_users || [];
-        achievedCount = registeredUsers.filter(u => u.has_paid).length;
+        achievedCount = registeredUsers.filter((u) => u.has_paid).length;
       } catch (apiError) {
         console.warn("Referral API error:", apiError.message);
       }
@@ -1561,12 +1652,15 @@ const getBusinessUserTarget = async (req, res) => {
     // Calculate remaining subscription
     const alreadyDeducted = Number(user.subscriptiondeductedWallet || 0);
     const subscriptionLeft = Math.max(achievedCount - alreadyDeducted, 0);
-    
+
     user.subscriptionLeft = subscriptionLeft;
 
     // Save to database
     await user.save();
-    console.log("User wallet updated:", { subscriptionWallet: achievedCount, subscriptionLeft });
+    console.log("User wallet updated:", {
+      subscriptionWallet: achievedCount,
+      subscriptionLeft,
+    });
 
     return ReS(
       res,
@@ -1581,7 +1675,7 @@ const getBusinessUserTarget = async (req, res) => {
           subscriptionLeft,
         },
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get Business User Target Error:", error);
@@ -1663,7 +1757,7 @@ const getCourseStatus = async (req, res) => {
         },
         courseStatus: status,
       },
-      200
+      200,
     );
   } catch (err) {
     console.error("Get Course Status Error:", err);
@@ -1870,7 +1964,11 @@ const setCourseStartEndDates = async (req, res) => {
       `;
 
       try {
-        const mailResult = await sendMailEduroom(user.email, `Course Details: ${course.name}`, emailHtml);
+        const mailResult = await sendMailEduroom(
+          user.email,
+          `Course Details: ${course.name}`,
+          emailHtml,
+        );
         if (mailResult?.success) {
           // 🔹 Mark sent = true and save again
           const updatedCourseDates = { ...(user.courseDates || {}) };
@@ -1880,28 +1978,36 @@ const setCourseStartEndDates = async (req, res) => {
             await user.save();
           }
         } else {
-          console.warn(`Warning: Failed to send course email to user ${userId}`);
+          console.warn(
+            `Warning: Failed to send course email to user ${userId}`,
+          );
         }
       } catch (err) {
-        console.warn(`Warning: Error sending email to user ${userId}:`, err.message);
+        console.warn(
+          `Warning: Error sending email to user ${userId}:`,
+          err.message,
+        );
       }
     } else {
       console.warn(`Warning: User ${userId} has no email configured`);
     }
 
-    return ReS(res, {
-      success: true,
-      message: "Course start and end dates updated successfully",
-      data: {
-        courseId,
-        courseName: course.name,
-        startDate: courseDatesUpdate.startDate,
-        endDate: courseDatesUpdate.endDate,
-        started: courseDatesUpdate.started,
-        sent: user.courseDates?.[courseId]?.sent ?? false,
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Course start and end dates updated successfully",
+        data: {
+          courseId,
+          courseName: course.name,
+          startDate: courseDatesUpdate.startDate,
+          endDate: courseDatesUpdate.endDate,
+          started: courseDatesUpdate.started,
+          sent: user.courseDates?.[courseId]?.sent ?? false,
+        },
       },
-    }, 200);
-
+      200,
+    );
   } catch (error) {
     console.error("Set Course Start/End Dates Error:", error);
     return ReE(res, error.message, 500);
@@ -1909,7 +2015,6 @@ const setCourseStartEndDates = async (req, res) => {
 };
 
 module.exports.setCourseStartEndDates = setCourseStartEndDates;
-
 
 const getUserMCQScore = async (req, res) => {
   try {
@@ -1962,7 +2067,7 @@ const getUserMCQScore = async (req, res) => {
           answers: userProgress.answers || {}, // include all saved answers
         },
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get User MCQ Score Error:", error);
@@ -2024,7 +2129,7 @@ const getUserCaseStudyResult = async (req, res) => {
           passed: result.passed,
         },
       },
-      200
+      200,
     );
   } catch (error) {
     console.error("Get User Case Study Result Error:", error);
