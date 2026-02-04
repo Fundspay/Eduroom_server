@@ -258,7 +258,6 @@ const getBdSheet = async (req, res) => {
             "endDate",
             "connectDate",
             "callStatus",
-            "registration",
             "selectionTest",
             "whatsappGroup",
             "day1",
