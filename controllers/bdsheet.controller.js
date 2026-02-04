@@ -250,7 +250,20 @@ const getBdSheet = async (req, res) => {
         {
           model: model.BdSheet,
           required: false,
-          attributes: ["id", "registration", "activeStatus", "startDate", "endDate"],
+          attributes: [
+            "id",
+            "registration",
+            "activeStatus",
+            "startDate",
+            "endDate",
+            "day1",
+            "day2",
+            "day3",
+            "day4",
+            "day5",
+            "day6",
+            "day7",
+          ],
         },
       ],
       order: [["id", "DESC"]],
@@ -344,7 +357,6 @@ const getBdSheet = async (req, res) => {
 };
 
 module.exports.getBdSheet = getBdSheet;
-
 
 const getBdSheetByCategory = async (req, res) => {
   try {
