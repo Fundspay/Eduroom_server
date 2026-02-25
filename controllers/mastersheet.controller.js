@@ -109,6 +109,8 @@ var fetchMasterSheetTargets = async function (req, res) {
             "no response",
             "unprofessional",
             "resumes received",
+            "CNA",
+            "connected"
           ],
         },
         resumeDate: { [Op.between]: [sDate, eDate] },
