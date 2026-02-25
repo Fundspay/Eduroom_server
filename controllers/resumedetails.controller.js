@@ -26,6 +26,8 @@ const updateResumeFields = async (req, res) => {
       "resumes received",
       "sending in 1-2 days",
       "delayed",
+      "connected",
+      "CNA",
       "no response",
       "unprofessional",
     ];
