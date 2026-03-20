@@ -37,8 +37,8 @@ const createCoSheet = async (req, res) => {
             mobileNumber: data.collegeDetails?.mobileNumber
               ? String(data.collegeDetails.mobileNumber)
               : data.mobileNumber
-              ? String(data.mobileNumber)
-              : null,
+                ? String(data.mobileNumber)
+                : null,
             emailId: data.collegeDetails?.emailId ?? data.emailId ?? null,
             city: data.collegeDetails?.city ?? data.city ?? null,
             state: data.collegeDetails?.state ?? data.state ?? null,
@@ -224,7 +224,7 @@ const getCoSheetByManager = async (req, res) => {
       order: [["dateOfConnect", "ASC"]] // Optional: order by date
     });
 
-     // ---------------------------
+    // ---------------------------
     // Fetch all registered managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -371,7 +371,7 @@ const getCoSheetByManagerBusy = async (req, res) => {
       return `${yyyy}-${mm}-${dd}`;
     };
 
-     // ---------------------------
+    // ---------------------------
     // Fetch all registered managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -450,7 +450,7 @@ const getCoSheetByManagerSwitchoff = async (req, res) => {
       return `${yyyy}-${mm}-${dd}`;
     };
 
-     // ---------------------------
+    // ---------------------------
     // Fetch all registered managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -529,7 +529,7 @@ const getCoSheetByManagerInvalid = async (req, res) => {
       return `${yyyy}-${mm}-${dd}`;
     };
 
-     // ---------------------------
+    // ---------------------------
     // Fetch all registered managers
     // ---------------------------
     const managers = await model.TeamManager.findAll({
@@ -577,6 +577,10 @@ const sendJDToCollege = async (req, res) => {
     // Step 2 — Build FormData for multipart request
     const form = new FormData();
 
+    console.log("attachment field:", JSON.stringify(req.body.attachment));
+    console.log("internshipType:", record.internshipType);
+    console.log("jdFile.Body type:", typeof jdFile?.Body);
+
     form.append("toAddress", record.emailId);
     form.append("fromAddress", fromAddress);
     form.append("userId", userId);
@@ -595,8 +599,7 @@ const sendJDToCollege = async (req, res) => {
 
       <p>Warm greetings from FundsAudit!</p>
 
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
-        record.collegeName || ""
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName || ""
       }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the 
@@ -680,8 +683,8 @@ const sendJDToCollege = async (req, res) => {
 
     return ReS(
       res,
-      { 
-        success: true, 
+      {
+        success: true,
         message: "JD sent successfully with proposal",
         messageId: response.data?.messageId
       },
