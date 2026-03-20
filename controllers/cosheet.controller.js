@@ -568,21 +568,27 @@ const sendJDToCollege = async (req, res) => {
     if (!record) return ReE(res, "CoSheet record not found", 404);
     if (!record.emailId) return ReE(res, "No email found for this college", 400);
 
-    console.log("attachment field:", JSON.stringify(req.body.attachment));
-    console.log("internshipType:", record.internshipType);
+    // ✅ Safe conversions — handle arrays, nulls, undefined
+    const toAddress = record.emailId;
+    const ccStr = Array.isArray(cc) ? cc.join(", ") : (cc || "");
+    const bccStr = Array.isArray(bcc) ? bcc.join(", ") : (bcc || "");
+    const bodyStr = Array.isArray(body) ? body.join("") : (body || "");
+    const subjectStr = Array.isArray(subject) ? subject.join("") : (subject || "");
+    const userIdStr = Array.isArray(userId) ? userId[0] : String(userId);
+    const fromAddressStr = Array.isArray(fromAddress) ? fromAddress[0] : String(fromAddress);
 
     // Step 2 — Build FormData
     const form = new FormData();
 
-    form.append("toAddress", record.emailId);
-    form.append("fromAddress", fromAddress);
-    form.append("userId", userId);
-    if (cc) form.append("cc", cc);
-    if (bcc) form.append("bcc", bcc);
+    form.append("toAddress", toAddress);
+    form.append("fromAddress", fromAddressStr);
+    form.append("userId", userIdStr);
+    if (ccStr.trim().length > 0) form.append("cc", ccStr);
+    if (bccStr.trim().length > 0) form.append("bcc", bccStr);
 
     const finalSubject =
-      subject && subject.trim().length > 0
-        ? subject
+      subjectStr.trim().length > 0
+        ? subjectStr
         : `Collaboration Proposal – FundsAudit`;
     form.append("subject", finalSubject);
 
@@ -599,7 +605,7 @@ const sendJDToCollege = async (req, res) => {
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the 
       Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE.</p>
 
-      ${body || ""}
+      ${bodyStr}
 
       <p>Looking forward to a meaningful and mutually beneficial association.</p>
 
@@ -615,12 +621,14 @@ const sendJDToCollege = async (req, res) => {
     form.append("bodyText", html);
 
     // Step 4 — Attachments
-    if (Array.isArray(attachment) && attachment.length > 0) {
+    const attachmentArr = Array.isArray(attachment) ? attachment : [];
+
+    if (attachmentArr.length > 0) {
       // Frontend provided attachments (base64)
-      for (const a of attachment) {
+      for (const a of attachmentArr) {
         if (a.content && a.filename) {
           const buffer = Buffer.from(a.content, "base64");
-          form.append("file", buffer, {  // ✅ fixed: "file" not "files"
+          form.append("file", buffer, {
             filename: a.filename,
             contentType: "application/pdf",
           });
@@ -653,8 +661,6 @@ const sendJDToCollege = async (req, res) => {
       const jdFile = await s3
         .getObject({ Bucket: "fundsroomhr", Key: jdKey })
         .promise();
-
-      console.log("jdFile.Body type:", typeof jdFile.Body); // ✅ moved here after jdFile is defined
 
       form.append("file", jdFile.Body, {
         filename: `${record.internshipType}.pdf`,
