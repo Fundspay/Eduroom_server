@@ -560,26 +560,19 @@ const sendJDToCollege = async (req, res) => {
     const { id } = req.params;
     const { cc, bcc, body, attachment, subject, userId, fromAddress } = req.body;
 
-    // ✅ Validate required fields
-    if (!userId) {
-      return ReE(res, "userId is required", 400);
-    }
-
-    if (!fromAddress) {
-      return ReE(res, "fromAddress is required (e.g., business@vikastransports.com)", 400);
-    }
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!fromAddress) return ReE(res, "fromAddress is required", 400);
 
     // Step 1 — Fetch college record
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
     if (!record.emailId) return ReE(res, "No email found for this college", 400);
 
-    // Step 2 — Build FormData for multipart request
-    const form = new FormData();
-
     console.log("attachment field:", JSON.stringify(req.body.attachment));
     console.log("internshipType:", record.internshipType);
-    console.log("jdFile.Body type:", typeof jdFile?.Body);
+
+    // Step 2 — Build FormData
+    const form = new FormData();
 
     form.append("toAddress", record.emailId);
     form.append("fromAddress", fromAddress);
@@ -599,7 +592,8 @@ const sendJDToCollege = async (req, res) => {
 
       <p>Warm greetings from FundsAudit!</p>
 
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${record.collegeName || ""
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
+        record.collegeName || ""
       }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
 
       <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the 
@@ -626,14 +620,14 @@ const sendJDToCollege = async (req, res) => {
       for (const a of attachment) {
         if (a.content && a.filename) {
           const buffer = Buffer.from(a.content, "base64");
-          form.append("files", buffer, {
+          form.append("file", buffer, {  // ✅ fixed: "file" not "files"
             filename: a.filename,
             contentType: "application/pdf",
           });
         }
       }
     } else {
-      // S3 fallback — fetch JD based on internshipType
+      // S3 fallback
       if (!record.internshipType) {
         return ReE(res, "No internshipType set for this record", 400);
       }
@@ -659,6 +653,8 @@ const sendJDToCollege = async (req, res) => {
       const jdFile = await s3
         .getObject({ Bucket: "fundsroomhr", Key: jdKey })
         .promise();
+
+      console.log("jdFile.Body type:", typeof jdFile.Body); // ✅ moved here after jdFile is defined
 
       form.append("file", jdFile.Body, {
         filename: `${record.internshipType}.pdf`,
@@ -686,7 +682,7 @@ const sendJDToCollege = async (req, res) => {
       {
         success: true,
         message: "JD sent successfully with proposal",
-        messageId: response.data?.messageId
+        messageId: response.data?.messageId,
       },
       200
     );
