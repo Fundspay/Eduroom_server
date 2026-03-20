@@ -553,12 +553,12 @@ const getCoSheetByManagerInvalid = async (req, res) => {
   }
 };
 
-module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid;
+module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid
 
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body, attachment, subject, userId, fromAddress } = req.body; // ✅ Get from req.body
+    const { cc, bcc, body, attachment, subject, userId, fromAddress } = req.body;
 
     // ✅ Validate required fields
     if (!userId) {
@@ -578,8 +578,8 @@ const sendJDToCollege = async (req, res) => {
     const form = new FormData();
 
     form.append("toAddress", record.emailId);
-    form.append("fromAddress", fromAddress); // ✅ From req.body
-    form.append("userId", userId); // ✅ From req.body
+    form.append("fromAddress", fromAddress);
+    form.append("userId", userId);
     if (cc) form.append("cc", cc);
     if (bcc) form.append("bcc", bcc);
 
@@ -671,6 +671,7 @@ const sendJDToCollege = async (req, res) => {
     });
 
     if (!response.data || response.status !== 200) {
+      console.error("SES API Error:", response.data);
       return ReE(res, "Failed to send JD email via SES", 500);
     }
 
@@ -679,7 +680,11 @@ const sendJDToCollege = async (req, res) => {
 
     return ReS(
       res,
-      { success: true, message: "JD sent successfully with proposal" },
+      { 
+        success: true, 
+        message: "JD sent successfully with proposal",
+        messageId: response.data?.messageId
+      },
       200
     );
   } catch (error) {
