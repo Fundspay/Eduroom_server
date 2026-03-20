@@ -4,6 +4,11 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
 const AWS = require("aws-sdk");
 const { Op } = require("sequelize");
+const axios = require("axios");
+const FormData = require("form-data");
+const AWS = require("aws-sdk");
+
+const SES_API_URL = "https://api.fundsweb.in/api/v1/sendmail/send-email";
 
 
 // / configure S3
@@ -550,31 +555,74 @@ const getCoSheetByManagerInvalid = async (req, res) => {
 
 module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid;
 
-
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body, attachment, subject } = req.body; 
+    const { cc, bcc, body, attachment, subject } = req.body;
+    const userId = req.user?.id;
+
+    // Step 1 — Fetch college record
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
+    if (!record.emailId) return ReE(res, "No email found for this college", 400);
 
-    if (!record.emailId) {
-      return ReE(res, "No email found for this college", 400);
-    }
+    // Step 2 — Build FormData for multipart request
+    const form = new FormData();
 
-    let attachments = [];
+    form.append("toAddress", record.emailId);
+    form.append("fromAddress", "contact@fundsaudit.com");
+    form.append("userId", userId);
+    if (cc) form.append("cc", cc);
+    if (bcc) form.append("bcc", bcc);
 
-    // MULTIPLE ATTACHMENTS FROM FRONTEND
+    const finalSubject =
+      subject && subject.trim().length > 0
+        ? subject
+        : `Collaboration Proposal – FundsAudit`;
+    form.append("subject", finalSubject);
+
+    // Step 3 — Build HTML body
+    const html = `
+      <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
+
+      <p>Warm greetings from FundsAudit!</p>
+
+      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
+        record.collegeName || ""
+      }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
+
+      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the 
+      Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE.</p>
+
+      ${body || ""}
+
+      <p>Looking forward to a meaningful and mutually beneficial association.</p>
+
+      <p>
+        Pooja M. Shedge<br/>
+        Branch Manager – Pune<br/>
+        +91 7385234536 | +91 9322509539<br/>
+        Pune, Maharashtra<br/>
+        <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
+        <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
+      </p>
+    `;
+    form.append("bodyText", html);
+
+    // Step 4 — Attachments
     if (Array.isArray(attachment) && attachment.length > 0) {
-      attachments = attachment
-        .filter(a => a.content && a.filename)
-        .map(a => ({
-          filename: a.filename,
-          content: Buffer.from(a.content, "base64"),
-        }));
-    }
-    // FALLBACK → JD mapping + S3 (UNCHANGED)
-    else {
+      // Frontend provided attachments (base64)
+      for (const a of attachment) {
+        if (a.content && a.filename) {
+          const buffer = Buffer.from(a.content, "base64");
+          form.append("files", buffer, {
+            filename: a.filename,
+            contentType: "application/pdf",
+          });
+        }
+      }
+    } else {
+      // S3 fallback — fetch JD based on internshipType
       if (!record.internshipType) {
         return ReE(res, "No internshipType set for this record", 400);
       }
@@ -601,60 +649,25 @@ const sendJDToCollege = async (req, res) => {
         .getObject({ Bucket: "fundsroomhr", Key: jdKey })
         .promise();
 
-      attachments = [
-        {
-          filename: `${record.internshipType}.pdf`,
-          content: jdFile.Body,
-        },
-      ];
+      form.append("file", jdFile.Body, {
+        filename: `${record.internshipType}.pdf`,
+        contentType: "application/pdf",
+      });
     }
 
-    const finalSubject =
-      subject && subject.trim().length > 0
-        ? subject
-        : `Collaboration Proposal – FundsAudit`;
-
-    const html = `
-      <p>Respected ${record.coordinatorName || "Sir/Madam"},</p>
-
-      <p>Warm greetings from FundsAudit!</p>
-
-      <p>We are reaching out with an exciting collaboration opportunity for your institute ${
-        record.collegeName || ""
-      }, aimed at enhancing student development through real-time industry exposure in the fintech space.</p>
-
-      <p>Founded in 2020, FundsAudit is an ISO-certified, innovation-driven fintech startup, registered under the Startup India initiative with 400,000 active customers. We are members of AMFI, SEBI, BSE, and NSE.</p>
-
-      ${body}
-
-      <p>Looking forward to a meaningful and mutually beneficial association.</p>
-
-      <p>
-        Pooja M. Shedge<br/>
-        Branch Manager – Pune<br/>
-        +91 7385234536 | +91 9322509539<br/>
-        Pune, Maharashtra<br/>
-        <a href="https://www.fundsaudit.in/">https://www.fundsaudit.in/</a><br/>
-        <a href="https://www.fundsweb.in/sub_sectors/subsector">https://www.fundsweb.in/sub_sectors/subsector</a>
-      </p>
-    `;
-
-    const mailResponse = await sendhrMail(
-      record.emailId,
-      finalSubject,
-      html,
-      attachments,
-      cc,
-      bcc
-    );
-
-    if (!mailResponse.success) {
-      return ReE(res, "Failed to send JD email", 500);
-    }
-
-    await record.update({
-      jdSentAt: new Date(),
+    // Step 5 — Call Project A's SES endpoint
+    const response = await axios.post(SES_API_URL, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
     });
+
+    if (!response.data || response.status !== 200) {
+      return ReE(res, "Failed to send JD email via SES", 500);
+    }
+
+    // Step 6 — Update record
+    await record.update({ jdSentAt: new Date() });
 
     return ReS(
       res,
@@ -662,13 +675,12 @@ const sendJDToCollege = async (req, res) => {
       200
     );
   } catch (error) {
-    console.error("Send JD Error:", error);
-    return ReE(res, error.message, 500);
+    console.error("Send JD Error:", error?.response?.data || error.message);
+    return ReE(res, error?.response?.data?.error || error.message, 500);
   }
 };
 
-module.exports.sendJDToCollege = sendJDToCollege;
-
+module.exports. sendJDToCollege =  sendJDToCollege
 
 
 
