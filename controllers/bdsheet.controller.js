@@ -5,6 +5,7 @@ const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
 const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses,StudentResume ,User  } = require("../models");
 const SES_API_URL = "https://api.fundsweb.in/api/v1/sendemail/send-email";
+const FormData = require("form-data");
 
 
 const upsertBdSheet = async (req, res) => {
