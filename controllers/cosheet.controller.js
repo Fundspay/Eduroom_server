@@ -558,8 +558,16 @@ module.exports.getCoSheetByManagerInvalid = getCoSheetByManagerInvalid;
 const sendJDToCollege = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body, attachment, subject } = req.body;
-    const userId = req.user?.id;
+    const { cc, bcc, body, attachment, subject, userId, fromAddress } = req.body; // ✅ Get from req.body
+
+    // ✅ Validate required fields
+    if (!userId) {
+      return ReE(res, "userId is required", 400);
+    }
+
+    if (!fromAddress) {
+      return ReE(res, "fromAddress is required (e.g., business@vikastransports.com)", 400);
+    }
 
     // Step 1 — Fetch college record
     const record = await model.CoSheet.findByPk(id);
@@ -570,8 +578,8 @@ const sendJDToCollege = async (req, res) => {
     const form = new FormData();
 
     form.append("toAddress", record.emailId);
-    form.append("fromAddress", "contact@fundsaudit.com");
-    form.append("userId", userId);
+    form.append("fromAddress", fromAddress); // ✅ From req.body
+    form.append("userId", userId); // ✅ From req.body
     if (cc) form.append("cc", cc);
     if (bcc) form.append("bcc", bcc);
 
@@ -680,8 +688,7 @@ const sendJDToCollege = async (req, res) => {
   }
 };
 
-module.exports. sendJDToCollege =  sendJDToCollege
-
+module.exports.sendJDToCollege = sendJDToCollege;
 
 
 const getCallStatsByUserWithTarget = async (req, res) => {
