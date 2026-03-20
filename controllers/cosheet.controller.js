@@ -6,7 +6,7 @@ const AWS = require("aws-sdk");
 const { Op } = require("sequelize");
 const axios = require("axios");
 const FormData = require("form-data");
-const AWS = require("aws-sdk");
+
 
 const SES_API_URL = "https://api.fundsweb.in/api/v1/sendmail/send-email";
 
