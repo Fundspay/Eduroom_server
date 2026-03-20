@@ -4,6 +4,13 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, fn, col } = model.Sequelize;
 const moment = require("moment");
 const { sendhrMail } = require("../middleware/mailerhr.middleware.js");
+const AWS = require("aws-sdk");
+const axios = require("axios");
+const FormData = require("form-data");
+
+
+const SES_API_URL = "https://api.fundsweb.in/api/v1/sendemail/send-email";
+
 
 
 
@@ -655,18 +662,26 @@ module.exports.getAllPendingFollowUps = getAllPendingFollowUps;
 const sendFollowUpEmail = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cc, bcc, body, subject } = req.body;
+    const { cc, bcc, body, subject, userId, fromAddress } = req.body;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!fromAddress) return ReE(res, "fromAddress is required", 400);
 
     const record = await model.CoSheet.findByPk(id);
     if (!record) return ReE(res, "CoSheet record not found", 404);
+    if (!record.emailId) return ReE(res, "No email found for this college", 400);
 
-    if (!record.emailId) {
-      return ReE(res, "No email found for this college", 400);
-    }
+    // Safe conversions
+    const ccStr = Array.isArray(cc) ? cc.join(", ") : (cc || "");
+    const bccStr = Array.isArray(bcc) ? bcc.join(", ") : (bcc || "");
+    const bodyStr = Array.isArray(body) ? body.join("") : (body || "");
+    const subjectStr = Array.isArray(subject) ? subject.join("") : (subject || "");
+    const userIdStr = Array.isArray(userId) ? userId[0] : String(userId);
+    const fromAddressStr = Array.isArray(fromAddress) ? fromAddress[0] : String(fromAddress);
 
     const finalSubject =
-      subject && subject.trim().length > 0
-        ? subject
+      subjectStr.trim().length > 0
+        ? subjectStr
         : `Reconfirmation of Live Project Process – FundsAudit`;
 
     const html = `
@@ -676,7 +691,7 @@ const sendFollowUpEmail = async (req, res) => {
 
       <p>I hope this message finds you well.</p>
 
-      ${body}
+      ${bodyStr}
 
       <p>Looking forward to a fruitful collaboration.</p>
 
@@ -689,31 +704,43 @@ const sendFollowUpEmail = async (req, res) => {
       </p>
     `;
 
-    const mailResponse = await sendhrMail(
-      record.emailId,
-      finalSubject,
-      html,
-      [],
-      cc,
-      bcc
-    );
+    // Build FormData
+    const form = new FormData();
 
-    if (!mailResponse.success) {
-      return ReE(res, "Failed to send follow-up email", 500);
+    form.append("toAddress", record.emailId);
+    form.append("fromAddress", fromAddressStr);
+    form.append("userId", userIdStr);
+    form.append("subject", finalSubject);
+    form.append("bodyText", html);
+    if (ccStr.trim().length > 0) form.append("cc", ccStr);
+    if (bccStr.trim().length > 0) form.append("bcc", bccStr);
+
+    // Call Project A's SES endpoint
+    const response = await axios.post(SES_API_URL, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+
+    if (!response.data || response.status !== 200) {
+      console.error("SES API Error:", response.data);
+      return ReE(res, "Failed to send follow-up email via SES", 500);
     }
 
-    await record.update({
-      followupemailsent: true
-    });
+    await record.update({ followupemailsent: true });
 
     return ReS(
       res,
-      { success: true, message: "Follow-up email sent successfully" },
+      {
+        success: true,
+        message: "Follow-up email sent successfully",
+        messageId: response.data?.messageId,
+      },
       200
     );
   } catch (error) {
-    console.error("Send FollowUp Email Error:", error);
-    return ReE(res, error.message, 500);
+    console.error("Send FollowUp Email Error:", error?.response?.data || error.message);
+    return ReE(res, error?.response?.data?.error || error.message, 500);
   }
 };
 
