@@ -1948,3 +1948,76 @@ const getAccountsCountWithTargetSummary = async (req, res) => {
 
 module.exports.getAccountsCountWithTargetSummary =
   getAccountsCountWithTargetSummary;
+
+
+  const sendGenericEmail = async (req, res) => {
+  try {
+    const { toAddress, cc, bcc, body, attachment, subject, userId, fromAddress } = req.body;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+    if (!fromAddress) return ReE(res, "fromAddress is required", 400);
+    if (!toAddress) return ReE(res, "toAddress is required", 400);
+    if (!subject) return ReE(res, "subject is required", 400);
+    if (!body) return ReE(res, "body is required", 400);
+
+    // Safe conversions
+    const ccStr = Array.isArray(cc) ? cc.join(", ") : (cc || "");
+    const bccStr = Array.isArray(bcc) ? bcc.join(", ") : (bcc || "");
+    const bodyStr = Array.isArray(body) ? body.join("") : (body || "");
+    const subjectStr = Array.isArray(subject) ? subject.join("") : (subject || "");
+    const userIdStr = Array.isArray(userId) ? userId[0] : String(userId);
+    const fromAddressStr = Array.isArray(fromAddress) ? fromAddress[0] : String(fromAddress);
+    const toAddressStr = Array.isArray(toAddress) ? toAddress.join(", ") : String(toAddress);
+
+    // Build FormData
+    const form = new FormData();
+
+    form.append("toAddress", toAddressStr);
+    form.append("fromAddress", fromAddressStr);
+    form.append("userId", userIdStr);
+    form.append("subject", subjectStr);
+    form.append("bodyText", bodyStr);
+    if (ccStr.trim().length > 0) form.append("cc", ccStr);
+    if (bccStr.trim().length > 0) form.append("bcc", bccStr);
+
+    // Attachments (base64 from frontend)
+    const attachmentArr = Array.isArray(attachment) ? attachment : [];
+    for (const a of attachmentArr) {
+      if (a.content && a.filename) {
+        const buffer = Buffer.from(a.content, "base64");
+        const mimeType = a.contentType || "application/octet-stream";
+        form.append("file", buffer, {
+          filename: a.filename,
+          contentType: mimeType,
+        });
+      }
+    }
+
+    // Call Project A's SES endpoint
+    const response = await axios.post(SES_API_URL, form, {
+      headers: {
+        ...form.getHeaders(),
+      },
+    });
+
+    if (!response.data || response.status !== 200) {
+      console.error("SES API Error:", response.data);
+      return ReE(res, "Failed to send email via SES", 500);
+    }
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Email sent successfully",
+        messageId: response.data?.messageId,
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Send Generic Email Error:", error?.response?.data || error.message);
+    return ReE(res, error?.response?.data?.error || error.message, 500);
+  }
+};
+
+module.exports.sendGenericEmail = sendGenericEmail;
