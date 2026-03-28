@@ -2,6 +2,9 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment-timezone");
+const { resolveSourceValue } = require("../utils/achievement.service");
+const { calculateFinal } = require("../utils/calculation.service");
+
 
 // ─────────────────────────────────────────────
 // 1. CREATE — Admin sets targets + weights only
@@ -183,3 +186,156 @@ var deleteConfig = async (req, res) => {
 };
 
 module.exports.deleteConfig = deleteConfig;
+
+"use strict";
+// ─────────────────────────────────────────────
+var calculateAchievement = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate config id
+    if (!id) return ReE(res, "Config ID is required", 400);
+
+    // Fetch the config
+    const config = await model.FundConfig.findOne({
+      where: { id, isDeleted: false },
+    });
+
+    if (!config) return ReE(res, "Fund config not found", 404);
+
+    const { managerId, periodMonth, periodYear, departments, ratings, retentionRate, targetCoins } =
+      config;
+
+    // Validate period
+    if (!periodMonth || !periodYear)
+      return ReE(res, "Config is missing periodMonth or periodYear", 400);
+
+    // ── Step 1: Resolve real DB values for each metric ──
+    const resolvedDepartments = await Promise.all(
+      departments.map(async (dept) => {
+        const resolvedMetrics = await Promise.all(
+          dept.metrics.map(async (metric) => {
+            let realValue = 0;
+
+            if (metric.source && metric.source !== "MANUAL") {
+              // Fetch actual count from DB based on source key
+              realValue = await resolveSourceValue(
+                metric.source,
+                managerId,
+                periodMonth,
+                periodYear
+              );
+            } else if (metric.source === "MANUAL" && metric.value != null) {
+              // Manual metric — use whatever value admin stored
+              realValue = parseFloat(metric.value) || 0;
+            }
+
+            return {
+              ...metric,
+              value: realValue, // override with real value
+            };
+          })
+        );
+
+        return {
+          ...dept,
+          metrics: resolvedMetrics,
+        };
+      })
+    );
+
+    // ── Step 2: Build config object for calculateFinal ──
+    const configForCalc = {
+      departments: resolvedDepartments,
+      ratings,
+      retentionRate: parseFloat(retentionRate),
+      targetCoins: parseFloat(targetCoins),
+    };
+
+    // ── Step 3: Run full calculation ──
+    const calculationResult = calculateFinal(configForCalc);
+
+    // ── Step 4: Upsert into FundResult ──
+    const existingResult = await model.FundResult.findOne({
+      where: { configId: id, isDeleted: false },
+    });
+
+    if (existingResult) {
+      // Update existing result
+      await existingResult.update({
+        deptBreakdown: calculationResult.deptBreakdown,
+        weightedTotalCoins: calculationResult.weightedTotalCoins,
+        retentionMultiplier: calculationResult.retentionMultiplier,
+        coinsAfterRetention: calculationResult.coinsAfterRetention,
+        finalRating: calculationResult.finalRating,
+        behaviorLevel: calculationResult.behaviorLevel,
+        behaviorMultiplier: calculationResult.behaviorMultiplier,
+        finalCoins: calculationResult.finalCoins,
+        achievementPercent: calculationResult.achievementPercent,
+        performanceCategory: calculationResult.performanceCategory,
+      });
+    } else {
+      // Create fresh result
+      await model.FundResult.create({
+        configId: id,
+        deptBreakdown: calculationResult.deptBreakdown,
+        weightedTotalCoins: calculationResult.weightedTotalCoins,
+        retentionMultiplier: calculationResult.retentionMultiplier,
+        coinsAfterRetention: calculationResult.coinsAfterRetention,
+        finalRating: calculationResult.finalRating,
+        behaviorLevel: calculationResult.behaviorLevel,
+        behaviorMultiplier: calculationResult.behaviorMultiplier,
+        finalCoins: calculationResult.finalCoins,
+        achievementPercent: calculationResult.achievementPercent,
+        performanceCategory: calculationResult.performanceCategory,
+      });
+    }
+
+    // ── Step 5: Fetch fresh result to return ──
+    const savedResult = await model.FundResult.findOne({
+      where: { configId: id, isDeleted: false },
+    });
+
+    // ── Step 6: Build summary for frontend ──
+    const coinsEarned = parseFloat(calculationResult.finalCoins);
+    const coinsTarget = parseFloat(targetCoins);
+    const coinsRemaining = Math.max(0, coinsTarget - coinsEarned);
+
+    const summary = {
+      targetCoins: coinsTarget,
+      coinsEarned: parseFloat(coinsEarned.toFixed(2)),
+      coinsRemaining: parseFloat(coinsRemaining.toFixed(2)),
+      achievementPercent: calculationResult.achievementPercent,
+      performanceCategory: calculationResult.performanceCategory,
+      behaviorLevel: calculationResult.behaviorLevel,
+      periodMonth,
+      periodYear,
+    };
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Achievement calculated successfully",
+        summary,
+        result: {
+          ...savedResult.dataValues,
+          createdAt: moment(savedResult.createdAt)
+            .tz("Asia/Kolkata")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment(savedResult.updatedAt)
+            .tz("Asia/Kolkata")
+            .format("YYYY-MM-DD HH:mm:ss"),
+        },
+        resolvedDepartments, // so frontend can see what real values were fetched
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Calculate Achievement Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.calculateAchievement = calculateAchievement;
+

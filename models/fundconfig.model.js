@@ -22,7 +22,7 @@ module.exports = (sequelize, Sequelize) => {
       },
 
       // 🔹 Departments — stored as JSONB array
-      // Structure: [{ key, name, icon, weight, metrics: [{ name, value, multiplier, weight }] }]
+      // Structure: [{ key, name, icon, weight, metrics: [{ name, multiplier, weight, source }] }]
       departments: {
         type: Sequelize.JSONB,
         allowNull: false,

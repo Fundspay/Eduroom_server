@@ -34,7 +34,8 @@ const mastersheetRouter = require("./mastersheet.route");
 const analysis1Router = require("./analysis1.route");
 const taskcalendarRouter = require("./taskcalendar.route");
 const scoresheetRouter = require("./scoresheet.route");
-const fundconfigRouter = require("./fundconfig.route")
+const fundconfigRouter = require("./fundconfig.route");
+const managerreviewRouter = require("./managerreview.route");
 
 
 
