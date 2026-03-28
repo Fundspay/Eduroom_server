@@ -9,5 +9,6 @@ router.get("/get/:id", fundConfigController.getConfig);
 router.put("/update/:id", fundConfigController.updateConfig);
 router.delete("/delete", fundConfigController.deleteConfig);
 router.post("/calculate/:id", fundConfigController.calculateAchievement);
+router.post("/final-report/:id", fundConfigController.finalReport);
 
 module.exports = router;

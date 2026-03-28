@@ -339,3 +339,266 @@ var calculateAchievement = async (req, res) => {
 
 module.exports.calculateAchievement = calculateAchievement;
 
+
+"use strict";
+
+// ─────────────────────────────────────────────
+// ADD THESE IMPORTS at the top of fundConfigController.js
+// (if not already added)
+// ─────────────────────────────────────────────
+// const { resolveSourceValue } = require("../utils/achievement.service");
+// const { calculateFinal } = require("../utils/calculation.service");
+
+// ─────────────────────────────────────────────
+// 7. FINAL REPORT — full fundcoins report with everything
+// POST /api/fund-config/final-report/:id
+// ─────────────────────────────────────────────
+var finalReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) return ReE(res, "Config ID is required", 400);
+
+    // ── Step 1: Fetch FundConfig ──
+    const config = await model.FundConfig.findOne({
+      where: { id, isDeleted: false },
+    });
+    if (!config) return ReE(res, "Fund config not found", 404);
+
+    const {
+      managerId,
+      employeeName,
+      employeeEmail,
+      position,
+      periodMonth,
+      periodYear,
+      departments,
+      ratings,
+      retentionRate,
+      targetCoins,
+    } = config;
+
+    if (!periodMonth || !periodYear)
+      return ReE(res, "Config is missing periodMonth or periodYear", 400);
+
+    // ── Step 2: Resolve real achieved values from DB per metric ──
+    const resolvedDepartments = await Promise.all(
+      departments.map(async (dept) => {
+        const resolvedMetrics = await Promise.all(
+          dept.metrics.map(async (metric) => {
+            let realValue = 0;
+
+            if (metric.source && metric.source !== "MANUAL") {
+              realValue = await resolveSourceValue(
+                metric.source,
+                managerId,
+                periodMonth,
+                periodYear
+              );
+            } else if (metric.source === "MANUAL" && metric.value != null) {
+              realValue = parseFloat(metric.value) || 0;
+            }
+
+            return {
+              ...metric,
+              value: realValue,
+            };
+          })
+        );
+
+        return {
+          ...dept,
+          metrics: resolvedMetrics,
+        };
+      })
+    );
+
+    // ── Step 3: Auto-fetch 360° ratings from ManagerReviews ──
+    const reviewRows = await model.ManagerReview.findAll({
+      where: {
+        targetManagerId: managerId,
+        periodMonth,
+        periodYear,
+        isDeleted: false,
+      },
+      attributes: ["reviewerType", "starRating"],
+      raw: true,
+    });
+
+    // Group and average by reviewerType
+    const grouped = {};
+    reviewRows.forEach((r) => {
+      if (!grouped[r.reviewerType]) grouped[r.reviewerType] = [];
+      grouped[r.reviewerType].push(parseFloat(r.starRating));
+    });
+
+    const avgByType = {};
+    Object.keys(grouped).forEach((type) => {
+      const arr = grouped[type];
+      avgByType[type] = parseFloat(
+        (arr.reduce((sum, v) => sum + v, 0) / arr.length).toFixed(2)
+      );
+    });
+
+    // ── Step 4: Merge real avg values into ratings array from config ──
+    // Config ratings has: { key, name, weight, value }
+    // We override value with real monthly avg from ManagerReviews
+    // If no reviews found for a type, fall back to config value or 0
+    const mergedRatings = ratings.map((r) => ({
+      ...r,
+      value: avgByType[r.key] !== undefined ? avgByType[r.key] : parseFloat(r.value) || 0,
+      reviewCount: grouped[r.key] ? grouped[r.key].length : 0,
+    }));
+
+    // ── Step 5: Run full calculateFinal with real data ──
+    const configForCalc = {
+      departments: resolvedDepartments,
+      ratings: mergedRatings,
+      retentionRate: parseFloat(retentionRate),
+      targetCoins: parseFloat(targetCoins),
+    };
+
+    const calc = calculateFinal(configForCalc);
+
+    // ── Step 6: Upsert into FundResult ──
+    const existingResult = await model.FundResult.findOne({
+      where: { configId: id, isDeleted: false },
+    });
+
+    if (existingResult) {
+      await existingResult.update({
+        deptBreakdown: calc.deptBreakdown,
+        weightedTotalCoins: calc.weightedTotalCoins,
+        retentionMultiplier: calc.retentionMultiplier,
+        coinsAfterRetention: calc.coinsAfterRetention,
+        finalRating: calc.finalRating,
+        behaviorLevel: calc.behaviorLevel,
+        behaviorMultiplier: calc.behaviorMultiplier,
+        finalCoins: calc.finalCoins,
+        achievementPercent: calc.achievementPercent,
+        performanceCategory: calc.performanceCategory,
+      });
+    } else {
+      await model.FundResult.create({
+        configId: id,
+        deptBreakdown: calc.deptBreakdown,
+        weightedTotalCoins: calc.weightedTotalCoins,
+        retentionMultiplier: calc.retentionMultiplier,
+        coinsAfterRetention: calc.coinsAfterRetention,
+        finalRating: calc.finalRating,
+        behaviorLevel: calc.behaviorLevel,
+        behaviorMultiplier: calc.behaviorMultiplier,
+        finalCoins: calc.finalCoins,
+        achievementPercent: calc.achievementPercent,
+        performanceCategory: calc.performanceCategory,
+      });
+    }
+
+    // ── Step 7: Fetch saved FundResult ──
+    const savedResult = await model.FundResult.findOne({
+      where: { configId: id, isDeleted: false },
+    });
+
+    // ── Step 8: Build dept breakdown for response ──
+    const departmentBreakdown = calc.deptBreakdown.map((dept) => ({
+      key: dept.key,
+      name: dept.name,
+      icon: dept.icon,
+      deptWeight: dept.deptWeight,
+      metrics: dept.metrics.map((m) => ({
+        name: m.name,
+        source: m.source || "MANUAL",
+        achievedValue: m.value,
+        multiplier: m.multiplier,
+        coinsEarned: parseFloat((m.value * m.multiplier).toFixed(2)),
+        weight: m.weight,
+        weightedCoins: parseFloat(m.coinsEarned !== undefined ? m.coinsEarned : 0),
+      })),
+      totalBeforeWeight: parseFloat(dept.totalBeforeWeight.toFixed(2)),
+      weightedContribution: parseFloat(dept.weightedContribution.toFixed(2)),
+    }));
+
+    // ── Step 9: Build ratings breakdown for response ──
+    const ratingsBreakdown = mergedRatings.map((r) => ({
+      key: r.key,
+      name: r.name,
+      weight: r.weight,
+      avgRating: r.value,
+      reviewCount: r.reviewCount,
+      contribution: parseFloat(((r.value * r.weight) / 100).toFixed(4)),
+    }));
+
+    // ── Step 10: Build full report response ──
+    const coinsEarned = parseFloat(calc.finalCoins);
+    const coinsTarget = parseFloat(targetCoins);
+    const coinsRemaining = Math.max(0, coinsTarget - coinsEarned);
+
+    const report = {
+      // Employee Info
+      employeeInfo: {
+        managerId,
+        employeeName,
+        employeeEmail,
+        position,
+        periodMonth,
+        periodYear,
+        period: `${String(periodMonth).padStart(2, "0")}/${periodYear}`,
+      },
+
+      // Target vs Achieved summary
+      summary: {
+        targetCoins: coinsTarget,
+        finalCoins: parseFloat(coinsEarned.toFixed(2)),
+        coinsRemaining: parseFloat(coinsRemaining.toFixed(2)),
+        achievementPercent: calc.achievementPercent,
+        performanceCategory: calc.performanceCategory,
+        behaviorLevel: calc.behaviorLevel,
+        behaviorMultiplier: calc.behaviorMultiplier,
+        finalRating: calc.finalRating,
+      },
+
+      // Department-wise breakdown
+      departmentBreakdown,
+
+      // Retention breakdown
+      retentionBreakdown: {
+        retentionRate: parseFloat(retentionRate),
+        retentionMultiplier: calc.retentionMultiplier,
+        weightedTotalCoins: parseFloat(calc.weightedTotalCoins.toFixed(2)),
+        coinsAfterRetention: parseFloat(calc.coinsAfterRetention.toFixed(2)),
+      },
+
+      // 360° ratings breakdown
+      ratingsBreakdown,
+
+      // Full FundResult row
+      fundResult: {
+        ...savedResult.dataValues,
+        createdAt: moment(savedResult.createdAt)
+          .tz("Asia/Kolkata")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(savedResult.updatedAt)
+          .tz("Asia/Kolkata")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      },
+    };
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Final fund coins report generated successfully",
+        data: report,
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Final Report Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.finalReport = finalReport;
+
+
+
