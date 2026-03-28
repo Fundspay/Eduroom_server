@@ -2,7 +2,7 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment-timezone");
-const { calculateFinal } = require("../services/calculationService");
+const { calculateFinal } = require("../utils/util.service.js");
 
 // ─────────────────────────────────────────────
 // 1. CREATE — Admin saves config + auto calculate

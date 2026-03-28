@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const fundConfigController = require("../controllers/fundsconfigController");
+const fundConfigController = require("../controllers/fundconfig.controller");
 
 router.post("/create", fundConfigController.createConfig);
 router.post("/list", fundConfigController.getAllConfigs);
