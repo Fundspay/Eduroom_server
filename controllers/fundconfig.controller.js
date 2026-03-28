@@ -2,10 +2,9 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment-timezone");
-const { calculateFinal } = require("../utils/calculation.service.js");
 
 // ─────────────────────────────────────────────
-// 1. CREATE — Admin saves config + auto calculate
+// 1. CREATE — Admin sets targets + weights only
 // ─────────────────────────────────────────────
 var createConfig = async (req, res) => {
   try {
@@ -34,7 +33,7 @@ var createConfig = async (req, res) => {
       return ReE(res, "ratings must be a non-empty array", 400);
     }
 
-    // Save config
+    // Save config — no calculation at this stage
     const config = await model.FundConfig.create({
       managerId,
       employeeName: employeeName.toString(),
@@ -48,26 +47,7 @@ var createConfig = async (req, res) => {
       periodYear: periodYear || null,
     });
 
-    // Run calculation on saved config
-    const result = calculateFinal({ departments, ratings, retentionRate, targetCoins });
-
-    // Save calculated result
-    const fundResult = await model.FundResult.create({
-      configId: config.id,
-      deptBreakdown: result.deptBreakdown,
-      weightedTotalCoins: result.weightedTotalCoins,
-      retentionMultiplier: result.retentionMultiplier,
-      coinsAfterRetention: result.coinsAfterRetention,
-      finalRating: result.finalRating,
-      behaviorLevel: result.behaviorLevel,
-      behaviorMultiplier: result.behaviorMultiplier,
-      finalCoins: result.finalCoins,
-      finalSalary: result.finalSalary,
-      achievementPercent: result.achievementPercent,
-      performanceCategory: result.performanceCategory,
-    });
-
-    return ReS(res, { config, fundResult }, 201);
+    return ReS(res, { success: true, message: "Fund config created successfully", data: config }, 201);
   } catch (error) {
     console.error("createConfig Error:", error);
     return ReE(res, error.message, 500);
@@ -77,7 +57,7 @@ var createConfig = async (req, res) => {
 module.exports.createConfig = createConfig;
 
 // ─────────────────────────────────────────────
-// 2. GET ONE — fetch config + its result
+// 2. GET ONE — fetch config only
 // ─────────────────────────────────────────────
 var getConfig = async (req, res) => {
   try {
@@ -85,13 +65,6 @@ var getConfig = async (req, res) => {
 
     const config = await model.FundConfig.findOne({
       where: { id, isDeleted: false },
-      include: [
-        {
-          model: model.FundResult,
-          where: { isDeleted: false },
-          required: false,
-        },
-      ],
     });
 
     if (!config) return ReE(res, "Fund config not found", 404);
@@ -122,13 +95,6 @@ var getAllConfigs = async (req, res) => {
 
     const configs = await model.FundConfig.findAll({
       where: { managerId, isDeleted: false },
-      include: [
-        {
-          model: model.FundResult,
-          where: { isDeleted: false },
-          required: false,
-        },
-      ],
       order: [["createdAt", "DESC"]],
     });
 
@@ -148,7 +114,7 @@ var getAllConfigs = async (req, res) => {
 module.exports.getAllConfigs = getAllConfigs;
 
 // ─────────────────────────────────────────────
-// 4. UPDATE — re-save config + recalculate result
+// 4. UPDATE — update targets + weights only
 // ─────────────────────────────────────────────
 var updateConfig = async (req, res) => {
   try {
@@ -168,7 +134,7 @@ var updateConfig = async (req, res) => {
     const config = await model.FundConfig.findOne({ where: { id, isDeleted: false } });
     if (!config) return ReE(res, "Fund config not found", 404);
 
-    // Update config with new values
+    // Update config with new values — no recalculation at this stage
     await config.update({
       employeeName: employeeName || config.employeeName,
       employeeEmail: employeeEmail || config.employeeEmail,
@@ -181,33 +147,7 @@ var updateConfig = async (req, res) => {
       periodYear: periodYear || config.periodYear,
     });
 
-    // Recalculate with updated values
-    const result = calculateFinal({
-      departments: departments || config.departments,
-      ratings: ratings || config.ratings,
-      retentionRate: retentionRate || config.retentionRate,
-      targetCoins: targetCoins || config.targetCoins,
-    });
-
-    // Update existing fund result
-    await model.FundResult.update(
-      {
-        deptBreakdown: result.deptBreakdown,
-        weightedTotalCoins: result.weightedTotalCoins,
-        retentionMultiplier: result.retentionMultiplier,
-        coinsAfterRetention: result.coinsAfterRetention,
-        finalRating: result.finalRating,
-        behaviorLevel: result.behaviorLevel,
-        behaviorMultiplier: result.behaviorMultiplier,
-        finalCoins: result.finalCoins,
-        finalSalary: result.finalSalary,
-        achievementPercent: result.achievementPercent,
-        performanceCategory: result.performanceCategory,
-      },
-      { where: { configId: id } }
-    );
-
-    return ReS(res, { success: true, message: "Fund config updated and recalculated successfully" }, 200);
+    return ReS(res, { success: true, message: "Fund config updated successfully" }, 200);
   } catch (error) {
     console.error("updateConfig Error:", error);
     return ReE(res, error.message, 500);
@@ -232,7 +172,7 @@ var deleteConfig = async (req, res) => {
     config.isDeleted = true;
     await config.save();
 
-    // Soft delete linked result
+    // Soft delete linked result if exists
     await model.FundResult.update({ isDeleted: true }, { where: { configId: id } });
 
     return ReS(res, { success: true, message: "Fund config deleted successfully" }, 200);
