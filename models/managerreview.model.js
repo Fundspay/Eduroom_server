@@ -20,7 +20,7 @@ module.exports = (sequelize, Sequelize) => {
       // 🔹 Type of reviewer
       // intern | peer | cross | manager | leadership
       reviewerType: {
-        type: Sequelize.Text,
+        type: Sequelize.ENUM("intern", "peer", "cross", "manager", "leadership"),
         allowNull: false,
       },
 
