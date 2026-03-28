@@ -36,14 +36,6 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: false,
         defaultValue: [],
       },
-
-      // 🔹 Retention
-      retentionRate: {
-        type: Sequelize.DECIMAL(5, 2),
-        allowNull: false,
-        defaultValue: 0,
-      },
-
       // 🔹 Evaluation period (optional but useful)
       periodMonth: { type: Sequelize.INTEGER, allowNull: true }, // 1–12
       periodYear: { type: Sequelize.INTEGER, allowNull: true },

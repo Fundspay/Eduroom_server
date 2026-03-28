@@ -205,7 +205,9 @@ const getHrSelectedColleges = async (managerId, periodMonth, periodYear) => {
   });
 
   const uniqueColleges = new Set();
-  resumes.forEach((r) => { if (r.collegeName) uniqueColleges.add(r.collegeName); });
+  resumes.forEach((r) => {
+    if (r.collegeName) uniqueColleges.add(r.collegeName);
+  });
 
   return uniqueColleges.size;
 };
@@ -225,6 +227,42 @@ const getHrSelection = async (managerId, periodMonth, periodYear) => {
       Dateofonboarding: { [Op.between]: [start, end] },
     },
   });
+};
+
+// ─────────────────────────────────────────────
+// RETENTION RATE — active interns / total allocated
+// retentionRate = (activeInterns / totalAllocated) * 100
+// Higher staying = higher rate = higher multiplier = more coins
+// ─────────────────────────────────────────────
+const getRetentionRate = async (managerId, periodMonth, periodYear) => {
+  const { start, end } = getMonthRange(periodMonth, periodYear);
+
+  // Total interns allocated to this manager this month
+  const totalAllocated = await model.BdSheet.count({
+    where: {
+      teamManagerId: managerId,
+      startDate: { [Op.between]: [start, end] },
+    },
+    distinct: true,
+    col: "studentResumeId",
+  });
+
+  // No interns allocated — retention is 0
+  if (!totalAllocated) return 0;
+
+  // Interns still active under this manager this month
+  const totalActive = await model.BdSheet.count({
+    where: {
+      teamManagerId: managerId,
+      activeStatus: "Active",
+      startDate: { [Op.between]: [start, end] },
+    },
+    distinct: true,
+    col: "studentResumeId",
+  });
+
+  // retentionRate = (active / total) * 100
+  return parseFloat(((totalActive / totalAllocated) * 100).toFixed(2));
 };
 
 // ─────────────────────────────────────────────
@@ -251,10 +289,10 @@ const resolveSourceValue = async (source, managerId, periodMonth, periodYear) =>
     case "HR_SELECTION":
       return await getHrSelection(managerId, periodMonth, periodYear);
     case "MANUAL":
-      return 0; // manual — admin will enter value separately
+      return 0;
     default:
       return 0;
   }
 };
 
-module.exports = { resolveSourceValue };
+module.exports = { resolveSourceValue, getRetentionRate };

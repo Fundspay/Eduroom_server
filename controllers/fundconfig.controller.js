@@ -2,10 +2,13 @@
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const moment = require("moment-timezone");
-const { resolveSourceValue } = require("../utils/achievement.service");
+const { resolveSourceValue, getRetentionRate } = require("../utils/achievement.service");
 const { calculateFinal } = require("../utils/calculation.service");
 
 
+// ─────────────────────────────────────────────
+// 1. CREATE — Admin sets targets + weights only
+// ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
 // 1. CREATE — Admin sets targets + weights only
 // ─────────────────────────────────────────────
@@ -19,13 +22,13 @@ var createConfig = async (req, res) => {
       targetCoins,
       departments,
       ratings,
-      retentionRate,
       periodMonth,
       periodYear,
     } = req.body;
 
-    if (!managerId || !employeeName || !position || !targetCoins || !departments || !ratings || !retentionRate) {
-      return ReE(res, "managerId, employeeName, position, targetCoins, departments, ratings and retentionRate are required", 400);
+    // Validate required fields — retentionRate removed (auto-calculated from DB)
+    if (!managerId || !employeeName || !position || !targetCoins || !departments || !ratings) {
+      return ReE(res, "managerId, employeeName, position, targetCoins, departments and ratings are required", 400);
     }
 
     if (!Array.isArray(departments) || departments.length === 0) {
@@ -36,7 +39,7 @@ var createConfig = async (req, res) => {
       return ReE(res, "ratings must be a non-empty array", 400);
     }
 
-    // Save config — no calculation at this stage
+    // Save config — no calculation at this stage, retentionRate auto-fetched later
     const config = await model.FundConfig.create({
       managerId,
       employeeName: employeeName.toString(),
@@ -45,7 +48,6 @@ var createConfig = async (req, res) => {
       targetCoins,
       departments,
       ratings,
-      retentionRate,
       periodMonth: periodMonth || null,
       periodYear: periodYear || null,
     });
@@ -62,15 +64,25 @@ module.exports.createConfig = createConfig;
 // ─────────────────────────────────────────────
 // 2. GET ONE — fetch config only
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// 2. GET ONE — fetch config + all team managers
+// ─────────────────────────────────────────────
 var getConfig = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Fetch config
     const config = await model.FundConfig.findOne({
       where: { id, isDeleted: false },
     });
-
     if (!config) return ReE(res, "Fund config not found", 404);
+
+    // Fetch all active team managers
+    const teamManagers = await model.TeamManager.findAll({
+      where: { isDeleted: false, isActive: true },
+      attributes: ["id", "managerId", "name", "email", "department", "position"],
+      order: [["name", "ASC"]],
+    });
 
     const formattedConfig = {
       ...config.dataValues,
@@ -78,7 +90,7 @@ var getConfig = async (req, res) => {
       updatedAt: moment(config.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
     };
 
-    return ReS(res, { success: true, data: formattedConfig }, 200);
+    return ReS(res, { success: true, data: formattedConfig, teamManagers }, 200);
   } catch (error) {
     console.error("getConfig Error:", error);
     return ReE(res, error.message, 500);
@@ -86,7 +98,6 @@ var getConfig = async (req, res) => {
 };
 
 module.exports.getConfig = getConfig;
-
 // ─────────────────────────────────────────────
 // 3. GET ALL — list all configs for a manager
 // ─────────────────────────────────────────────
@@ -187,7 +198,7 @@ var deleteConfig = async (req, res) => {
 
 module.exports.deleteConfig = deleteConfig;
 
-"use strict";
+
 // ─────────────────────────────────────────────
 var calculateAchievement = async (req, res) => {
   try {
@@ -340,8 +351,6 @@ var calculateAchievement = async (req, res) => {
 module.exports.calculateAchievement = calculateAchievement;
 
 
-"use strict";
-
 // ─────────────────────────────────────────────
 // ADD THESE IMPORTS at the top of fundConfigController.js
 // (if not already added)
@@ -349,6 +358,10 @@ module.exports.calculateAchievement = calculateAchievement;
 // const { resolveSourceValue } = require("../utils/achievement.service");
 // const { calculateFinal } = require("../utils/calculation.service");
 
+// ─────────────────────────────────────────────
+// 7. FINAL REPORT — full fundcoins report with everything
+// POST /api/fund-config/final-report/:id
+// ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
 // 7. FINAL REPORT — full fundcoins report with everything
 // POST /api/fund-config/final-report/:id
@@ -374,14 +387,17 @@ var finalReport = async (req, res) => {
       periodYear,
       departments,
       ratings,
-      retentionRate,
       targetCoins,
     } = config;
 
     if (!periodMonth || !periodYear)
       return ReE(res, "Config is missing periodMonth or periodYear", 400);
 
-    // ── Step 2: Resolve real achieved values from DB per metric ──
+    // ── Step 2: Auto-calculate retention rate from DB ──
+    // retentionRate = (activeInterns / totalAllocated) * 100
+    const retentionRate = await getRetentionRate(managerId, periodMonth, periodYear);
+
+    // ── Step 3: Resolve real achieved values from DB per metric ──
     const resolvedDepartments = await Promise.all(
       departments.map(async (dept) => {
         const resolvedMetrics = await Promise.all(
@@ -413,7 +429,7 @@ var finalReport = async (req, res) => {
       })
     );
 
-    // ── Step 3: Auto-fetch 360° ratings from ManagerReviews ──
+    // ── Step 4: Auto-fetch 360° ratings from ManagerReviews ──
     const reviewRows = await model.ManagerReview.findAll({
       where: {
         targetManagerId: managerId,
@@ -440,27 +456,26 @@ var finalReport = async (req, res) => {
       );
     });
 
-    // ── Step 4: Merge real avg values into ratings array from config ──
-    // Config ratings has: { key, name, weight, value }
-    // We override value with real monthly avg from ManagerReviews
-    // If no reviews found for a type, fall back to config value or 0
+    // ── Step 5: Merge real avg values into ratings array from config ──
+    // Override value with real monthly avg from ManagerReviews
+    // If no reviews found for a type, fall back to 0
     const mergedRatings = ratings.map((r) => ({
       ...r,
       value: avgByType[r.key] !== undefined ? avgByType[r.key] : parseFloat(r.value) || 0,
       reviewCount: grouped[r.key] ? grouped[r.key].length : 0,
     }));
 
-    // ── Step 5: Run full calculateFinal with real data ──
+    // ── Step 6: Run full calculateFinal with real data ──
     const configForCalc = {
       departments: resolvedDepartments,
       ratings: mergedRatings,
-      retentionRate: parseFloat(retentionRate),
+      retentionRate: retentionRate, // auto-fetched from DB
       targetCoins: parseFloat(targetCoins),
     };
 
     const calc = calculateFinal(configForCalc);
 
-    // ── Step 6: Upsert into FundResult ──
+    // ── Step 7: Upsert into FundResult ──
     const existingResult = await model.FundResult.findOne({
       where: { configId: id, isDeleted: false },
     });
@@ -494,12 +509,12 @@ var finalReport = async (req, res) => {
       });
     }
 
-    // ── Step 7: Fetch saved FundResult ──
+    // ── Step 8: Fetch saved FundResult ──
     const savedResult = await model.FundResult.findOne({
       where: { configId: id, isDeleted: false },
     });
 
-    // ── Step 8: Build dept breakdown for response ──
+    // ── Step 9: Build dept breakdown for response ──
     const departmentBreakdown = calc.deptBreakdown.map((dept) => ({
       key: dept.key,
       name: dept.name,
@@ -518,7 +533,7 @@ var finalReport = async (req, res) => {
       weightedContribution: parseFloat(dept.weightedContribution.toFixed(2)),
     }));
 
-    // ── Step 9: Build ratings breakdown for response ──
+    // ── Step 10: Build ratings breakdown for response ──
     const ratingsBreakdown = mergedRatings.map((r) => ({
       key: r.key,
       name: r.name,
@@ -528,7 +543,7 @@ var finalReport = async (req, res) => {
       contribution: parseFloat(((r.value * r.weight) / 100).toFixed(4)),
     }));
 
-    // ── Step 10: Build full report response ──
+    // ── Step 11: Build full report response ──
     const coinsEarned = parseFloat(calc.finalCoins);
     const coinsTarget = parseFloat(targetCoins);
     const coinsRemaining = Math.max(0, coinsTarget - coinsEarned);
@@ -560,9 +575,9 @@ var finalReport = async (req, res) => {
       // Department-wise breakdown
       departmentBreakdown,
 
-      // Retention breakdown
+      // Retention breakdown — now with auto-fetched rate
       retentionBreakdown: {
-        retentionRate: parseFloat(retentionRate),
+        retentionRate: retentionRate, // auto-fetched from BdSheet
         retentionMultiplier: calc.retentionMultiplier,
         weightedTotalCoins: parseFloat(calc.weightedTotalCoins.toFixed(2)),
         coinsAfterRetention: parseFloat(calc.coinsAfterRetention.toFixed(2)),
@@ -599,6 +614,3 @@ var finalReport = async (req, res) => {
 };
 
 module.exports.finalReport = finalReport;
-
-
-
