@@ -79,5 +79,6 @@ router.use("/analysis1", analysis1Router);
 router.use("/taskcalendar", taskcalendarRouter);
 router.use("/scoresheet", scoresheetRouter);
 router.use("/fundconfig", fundconfigRouter);
+router.use("/managerreview", managerreviewRouter);
 
 module.exports = router;
