@@ -34,6 +34,7 @@ const mastersheetRouter = require("./mastersheet.route");
 const analysis1Router = require("./analysis1.route");
 const taskcalendarRouter = require("./taskcalendar.route");
 const scoresheetRouter = require("./scoresheet.route");
+const fundconfigRouter = require("./fundconfig.route")
 
 
 
@@ -76,5 +77,6 @@ router.use("/mastersheet", mastersheetRouter);
 router.use("/analysis1", analysis1Router);
 router.use("/taskcalendar", taskcalendarRouter);
 router.use("/scoresheet", scoresheetRouter);
+router.use
 
 module.exports = router;
