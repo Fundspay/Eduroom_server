@@ -623,6 +623,7 @@ const loginWithEmailPassword = async (req, res) => {
     await activeAccount.update({ lastLoginAt: new Date() });
 
     let payload = {};
+
     if (role === "user") {
       payload = {
         user_id: activeAccount.id,
@@ -644,6 +645,13 @@ const loginWithEmailPassword = async (req, res) => {
         };
       }
     } else {
+      // ── Fetch latest FundConfig id for this manager ──
+      const fundConfig = await model.FundConfig.findOne({
+        where: { managerId: activeAccount.id, isDeleted: false },
+        order: [["createdAt", "DESC"]], // latest config
+        attributes: ["id", "periodMonth", "periodYear"],
+      });
+
       payload = {
         managerId: activeAccount.id,
         name: activeAccount.name,
@@ -652,12 +660,20 @@ const loginWithEmailPassword = async (req, res) => {
         department: activeAccount.department,
         position: activeAccount.position,
         internshipStatus: activeAccount.internshipStatus || null,
+        // Fund config details — null if no config created yet
+        fundConfigId: fundConfig ? fundConfig.id : null,
+        fundConfigPeriod: fundConfig
+          ? {
+              periodMonth: fundConfig.periodMonth,
+              periodYear: fundConfig.periodYear,
+            }
+          : null,
       };
     }
 
     const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-    // ✅ dynamic key based on role
+    // Dynamic key based on role
     const responseKey = role === "user" ? "user" : "account";
 
     return ReS(
