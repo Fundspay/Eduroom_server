@@ -594,7 +594,7 @@ var upsertUserDayWork = async function (req, res) {
       ratingComment,
     } = req.body;
 
-    console.log("REQ BODY:", req.body); // 🔥 debug
+    console.log("REQ BODY:", req.body);
 
     // ✅ Validation
     if (!user_id || !day_no || day_no < 1 || day_no > 10) {
@@ -622,46 +622,34 @@ var upsertUserDayWork = async function (req, res) {
         work_status: work_status || "Not Completed",
         comment: comment !== undefined ? comment : null,
         daily_target: daily_target !== undefined ? daily_target : 0,
-
-        // ✅ FIXED
-        starRating:
-          starRating !== undefined ? parseFloat(starRating) : null,
-        ratingComment:
-          ratingComment !== undefined ? ratingComment : null,
+        starRating: starRating !== undefined ? parseFloat(starRating) : null,
+        ratingComment: ratingComment !== undefined ? ratingComment : null,
         isRated: starRating !== undefined,
       });
     } else {
-      // 🔴 Prevent re-rating
-      if (starRating !== undefined && record.isRated) {
-        return ReE(
-          res,
-          "You have already submitted a rating for this day",
-          409
-        );
-      }
-
       // ✅ Update normal fields
       if (work_status !== undefined) record.work_status = work_status;
       if (comment !== undefined) record.comment = comment;
       if (daily_target !== undefined) record.daily_target = daily_target;
 
-      // ✅ Update rating
-      if (starRating !== undefined) {
+      // 🔴 Prevent re-rating (only block starRating, NOT ratingComment)
+      if (starRating !== undefined && record.isRated) {
+        return ReE(res, "You have already submitted a rating for this day", 409);
+      }
+
+      // ✅ Case 1: Both starRating + ratingComment sent together (first time rating)
+      if (starRating !== undefined && !record.isRated) {
         record.starRating = parseFloat(starRating);
-        record.ratingComment =
-          ratingComment !== undefined ? ratingComment : null;
+        record.ratingComment = ratingComment !== undefined ? ratingComment : null;
         record.isRated = true;
       }
 
-      // ✅ Allow comment update even after rating (optional)
-      if (
-        starRating === undefined &&
-        ratingComment !== undefined &&
-        record.isRated
-      ) {
+      // ✅ Case 2: Only ratingComment sent (update comment after already rated or not)
+      if (starRating === undefined && ratingComment !== undefined) {
         record.ratingComment = ratingComment;
       }
 
+      // ✅ Single save — covers all cases
       await record.save();
     }
 
@@ -767,6 +755,7 @@ var upsertUserDayWork = async function (req, res) {
     return ReE(res, err.message, 500);
   }
 };
+
 module.exports.upsertUserDayWork = upsertUserDayWork;
 
 var submitDayRating = async (req, res) => {
