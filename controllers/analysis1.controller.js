@@ -449,7 +449,7 @@ var getUserAnalysis = async function (req, res) {
       const dayNo = i + 1;
 
       let currentDate = null;
-      let dateDay = "Date not available";
+      let dateDay = "Date not available";  
 
       if (start_date) {
         currentDate = new Date(start_date);
@@ -584,11 +584,24 @@ module.exports.getUserAnalysis = getUserAnalysis;
 // ─────────────────────────────────────────────
 var upsertUserDayWork = async function (req, res) {
   try {
-    const { user_id, day_no, work_status, comment, daily_target, starRating, ratingComment } = req.body;
+    const {
+      user_id,
+      day_no,
+      work_status,
+      comment,
+      daily_target,
+      starRating,
+      ratingComment,
+    } = req.body;
 
-    if (!user_id || !day_no) return ReE(res, "User ID and Day No are required", 400);
+    console.log("REQ BODY:", req.body); // 🔥 debug
 
-    // Validate star rating if provided
+    // ✅ Validation
+    if (!user_id || !day_no || day_no < 1 || day_no > 10) {
+      return ReE(res, "Valid User ID and Day No (1–10) are required", 400);
+    }
+
+    // ✅ Validate rating
     if (starRating !== undefined) {
       const rating = parseFloat(starRating);
       if (isNaN(rating) || rating < 1 || rating > 5) {
@@ -596,82 +609,108 @@ var upsertUserDayWork = async function (req, res) {
       }
     }
 
-    // Find existing record
-    let record = await model.analysis1.findOne({ where: { user_id, day_no } });
+    // 🔹 Find existing record
+    let record = await model.analysis1.findOne({
+      where: { user_id, day_no },
+    });
 
+    // 🔥 CREATE
     if (!record) {
-      // Create new row if not exists
       record = await model.analysis1.create({
         user_id,
         day_no,
         work_status: work_status || "Not Completed",
-        comment: comment || null,
-        daily_target: daily_target || 0,
-        starRating: starRating ? parseFloat(starRating) : null,
-        ratingComment: ratingComment || null,
-        isRated: starRating ? true : false,
+        comment: comment !== undefined ? comment : null,
+        daily_target: daily_target !== undefined ? daily_target : 0,
+
+        // ✅ FIXED
+        starRating:
+          starRating !== undefined ? parseFloat(starRating) : null,
+        ratingComment:
+          ratingComment !== undefined ? ratingComment : null,
+        isRated: starRating !== undefined,
       });
     } else {
-      // Check if already rated — don't allow re-rating
+      // 🔴 Prevent re-rating
       if (starRating !== undefined && record.isRated) {
-        return ReE(res, "You have already submitted a rating for this day", 409);
+        return ReE(
+          res,
+          "You have already submitted a rating for this day",
+          409
+        );
       }
 
-      // Update work fields
+      // ✅ Update normal fields
       if (work_status !== undefined) record.work_status = work_status;
       if (comment !== undefined) record.comment = comment;
       if (daily_target !== undefined) record.daily_target = daily_target;
 
-      // Update rating fields if provided
+      // ✅ Update rating
       if (starRating !== undefined) {
         record.starRating = parseFloat(starRating);
-        record.ratingComment = ratingComment || null;
+        record.ratingComment =
+          ratingComment !== undefined ? ratingComment : null;
         record.isRated = true;
+      }
+
+      // ✅ Allow comment update even after rating (optional)
+      if (
+        starRating === undefined &&
+        ratingComment !== undefined &&
+        record.isRated
+      ) {
+        record.ratingComment = ratingComment;
       }
 
       await record.save();
     }
 
-    // ── If rating was submitted — push overall avg to ManagerReview ──
+    // ─────────────────────────────────────────────
+    // 🔥 UPDATE MANAGER REVIEW (only if rating given)
+    // ─────────────────────────────────────────────
     if (starRating !== undefined) {
-      // Fetch all rated days for this intern
       const allRatedDays = await model.analysis1.findAll({
         where: { user_id, isRated: true },
         attributes: ["starRating"],
         raw: true,
       });
 
-      // Calculate overall avg across all rated days
-      const overallAvg = parseFloat(
-        (
-          allRatedDays.reduce((sum, d) => sum + parseFloat(d.starRating), 0) /
-          allRatedDays.length
-        ).toFixed(2)
-      );
+      const overallAvg =
+        allRatedDays.length > 0
+          ? parseFloat(
+              (
+                allRatedDays.reduce(
+                  (sum, d) => sum + parseFloat(d.starRating),
+                  0
+                ) / allRatedDays.length
+              ).toFixed(2)
+            )
+          : null;
 
-      // Find manager linked to this intern via Status table
       const userStatus = await model.Status.findOne({
         where: { userId: user_id },
         attributes: ["teamManager"],
       });
 
-      if (userStatus && userStatus.teamManager) {
-        // Get TeamManager id from name
+      if (userStatus?.teamManager) {
         const manager = await model.TeamManager.findOne({
-          where: { name: userStatus.teamManager, isDeleted: false },
+          where: {
+            name: userStatus.teamManager,
+            isDeleted: false,
+          },
           attributes: ["id"],
         });
 
         if (manager) {
-          // Get period from record start_date
-          const startDate = record.start_date
-            ? moment(record.start_date)
-            : moment();
+          if (!record.start_date) {
+            return ReE(res, "Start date missing for this user", 400);
+          }
+
+          const startDate = moment(record.start_date);
           const periodMonth = startDate.month() + 1;
           const periodYear = startDate.year();
           const reviewDate = moment().format("YYYY-MM-DD");
 
-          // Upsert into ManagerReview — one overall intern review per user per month
           const existingReview = await model.ManagerReview.findOne({
             where: {
               targetManagerId: manager.id,
@@ -684,14 +723,12 @@ var upsertUserDayWork = async function (req, res) {
           });
 
           if (existingReview) {
-            // Update with latest overall avg
             await existingReview.update({
               starRating: overallAvg,
               comment: `Overall avg from ${allRatedDays.length} days rated`,
               reviewDate,
             });
           } else {
-            // Create fresh intern review
             await model.ManagerReview.create({
               targetManagerId: manager.id,
               reviewerManagerId: user_id,
@@ -707,7 +744,9 @@ var upsertUserDayWork = async function (req, res) {
       }
     }
 
-    // Fetch BUSINESS_TASK from User table
+    // ─────────────────────────────────────────────
+    // 🔥 BUSINESS TASK CALCULATION
+    // ─────────────────────────────────────────────
     const user = await model.User.findOne({
       where: { id: user_id },
       attributes: ["subscriptionLeft", "subscriptiondeductedWallet"],
@@ -717,7 +756,6 @@ var upsertUserDayWork = async function (req, res) {
       (parseInt(user?.subscriptionLeft || 0, 10) +
         parseInt(user?.subscriptiondeductedWallet || 0, 10)) || 0;
 
-    // Include BUSINESS_TASK in response
     const responseData = {
       ...record.toJSON(),
       BUSINESS_TASK: businessTaskValue,
@@ -729,7 +767,6 @@ var upsertUserDayWork = async function (req, res) {
     return ReE(res, err.message, 500);
   }
 };
-
 module.exports.upsertUserDayWork = upsertUserDayWork;
 
 var submitDayRating = async (req, res) => {
