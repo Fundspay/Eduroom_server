@@ -160,9 +160,14 @@ module.exports.getAllConfigs = getAllConfigs;
 // if no id given — return only all team managers
 // if id given — return config + all team managers
 // ─────────────────────────────────────────────
-var getConfig = async (req, res) => {
+// ─────────────────────────────────────────────
+// GET CONFIG — fetch by managerId instead of configId
+// if no managerId given — return only all team managers
+// if managerId given — return their config + all team managers
+// ─────────────────────────────────────────────
+var getConf = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { managerId } = req.params;
 
     // Fetch all active team managers (always returned)
     const teamManagers = await model.TeamManager.findAll({
@@ -171,16 +176,18 @@ var getConfig = async (req, res) => {
       order: [["name", "ASC"]],
     });
 
-    // No id given — just return team managers
-    if (!id) {
+    // No managerId given — just return team managers
+    if (!managerId) {
       return ReS(res, { success: true, teamManagers }, 200);
     }
 
-    // Id given — fetch config too
+    // managerId given — fetch their latest config
     const config = await model.FundConfig.findOne({
-      where: { id, isDeleted: false },
+      where: { managerId, isDeleted: false },
+      order: [["createdAt", "DESC"]], // latest config first
     });
-    if (!config) return ReE(res, "Fund config not found", 404);
+
+    if (!config) return ReE(res, "Fund config not found for this manager", 404);
 
     const formattedConfig = {
       ...config.dataValues,
@@ -190,12 +197,12 @@ var getConfig = async (req, res) => {
 
     return ReS(res, { success: true, data: formattedConfig, teamManagers }, 200);
   } catch (error) {
-    console.error("getConfig Error:", error);
+    console.error("getConf Error:", error);
     return ReE(res, error.message, 500);
   }
 };
 
-module.exports.getConfig = getConfig;
+module.exports.getConf = getConf;
 
 // ─────────────────────────────────────────────
 // 4. UPDATE — update targets + weights only
