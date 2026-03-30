@@ -3,10 +3,10 @@ const router = express.Router();
 
 const fundConfigController = require("../controllers/fundconfig.controller");
 
+router.get("/fetch", fundConfigController.getConfig);
 router.post("/create", fundConfigController.createConfig);
 router.post("/list", fundConfigController.getAllConfigs);
-router.get("/get", fundConfigController.getConfig);
-router.get("/get/:id", fundConfigController.getConf);
+router.get("/get/:managerId", fundConfigController.getConf);
 
 router.put("/update/:id", fundConfigController.updateConfig);
 router.delete("/delete", fundConfigController.deleteConfig);
