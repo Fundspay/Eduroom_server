@@ -94,16 +94,11 @@ module.exports.createConfig = createConfig;
 // ─────────────────────────────────────────────
 // 2. GET ONE — fetch config + all team managers
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// GET CONFIG — returns all active team managers list
+// ─────────────────────────────────────────────
 var getConfig = async (req, res) => {
   try {
-    const { id } = req.params;
-
-    // Fetch config
-    const config = await model.FundConfig.findOne({
-      where: { id, isDeleted: false },
-    });
-    if (!config) return ReE(res, "Fund config not found", 404);
-
     // Fetch all active team managers
     const teamManagers = await model.TeamManager.findAll({
       where: { isDeleted: false, isActive: true },
@@ -111,13 +106,7 @@ var getConfig = async (req, res) => {
       order: [["name", "ASC"]],
     });
 
-    const formattedConfig = {
-      ...config.dataValues,
-      createdAt: moment(config.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment(config.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
-    };
-
-    return ReS(res, { success: true, data: formattedConfig, teamManagers }, 200);
+    return ReS(res, { success: true, total: teamManagers.length, teamManagers }, 200);
   } catch (error) {
     console.error("getConfig Error:", error);
     return ReE(res, error.message, 500);
