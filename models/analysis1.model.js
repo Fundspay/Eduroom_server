@@ -34,7 +34,6 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
       },
 
-      // FIXED TYPE
       business_task: {
         type: Sequelize.TEXT,
         allowNull: true,
@@ -63,17 +62,36 @@ module.exports = (sequelize, Sequelize) => {
         defaultValue: 0,
       },
 
-      //  NEW
       percent_of_work: {
         type: Sequelize.STRING(10),
         allowNull: true,
         defaultValue: "0.00%",
       },
 
-      //  NEW
       category: {
         type: Sequelize.STRING(100),
         allowNull: true,
+      },
+
+      // 🔹 Daily star rating given by intern for their manager (1.0 to 5.0)
+      starRating: {
+        type: Sequelize.DECIMAL(3, 2),
+        allowNull: true,
+        defaultValue: null,
+      },
+
+      // 🔹 Rating comment given by intern for that day
+      ratingComment: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      },
+
+      // 🔹 Flag — whether intern has submitted rating for this day
+      isRated: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
       },
 
       createdAt: {
@@ -94,7 +112,7 @@ module.exports = (sequelize, Sequelize) => {
       indexes: [
         {
           unique: true,
-          fields: ["user_id", "day_no"], // REQUIRED FOR UPSERT SAFETY
+          fields: ["user_id", "day_no"],
         },
       ],
     }

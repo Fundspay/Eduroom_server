@@ -364,6 +364,9 @@ var updateStoredCourse = async function (req, res) {
 module.exports.updateStoredCourse = updateStoredCourse;
 
 
+// ─────────────────────────────────────────────
+// GET USER ANALYSIS — fetch all 10 days with rating per day
+// ─────────────────────────────────────────────
 var getUserAnalysis = async function (req, res) {
   try {
     const { userId } = req.params;
@@ -426,6 +429,10 @@ var getUserAnalysis = async function (req, res) {
 
     const data = [];
 
+    // Track overall rating summary
+    let totalRatedDays = 0;
+    let ratingSum = 0;
+
     for (let i = 0; i < totalDays; i++) {
       let dateDay = "Date not available";
       let currentDate = null;
@@ -463,6 +470,23 @@ var getUserAnalysis = async function (req, res) {
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
+      // ── Rating fields per day ──
+      const starRating = existingDay?.starRating ? parseFloat(existingDay.starRating) : null;
+      const ratingComment = existingDay?.ratingComment || null;
+      const isRated = existingDay?.isRated || false;
+
+      // Accumulate for overall avg
+      if (isRated && starRating !== null) {
+        totalRatedDays++;
+        ratingSum += starRating;
+      }
+
+      // ── Can intern rate today? ──
+      let canRateToday = false;
+      if (currentDate && currentDate.getTime() === today.getTime() && !isRated) {
+        canRateToday = true;
+      }
+
       let workStatusPercentage = 0;
       if (workStatus === "Completed") workStatusPercentage = 100;
       else if (workStatus === "In Progress") workStatusPercentage = 33;
@@ -475,7 +499,7 @@ var getUserAnalysis = async function (req, res) {
         );
       }
 
-      //  FIX: Only create if not exists (NO OVERWRITE)
+      // Only create if not exists (NO OVERWRITE)
       if (!existingDay) {
         await model.analysis1.create({
           user_id: userId,
@@ -503,19 +527,36 @@ var getUserAnalysis = async function (req, res) {
         DAILY_TARGET: dailyTarget,
         PERCENT_OF_WORK: percentOfWork,
         COLOR_PERCENTAGE: colorPercentage,
-        CATEGORY: categoryDistribution[i]
+        CATEGORY: categoryDistribution[i],
+        // ── Rating fields ──
+        STAR_RATING: starRating,         // null if not rated yet
+        RATING_COMMENT: ratingComment,   // null if not rated yet
+        IS_RATED: isRated,               // false if not rated yet
+        CAN_RATE_TODAY: canRateToday,    // true only if today is that exact day and not rated
       });
     }
 
-    return ReS(res, { success: true, data }, 200);
+    // ── Overall rating summary across all days ──
+    const overallAvgRating = totalRatedDays > 0
+      ? parseFloat((ratingSum / totalRatedDays).toFixed(2))
+      : null;
+
+    const ratingSummary = {
+      totalDays,
+      totalRatedDays,
+      pendingRatingDays: totalDays - totalRatedDays,
+      overallAvgRating, // null if no days rated yet
+    };
+
+    return ReS(res, { success: true, ratingSummary, data }, 200);
 
   } catch (err) {
+    console.error("getUserAnalysis Error:", err);
     return ReE(res, err.message, 500);
   }
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
 
 
 
@@ -570,6 +611,150 @@ var upsertUserDayWork = async function(req, res) {
 };
 
 module.exports.upsertUserDayWork = upsertUserDayWork;
+
+var submitDayRating = async (req, res) => {
+  try {
+    const { userId, dayNo, starRating, ratingComment } = req.body;
+ 
+    // Validate required fields
+    if (!userId || !dayNo || !starRating) {
+      return ReE(res, "userId, dayNo and starRating are required", 400);
+    }
+ 
+    // Validate star rating range
+    const rating = parseFloat(starRating);
+    if (isNaN(rating) || rating < 1 || rating > 5) {
+      return ReE(res, "starRating must be between 1.0 and 5.0", 400);
+    }
+ 
+    // Fetch the day record
+    const dayRecord = await model.analysis1.findOne({
+      where: { user_id: userId, day_no: dayNo },
+    });
+    if (!dayRecord) return ReE(res, "Day record not found", 404);
+ 
+    // Check if already rated
+    if (dayRecord.isRated) {
+      return ReE(res, "You have already submitted a rating for this day", 409);
+    }
+ 
+    // Validate — intern can only rate on that exact day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+ 
+    if (dayRecord.start_date) {
+      const dayDate = new Date(dayRecord.start_date);
+      dayDate.setDate(dayDate.getDate() + (dayNo - 1));
+      dayDate.setHours(0, 0, 0, 0);
+ 
+      if (dayDate.getTime() !== today.getTime()) {
+        return ReE(res, "You can only submit a rating on that exact day", 400);
+      }
+    }
+ 
+    // Save rating for this day
+    await dayRecord.update({
+      starRating: rating,
+      ratingComment: ratingComment || null,
+      isRated: true,
+    });
+ 
+    // ── Check if all 10 days are rated — push overall avg to ManagerReview ──
+    const allDays = await model.analysis1.findAll({
+      where: { user_id: userId },
+      attributes: ["starRating", "isRated", "start_date"],
+    });
+ 
+    const totalDays = allDays.length;
+    const ratedDays = allDays.filter((d) => d.isRated && d.starRating !== null);
+ 
+    // Calculate overall avg across all rated days so far
+    const overallAvg = parseFloat(
+      (
+        ratedDays.reduce((sum, d) => sum + parseFloat(d.starRating), 0) /
+        ratedDays.length
+      ).toFixed(2)
+    );
+ 
+    // Find manager linked to this intern via Status table
+    const userStatus = await model.Status.findOne({
+      where: { userId },
+      attributes: ["teamManager"],
+    });
+ 
+    if (userStatus && userStatus.teamManager) {
+      // Get TeamManager id from name
+      const manager = await model.TeamManager.findOne({
+        where: { name: userStatus.teamManager, isDeleted: false },
+        attributes: ["id"],
+      });
+ 
+      if (manager) {
+        // Get period from start_date of day 1
+        const day1 = allDays.find((d) => true);
+        const startDate = day1?.start_date ? moment(day1.start_date) : moment();
+        const periodMonth = startDate.month() + 1;
+        const periodYear = startDate.year();
+        const reviewDate = moment().format("YYYY-MM-DD");
+ 
+        // Upsert into ManagerReview — one overall intern review per userId per month
+        const existingReview = await model.ManagerReview.findOne({
+          where: {
+            targetManagerId: manager.id,
+            reviewerManagerId: userId, // using userId as reviewer reference
+            reviewerType: "intern",
+            periodMonth,
+            periodYear,
+            isDeleted: false,
+          },
+        });
+ 
+        if (existingReview) {
+          // Update with latest overall avg
+          await existingReview.update({
+            starRating: overallAvg,
+            comment: `Overall avg from ${ratedDays.length}/${totalDays} days rated`,
+            reviewDate,
+          });
+        } else {
+          // Create fresh intern review
+          await model.ManagerReview.create({
+            targetManagerId: manager.id,
+            reviewerManagerId: userId,
+            reviewerType: "intern",
+            starRating: overallAvg,
+            comment: `Overall avg from ${ratedDays.length}/${totalDays} days rated`,
+            reviewDate,
+            periodMonth,
+            periodYear,
+          });
+        }
+      }
+    }
+ 
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Rating submitted successfully",
+        data: {
+          dayNo,
+          starRating: rating,
+          ratingComment: ratingComment || null,
+          totalRatedDays: ratedDays.length,
+          totalDays,
+          overallAvgSoFar: overallAvg,
+        },
+      },
+      200
+    );
+  } catch (error) {
+    console.error("submitDayRating Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+ 
+module.exports.submitDayRating = submitDayRating;
 
 
 

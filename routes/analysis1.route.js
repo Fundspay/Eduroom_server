@@ -15,6 +15,8 @@ router.get("/analysis/:userId", analysis1Controller.getUserAnalysis);
 //update the work status
 router.post("/user/day-work", analysis1Controller.upsertUserDayWork);
 
+router.post("/submit-rating", analysis1Controller.submitDayRating);
+
 
 
 

@@ -433,9 +433,6 @@ module.exports.calculateAchievement = calculateAchievement;
 // POST /api/fund-config/final-report/:id
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
-// 7. FINAL REPORT — full fundcoins report with everything
-// POST /api/fund-config/final-report/:id
-// ─────────────────────────────────────────────
 var finalReport = async (req, res) => {
   try {
     const { id } = req.params;
@@ -499,12 +496,85 @@ var finalReport = async (req, res) => {
       })
     );
 
-    // ── Step 4: Auto-fetch 360° ratings from ManagerReviews ──
+    // ── Step 4: Fetch manager name to find interns via Status table ──
+    const managerRecord = await model.TeamManager.findByPk(managerId, {
+      attributes: ["name"],
+    });
+    const managerName = managerRecord ? managerRecord.name : null;
+
+    // ── Step 5: Get all intern userIds under this manager from Status table ──
+    let internAvgRating = 0;
+    let internReviewCount = 0;
+    let internBreakdown = [];
+
+    if (managerName) {
+      const statuses = await model.Status.findAll({
+        where: { teamManager: managerName },
+        attributes: ["userId"],
+        raw: true,
+      });
+
+      const internUserIds = statuses.map((s) => s.userId);
+
+      if (internUserIds.length > 0) {
+        // For each intern, fetch their analysis1 records and calculate avg rating
+        const internRatings = await Promise.all(
+          internUserIds.map(async (uid) => {
+            const days = await model.analysis1.findAll({
+              where: {
+                user_id: uid,
+                isRated: true,
+              },
+              attributes: ["day_no", "starRating", "ratingComment"],
+              raw: true,
+            });
+
+            if (!days.length) return null;
+
+            const avg = parseFloat(
+              (
+                days.reduce((sum, d) => sum + parseFloat(d.starRating), 0) /
+                days.length
+              ).toFixed(2)
+            );
+
+            return {
+              userId: uid,
+              ratedDays: days.length,
+              avgRating: avg,
+              days: days.map((d) => ({
+                dayNo: d.day_no,
+                starRating: parseFloat(d.starRating),
+                ratingComment: d.ratingComment || null,
+              })),
+            };
+          })
+        );
+
+        // Filter out interns with no ratings
+        internBreakdown = internRatings.filter((r) => r !== null);
+        internReviewCount = internBreakdown.length;
+
+        if (internReviewCount > 0) {
+          // Overall avg across all interns
+          internAvgRating = parseFloat(
+            (
+              internBreakdown.reduce((sum, r) => sum + r.avgRating, 0) /
+              internReviewCount
+            ).toFixed(2)
+          );
+        }
+      }
+    }
+
+    // ── Step 6: Auto-fetch other 360° ratings from ManagerReviews ──
+    // (peer, cross, manager, leadership — NOT intern, that comes from analysis1)
     const reviewRows = await model.ManagerReview.findAll({
       where: {
         targetManagerId: managerId,
         periodMonth,
         periodYear,
+        reviewerType: { [require("sequelize").Op.ne]: "intern" }, // exclude intern — handled separately
         isDeleted: false,
       },
       attributes: ["reviewerType", "starRating"],
@@ -526,26 +596,27 @@ var finalReport = async (req, res) => {
       );
     });
 
-    // ── Step 5: Merge real avg values into ratings array from config ──
-    // Override value with real monthly avg from ManagerReviews
-    // If no reviews found for a type, fall back to 0
+    // Override intern avg with real value from analysis1
+    avgByType["intern"] = internAvgRating;
+
+    // ── Step 7: Merge real avg values into ratings array from config ──
     const mergedRatings = ratings.map((r) => ({
       ...r,
       value: avgByType[r.key] !== undefined ? avgByType[r.key] : parseFloat(r.value) || 0,
-      reviewCount: grouped[r.key] ? grouped[r.key].length : 0,
+      reviewCount: r.key === "intern" ? internReviewCount : (grouped[r.key] ? grouped[r.key].length : 0),
     }));
 
-    // ── Step 6: Run full calculateFinal with real data ──
+    // ── Step 8: Run full calculateFinal with real data ──
     const configForCalc = {
       departments: resolvedDepartments,
       ratings: mergedRatings,
-      retentionRate: retentionRate, // auto-fetched from DB
+      retentionRate: retentionRate,
       targetCoins: parseFloat(targetCoins),
     };
 
     const calc = calculateFinal(configForCalc);
 
-    // ── Step 7: Upsert into FundResult ──
+    // ── Step 9: Upsert into FundResult ──
     const existingResult = await model.FundResult.findOne({
       where: { configId: id, isDeleted: false },
     });
@@ -579,12 +650,12 @@ var finalReport = async (req, res) => {
       });
     }
 
-    // ── Step 8: Fetch saved FundResult ──
+    // ── Step 10: Fetch saved FundResult ──
     const savedResult = await model.FundResult.findOne({
       where: { configId: id, isDeleted: false },
     });
 
-    // ── Step 9: Build dept breakdown for response ──
+    // ── Step 11: Build dept breakdown for response ──
     const departmentBreakdown = calc.deptBreakdown.map((dept) => ({
       key: dept.key,
       name: dept.name,
@@ -603,7 +674,7 @@ var finalReport = async (req, res) => {
       weightedContribution: parseFloat(dept.weightedContribution.toFixed(2)),
     }));
 
-    // ── Step 10: Build ratings breakdown for response ──
+    // ── Step 12: Build ratings breakdown for response ──
     const ratingsBreakdown = mergedRatings.map((r) => ({
       key: r.key,
       name: r.name,
@@ -613,7 +684,7 @@ var finalReport = async (req, res) => {
       contribution: parseFloat(((r.value * r.weight) / 100).toFixed(4)),
     }));
 
-    // ── Step 11: Build full report response ──
+    // ── Step 13: Build full report response ──
     const coinsEarned = parseFloat(calc.finalCoins);
     const coinsTarget = parseFloat(targetCoins);
     const coinsRemaining = Math.max(0, coinsTarget - coinsEarned);
@@ -645,9 +716,9 @@ var finalReport = async (req, res) => {
       // Department-wise breakdown
       departmentBreakdown,
 
-      // Retention breakdown — now with auto-fetched rate
+      // Retention breakdown
       retentionBreakdown: {
-        retentionRate: retentionRate, // auto-fetched from BdSheet
+        retentionRate: retentionRate,
         retentionMultiplier: calc.retentionMultiplier,
         weightedTotalCoins: parseFloat(calc.weightedTotalCoins.toFixed(2)),
         coinsAfterRetention: parseFloat(calc.coinsAfterRetention.toFixed(2)),
@@ -655,6 +726,14 @@ var finalReport = async (req, res) => {
 
       // 360° ratings breakdown
       ratingsBreakdown,
+
+      // Intern review breakdown — per intern avg
+      internReviewBreakdown: {
+        totalInternsUnderManager: managerName ? (await model.Status.count({ where: { teamManager: managerName } })) : 0,
+        totalInternsRated: internReviewCount,
+        overallInternAvgRating: internAvgRating,
+        perInternBreakdown: internBreakdown,
+      },
 
       // Full FundResult row
       fundResult: {
