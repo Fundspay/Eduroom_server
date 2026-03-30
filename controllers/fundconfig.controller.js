@@ -652,24 +652,33 @@ var finalReport = async (req, res) => {
     });
 
     // ── Step 11: Build dept breakdown for response ──
+    // Shows target vs achieved vs % per metric
     const departmentBreakdown = calc.deptBreakdown.map((dept) => ({
       key: dept.key,
       name: dept.name,
       icon: dept.icon,
       deptWeight: dept.deptWeight,
-      metrics: dept.metrics.map((m) => ({
-        name: m.name,
-        source: m.source || "MANUAL",
-        achievedValue: m.value,
-        multiplier: m.multiplier,
-        coinsEarned: parseFloat((m.value * m.multiplier).toFixed(2)),
-        weight: m.weight,
-        weightedCoins: parseFloat(m.coinsEarned !== undefined ? m.coinsEarned : 0),
-      })),
+      metrics: dept.metrics.map((m) => {
+        const achieved = m.value || 0;
+        const target = m.target || 0;
+        const metricAchievementPercent =
+          target > 0 ? parseFloat(((achieved / target) * 100).toFixed(2)) : null;
+
+        return {
+          name: m.name,
+          source: m.source || "MANUAL",
+          target,                                                          // admin set target
+          achievedValue: achieved,                                         // real DB value
+          metricAchievementPercent,                                        // achieved/target %
+          multiplier: m.multiplier,
+          coinsEarned: parseFloat((achieved * m.multiplier).toFixed(2)),  // coins from this metric
+          weight: m.weight,
+          weightedCoins: parseFloat(m.coinsEarned !== undefined ? m.coinsEarned : 0),
+        };
+      }),
       totalBeforeWeight: parseFloat(dept.totalBeforeWeight.toFixed(2)),
       weightedContribution: parseFloat(dept.weightedContribution.toFixed(2)),
     }));
-
     // ── Step 12: Build ratings breakdown for response ──
     const ratingsBreakdown = mergedRatings.map((r) => ({
       key: r.key,
