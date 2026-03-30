@@ -364,7 +364,6 @@ var updateStoredCourse = async function (req, res) {
 
 module.exports.updateStoredCourse = updateStoredCourse;
 
-
 // ─────────────────────────────────────────────
 // GET USER ANALYSIS — fetch all 10 days with rating per day
 // ─────────────────────────────────────────────
@@ -374,7 +373,7 @@ var getUserAnalysis = async function (req, res) {
     if (!userId) return ReE(res, "User ID is required", 400);
 
     const record = await model.analysis1.findOne({
-      where: { user_id: userId }
+      where: { user_id: userId },
     });
 
     if (!record) return ReE(res, "Record not found", 404);
@@ -390,7 +389,7 @@ var getUserAnalysis = async function (req, res) {
 
     const user = await model.User.findOne({
       where: { id: userId },
-      attributes: ["subscriptionWallet"]
+      attributes: ["subscriptionWallet"],
     });
 
     const achievedBusinessTask =
@@ -404,7 +403,7 @@ var getUserAnalysis = async function (req, res) {
     const businessTaskText = String(taskValue);
 
     const percentageDistribution = [18, 22, 25, 25, 10];
-    const dailyTargets = percentageDistribution.map(p =>
+    const dailyTargets = percentageDistribution.map((p) =>
       Math.round((p / 100) * taskValue)
     );
 
@@ -420,7 +419,7 @@ var getUserAnalysis = async function (req, res) {
       "1500 STIPEND",
       "2500 STIPEND",
       "3500 STIPEND",
-      "5000 STIPEND"
+      "5000 STIPEND",
     ];
 
     const totalDays = 10;
@@ -464,17 +463,36 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
+      // ── Fetch existing day record with all fields explicitly ──
       const existingDay = await model.analysis1.findOne({
-        where: { user_id: userId, day_no: i + 1 }
+        where: { user_id: userId, day_no: i + 1 },
+        attributes: [
+          "id",
+          "work_status",
+          "comment",
+          "daily_target",
+          "percent_of_work",
+          "category",
+          "starRating",
+          "ratingComment",
+          "isRated",
+        ],
       });
 
       const workStatus = existingDay?.work_status || "Not Completed";
       const comment = existingDay?.comment || "";
 
-      // ── Rating fields per day ──
-      const starRating = existingDay?.starRating ? parseFloat(existingDay.starRating) : null;
-      const ratingComment = existingDay?.ratingComment || null;
-      const isRated = existingDay?.isRated || false;
+      // ── Rating fields — safely extract ──
+      const rawRating = existingDay ? existingDay.get("starRating") : null;
+      const starRating = rawRating !== null && rawRating !== undefined
+        ? parseFloat(rawRating)
+        : null;
+
+      const rawRatingComment = existingDay ? existingDay.get("ratingComment") : null;
+      const ratingComment = rawRatingComment || null;
+
+      const rawIsRated = existingDay ? existingDay.get("isRated") : false;
+      const isRated = rawIsRated === true || rawIsRated === 1 ? true : false;
 
       // Accumulate for overall avg
       if (isRated && starRating !== null) {
@@ -513,7 +531,10 @@ var getUserAnalysis = async function (req, res) {
           percent_of_work: percentOfWork,
           category: categoryDistribution[i],
           work_status: "Not Completed",
-          comment: ""
+          comment: "",
+          starRating: null,
+          ratingComment: null,
+          isRated: false,
         });
       }
 
@@ -530,17 +551,18 @@ var getUserAnalysis = async function (req, res) {
         COLOR_PERCENTAGE: colorPercentage,
         CATEGORY: categoryDistribution[i],
         // ── Rating fields ──
-        STAR_RATING: starRating,         // null if not rated yet
-        RATING_COMMENT: ratingComment,   // null if not rated yet
-        IS_RATED: isRated,               // false if not rated yet
-        CAN_RATE_TODAY: canRateToday,    // true only if today is that exact day and not rated
+        STAR_RATING: starRating,        // null if not rated yet
+        RATING_COMMENT: ratingComment,  // null if not rated yet
+        IS_RATED: isRated,              // false if not rated yet
+        CAN_RATE_TODAY: canRateToday,   // true only if today is that exact day and not rated
       });
     }
 
     // ── Overall rating summary across all days ──
-    const overallAvgRating = totalRatedDays > 0
-      ? parseFloat((ratingSum / totalRatedDays).toFixed(2))
-      : null;
+    const overallAvgRating =
+      totalRatedDays > 0
+        ? parseFloat((ratingSum / totalRatedDays).toFixed(2))
+        : null;
 
     const ratingSummary = {
       totalDays,
@@ -550,7 +572,6 @@ var getUserAnalysis = async function (req, res) {
     };
 
     return ReS(res, { success: true, ratingSummary, data }, 200);
-
   } catch (err) {
     console.error("getUserAnalysis Error:", err);
     return ReE(res, err.message, 500);
@@ -558,10 +579,6 @@ var getUserAnalysis = async function (req, res) {
 };
 
 module.exports.getUserAnalysis = getUserAnalysis;
-
-
-
-
 // ─────────────────────────────────────────────
 // UPSERT USER DAY WORK — update work status + intern rating for that day
 // ─────────────────────────────────────────────
