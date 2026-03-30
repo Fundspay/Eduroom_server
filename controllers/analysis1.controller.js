@@ -372,6 +372,7 @@ var getUserAnalysis = async function (req, res) {
     const { userId } = req.params;
     if (!userId) return ReE(res, "User ID is required", 400);
 
+    // 🔹 Get base record
     const record = await model.analysis1.findOne({
       where: { user_id: userId },
     });
@@ -387,6 +388,7 @@ var getUserAnalysis = async function (req, res) {
       calculatedEndDate.setHours(0, 0, 0, 0);
     }
 
+    // 🔹 Get user wallet
     const user = await model.User.findOne({
       where: { id: userId },
       attributes: ["subscriptionWallet"],
@@ -427,15 +429,27 @@ var getUserAnalysis = async function (req, res) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // 🔥 Fetch all records at once
+    const allDays = await model.analysis1.findAll({
+      where: { user_id: userId },
+    });
+
+    // Convert to map for fast lookup
+    const dayMap = {};
+    allDays.forEach((d) => {
+      dayMap[d.day_no] = d;
+    });
+
     const data = [];
 
-    // Track overall rating summary
     let totalRatedDays = 0;
     let ratingSum = 0;
 
     for (let i = 0; i < totalDays; i++) {
-      let dateDay = "Date not available";
+      const dayNo = i + 1;
+
       let currentDate = null;
+      let dateDay = "Date not available";
 
       if (start_date) {
         currentDate = new Date(start_date);
@@ -463,44 +477,53 @@ var getUserAnalysis = async function (req, res) {
             : "0.00%";
       }
 
-      // ── Fetch existing day record with all fields explicitly ──
-      const existingDay = await model.analysis1.findOne({
-        where: { user_id: userId, day_no: i + 1 },
-        attributes: [
-          "id",
-          "work_status",
-          "comment",
-          "daily_target",
-          "percent_of_work",
-          "category",
-          "starRating",
-          "ratingComment",
-          "isRated",
-        ],
-      });
+      let dayRecord = dayMap[dayNo];
 
-      const workStatus = existingDay?.work_status || "Not Completed";
-      const comment = existingDay?.comment || "";
+      // 🔥 CREATE or UPDATE
+      if (!dayRecord) {
+        dayRecord = await model.analysis1.create({
+          user_id: userId,
+          day_no: dayNo,
+          course_id: course_id || null,
+          course_name: course_name || null,
+          start_date: start_date || null,
+          end_date: calculatedEndDate || null,
+          daily_target: dailyTarget,
+          percent_of_work: percentOfWork,
+          category: categoryDistribution[i],
+          work_status: "Not Completed",
+          comment: "",
+          starRating: null,
+          ratingComment: null,
+          isRated: false,
+        });
+      } else {
+        // 🔥 Update dynamic fields
+        await dayRecord.update({
+          daily_target: dailyTarget,
+          percent_of_work: percentOfWork,
+          category: categoryDistribution[i],
+        });
+      }
 
-      // ── Rating fields — safely extract ──
-      const rawRating = existingDay ? existingDay.get("starRating") : null;
-      const starRating = rawRating !== null && rawRating !== undefined
-        ? parseFloat(rawRating)
-        : null;
+      const workStatus = dayRecord.work_status || "Not Completed";
+      const comment = dayRecord.comment || "";
 
-      const rawRatingComment = existingDay ? existingDay.get("ratingComment") : null;
-      const ratingComment = rawRatingComment || null;
+      const starRating =
+        dayRecord.starRating !== null
+          ? parseFloat(dayRecord.starRating)
+          : null;
 
-      const rawIsRated = existingDay ? existingDay.get("isRated") : false;
-      const isRated = rawIsRated === true || rawIsRated === 1 ? true : false;
+      const ratingComment = dayRecord.ratingComment || null;
 
-      // Accumulate for overall avg
+      const isRated =
+        dayRecord.isRated === true || dayRecord.isRated === 1;
+
       if (isRated && starRating !== null) {
         totalRatedDays++;
         ratingSum += starRating;
       }
 
-      // ── Can intern rate today? ──
       let canRateToday = false;
       if (currentDate && currentDate.getTime() === today.getTime() && !isRated) {
         canRateToday = true;
@@ -518,29 +541,9 @@ var getUserAnalysis = async function (req, res) {
         );
       }
 
-      // Only create if not exists (NO OVERWRITE)
-      if (!existingDay) {
-        await model.analysis1.create({
-          user_id: userId,
-          day_no: i + 1,
-          course_id: course_id || null,
-          course_name: course_name || null,
-          start_date: start_date || null,
-          end_date: calculatedEndDate || null,
-          daily_target: dailyTarget,
-          percent_of_work: percentOfWork,
-          category: categoryDistribution[i],
-          work_status: "Not Completed",
-          comment: "",
-          starRating: null,
-          ratingComment: null,
-          isRated: false,
-        });
-      }
-
       data.push({
-        SR: i + 1,
-        DAY_OF_WORK: `DAY ${i + 1}`,
+        SR: dayNo,
+        DAY_OF_WORK: `DAY ${dayNo}`,
         DATE_DAY: dateDay,
         WORK_STATUS: workStatus,
         COMMENT: comment,
@@ -550,15 +553,13 @@ var getUserAnalysis = async function (req, res) {
         PERCENT_OF_WORK: percentOfWork,
         COLOR_PERCENTAGE: colorPercentage,
         CATEGORY: categoryDistribution[i],
-        // ── Rating fields ──
-        STAR_RATING: starRating,        // null if not rated yet
-        RATING_COMMENT: ratingComment,  // null if not rated yet
-        IS_RATED: isRated,              // false if not rated yet
-        CAN_RATE_TODAY: canRateToday,   // true only if today is that exact day and not rated
+        STAR_RATING: starRating,
+        RATING_COMMENT: ratingComment,
+        IS_RATED: isRated,
+        CAN_RATE_TODAY: canRateToday,
       });
     }
 
-    // ── Overall rating summary across all days ──
     const overallAvgRating =
       totalRatedDays > 0
         ? parseFloat((ratingSum / totalRatedDays).toFixed(2))
@@ -568,7 +569,7 @@ var getUserAnalysis = async function (req, res) {
       totalDays,
       totalRatedDays,
       pendingRatingDays: totalDays - totalRatedDays,
-      overallAvgRating, // null if no days rated yet
+      overallAvgRating,
     };
 
     return ReS(res, { success: true, ratingSummary, data }, 200);
@@ -577,7 +578,6 @@ var getUserAnalysis = async function (req, res) {
     return ReE(res, err.message, 500);
   }
 };
-
 module.exports.getUserAnalysis = getUserAnalysis;
 // ─────────────────────────────────────────────
 // UPSERT USER DAY WORK — update work status + intern rating for that day

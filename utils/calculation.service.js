@@ -2,11 +2,28 @@
 
 // ─────────────────────────────────────────────
 // 1. Calculate coins earned per department
+// MANUAL metrics — cap achieved at target (can't earn more than 100% of target)
+// DB metrics — use real fetched value as is (no cap)
 // ─────────────────────────────────────────────
 const calculateDeptCoins = (departments) => {
   return departments.map((dept) => {
     const metrics = dept.metrics.map((metric) => {
-      const coinsEarned = (metric.value || 0) * (metric.multiplier || 0);
+      const achieved = parseFloat(metric.value) || 0;
+      const target = parseFloat(metric.target) || 0;
+
+      let effectiveValue;
+
+      if (metric.source === "MANUAL") {
+        // MANUAL — admin enters achieved value
+        // Cap at target so coins can't exceed 100% target coins
+        effectiveValue = target > 0 ? Math.min(achieved, target) : achieved;
+      } else {
+        // DB metrics — real fetched value, no cap
+        effectiveValue = achieved;
+      }
+
+      const coinsEarned = effectiveValue * (metric.multiplier || 0);
+
       return { ...metric, coinsEarned };
     });
 
