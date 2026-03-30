@@ -12,6 +12,9 @@ const { calculateFinal } = require("../utils/calculation.service");
 // ─────────────────────────────────────────────
 // 1. CREATE — Admin sets targets + weights only
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// 1. UPSERT — create or update config for same manager + period
+// ─────────────────────────────────────────────
 var createConfig = async (req, res) => {
   try {
     const {
@@ -39,7 +42,31 @@ var createConfig = async (req, res) => {
       return ReE(res, "ratings must be a non-empty array", 400);
     }
 
-    // Save config — no calculation at this stage, retentionRate auto-fetched later
+    // Check if config already exists for same manager + period
+    const existing = await model.FundConfig.findOne({
+      where: {
+        managerId,
+        periodMonth: periodMonth || null,
+        periodYear: periodYear || null,
+        isDeleted: false,
+      },
+    });
+
+    if (existing) {
+      // Update existing config
+      await existing.update({
+        employeeName: employeeName.toString(),
+        employeeEmail: employeeEmail ? employeeEmail.toString() : null,
+        position: position.toString(),
+        targetCoins,
+        departments,
+        ratings,
+      });
+
+      return ReS(res, { success: true, message: "Fund config updated successfully", data: existing }, 200);
+    }
+
+    // Create fresh config
     const config = await model.FundConfig.create({
       managerId,
       employeeName: employeeName.toString(),
@@ -126,6 +153,49 @@ var getAllConfigs = async (req, res) => {
 };
 
 module.exports.getAllConfigs = getAllConfigs;
+
+
+// ─────────────────────────────────────────────
+// 2. GET ONE — fetch config + all team managers
+// if no id given — return only all team managers
+// if id given — return config + all team managers
+// ─────────────────────────────────────────────
+var getConfig = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch all active team managers (always returned)
+    const teamManagers = await model.TeamManager.findAll({
+      where: { isDeleted: false, isActive: true },
+      attributes: ["id", "managerId", "name", "email", "department", "position"],
+      order: [["name", "ASC"]],
+    });
+
+    // No id given — just return team managers
+    if (!id) {
+      return ReS(res, { success: true, teamManagers }, 200);
+    }
+
+    // Id given — fetch config too
+    const config = await model.FundConfig.findOne({
+      where: { id, isDeleted: false },
+    });
+    if (!config) return ReE(res, "Fund config not found", 404);
+
+    const formattedConfig = {
+      ...config.dataValues,
+      createdAt: moment(config.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(config.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
+    };
+
+    return ReS(res, { success: true, data: formattedConfig, teamManagers }, 200);
+  } catch (error) {
+    console.error("getConfig Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getConfig = getConfig;
 
 // ─────────────────────────────────────────────
 // 4. UPDATE — update targets + weights only

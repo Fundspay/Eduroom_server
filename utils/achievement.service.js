@@ -254,7 +254,7 @@ const getRetentionRate = async (managerId, periodMonth, periodYear) => {
   const totalActive = await model.BdSheet.count({
     where: {
       teamManagerId: managerId,
-      activeStatus: "Active",
+      activeStatus: "active",
       startDate: { [Op.between]: [start, end] },
     },
     distinct: true,
