@@ -1759,11 +1759,6 @@ var getReferralDataByPhone = async (req, res) => {
 module.exports.getReferralDataByPhone = getReferralDataByPhone;
 
 
-"use strict";
-
-const model = require("../models");
-const { ReE, ReS } = require("../utils/util.service.js");
-
 // ─────────────────────────────────────────────
 // POST /api/marketing/submit
 // Intern submits their marketing metrics for the current period
