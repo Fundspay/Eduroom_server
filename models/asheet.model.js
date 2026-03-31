@@ -1,4 +1,5 @@
 "use strict";
+
 module.exports = (sequelize, Sequelize) => {
   const ASheet = sequelize.define(
     "ASheet",
@@ -22,7 +23,7 @@ module.exports = (sequelize, Sequelize) => {
       smmPresence: { type: Sequelize.STRING, allowNull: true },
       meetingStatus: { type: Sequelize.STRING, allowNull: true },
 
-      // 🔹 Added new fields (C1 to C4 tracking)
+      // 🔹 C1 to C4 tracking
       dateOfC1Connect: { type: Sequelize.DATEONLY, allowNull: true },
       c1Status: { type: Sequelize.STRING, allowNull: true },
       c1Comment: { type: Sequelize.STRING, allowNull: true },
@@ -39,13 +40,25 @@ module.exports = (sequelize, Sequelize) => {
       c4Status: { type: Sequelize.STRING, allowNull: true },
       c4Comment: { type: Sequelize.STRING, allowNull: true },
 
-      // 🔹 Foreign key (User)
-      userId: { type: Sequelize.BIGINT, allowNull: true },
+      // 🔹 Foreign key (TeamManager)
+      teamManagerId: { type: Sequelize.BIGINT, allowNull: true },
 
       // 🔹 System fields
-      isActive: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: true },
-      createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
-      updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+      isActive: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: true,
+      },
+      createdAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
+      updatedAt: {
+        type: Sequelize.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+      },
     },
     {
       timestamps: true,
@@ -54,18 +67,19 @@ module.exports = (sequelize, Sequelize) => {
 
   // 🔹 Associations
   ASheet.associate = function (models) {
-    // ASheet belongs to User
-    ASheet.belongsTo(models.User, {
-      foreignKey: "userId",
+    // ASheet belongs to TeamManager
+    ASheet.belongsTo(models.TeamManager, {
+      foreignKey: "teamManagerId",
+      targetKey: "id",
       onDelete: "SET NULL",
       onUpdate: "CASCADE",
     });
 
     // ASheet hasOne MSheet
     ASheet.hasOne(models.MSheet, {
-      foreignKey: "aSheetId", // matches MSheet.aSheetId
+      foreignKey: "aSheetId",
       sourceKey: "id",
-      as: "MSheet", // alias used in queries
+      as: "MSheet",
     });
   };
 

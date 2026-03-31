@@ -3,149 +3,124 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
-const { database } = require("firebase-admin");
 
 const fetchC1ScheduledDetails = async (req, res) => {
   try {
     const c1ScheduledRows = await model.ASheet.findAll({
-      where: {
-        meetingStatus: { [Op.iLike]: "%C1 Scheduled%" },
-      },
-      order: [["dateOfConnect", "DESC"]], // ✅ latest first
+      where: { meetingStatus: { [Op.iLike]: "%C1 Scheduled%" } },
+      order: [["dateOfConnect", "DESC"]],
       raw: true,
     });
 
-    return ReS(
-      res,
-      {
-        success: true,
-        totalC1Scheduled: c1ScheduledRows.length,
-        data: c1ScheduledRows,
-      },
-      200
-    );
+    return ReS(res, {
+      success: true,
+      totalC1Scheduled: c1ScheduledRows.length,
+      data: c1ScheduledRows,
+    }, 200);
   } catch (error) {
     console.error("fetchC1ScheduledDetails Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.fetchC1ScheduledDetails = fetchC1ScheduledDetails;
+
 
 const updateASheetFollowupFields = async (req, res) => {
   try {
     const record = await model.ASheet.findByPk(req.params.id);
     if (!record) return ReE(res, "ASheet record not found", 404);
 
-    const updateData = req.body;
-
-    // ✅ Only allow updating the newly added fields (C1–C4)
     const allowedFields = [
       "dateOfC1Connect", "c1Status", "c1Comment",
       "dateOfC2Clarity", "c2Status", "c2Comment",
       "dateOfC3Clarity", "c3Status", "c3Comment",
-      "dateOfC4Customer", "c4Status", "c4Comment"
+      "dateOfC4Customer", "c4Status", "c4Comment",
     ];
 
     const updates = {};
     for (const key of allowedFields) {
-      if (updateData[key] !== undefined) {
-        updates[key] = updateData[key];
-      }
+      if (req.body[key] !== undefined) updates[key] = req.body[key];
     }
 
-    if (!Object.keys(updates).length) {
-      return ReE(res, "No valid follow-up fields provided for update", 400);
-    }
+    if (!Object.keys(updates).length) return ReE(res, "No valid follow-up fields provided for update", 400);
 
-    // ✅ Perform update
     await record.update(updates);
-
     return ReS(res, { success: true, message: "Follow-up fields updated successfully", data: record }, 200);
   } catch (error) {
     console.error("updateASheetFollowupFields Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.updateASheetFollowupFields = updateASheetFollowupFields;
 
-const getC1ScheduledByUser = async (req, res) => {
+
+const getC1ScheduledByTeamManager = async (req, res) => {
   try {
-    const userId = req.query.userId || req.params.userId;
-    if (!userId) return ReE(res, "userId is required", 400);
+    const teamManagerId = req.query.teamManagerId || req.params.teamManagerId;
+    if (!teamManagerId) return ReE(res, "teamManagerId is required", 400);
 
-    let user;
-    try {
-      user = await model.User.findOne({
-        where: { id: userId },
-        attributes: ["id", "firstName", "lastName", "email", "mobileNumber"],
-        raw: true,
-      });
-    } catch (err) {
-      console.warn("⚠️ mobileNumber column missing in User table, skipping it...");
-      user = await model.User.findOne({
-        where: { id: userId },
-        attributes: ["id", "firstName", "lastName", "email"],
-        raw: true,
-      });
-    }
+    const manager = await model.TeamManager.findOne({
+      where: { id: teamManagerId },
+      attributes: ["id", "name", "email", "mobileNumber"],
+      raw: true,
+    });
 
-    if (!user) return ReE(res, "User not found", 404);
-
-    const userName = `${user.firstName} ${user.lastName}`.trim();
+    if (!manager) return ReE(res, "TeamManager not found", 404);
 
     const aSheetData = await model.ASheet.findAll({
       where: {
-        sourcedBy: { [Op.iLike]: userName },
+        sourcedBy: { [Op.iLike]: manager.name },
         meetingStatus: { [Op.iLike]: "%C1 Scheduled%" },
       },
-      order: [["dateOfConnect", "DESC"]], // ✅ latest first
+      order: [["dateOfConnect", "DESC"]],
       raw: true,
       attributes: [
-        "id","sr","sourcedFrom","sourcedBy","dateOfConnect","businessName",
-        "contactPersonName","mobileNumber","address","email","businessSector",
-        "zone","landmark","existingWebsite","smmPresence","meetingStatus","userId",
-        "dateOfC1Connect","c1Status","c1Comment","dateOfC2Clarity","c2Status","c2Comment",
-        "dateOfC3Clarity","c3Status","c3Comment","dateOfC4Customer","c4Status","c4Comment",
-        "createdAt","updatedAt",
+        "id", "sr", "sourcedFrom", "sourcedBy", "dateOfConnect", "businessName",
+        "contactPersonName", "mobileNumber", "address", "email", "businessSector",
+        "zone", "landmark", "existingWebsite", "smmPresence", "meetingStatus", "teamManagerId",
+        "dateOfC1Connect", "c1Status", "c1Comment",
+        "dateOfC2Clarity", "c2Status", "c2Comment",
+        "dateOfC3Clarity", "c3Status", "c3Comment",
+        "dateOfC4Customer", "c4Status", "c4Comment",
+        "createdAt", "updatedAt",
       ],
     });
 
-    const allUsers = await model.User.findAll({
+    const allManagers = await model.TeamManager.findAll({
       where: { isDeleted: false },
-      attributes: ["id", "firstName", "lastName", "email"],
+      attributes: ["id", "name", "email", "managerId"],
       raw: true,
     });
 
-    const allUsersWithName = allUsers.map(u => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      email: u.email,
-      name: `${u.firstName} ${u.lastName}`.trim(),
-    }));
-
     return ReS(res, {
       success: true,
-      userId: user.id,
-      userName,
+      teamManagerId: manager.id,
+      managerName: manager.name,
       totalRecords: aSheetData.length,
       data: aSheetData,
-      users: allUsersWithName,
+      managers: allManagers,
     });
   } catch (error) {
-    console.error("Get C1 Scheduled By User Error:", error);
+    console.error("getC1ScheduledByTeamManager Error:", error);
     return ReE(res, error.message, 500);
   }
 };
+module.exports.getC1ScheduledByTeamManager = getC1ScheduledByTeamManager;
 
-module.exports.getC1ScheduledByUser = getC1ScheduledByUser;
 
+const c1Attributes = [
+  "id", "sr", "sourcedFrom", "sourcedBy", "dateOfConnect", "businessName",
+  "contactPersonName", "mobileNumber", "address", "email", "businessSector",
+  "zone", "landmark", "existingWebsite", "smmPresence", "meetingStatus", "teamManagerId",
+  "dateOfC1Connect", "c1Status", "c1Comment",
+  "dateOfC2Clarity", "c2Status", "c2Comment",
+  "dateOfC3Clarity", "c3Status", "c3Comment",
+  "dateOfC4Customer", "c4Status", "c4Comment",
+  "createdAt", "updatedAt",
+];
 
 const getAllFollowUps = async (req, res) => {
   try {
-    // 🔹 Fetch all ASheet records where any of c1–c4 status includes "Follow Up"
     const aSheetData = await model.ASheet.findAll({
       where: {
         [Op.or]: [
@@ -157,60 +132,20 @@ const getAllFollowUps = async (req, res) => {
       },
       order: [["dateOfConnect", "ASC"]],
       raw: true,
-      attributes: [
-        "id",
-        "sr",
-        "sourcedFrom",
-        "sourcedBy",
-        "dateOfConnect",
-        "businessName",
-        "contactPersonName",
-        "mobileNumber",
-        "address",
-        "email",
-        "businessSector",
-        "zone",
-        "landmark",
-        "existingWebsite",
-        "smmPresence",
-        "meetingStatus",
-        "userId",
-
-        // 🔹 C1–C4 tracking fields
-        "dateOfC1Connect",
-        "c1Status",
-        "c1Comment",
-        "dateOfC2Clarity",
-        "c2Status",
-        "c2Comment",
-        "dateOfC3Clarity",
-        "c3Status",
-        "c3Comment",
-        "dateOfC4Customer",
-        "c4Status",
-        "c4Comment",
-
-        "createdAt",
-        "updatedAt",
-      ],
+      attributes: c1Attributes,
     });
 
-    return ReS(res, {
-      success: true,
-      totalRecords: aSheetData.length,
-      data: aSheetData,
-    });
+    return ReS(res, { success: true, totalRecords: aSheetData.length, data: aSheetData });
   } catch (error) {
-    console.error("Get All Follow Ups Error:", error);
+    console.error("getAllFollowUps Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getAllFollowUps = getAllFollowUps;
+
 
 const getAllNotintrested = async (req, res) => {
   try {
-    // 🔹 Fetch all ASheet records where any of c1–c4 status includes "Follow Up"
     const aSheetData = await model.ASheet.findAll({
       where: {
         [Op.or]: [
@@ -222,60 +157,20 @@ const getAllNotintrested = async (req, res) => {
       },
       order: [["dateOfConnect", "ASC"]],
       raw: true,
-      attributes: [
-        "id",
-        "sr",
-        "sourcedFrom",
-        "sourcedBy",
-        "dateOfConnect",
-        "businessName",
-        "contactPersonName",
-        "mobileNumber",
-        "address",
-        "email",
-        "businessSector",
-        "zone",
-        "landmark",
-        "existingWebsite",
-        "smmPresence",
-        "meetingStatus",
-        "userId",
-
-        // 🔹 C1–C4 tracking fields
-        "dateOfC1Connect",
-        "c1Status",
-        "c1Comment",
-        "dateOfC2Clarity",
-        "c2Status",
-        "c2Comment",
-        "dateOfC3Clarity",
-        "c3Status",
-        "c3Comment",
-        "dateOfC4Customer",
-        "c4Status",
-        "c4Comment",
-
-        "createdAt",
-        "updatedAt",
-      ],
+      attributes: c1Attributes,
     });
 
-    return ReS(res, {
-      success: true,
-      totalRecords: aSheetData.length,
-      data: aSheetData,
-    });
+    return ReS(res, { success: true, totalRecords: aSheetData.length, data: aSheetData });
   } catch (error) {
-    console.error("Get All Follow Ups Error:", error);
+    console.error("getAllNotintrested Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getAllNotintrested = getAllNotintrested;
+
 
 const getAllDicey = async (req, res) => {
   try {
-    // 🔹 Fetch all ASheet records where any of c1–c4 status includes "Follow Up"
     const aSheetData = await model.ASheet.findAll({
       where: {
         [Op.or]: [
@@ -287,55 +182,15 @@ const getAllDicey = async (req, res) => {
       },
       order: [["dateOfConnect", "ASC"]],
       raw: true,
-      attributes: [
-        "id",
-        "sr",
-        "sourcedFrom",
-        "sourcedBy",
-        "dateOfConnect",
-        "businessName",
-        "contactPersonName",
-        "mobileNumber",
-        "address",
-        "email",
-        "businessSector",
-        "zone",
-        "landmark",
-        "existingWebsite",
-        "smmPresence",
-        "meetingStatus",
-        "userId",
-
-        // 🔹 C1–C4 tracking fields
-        "dateOfC1Connect",
-        "c1Status",
-        "c1Comment",
-        "dateOfC2Clarity",
-        "c2Status",
-        "c2Comment",
-        "dateOfC3Clarity",
-        "c3Status",
-        "c3Comment",
-        "dateOfC4Customer",
-        "c4Status",
-        "c4Comment",
-
-        "createdAt",
-        "updatedAt",
-      ],
+      attributes: c1Attributes,
     });
 
-    return ReS(res, {
-      success: true,
-      totalRecords: aSheetData.length,
-      data: aSheetData,
-    });
+    return ReS(res, { success: true, totalRecords: aSheetData.length, data: aSheetData });
   } catch (error) {
-    console.error("Get All Follow Ups Error:", error);
+    console.error("getAllDicey Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.getAllDicey = getAllDicey;
 
 
@@ -376,23 +231,24 @@ const fetchSubscriptionC1AndMSheetDetails = async (req, res) => {
       })
     );
 
-    const allUsers = await model.User.findAll({
-      attributes: ["id", "firstName", "lastName", "email", "phoneNumber"],
+    // Fetch all active TeamManagers
+    const allManagers = await model.TeamManager.findAll({
+      where: { isDeleted: false },
+      attributes: ["id", "name", "email", "mobileNumber", "managerId"],
     });
 
-    const users = allUsers.map((u) => ({
-      id: u.id,
-      firstName: u.firstName,
-      lastName: u.lastName,
-      email: u.email,
-      mobileNumber: u.phoneNumber,
-      name: `${u.firstName} ${u.lastName}`.trim(),
+    const managers = allManagers.map((m) => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      mobileNumber: m.mobileNumber,
+      managerId: m.managerId,
     }));
 
     const c1ScheduledRows = await model.ASheet.findAll({
       where: { meetingStatus: { [Op.iLike]: "%C1 Scheduled%" } },
       include: [{ model: model.MSheet, required: false, as: "MSheet" }],
-      order: [["dateOfConnect", "DESC"]], // ✅ latest first
+      order: [["dateOfConnect", "DESC"]],
     });
 
     const existingIds = new Set(combinedResults.map((r) => r.id));
@@ -402,28 +258,24 @@ const fetchSubscriptionC1AndMSheetDetails = async (req, res) => {
 
     const finalArray = [...combinedResults, ...c1Filtered];
 
-    const cleanedArray = finalArray.filter(
-      (item) =>
-        item.c4Status &&
-        item.c4Status.trim() !== "" &&
-        item.c4Status.trim().toLowerCase() !== "null"
-    );
-
-    // ✅ FINAL latest first sorting
-    cleanedArray.sort(
-      (a, b) => new Date(b.dateOfConnect) - new Date(a.dateOfConnect)
-    );
+    const cleanedArray = finalArray
+      .filter(
+        (item) =>
+          item.c4Status &&
+          item.c4Status.trim() !== "" &&
+          item.c4Status.trim().toLowerCase() !== "null"
+      )
+      .sort((a, b) => new Date(b.dateOfConnect) - new Date(a.dateOfConnect));
 
     return ReS(res, {
       success: true,
       total: cleanedArray.length,
       data: cleanedArray,
-      users,
+      managers,
     }, 200);
   } catch (error) {
     console.error("fetchSubscriptionC1AndMSheetDetails Error:", error);
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.fetchSubscriptionC1AndMSheetDetails = fetchSubscriptionC1AndMSheetDetails;
