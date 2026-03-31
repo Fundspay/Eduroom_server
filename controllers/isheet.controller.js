@@ -206,7 +206,7 @@ const fetchSubscriptionC1AndMSheetDetails = async (req, res) => {
           ],
         },
       },
-      include: [{ model: model.MSheet, required: false, as: "MSheet" }],
+      include: [{ model: model.MSheet, required: false}],
     });
 
     const combinedResults = await Promise.all(
@@ -247,7 +247,7 @@ const fetchSubscriptionC1AndMSheetDetails = async (req, res) => {
 
     const c1ScheduledRows = await model.ASheet.findAll({
       where: { meetingStatus: { [Op.iLike]: "%C1 Scheduled%" } },
-      include: [{ model: model.MSheet, required: false, as: "MSheet" }],
+      include: [{ model: model.MSheet, required: false }],
       order: [["dateOfConnect", "DESC"]],
     });
 
