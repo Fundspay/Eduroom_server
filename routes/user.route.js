@@ -2,6 +2,7 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user.controller");
+const marketingController = require("../controllers/marketing.controller");
 const { firebaseAuth } = require('../middleware/auth.middleware');
 const { uploadProfilePicture} = require("../middleware/s3.middleware");
 
@@ -44,6 +45,15 @@ router.get("/referral/count", userController.getReferralPaidUsersDateWise);
 
 router.get('/web/:phoneNumber', userController.getReferralDataByPhone);
 
+// ─────────────────────────────────────────────
+// Marketing Metrics Routes
+// ─────────────────────────────────────────────
+
+// Intern submits their marketing metrics (partial updates allowed)
+router.post("/marketing/submit", userController.submitMarketingMetrics);
+
+// Team manager fetches all pending submissions under them
+router.get("/marketing/pending/:managerId", userController.getPendingMarketingSubmissions);
 
 
 module.exports = router;

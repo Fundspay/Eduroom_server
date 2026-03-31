@@ -1757,3 +1757,175 @@ var getReferralDataByPhone = async (req, res) => {
 };
 
 module.exports.getReferralDataByPhone = getReferralDataByPhone;
+
+
+"use strict";
+
+const model = require("../models");
+const { ReE, ReS } = require("../utils/util.service.js");
+
+// ─────────────────────────────────────────────
+// POST /api/marketing/submit
+// Intern submits their marketing metrics for the current period
+// Body: { userId, qualifiedLeads, reviews, ratings, followersGrowth }
+// ─────────────────────────────────────────────
+var submitMarketingMetrics = async (req, res) => {
+  try {
+    const { userId, qualifiedLeads, reviews, ratings, followersGrowth } = req.body;
+
+    // ── Validate required fields ──
+    if (!userId) {
+      return ReE(res, "userId is required", 400);
+    }
+
+    if (
+      qualifiedLeads == null &&
+      reviews == null &&
+      ratings == null &&
+      followersGrowth == null
+    ) {
+      return ReE(res, "At least one marketing metric is required", 400);
+    }
+
+    // ── Validate types ──
+    if (qualifiedLeads != null && (!Number.isInteger(Number(qualifiedLeads)) || Number(qualifiedLeads) < 0)) {
+      return ReE(res, "qualifiedLeads must be a non-negative integer", 400);
+    }
+
+    if (reviews != null && (!Number.isInteger(Number(reviews)) || Number(reviews) < 0)) {
+      return ReE(res, "reviews must be a non-negative integer", 400);
+    }
+
+    if (ratings != null && (isNaN(Number(ratings)) || Number(ratings) < 0 || Number(ratings) > 5)) {
+      return ReE(res, "ratings must be a decimal between 0 and 5", 400);
+    }
+
+    if (followersGrowth != null && (!Number.isInteger(Number(followersGrowth)) || Number(followersGrowth) < 0)) {
+      return ReE(res, "followersGrowth must be a non-negative integer", 400);
+    }
+
+    // ── Find the intern ──
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+      attributes: [
+        "id", "firstName", "lastName", "email",
+        "assignedTeamManager",
+        "marketingVerificationStatus",
+        "qualifiedLeads", "reviews", "ratings", "followersGrowth",
+        "marketingSubmittedAt",
+      ],
+    });
+
+    if (!user) return ReE(res, "User not found", 404);
+
+    // ── Block resubmission if already approved ──
+    if (user.marketingVerificationStatus === "approved") {
+      return ReE(res, "Marketing metrics already approved. Cannot resubmit.", 400);
+    }
+
+    // ── Update marketing metric fields ──
+    const updatePayload = {
+      marketingVerificationStatus: "pending",
+      marketingSubmittedAt: new Date(),
+    };
+
+    if (qualifiedLeads != null) updatePayload.qualifiedLeads = parseInt(qualifiedLeads);
+    if (reviews != null)        updatePayload.reviews        = parseInt(reviews);
+    if (ratings != null)        updatePayload.ratings        = parseFloat(parseFloat(ratings).toFixed(2));
+    if (followersGrowth != null) updatePayload.followersGrowth = parseInt(followersGrowth);
+
+    await user.update(updatePayload);
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Marketing metrics submitted successfully. Awaiting team manager verification.",
+        data: {
+          userId: user.id,
+          name: `${user.firstName} ${user.lastName}`,
+          email: user.email,
+          submittedAt: updatePayload.marketingSubmittedAt,
+          metrics: {
+            qualifiedLeads: updatePayload.qualifiedLeads ?? user.qualifiedLeads,
+            reviews:        updatePayload.reviews        ?? user.reviews,
+            ratings:        updatePayload.ratings        ?? user.ratings,
+            followersGrowth: updatePayload.followersGrowth ?? user.followersGrowth,
+          },
+          verificationStatus: "pending",
+        },
+      },
+      200
+    );
+  } catch (error) {
+    console.error("submitMarketingMetrics Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.submitMarketingMetrics = submitMarketingMetrics;
+
+
+// ─────────────────────────────────────────────
+// GET /api/marketing/pending/:managerId
+// Team manager fetches all interns under them with pending marketing submissions
+// ─────────────────────────────────────────────
+var getPendingMarketingSubmissions = async (req, res) => {
+  try {
+    const { managerId } = req.params;
+
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    // Verify the team manager exists
+    const manager = await model.TeamManager.findOne({
+      where: { id: managerId, isDeleted: false, isActive: true },
+      attributes: ["id", "name"],
+    });
+
+    if (!manager) return ReE(res, "Team manager not found", 404);
+
+    // Find all interns assigned to this manager with pending status
+    const pendingUsers = await model.User.findAll({
+      where: {
+        assignedTeamManager: managerId,
+        marketingVerificationStatus: "pending",
+        isDeleted: false,
+      },
+      attributes: [
+        "id", "firstName", "lastName", "email",
+        "qualifiedLeads", "reviews", "ratings", "followersGrowth",
+        "marketingVerificationStatus", "marketingSubmittedAt",
+      ],
+      order: [["marketingSubmittedAt", "ASC"]],
+    });
+
+    return ReS(
+      res,
+      {
+        success: true,
+        managerId,
+        managerName: manager.name,
+        totalPending: pendingUsers.length,
+        data: pendingUsers.map((u) => ({
+          userId: u.id,
+          name: `${u.firstName} ${u.lastName}`,
+          email: u.email,
+          submittedAt: u.marketingSubmittedAt,
+          metrics: {
+            qualifiedLeads: u.qualifiedLeads,
+            reviews: u.reviews,
+            ratings: u.ratings,
+            followersGrowth: u.followersGrowth,
+          },
+          verificationStatus: u.marketingVerificationStatus,
+        })),
+      },
+      200
+    );
+  } catch (error) {
+    console.error("getPendingMarketingSubmissions Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getPendingMarketingSubmissions = getPendingMarketingSubmissions;
