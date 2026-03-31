@@ -85,7 +85,6 @@ const updateMSheet = async (req, res) => {
 module.exports.updateMSheet = updateMSheet;
 
 
-// Fetch Single MSheet by ID
 var fetchMSheetById = async (req, res) => {
   try {
     const msheet = await model.MSheet.findByPk(req.params.id, {
@@ -101,17 +100,14 @@ var fetchMSheetById = async (req, res) => {
 module.exports.fetchMSheetById = fetchMSheetById;
 
 
-// Fetch MSheets by TeamManager ID (via ASheet.teamManagerId)
 var fetchMSheetsByTeamManagerId = async (req, res) => {
   try {
     const msheets = await model.MSheet.findAll({
-      include: [
-        {
-          model: model.ASheet,
-          where: { teamManagerId: req.params.teamManagerId },
-          required: true,
-        },
-      ],
+      include: [{
+        model: model.ASheet,
+        where: { teamManagerId: req.params.teamManagerId },
+        required: true,
+      }],
     });
 
     return ReS(res, { success: true, msheets }, 200);
@@ -122,7 +118,6 @@ var fetchMSheetsByTeamManagerId = async (req, res) => {
 module.exports.fetchMSheetsByTeamManagerId = fetchMSheetsByTeamManagerId;
 
 
-// Fetch All MSheets
 var fetchAllMSheets = async (req, res) => {
   try {
     const msheets = await model.MSheet.findAll({
@@ -137,7 +132,6 @@ var fetchAllMSheets = async (req, res) => {
 module.exports.fetchAllMSheets = fetchAllMSheets;
 
 
-// Fetch MSheets by TeamManager (matched by name)
 const mgetMSheetsByTeamManagerId = async (req, res) => {
   try {
     const { teamManagerId } = req.params;
@@ -153,9 +147,7 @@ const mgetMSheetsByTeamManagerId = async (req, res) => {
     if (!fullName) return ReE(res, "TeamManager has no valid name to match.", 400);
 
     const msheets = await model.MSheet.findAll({
-      where: {
-        rmAssignedName: { [Op.iLike]: `%${fullName}%` },
-      },
+      where: { rmAssignedName: { [Op.iLike]: `%${fullName}%` } },
       include: [{ model: model.ASheet, required: false }],
     });
 
@@ -179,19 +171,15 @@ const fetchSubscriptionC1AndMSheetDetailsByRM = async (req, res) => {
     if (!name || !name.trim()) return ReE(res, "RM name is required.", 400);
 
     const msheets = await model.MSheet.findAll({
-      where: {
-        rmAssignedName: { [Op.iLike]: `%${name.trim()}%` },
-      },
-      include: [
-        { model: model.ASheet, as: "ASheet", required: true },
-      ],
-      order: [[{ model: model.ASheet, as: "ASheet" }, "dateOfConnect", "DESC"]],
+      where: { rmAssignedName: { [Op.iLike]: `%${name.trim()}%` } },
+      include: [{ model: model.ASheet, required: true }],
+      order: [[model.ASheet, "dateOfConnect", "DESC"]], // ✅ no alias
     });
 
     const combinedResults = await Promise.all(
       msheets.map(async (m) => {
         const row = m.toJSON();
-        const asheet = row.ASheet || {};
+        const asheet = row.ASheet || {};  // Sequelize uses model name as key when no alias
 
         const email = asheet.email?.trim() || "";
         const phoneNumber = asheet.mobileNumber?.trim() || "";
@@ -221,7 +209,6 @@ const fetchSubscriptionC1AndMSheetDetailsByRM = async (req, res) => {
           item.c4Status.trim().toLowerCase() !== "null")
     );
 
-    // Fetch all active TeamManagers for response
     const allManagers = await model.TeamManager.findAll({
       where: { isDeleted: false },
       attributes: ["id", "name", "email", "mobileNumber", "managerId"],
