@@ -429,6 +429,10 @@ module.exports.calculateAchievement = calculateAchievement;
 // POST /api/fund-config/final-report/:id
 // ─────────────────────────────────────────────
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// 7. FINAL REPORT — full fundcoins report with everything
+// POST /api/fund-config/final-report/:id
+// ─────────────────────────────────────────────
 var finalReport = async (req, res) => {
   try {
     const { id } = req.params;
@@ -468,6 +472,7 @@ var finalReport = async (req, res) => {
             let realValue = 0;
 
             if (metric.source && metric.source !== "MANUAL") {
+              // DB metric — fetch real value from DB
               realValue = await resolveSourceValue(
                 metric.source,
                 managerId,
@@ -475,6 +480,7 @@ var finalReport = async (req, res) => {
                 periodYear
               );
             } else if (metric.source === "MANUAL" && metric.value != null) {
+              // MANUAL metric — use value admin entered (achieved)
               realValue = parseFloat(metric.value) || 0;
             }
 
@@ -513,7 +519,7 @@ var finalReport = async (req, res) => {
       const internUserIds = statuses.map((s) => s.userId);
 
       if (internUserIds.length > 0) {
-        // For each intern, fetch their analysis1 records and calculate avg rating
+        // For each intern fetch their analysis1 records and calculate avg rating
         const internRatings = await Promise.all(
           internUserIds.map(async (uid) => {
             const days = await model.analysis1.findAll({
@@ -564,13 +570,14 @@ var finalReport = async (req, res) => {
     }
 
     // ── Step 6: Auto-fetch other 360° ratings from ManagerReviews ──
-    // (peer, cross, manager, leadership — NOT intern, that comes from analysis1)
+    // peer, cross, manager, leadership — NOT intern (comes from analysis1)
+    const { Op } = require("sequelize");
     const reviewRows = await model.ManagerReview.findAll({
       where: {
         targetManagerId: managerId,
         periodMonth,
         periodYear,
-        reviewerType: { [require("sequelize").Op.ne]: "intern" }, // exclude intern — handled separately
+        reviewerType: { [Op.ne]: "intern" },
         isDeleted: false,
       },
       attributes: ["reviewerType", "starRating"],
@@ -596,10 +603,13 @@ var finalReport = async (req, res) => {
     avgByType["intern"] = internAvgRating;
 
     // ── Step 7: Merge real avg values into ratings array from config ──
+    // If no reviews found for a type fall back to 0
     const mergedRatings = ratings.map((r) => ({
       ...r,
       value: avgByType[r.key] !== undefined ? avgByType[r.key] : parseFloat(r.value) || 0,
-      reviewCount: r.key === "intern" ? internReviewCount : (grouped[r.key] ? grouped[r.key].length : 0),
+      reviewCount: r.key === "intern"
+        ? internReviewCount
+        : grouped[r.key] ? grouped[r.key].length : 0,
     }));
 
     // ── Step 8: Run full calculateFinal with real data ──
@@ -652,7 +662,7 @@ var finalReport = async (req, res) => {
     });
 
     // ── Step 11: Build dept breakdown for response ──
-    // Shows target vs achieved vs % per metric
+    // coinsEarned comes directly from calculateDeptCoins (cap already applied for MANUAL)
     const departmentBreakdown = calc.deptBreakdown.map((dept) => ({
       key: dept.key,
       name: dept.name,
@@ -667,18 +677,18 @@ var finalReport = async (req, res) => {
         return {
           name: m.name,
           source: m.source || "MANUAL",
-          target,                                                          // admin set target
-          achievedValue: achieved,                                         // real DB value
-          metricAchievementPercent,                                        // achieved/target %
+          target,
+          achievedValue: achieved,
+          metricAchievementPercent,
           multiplier: m.multiplier,
-          coinsEarned: parseFloat((achieved * m.multiplier).toFixed(2)),  // coins from this metric
           weight: m.weight,
-          weightedCoins: parseFloat(m.coinsEarned !== undefined ? m.coinsEarned : 0),
+          coinsEarned: parseFloat(m.coinsEarned.toFixed(2)), // ✅ from calculateDeptCoins, cap already applied
         };
       }),
       totalBeforeWeight: parseFloat(dept.totalBeforeWeight.toFixed(2)),
       weightedContribution: parseFloat(dept.weightedContribution.toFixed(2)),
     }));
+
     // ── Step 12: Build ratings breakdown for response ──
     const ratingsBreakdown = mergedRatings.map((r) => ({
       key: r.key,
@@ -734,7 +744,9 @@ var finalReport = async (req, res) => {
 
       // Intern review breakdown — per intern avg
       internReviewBreakdown: {
-        totalInternsUnderManager: managerName ? (await model.Status.count({ where: { teamManager: managerName } })) : 0,
+        totalInternsUnderManager: managerName
+          ? await model.Status.count({ where: { teamManager: managerName } })
+          : 0,
         totalInternsRated: internReviewCount,
         overallInternAvgRating: internAvgRating,
         perInternBreakdown: internBreakdown,
