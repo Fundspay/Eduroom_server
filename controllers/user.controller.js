@@ -1929,3 +1929,43 @@ var getPendingMarketingSubmissions = async (req, res) => {
 };
 
 module.exports.getPendingMarketingSubmissions = getPendingMarketingSubmissions;
+
+// ─────────────────────────────────────────────
+// VERIFY MARKETING — team manager verifies intern's marketing metrics
+// POST /api/marketing/verify
+// ─────────────────────────────────────────────
+var verifyMarketing = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) return ReE(res, "userId is required", 400);
+
+    // Find the user
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false },
+    });
+    if (!user) return ReE(res, "User not found", 404);
+
+    // Update marketingVerified to true
+    await user.update({ marketingVerified: true });
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Marketing metrics verified successfully",
+        data: {
+          userId: user.id,
+          name: `${user.firstName} ${user.lastName}`,
+          marketingVerified: true,
+        },
+      },
+      200
+    );
+  } catch (error) {
+    console.error("verifyMarketing Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.verifyMarketing = verifyMarketing;

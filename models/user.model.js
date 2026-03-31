@@ -134,6 +134,13 @@ module.exports = (sequelize, Sequelize) => {
         defaultValue: "pending",
       },
 
+      // 🔹 Marketing verification
+      marketingVerified: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+
       // Timestamp when intern submitted marketing metrics
       marketingSubmittedAt: {
         type: Sequelize.DATE,

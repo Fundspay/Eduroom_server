@@ -54,6 +54,7 @@ router.post("/marketing/submit", userController.submitMarketingMetrics);
 
 // Team manager fetches all pending submissions under them
 router.get("/marketing/pending/:managerId", userController.getPendingMarketingSubmissions);
+router.post("/marketing/verify", userController.verifyMarketing);
 
 
 module.exports = router;
