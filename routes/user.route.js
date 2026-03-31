@@ -2,7 +2,6 @@
 const express = require("express");
 const router = express.Router();
 const userController = require("../controllers/user.controller");
-const marketingController = require("../controllers/marketing.controller");
 const { firebaseAuth } = require('../middleware/auth.middleware');
 const { uploadProfilePicture} = require("../middleware/s3.middleware");
 
