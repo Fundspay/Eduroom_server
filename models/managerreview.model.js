@@ -94,6 +94,7 @@ module.exports = (sequelize, Sequelize) => {
       onUpdate: "CASCADE",
     });
 
+  
     // The manager giving the review
     ManagerReview.belongsTo(models.TeamManager, {
       foreignKey: "reviewerManagerId",
