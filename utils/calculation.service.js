@@ -32,13 +32,15 @@ const calculateDeptCoins = (departments) => {
       0
     );
 
-    const weightedContribution = (totalBeforeWeight * (dept.weight || 0)) / 100;
+    // ✅ Fixed — fallback handles both dept.weight and dept.deptWeight
+    const deptWeight = parseFloat(dept.weight || dept.deptWeight || 0);
+    const weightedContribution = (totalBeforeWeight * deptWeight) / 100;
 
     return {
       key: dept.key,
       name: dept.name,
       icon: dept.icon || "",
-      deptWeight: dept.weight,
+      deptWeight,
       metrics,
       totalBeforeWeight,
       weightedContribution,
@@ -77,10 +79,12 @@ const getBehaviorMultiplier = (ratings) => {
     behaviorLevel = "Bronze";
   } else if (finalRating >= 3.0) {
     multiplier = 0.75;
-    behaviorLevel = "Bronze";
+    // ✅ Fixed — BRD says Needs Improvement not Bronze
+    behaviorLevel = "Needs Improvement";
   } else {
     multiplier = 0.5;
-    behaviorLevel = "Needs Improvement";
+    // ✅ Fixed — BRD says Poor not Needs Improvement
+    behaviorLevel = "Poor";
   }
 
   return {

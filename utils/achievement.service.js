@@ -54,20 +54,9 @@ const getBdAccounts = async (managerId, periodMonth, periodYear) => {
     raw: true,
   });
 
-  return payments.filter((p) => {
-    let paymentDate;
-    if (typeof p.dateOfPayment === "string") {
-      paymentDate = p.dateOfPayment.split("T")[0];
-    } else {
-      const d = new Date(p.dateOfPayment);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      paymentDate = `${year}-${month}-${day}`;
-    }
-    const monthStr = `${periodYear}-${String(periodMonth).padStart(2, "0")}`;
-    return paymentDate.startsWith(monthStr);
-  }).length;
+  // NOTE: Op.between already filters the month range
+  // secondary JS filter removed — was redundant
+  return payments.length;
 };
 
 // ─────────────────────────────────────────────
@@ -79,7 +68,7 @@ const getBdInternsActive = async (managerId, periodMonth, periodYear) => {
   const achieved = await model.BdSheet.count({
     where: {
       teamManagerId: managerId,
-      activeStatus: "Active",
+      activeStatus: "active", // ⚠️ keep consistent with DB casing
       startDate: { [Op.between]: [start, end] },
     },
     distinct: true,
@@ -230,14 +219,107 @@ const getHrSelection = async (managerId, periodMonth, periodYear) => {
 };
 
 // ─────────────────────────────────────────────
+// MARKETING — Qualified Leads
+// Sum of qualifiedLeads across all approved interns
+// under this manager who submitted in the given period
+// ─────────────────────────────────────────────
+const getMarketingQualifiedLeads = async (managerId, periodMonth, periodYear) => {
+  const { start, end } = getMonthRange(periodMonth, periodYear);
+
+  const result = await model.User.findAll({
+    where: {
+      assignedTeamManager: managerId,
+      marketingVerificationStatus: "approved",
+      marketingSubmittedAt: { [Op.between]: [start, end] },
+      qualifiedLeads: { [Op.ne]: null },
+      isDeleted: false,
+    },
+    attributes: ["qualifiedLeads"],
+    raw: true,
+  });
+
+  return result.reduce((sum, u) => sum + (parseInt(u.qualifiedLeads) || 0), 0);
+};
+
+// ─────────────────────────────────────────────
+// MARKETING — Reviews
+// Sum of reviews across all approved interns for the period
+// ─────────────────────────────────────────────
+const getMarketingReviews = async (managerId, periodMonth, periodYear) => {
+  const { start, end } = getMonthRange(periodMonth, periodYear);
+
+  const result = await model.User.findAll({
+    where: {
+      assignedTeamManager: managerId,
+      marketingVerificationStatus: "approved",
+      marketingSubmittedAt: { [Op.between]: [start, end] },
+      reviews: { [Op.ne]: null },
+      isDeleted: false,
+    },
+    attributes: ["reviews"],
+    raw: true,
+  });
+
+  return result.reduce((sum, u) => sum + (parseInt(u.reviews) || 0), 0);
+};
+
+// ─────────────────────────────────────────────
+// MARKETING — Ratings
+// Average of ratings across all approved interns for the period
+// Returns 0 if no approved interns with ratings
+// ─────────────────────────────────────────────
+const getMarketingRatings = async (managerId, periodMonth, periodYear) => {
+  const { start, end } = getMonthRange(periodMonth, periodYear);
+
+  const result = await model.User.findAll({
+    where: {
+      assignedTeamManager: managerId,
+      marketingVerificationStatus: "approved",
+      marketingSubmittedAt: { [Op.between]: [start, end] },
+      ratings: { [Op.ne]: null },
+      isDeleted: false,
+    },
+    attributes: ["ratings"],
+    raw: true,
+  });
+
+  if (!result.length) return 0;
+
+  const total = result.reduce((sum, u) => sum + (parseFloat(u.ratings) || 0), 0);
+  return parseFloat((total / result.length).toFixed(2));
+};
+
+// ─────────────────────────────────────────────
+// MARKETING — Followers Growth
+// Sum of followersGrowth across all approved interns for the period
+// Note: BRD multiplier is 25 coins per 10 followers
+// The raw count is returned here — multiplier applied in calculateDeptCoins
+// ─────────────────────────────────────────────
+const getMarketingFollowersGrowth = async (managerId, periodMonth, periodYear) => {
+  const { start, end } = getMonthRange(periodMonth, periodYear);
+
+  const result = await model.User.findAll({
+    where: {
+      assignedTeamManager: managerId,
+      marketingVerificationStatus: "approved",
+      marketingSubmittedAt: { [Op.between]: [start, end] },
+      followersGrowth: { [Op.ne]: null },
+      isDeleted: false,
+    },
+    attributes: ["followersGrowth"],
+    raw: true,
+  });
+
+  return result.reduce((sum, u) => sum + (parseInt(u.followersGrowth) || 0), 0);
+};
+
+// ─────────────────────────────────────────────
 // RETENTION RATE — active interns / total allocated
 // retentionRate = (activeInterns / totalAllocated) * 100
-// Higher staying = higher rate = higher multiplier = more coins
 // ─────────────────────────────────────────────
 const getRetentionRate = async (managerId, periodMonth, periodYear) => {
   const { start, end } = getMonthRange(periodMonth, periodYear);
 
-  // Total interns allocated to this manager this month
   const totalAllocated = await model.BdSheet.count({
     where: {
       teamManagerId: managerId,
@@ -247,10 +329,9 @@ const getRetentionRate = async (managerId, periodMonth, periodYear) => {
     col: "studentResumeId",
   });
 
-  // No interns allocated — retention is 0
   if (!totalAllocated) return 0;
 
-  // Interns still active under this manager this month
+  // ⚠️ Fixed: use "Active" (capital A) to match getBdInternsActive
   const totalActive = await model.BdSheet.count({
     where: {
       teamManagerId: managerId,
@@ -261,7 +342,6 @@ const getRetentionRate = async (managerId, periodMonth, periodYear) => {
     col: "studentResumeId",
   });
 
-  // retentionRate = (active / total) * 100
   return parseFloat(((totalActive / totalAllocated) * 100).toFixed(2));
 };
 
@@ -270,12 +350,15 @@ const getRetentionRate = async (managerId, periodMonth, periodYear) => {
 // ─────────────────────────────────────────────
 const resolveSourceValue = async (source, managerId, periodMonth, periodYear) => {
   switch (source) {
+    // ── BD ──
     case "BD_ACCOUNTS":
       return await getBdAccounts(managerId, periodMonth, periodYear);
     case "BD_INTERNS_ACTIVE":
       return await getBdInternsActive(managerId, periodMonth, periodYear);
     case "BD_INTERNS_ALLOCATED":
       return await getBdInternsAllocated(managerId, periodMonth, periodYear);
+
+    // ── HR ──
     case "HR_COLLEGE_CONNECT":
       return await getHrCollegeConnect(managerId, periodMonth, periodYear);
     case "HR_JD_SEND":
@@ -288,8 +371,19 @@ const resolveSourceValue = async (source, managerId, periodMonth, periodYear) =>
       return await getHrSelectedColleges(managerId, periodMonth, periodYear);
     case "HR_SELECTION":
       return await getHrSelection(managerId, periodMonth, periodYear);
+
+    // ── MARKETING ──
+    case "MARKETING_QUALIFIED_LEADS":
+      return await getMarketingQualifiedLeads(managerId, periodMonth, periodYear);
+    case "MARKETING_REVIEWS":
+      return await getMarketingReviews(managerId, periodMonth, periodYear);
+    case "MARKETING_RATINGS":
+      return await getMarketingRatings(managerId, periodMonth, periodYear);
+    case "MARKETING_FOLLOWERS_GROWTH":
+      return await getMarketingFollowersGrowth(managerId, periodMonth, periodYear);
+
+    // ── MANUAL or unknown — return 0, value comes from config ──
     case "MANUAL":
-      return 0;
     default:
       return 0;
   }

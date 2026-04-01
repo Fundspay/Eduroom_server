@@ -44,6 +44,16 @@ router.get("/referral/count", userController.getReferralPaidUsersDateWise);
 
 router.get('/web/:phoneNumber', userController.getReferralDataByPhone);
 
+// ─────────────────────────────────────────────
+// Marketing Metrics Routes
+// ─────────────────────────────────────────────
+
+// Intern submits their marketing metrics (partial updates allowed)
+router.post("/marketing/submit", userController.submitMarketingMetrics);
+
+// Team manager fetches all pending submissions under them
+router.get("/marketing/pending/:managerId", userController.getPendingMarketingSubmissions);
+router.post("/marketing/verify", userController.verifyMarketing);
 
 
 module.exports = router;
