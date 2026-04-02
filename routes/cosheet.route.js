@@ -24,6 +24,6 @@ router.get("/internship-type-colleges/:teamManagerId", cosheetController.getInte
 router.delete("/cosheet/:id", cosheetController.deleteCoSheet);
 
 router.get("/colleges", cosheetController.getColleges);
-router.get("/cosheet/email-status", coSheetController.getEmailStatusByRow);
+router.get("/cosheet/email-status", cosheetController.getEmailStatusByRow);
 
 module.exports = router;
