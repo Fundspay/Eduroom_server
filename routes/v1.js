@@ -40,6 +40,7 @@ const myTarget1Router = require("./mytarget1.route");
 const asheetRouter = require("./asheet.route");
 const isheetRouter = require("./isheet.route");
 const msheetRouter = require("./msheet.route");
+const marketingRouter = require("./marketing.route");
 
 
 
@@ -88,12 +89,9 @@ router.use("/mytarget1", myTarget1Router);
 router.use("/asheet", asheetRouter);
 router.use("/isheet", isheetRouter);
 router.use("/msheet", msheetRouter);
+router.use("/marketing", marketingRouter);
 
 
 module.exports = router;
-
-
-
-
 
 
