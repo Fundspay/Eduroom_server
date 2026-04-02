@@ -1108,8 +1108,28 @@ const getEmailStatusByRow = async (req, res) => {
       );
       emailStatus = fundswebRes.data?.data || null;
     } catch (err) {
+      if (err.response?.status === 404) {
+        // Email was never sent via fundsweb — return cleanly
+        return ReS(res, {
+          success: true,
+          rowId,
+          email,
+          emailStatus: {
+            isOpened: false,
+            openCount: 0,
+            openedAt: null,
+            deviceType: null,
+            browser: null,
+            os: null,
+            lastCheckedAt: null,
+            message: "Email not sent via fundsweb"
+          }
+        }, 200);
+      }
+
+      // Any other error
       console.error("Fundsweb call failed:", err.message);
-      return ReE(res, "Could not fetch email status from fundsweb", 502);
+      return ReE(res, "Could not reach fundsweb", 502);
     }
 
     // 3. Save the fetched status into CoSheet row
