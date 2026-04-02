@@ -43,9 +43,17 @@ module.exports = (sequelize, Sequelize) => {
       },
 
       googleReviews: {
-        type: Sequelize.INTEGER,
-        allowNull: true,
-        defaultValue: 0
+        type: Sequelize.STRING,
+        allowNull: true
+      },
+
+      isVerified: {
+        type: Sequelize.STRING,
+        allowNull: false,
+        defaultValue: "pending",
+        validate: {
+          isIn: [["pending", "verified"]]
+        }
       },
 
       isDeleted: {
