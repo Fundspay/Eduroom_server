@@ -1,8 +1,8 @@
 "use strict";
 
 module.exports = (sequelize, Sequelize) => {
-    const Marketing = sequelize.define(
-        "Marketing",
+    const Marketing1 = sequelize.define(
+        "Marketing1",
         {
             id: { autoIncrement: true, primaryKey: true, type: Sequelize.BIGINT },
 
@@ -43,14 +43,14 @@ module.exports = (sequelize, Sequelize) => {
             },
         },
         {
-            tableName: "Marketing",
+            tableName: "Marketing1",
             timestamps: true,
         }
     );
 
     // ✅ Associations
-    Marketing.associate = (models) => {
-        Marketing.belongsTo(models.User, {
+    Marketing1.associate = (models) => {
+        Marketing1.belongsTo(models.User, {
             foreignKey: "userId",
             onDelete: "CASCADE",
             onUpdate: "CASCADE",
