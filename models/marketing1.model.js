@@ -57,5 +57,5 @@ module.exports = (sequelize, Sequelize) => {
         });
     };
 
-    return Marketing;
+    return Marketing1;
 };
