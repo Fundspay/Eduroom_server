@@ -175,12 +175,26 @@ var getReviewsByManager = async (req, res) => {
 
     const reviews = await model.ManagerReview.findAll({
       where: whereClause,
+      include: [
+        {
+          model: model.TeamManager,
+          as: "targetManager",
+          attributes: ["id", "name"], // change "name" if your column is different
+        },
+        {
+          model: model.TeamManager,
+          as: "reviewerManager",
+          attributes: ["id", "name"],
+        },
+      ],
       order: [["reviewDate", "DESC"]],
     });
 
     const formattedReviews = reviews.map((r) => ({
       ...r.dataValues,
       starRating: parseFloat(r.starRating),
+      targetManagerName: r.targetManager ? r.targetManager.name : null,
+      reviewerManagerName: r.reviewerManager ? r.reviewerManager.name : null,
       createdAt: moment(r.createdAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
       updatedAt: moment(r.updatedAt).tz("Asia/Kolkata").format("YYYY-MM-DD HH:mm:ss"),
     }));
