@@ -40,6 +40,15 @@ module.exports = (sequelize, Sequelize) => {
       resumeCount: { type: Sequelize.INTEGER, allowNull: true },
       expectedResponseDate: { type: Sequelize.DATE, allowNull: true },
       followupemailsent: { type: Sequelize.BOOLEAN, allowNull: true },
+      // Add these fields in CoSheet model after jdSentAt
+      jdEmailSentStatus: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: false },
+      jdEmailIsOpened: { type: Sequelize.BOOLEAN, allowNull: true, defaultValue: false },
+      jdEmailOpenCount: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
+      jdEmailOpenedAt: { type: Sequelize.DATE, allowNull: true },
+      jdEmailDeviceType: { type: Sequelize.STRING, allowNull: true },
+      jdEmailBrowser: { type: Sequelize.STRING, allowNull: true },
+      jdEmailOs: { type: Sequelize.STRING, allowNull: true },
+      jdEmailLastCheckedAt: { type: Sequelize.DATE, allowNull: true },
 
       // 🔹 Foreign key to TeamManager instead of User
       teamManagerId: { type: Sequelize.BIGINT, allowNull: true },

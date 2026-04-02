@@ -1082,4 +1082,72 @@ module.exports.getColleges = getColleges;
 
 
 
+const getEmailStatusByRow = async (req, res) => {
+  try {
+    const { rowId, email } = req.query;
 
+    if (!rowId || !email) {
+      return ReE(res, "rowId and email are required", 400);
+    }
+
+    // 1. Find the CoSheet row
+    const coSheet = await model.CoSheet.findOne({
+      where: { id: rowId, isActive: true },
+    });
+
+    if (!coSheet) {
+      return ReE(res, "CoSheet row not found", 404);
+    }
+
+    // 2. Call fundsweb to get email open status
+    let emailStatus = null;
+    try {
+      const fundswebRes = await axios.get(
+        `https://api.fundsweb.in/api/v1/emailtracking/email/open-status`,
+        { params: { email } }
+      );
+      emailStatus = fundswebRes.data?.data || null;
+    } catch (err) {
+      console.error("Fundsweb call failed:", err.message);
+      return ReE(res, "Could not fetch email status from fundsweb", 502);
+    }
+
+    // 3. Save the fetched status into CoSheet row
+    if (emailStatus) {
+      await coSheet.update({
+        jdEmailIsOpened: emailStatus.isOpened || false,
+        jdEmailOpenCount: emailStatus.openCount || 0,
+        jdEmailOpenedAt: emailStatus.openedAt || null,
+        jdEmailDeviceType: emailStatus.deviceType || null,
+        jdEmailBrowser: emailStatus.browser || null,
+        jdEmailOs: emailStatus.os || null,
+        jdEmailLastCheckedAt: new Date(),
+      });
+    }
+
+    return ReS(
+      res,
+      {
+        success: true,
+        rowId,
+        email,
+        emailStatus: {
+          isOpened: coSheet.jdEmailIsOpened,
+          openCount: coSheet.jdEmailOpenCount,
+          openedAt: coSheet.jdEmailOpenedAt,
+          deviceType: coSheet.jdEmailDeviceType,
+          browser: coSheet.jdEmailBrowser,
+          os: coSheet.jdEmailOs,
+          lastCheckedAt: coSheet.jdEmailLastCheckedAt,
+        },
+      },
+      200
+    );
+
+  } catch (error) {
+    console.error("getEmailStatusByRow error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.getEmailStatusByRow = getEmailStatusByRow;
