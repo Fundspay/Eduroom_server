@@ -22,7 +22,6 @@ var addCourse = async (req, res) => {
       interpersonalSkills,
       managerName,
       managerPosition,
-      // ✅ New target fields
       followerTarget,
       reviewAndRatingTarget,
       postTarget
@@ -49,10 +48,10 @@ var addCourse = async (req, res) => {
         interpersonalSkills: interpersonalSkills || null,
         managerName: managerName || null,
         managerPosition: managerPosition || null,
-        // ✅ New target fields
-        followerTarget: followerTarget || null,
-        reviewAndRatingTarget: reviewAndRatingTarget || null,
-        postTarget: postTarget || null
+        // ✅ Only these 3 fixed
+        followerTarget: followerTarget ? Number(followerTarget) : null,
+        reviewAndRatingTarget: reviewAndRatingTarget ? Number(reviewAndRatingTarget) : null,
+        postTarget: postTarget ? Number(postTarget) : null
       });
 
       return ReS(res, course, 201);
@@ -90,10 +89,10 @@ var updateCourse = async (req, res) => {
         interpersonalSkills: req.body.interpersonalSkills !== undefined ? req.body.interpersonalSkills : course.interpersonalSkills,
         managerName: req.body.managerName !== undefined ? req.body.managerName : course.managerName,
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition,
-        // ✅ New target fields
-        followerTarget: req.body.followerTarget !== undefined ? req.body.followerTarget : course.followerTarget,
-        reviewAndRatingTarget: req.body.reviewAndRatingTarget !== undefined ? req.body.reviewAndRatingTarget : course.reviewAndRatingTarget,
-        postTarget: req.body.postTarget !== undefined ? req.body.postTarget : course.postTarget
+        // ✅ Only these 3 fixed
+        followerTarget: req.body.followerTarget !== undefined ? (req.body.followerTarget === "" ? null : Number(req.body.followerTarget)) : course.followerTarget,
+        reviewAndRatingTarget: req.body.reviewAndRatingTarget !== undefined ? (req.body.reviewAndRatingTarget === "" ? null : Number(req.body.reviewAndRatingTarget)) : course.reviewAndRatingTarget,
+        postTarget: req.body.postTarget !== undefined ? (req.body.postTarget === "" ? null : Number(req.body.postTarget)) : course.postTarget
       });
 
       // -----------------------------------------------------
