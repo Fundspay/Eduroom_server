@@ -3,6 +3,14 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { uploadGeneralFile } = require("../middleware/s3.middleware.js");
 
+// ✅ Helper at the top of your controller file
+const toIntOrNull = (val, fallback = null) => {
+  if (val === undefined) return fallback;
+  if (val === null || val === "") return null;
+  const n = Number(val);
+  return isNaN(n) ? null : n;
+};
+
 var addCourse = async (req, res) => {
   uploadGeneralFile.fields([
     { name: "img", maxCount: 1 },
@@ -22,7 +30,6 @@ var addCourse = async (req, res) => {
       interpersonalSkills,
       managerName,
       managerPosition,
-      // ✅ New target fields
       followerTarget,
       reviewAndRatingTarget,
       postTarget
@@ -39,20 +46,19 @@ var addCourse = async (req, res) => {
         name,
         domainId,
         description: description || null,
-        businessTarget: businessTarget || null,
-        totalDays: totalDays || null,
-        duration: duration || null,
-        certificateCount: certificateCount || null,
+        businessTarget:        toIntOrNull(businessTarget),
+        totalDays:             toIntOrNull(totalDays),
+        duration:              toIntOrNull(duration),
+        certificateCount:      toIntOrNull(certificateCount),
         img: req.files?.img ? req.files.img[0].location : null,
         img2: req.files?.img2 ? req.files.img2[0].location : null,
         domainSkills: domainSkills || null,
         interpersonalSkills: interpersonalSkills || null,
         managerName: managerName || null,
         managerPosition: managerPosition || null,
-        // ✅ New target fields
-        followerTarget: followerTarget || null,
-        reviewAndRatingTarget: reviewAndRatingTarget || null,
-        postTarget: postTarget || null
+        followerTarget:        toIntOrNull(followerTarget),
+        reviewAndRatingTarget: toIntOrNull(reviewAndRatingTarget),
+        postTarget:            toIntOrNull(postTarget)
       });
 
       return ReS(res, course, 201);
@@ -74,52 +80,52 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
+      const courseId = course.id; // ✅ Save before update
       const oldBusinessTarget = course.businessTarget;
 
       await course.update({
         name: req.body.name || course.name,
         domainId: req.body.domainId || course.domainId,
-        description: req.body.description !== undefined ? req.body.description : course.description,
-        businessTarget: req.body.businessTarget !== undefined ? req.body.businessTarget : course.businessTarget,
-        totalDays: req.body.totalDays !== undefined ? req.body.totalDays : course.totalDays,
-        duration: req.body.duration !== undefined ? req.body.duration : course.duration,
-        certificateCount: req.body.certificateCount !== undefined ? req.body.certificateCount : course.certificateCount,
-        img: req.files?.img ? req.files.img[0].location : course.img,
+        description:      req.body.description !== undefined ? req.body.description : course.description,
+        businessTarget:        toIntOrNull(req.body.businessTarget, course.businessTarget),
+        totalDays:             toIntOrNull(req.body.totalDays, course.totalDays),
+        duration:              toIntOrNull(req.body.duration, course.duration),
+        certificateCount:      toIntOrNull(req.body.certificateCount, course.certificateCount),
+        img:  req.files?.img  ? req.files.img[0].location  : course.img,
         img2: req.files?.img2 ? req.files.img2[0].location : course.img2,
-        domainSkills: req.body.domainSkills !== undefined ? req.body.domainSkills : course.domainSkills,
+        domainSkills:        req.body.domainSkills !== undefined        ? req.body.domainSkills        : course.domainSkills,
         interpersonalSkills: req.body.interpersonalSkills !== undefined ? req.body.interpersonalSkills : course.interpersonalSkills,
-        managerName: req.body.managerName !== undefined ? req.body.managerName : course.managerName,
-        managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition,
-        // ✅ New target fields
-        followerTarget: req.body.followerTarget !== undefined ? req.body.followerTarget : course.followerTarget,
-        reviewAndRatingTarget: req.body.reviewAndRatingTarget !== undefined ? req.body.reviewAndRatingTarget : course.reviewAndRatingTarget,
-        postTarget: req.body.postTarget !== undefined ? req.body.postTarget : course.postTarget
+        managerName:         req.body.managerName !== undefined         ? req.body.managerName         : course.managerName,
+        managerPosition:     req.body.managerPosition !== undefined     ? req.body.managerPosition     : course.managerPosition,
+        followerTarget:        toIntOrNull(req.body.followerTarget, course.followerTarget),
+        reviewAndRatingTarget: toIntOrNull(req.body.reviewAndRatingTarget, course.reviewAndRatingTarget),
+        postTarget:            toIntOrNull(req.body.postTarget, course.postTarget)
       });
 
       // -----------------------------------------------------
       //  UPDATE Users.businessTargets IF businessTarget CHANGED
       // -----------------------------------------------------
-      if (req.body.businessTarget !== undefined && req.body.businessTarget !== oldBusinessTarget) {
-        const newTarget = Number(req.body.businessTarget);
-        const users = await model.User.findAll();
+      const newBusinessTarget = toIntOrNull(req.body.businessTarget);
 
+      if (req.body.businessTarget !== undefined && newBusinessTarget !== oldBusinessTarget) {
+        const users = await model.User.findAll();
         let updatedUsersCount = 0;
 
         for (const user of users) {
-          if (!user.businessTargets) continue;
+          try {
+            if (!user.businessTargets || !user.businessTargets[courseId]) continue;
 
-          const bt = { ...user.businessTargets };
+            const bt = JSON.parse(JSON.stringify(user.businessTargets)); // deep clone
+            bt[courseId].target = newBusinessTarget;
 
-          if (bt[course.id]) {
-            console.log(`➡ Updating User ID: ${user.id} for Course: ${course.id}`);
-            console.log("   Old target:", bt[course.id].target, "| New target:", newTarget);
+            await model.User.update(
+              { businessTargets: bt },
+              { where: { id: user.id } }
+            );
 
-            bt[course.id].target = newTarget;
-            user.businessTargets = bt;
-            user.changed("businessTargets", true);
-
-            await user.save({ fields: ["businessTargets"] });
             updatedUsersCount++;
+          } catch (userErr) {
+            console.error(`❌ Failed to update user ${user.id}:`, userErr.message);
           }
         }
 
