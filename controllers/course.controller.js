@@ -1,10 +1,9 @@
 "use strict";
 const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
-const { uploadGeneralFile } = require("../middleware/s3.middleware.js"); // adjust path if needed
+const { uploadGeneralFile } = require("../middleware/s3.middleware.js");
 
 var addCourse = async (req, res) => {
-  // Accept two files: img and img2
   uploadGeneralFile.fields([
     { name: "img", maxCount: 1 },
     { name: "img2", maxCount: 1 }
@@ -22,7 +21,11 @@ var addCourse = async (req, res) => {
       domainSkills,
       interpersonalSkills,
       managerName,
-      managerPosition
+      managerPosition,
+      // ✅ New target fields
+      followerTarget,
+      reviewAndRatingTarget,
+      postTarget
     } = req.body;
 
     if (!name) return ReE(res, "Course name is required", 400);
@@ -45,7 +48,11 @@ var addCourse = async (req, res) => {
         domainSkills: domainSkills || null,
         interpersonalSkills: interpersonalSkills || null,
         managerName: managerName || null,
-        managerPosition: managerPosition || null
+        managerPosition: managerPosition || null,
+        // ✅ New target fields
+        followerTarget: followerTarget || null,
+        reviewAndRatingTarget: reviewAndRatingTarget || null,
+        postTarget: postTarget || null
       });
 
       return ReS(res, course, 201);
@@ -67,10 +74,8 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
-      // Store old businessTarget to compare later
       const oldBusinessTarget = course.businessTarget;
 
-      // Update the course
       await course.update({
         name: req.body.name || course.name,
         domainId: req.body.domainId || course.domainId,
@@ -84,18 +89,17 @@ var updateCourse = async (req, res) => {
         domainSkills: req.body.domainSkills !== undefined ? req.body.domainSkills : course.domainSkills,
         interpersonalSkills: req.body.interpersonalSkills !== undefined ? req.body.interpersonalSkills : course.interpersonalSkills,
         managerName: req.body.managerName !== undefined ? req.body.managerName : course.managerName,
-        managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition
+        managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition,
+        // ✅ New target fields
+        followerTarget: req.body.followerTarget !== undefined ? req.body.followerTarget : course.followerTarget,
+        reviewAndRatingTarget: req.body.reviewAndRatingTarget !== undefined ? req.body.reviewAndRatingTarget : course.reviewAndRatingTarget,
+        postTarget: req.body.postTarget !== undefined ? req.body.postTarget : course.postTarget
       });
-
-  
 
       // -----------------------------------------------------
       //  UPDATE Users.businessTargets IF businessTarget CHANGED
       // -----------------------------------------------------
       if (req.body.businessTarget !== undefined && req.body.businessTarget !== oldBusinessTarget) {
-
-       
-
         const newTarget = Number(req.body.businessTarget);
         const users = await model.User.findAll();
 
@@ -106,16 +110,13 @@ var updateCourse = async (req, res) => {
 
           const bt = { ...user.businessTargets };
 
-          // If user has this course entry → update only TARGET
           if (bt[course.id]) {
-
             console.log(`➡ Updating User ID: ${user.id} for Course: ${course.id}`);
             console.log("   Old target:", bt[course.id].target, "| New target:", newTarget);
 
-            bt[course.id].target = newTarget; // only update the target
+            bt[course.id].target = newTarget;
             user.businessTargets = bt;
-
-             user.changed("businessTargets", true);  
+            user.changed("businessTargets", true);
 
             await user.save({ fields: ["businessTargets"] });
             updatedUsersCount++;
@@ -135,100 +136,15 @@ var updateCourse = async (req, res) => {
     }
   });
 };
-
 module.exports.updateCourse = updateCourse;
-
-// ✅ Fetch all Courses
-// const fetchAllCourses = async (req, res) => {
-//   try {
-//     const { userId } = req.query;
-//     if (!userId) return ReE(res, "userId is required", 400);
-
-//     // 🔹 Fetch user with TeamManager
-//     const user = await model.User.findByPk(userId, {
-//       include: [
-//         {
-//           model: model.TeamManager,
-//           as: "teamManager",
-//           attributes: ["internshipStatus", "name", "email"],
-//         },
-//       ],
-//     });
-
-//     if (!user) return ReE(res, "User not found", 404);
-
-//     // 🔹 Fetch all courses with domain
-//     const courses = await model.Course.findAll({
-//       where: { isDeleted: false },
-//       attributes: { exclude: ["createdAt", "updatedAt"] },
-//       include: [{ model: model.Domain, attributes: ["name"] }],
-//     });
-
-//     // 🔹 Fetch all CoursePreviews at once
-//     const previews = await model.CoursePreview.findAll({
-//       where: { isDeleted: false },
-//       attributes: [
-//         ["id", "coursePreviewId"],
-//         "courseId",
-//         "domainId",
-//         "title",
-//         "heading",
-//         "dayCount",
-//       ],
-//       raw: true,
-//     });
-
-//     // 🔹 Map courses with status and previews
-//     const coursesWithStatus = courses.map((course) => {
-//       let status = "Not Started";
-
-//       const courseDates = user.courseDates || {};
-//       const courseStatuses = user.courseStatuses || {};
-//       const courseIdStr = String(course.id); // 🔹 Ensure string key access
-
-//       // ✅ Check if course has started
-//       if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
-//         status = courseStatuses[courseIdStr] || "Started";
-//       } else {
-//         status = "Not Started";
-//       }
-
-//       // 🔹 Attach previews specific to this course
-//       const coursePreviews = previews
-//         .filter((p) => p.courseId === course.id)
-//         .map((p) => ({
-//           coursePreviewId: p.coursePreviewId,
-//           dayCount: p.dayCount,
-//           title: p.title,
-//           heading: p.heading,
-//         }));
-
-//       return {
-//         ...course.toJSON(),
-//         courseId: course.id,
-//         CoursePreviews: coursePreviews,
-//         status,
-//         userCreatedAt: user.createdAt, // 🔹 Add user createdAt here
-//       };
-//     });
-
-//     return ReS(res, { success: true, data: coursesWithStatus }, 200);
-//   } catch (error) {
-//     console.error("Fetch All Courses Error:", error);
-//     return ReE(res, error.message, 500);
-//   }
-// };
-
-// module.exports.fetchAllCourses = fetchAllCourses;
 
 var listCourses = async (req, res) => {
   try {
-    // Optionally, you can include domain details with each course
     const courses = await model.Course.findAll({
-      where: { isDeleted: false }, // exclude deleted courses if you use soft-delete
+      where: { isDeleted: false },
       include: [
         {
-          model: model.Domain,  
+          model: model.Domain,
           attributes: ["id", "name"]
         }
       ],
@@ -240,21 +156,17 @@ var listCourses = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.listCourses = listCourses;
-
 
 const fetchAllCourses = async (req, res) => {
   try {
     const { userId } = req.query;
 
-    // 🔹 Validate userId: must be a positive integer
     const userIdNum = Number(userId);
     if (!userId || isNaN(userIdNum) || !Number.isInteger(userIdNum) || userIdNum <= 0) {
       return ReE(res, "Valid userId is required", 400);
     }
 
-    // 🔹 Fetch user with TeamManager
     const user = await model.User.findByPk(userIdNum, {
       include: [
         {
@@ -267,14 +179,12 @@ const fetchAllCourses = async (req, res) => {
 
     if (!user) return ReE(res, "User not found", 404);
 
-    // 🔹 Fetch all courses with domain
     const courses = await model.Course.findAll({
       where: { isDeleted: false },
       attributes: { exclude: ["createdAt", "updatedAt"] },
       include: [{ model: model.Domain, attributes: ["name"] }],
     });
 
-    // 🔹 Fetch all CoursePreviews at once
     const previews = await model.CoursePreview.findAll({
       where: { isDeleted: false },
       attributes: [
@@ -288,20 +198,17 @@ const fetchAllCourses = async (req, res) => {
       raw: true,
     });
 
-    // 🔹 Map courses with status and previews
     const coursesWithStatus = courses.map((course) => {
       let status = "Not Started";
 
       const courseDates = user.courseDates || {};
       const courseStatuses = user.courseStatuses || {};
-      const courseIdStr = String(course.id); // 🔹 Ensure string key access
+      const courseIdStr = String(course.id);
 
-      // ✅ Check if course has started
       if (courseDates[courseIdStr] && courseDates[courseIdStr].started) {
         status = courseStatuses[courseIdStr] || "Started";
       }
 
-      // 🔹 Attach previews specific to this course
       const coursePreviews = previews
         .filter((p) => p.courseId === course.id)
         .map((p) => ({
@@ -316,7 +223,7 @@ const fetchAllCourses = async (req, res) => {
         courseId: course.id,
         CoursePreviews: coursePreviews,
         status,
-        userCreatedAt: user.createdAt, // 🔹 Add user createdAt
+        userCreatedAt: user.createdAt,
       };
     });
 
@@ -326,41 +233,36 @@ const fetchAllCourses = async (req, res) => {
     return ReE(res, error.message, 500);
   }
 };
-
 module.exports.fetchAllCourses = fetchAllCourses;
 
-
-// ✅ Fetch single Course by ID
 var fetchSingleCourse = async (req, res) => {
-    const { id } = req.params;
-    if (!id) return ReE(res, "Course ID is required", 400);
+  const { id } = req.params;
+  if (!id) return ReE(res, "Course ID is required", 400);
 
-    try {
-        const course = await model.Course.findByPk(id, {
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }],
-        });
-        if (!course) return ReE(res, "Course not found", 404);
-        return ReS(res, course, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+  try {
+    const course = await model.Course.findByPk(id, {
+      attributes: { exclude: ["createdAt", "updatedAt"] },
+      include: [{ model: model.Domain, attributes: ["name"] }],
+    });
+    if (!course) return ReE(res, "Course not found", 404);
+    return ReS(res, course, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
 };
 module.exports.fetchSingleCourse = fetchSingleCourse;
 
-// ✅ Hard delete Course
 var deleteCourse = async (req, res) => {
-    try {
-        const course = await model.Course.findByPk(req.params.id);
-        if (!course) return ReE(res, "Course not found", 404);
+  try {
+    const course = await model.Course.findByPk(req.params.id);
+    if (!course) return ReE(res, "Course not found", 404);
 
-        await course.destroy(); // <-- hard delete
-        return ReS(res, { message: "Course deleted successfully" }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+    await course.destroy();
+    return ReS(res, { message: "Course deleted successfully" }, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
 };
-
 module.exports.deleteCourse = deleteCourse;
 
 

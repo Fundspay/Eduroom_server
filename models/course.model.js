@@ -20,6 +20,12 @@ module.exports = (sequelize, Sequelize) => {
       totalDays: { type: Sequelize.INTEGER, allowNull: true },
       duration: { type: Sequelize.STRING, allowNull: true },
       certificateCount: { type: Sequelize.INTEGER, allowNull: true },
+
+      // ✅ New target fields
+      followerTarget: { type: Sequelize.INTEGER, allowNull: true },
+      reviewAndRatingTarget: { type: Sequelize.INTEGER, allowNull: true },
+      postTarget: { type: Sequelize.INTEGER, allowNull: true },
+
       isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
