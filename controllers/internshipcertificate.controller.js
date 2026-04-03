@@ -42,12 +42,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
       return res.status(404).json({ success: false, message: "Course not found" });
     }
 
-    // 🔹 CHECK END DATE - Don't allow certificate generation before end date
+    // 🔹 CHECK END DATE
     const userCourseData = user.courseDates?.[courseId];
     if (userCourseData?.endDate) {
       const currentDate = new Date();
       const courseEndDate = new Date(userCourseData.endDate);
-      
       if (currentDate < courseEndDate) {
         await transaction.rollback();
         return res.status(400).json({
@@ -59,16 +58,48 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }
     }
 
-    // 🔹 Get business target from user JSON first, fallback to course
+    // 🔹 Get targets
     const userTargetObj = user.businessTargets?.[courseId];
-    const businessTarget = userTargetObj?.target !== undefined
+    const businessTarget        = userTargetObj?.target !== undefined
       ? parseInt(userTargetObj.target, 10)
       : parseInt(course?.businessTarget || 0, 10);
+    const followerTarget        = parseInt(course?.followerTarget || 0, 10);
+    const reviewAndRatingTarget = parseInt(course?.reviewAndRatingTarget || 0, 10);
+    const postTarget            = parseInt(course?.postTarget || 0, 10);
 
     // 🔹 Wallet info
     const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
-    let newDeductedWallet = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    let newSubscriptionLeft = Math.max(0, subscriptionWallet - newDeductedWallet);
+    let newDeductedWallet    = parseInt(user.subscriptiondeductedWallet || 0, 10);
+    let newSubscriptionLeft  = Math.max(0, subscriptionWallet - newDeductedWallet);
+
+    // 🔹 Check which path qualifies
+    const businessTargetMet = newSubscriptionLeft >= businessTarget && businessTarget > 0;
+    const threeTargetsMet   = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
+                              && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
+
+    if (!businessTargetMet && !threeTargetsMet) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: "Insufficient subscription wallet. Neither business target nor the 3 marketing targets are met.",
+        wallet: {
+          totalSubscribed: subscriptionWallet,
+          totalDeducted: newDeductedWallet,
+          subscriptionLeft: newSubscriptionLeft,
+          businessTarget,
+          followerTarget,
+          reviewAndRatingTarget,
+          postTarget,
+        },
+      });
+    }
+
+    // 🔹 Decide how much to deduct — businessTarget takes priority
+    const deductionAmount = businessTargetMet
+      ? businessTarget
+      : (followerTarget + reviewAndRatingTarget + postTarget);
+
+    const deductionType = businessTargetMet ? "businessTarget" : "threeTargets";
 
     // 🔹 Check if certificate already exists
     let certificate = await model.InternshipCertificate.findOne({
@@ -78,25 +109,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     // 🔹 Deduct wallet only if first-time issuance
     if (!certificate) {
-      if (newSubscriptionLeft < businessTarget) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: "Insufficient subscription wallet, business target not met",
-          wallet: {
-            totalSubscribed: subscriptionWallet,
-            businessTarget,
-            totalDeducted: newDeductedWallet,
-            subscriptionLeft: newSubscriptionLeft,
-          },
-        });
-      }
-
-      newDeductedWallet += businessTarget;
+      newDeductedWallet  += deductionAmount;
       newSubscriptionLeft = subscriptionWallet - newDeductedWallet;
 
       user.subscriptiondeductedWallet = newDeductedWallet;
-      user.subscriptionLeft = newSubscriptionLeft;
+      user.subscriptionLeft           = newSubscriptionLeft;
 
       await user.save({
         fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
@@ -106,7 +123,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     // 🔹 Generate certificate
     const certificateFile = await generateInternshipCertificate(userId, courseId);
-
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
       return res.status(500).json({
@@ -118,8 +134,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
     // 🔹 Save or update certificate
     if (certificate) {
       certificate.certificateUrl = certificateFile.fileUrl;
-      certificate.isIssued = true;
-      certificate.issuedDate = new Date();
+      certificate.isIssued       = true;
+      certificate.issuedDate     = new Date();
       await certificate.save({ transaction });
     } else {
       certificate = await model.InternshipCertificate.create(
@@ -127,9 +143,9 @@ const createAndSendInternshipCertificate = async (req, res) => {
           userId,
           courseId,
           certificateUrl: certificateFile.fileUrl,
-          isIssued: true,
-          issuedDate: new Date(),
-          deductedWallet: businessTarget,
+          isIssued:       true,
+          issuedDate:     new Date(),
+          deductedWallet: deductionAmount,
         },
         { transaction }
       );
@@ -148,18 +164,22 @@ const createAndSendInternshipCertificate = async (req, res) => {
     `;
     await sendMail(user.email, subject, html);
 
-    // 🔹 Commit transaction
     await transaction.commit();
 
     return res.status(200).json({
       success: true,
       message: "Internship Certificate generated and sent successfully",
       certificateUrl: certificateFile.fileUrl,
+      deductionType, // "businessTarget" or "threeTargets"
       wallet: {
         totalSubscribed: subscriptionWallet,
-        businessTarget,
+        deductionAmount,
         totalDeducted: newDeductedWallet,
         subscriptionLeft: newSubscriptionLeft,
+        businessTarget,
+        followerTarget,
+        reviewAndRatingTarget,
+        postTarget,
       },
     });
 
