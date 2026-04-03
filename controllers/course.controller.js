@@ -90,9 +90,9 @@ var updateCourse = async (req, res) => {
         managerName: req.body.managerName !== undefined ? req.body.managerName : course.managerName,
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition,
         // ✅ Only these 3 fixed
-        followerTarget: req.body.followerTarget !== undefined ? (req.body.followerTarget === "" ? null : Number(req.body.followerTarget)) : course.followerTarget,
-        reviewAndRatingTarget: req.body.reviewAndRatingTarget !== undefined ? (req.body.reviewAndRatingTarget === "" ? null : Number(req.body.reviewAndRatingTarget)) : course.reviewAndRatingTarget,
-        postTarget: req.body.postTarget !== undefined ? (req.body.postTarget === "" ? null : Number(req.body.postTarget)) : course.postTarget
+        followerTarget: (req.body.followerTarget !== undefined && req.body.followerTarget !== "" && !isNaN(req.body.followerTarget)) ? Number(req.body.followerTarget) : course.followerTarget,
+reviewAndRatingTarget: (req.body.reviewAndRatingTarget !== undefined && req.body.reviewAndRatingTarget !== "" && !isNaN(req.body.reviewAndRatingTarget)) ? Number(req.body.reviewAndRatingTarget) : course.reviewAndRatingTarget,
+postTarget: (req.body.postTarget !== undefined && req.body.postTarget !== "" && !isNaN(req.body.postTarget)) ? Number(req.body.postTarget) : course.postTarget
       });
 
       // -----------------------------------------------------
