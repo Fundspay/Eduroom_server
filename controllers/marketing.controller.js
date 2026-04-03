@@ -68,9 +68,10 @@ const submitMarketing = async (req, res) => {
     if (
       Object.prototype.hasOwnProperty.call(req.body, "googleReviews") &&
       googleReviews !== null &&
-      (isNaN(googleReviews) || Number(googleReviews) < 0)
+      googleReviews !== "completed" &&
+      googleReviews !== "not_completed"
     ) {
-      return ReE(res, "googleReviews must be a valid number", 400);
+      return ReE(res, "googleReviews must be completed or not_completed", 400);
     }
 
     if (id) {
@@ -110,7 +111,7 @@ const submitMarketing = async (req, res) => {
       }
 
       if (Object.prototype.hasOwnProperty.call(req.body, "googleReviews")) {
-        marketing.googleReviews = googleReviews === null ? null : Number(googleReviews);
+        marketing.googleReviews = googleReviews || null;
       }
 
       await marketing.save();
@@ -149,8 +150,8 @@ const submitMarketing = async (req, res) => {
         ? posts
         : [],
       googleReviews: Object.prototype.hasOwnProperty.call(req.body, "googleReviews")
-        ? (googleReviews === null ? null : Number(googleReviews))
-        : 0
+        ? (googleReviews || null)
+        : null
     });
 
     return ReS(
@@ -207,6 +208,7 @@ const fetchMarketingByUser = async (req, res) => {
         posts: postsArray,
         postsCount: postsArray.length,
         googleReviews: item.googleReviews,
+        isVerified: item.isVerified,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt
       };
@@ -266,7 +268,9 @@ const fetchMarketingSummaryByUser = async (req, res) => {
         totalRatingReviewCompletedCount += 1;
       }
 
-      totalGoogleReviewsCount += Number(item.googleReviews || 0);
+      if (item.googleReviews === "completed") {
+        totalGoogleReviewsCount += 1;
+      }
     });
 
     return ReS(
@@ -289,3 +293,94 @@ const fetchMarketingSummaryByUser = async (req, res) => {
 };
 
 module.exports.fetchMarketingSummaryByUser = fetchMarketingSummaryByUser;
+
+const deleteMarketing = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return ReE(res, "id is required", 400);
+    }
+
+    const marketing = await model.Marketing.findOne({
+      where: { id: id, isDeleted: false }
+    });
+
+    if (!marketing) {
+      return ReE(res, "Marketing record not found", 404);
+    }
+
+    marketing.isDeleted = true;
+    await marketing.save();
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Marketing deleted successfully"
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Delete Marketing Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.deleteMarketing = deleteMarketing;
+
+const verifyMarketing = async (req, res) => {
+  try {
+    const { id, userId, isVerified } = req.body;
+
+    if (!id) {
+      return ReE(res, "id is required", 400);
+    }
+
+    if (!userId) {
+      return ReE(res, "userId is required", 400);
+    }
+
+    if (!isVerified) {
+      return ReE(res, "isVerified is required", 400);
+    }
+
+    if (isVerified !== "pending" && isVerified !== "verified") {
+      return ReE(res, "isVerified must be pending or verified", 400);
+    }
+
+    const user = await model.User.findOne({
+      where: { id: userId, isDeleted: false }
+    });
+
+    if (!user) {
+      return ReE(res, "User not found", 404);
+    }
+
+    const marketing = await model.Marketing.findOne({
+      where: { id: id, userId: userId, isDeleted: false }
+    });
+
+    if (!marketing) {
+      return ReE(res, "Marketing record not found", 404);
+    }
+
+    marketing.isVerified = isVerified;
+    await marketing.save();
+
+    return ReS(
+      res,
+      {
+        success: true,
+        message: "Marketing verification status updated successfully",
+        data: marketing
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Verify Marketing Error:", error);
+    return ReE(res, error.message, 500);
+  }
+};
+
+module.exports.verifyMarketing = verifyMarketing;
