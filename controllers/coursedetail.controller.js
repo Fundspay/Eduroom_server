@@ -1128,47 +1128,53 @@ module.exports.getDailyStatusPerUser = getDailyStatusPerUser;
 
 const getDailyStatusAllCoursesPerUser = async (req, res) => {
   try {
-    
-    const { userId } = req.params; 
-    // 🔒 HARD GUARD - yahin DB ko bachana hai
+    const { userId } = req.params;
+
     if (!userId || userId === "undefined" || isNaN(Number(userId))) {
       console.warn("⚠️ Invalid userId:", userId);
-
-      return ReS(
-        res,
-        {
-          userId: null,
-          fullName: null,
-          subscriptionWallet: 0,
-          subscriptiondeductedWallet: 0,
-          subscriptionLeft: 0,
-          courses: [],
-        },
-        200,
-      );
+      return ReS(res, {
+        userId: null, fullName: null,
+        subscriptionWallet: 0, subscriptiondeductedWallet: 0, subscriptionLeft: 0,
+        courses: [],
+      }, 200);
     }
 
-    // Fetch user instance
     let user = await model.User.findByPk(userId);
-
     if (!user) {
       console.warn("⚠️ User not found:", userId);
-
-      return ReS(
-        res,
-        {
-          userId: null,
-          fullName: null,
-          subscriptionWallet: 0,
-          subscriptiondeductedWallet: 0,
-          subscriptionLeft: 0,
-          courses: [],
-        },
-        200,
-      );
+      return ReS(res, {
+        userId: null, fullName: null,
+        subscriptionWallet: 0, subscriptiondeductedWallet: 0, subscriptionLeft: 0,
+        courses: [],
+      }, 200);
     }
 
     await user.reload();
+
+    // ✅ Fetch all Marketing records for this user
+    const marketingRecords = await model.Marketing.findAll({
+      where: { userId, isDeleted: false },
+    });
+
+    // ✅ Only count verified Marketing records
+    const verifiedRecords = marketingRecords.filter(m => m.isVerified === "verified");
+
+    const achievedFollowers = verifiedRecords.reduce((sum, m) => {
+      const arr = Array.isArray(m.followers) ? m.followers : [];
+      return sum + arr.length;
+    }, 0);
+
+    const achievedPosts = verifiedRecords.reduce((sum, m) => {
+      const arr = Array.isArray(m.posts) ? m.posts : [];
+      return sum + arr.length;
+    }, 0);
+
+    const achievedReviewAndRating = verifiedRecords.reduce((sum, m) => {
+      let count = 0;
+      if (m.googleReviews) count += 1;
+      if (m.ratingReviewStatus && m.ratingReviewStatus !== "pending") count += 1;
+      return sum + count;
+    }, 0);
 
     // Normalize businessTargets
     const normalizedBusinessTargets = {};
@@ -1185,13 +1191,13 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       subscriptionWallet: user.subscriptionWallet,
       subscriptiondeductedWallet: user.subscriptiondeductedWallet,
       subscriptionLeft: Math.max(
-        (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0),
-        0,
+        (user.subscriptionWallet || 0) - (user.subscriptiondeductedWallet || 0), 0
       ),
       courses: [],
     };
 
     const courseIds = Object.keys(user.courseStatuses || {});
+
     for (const courseId of courseIds) {
       const course = await model.Course.findOne({
         where: { id: courseId, isDeleted: false },
@@ -1209,10 +1215,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
       let sessions = await model.CourseDetail.findAll({
         where: { courseId, isDeleted: false },
-        order: [
-          ["day", "ASC"],
-          ["sessionNumber", "ASC"],
-        ],
+        order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
       // Remove duplicate sessionNumbers per day
@@ -1241,12 +1244,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         let caseStudyPercentage = null;
 
         const latestCaseStudy = await model.CaseStudyResult.findOne({
-          where: {
-            userId,
-            courseId,
-            day: session.day,
-            sessionNumber: session.sessionNumber,
-          },
+          where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
           order: [["createdAt", "DESC"]],
         });
 
@@ -1256,9 +1254,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         } else {
           totalMCQs = progress.totalMCQs || 0;
           correctMCQs = progress.correctMCQs || 0;
-          sessionCompletionPercentage = totalMCQs
-            ? (correctMCQs / totalMCQs) * 100
-            : 0;
+          sessionCompletionPercentage = totalMCQs ? (correctMCQs / totalMCQs) * 100 : 0;
         }
 
         if (!daysMap[session.day])
@@ -1273,9 +1269,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           daysMap[session.day].completed++;
         }
 
-        // ✅ Set status based on course type
         const status =
-          courseId === "9" // Mobile App Developer
+          courseId === "9"
             ? latestCaseStudy
               ? `${Number(sessionCompletionPercentage).toFixed(2)}%`
               : sessionCompletionPercentage >= COMPLETION_THRESHOLD
@@ -1314,10 +1309,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? (completedSessions / totalSessions) * 100
         : 0;
 
-      const btEntry = normalizedBusinessTargets[courseId] || {
-        target: 0,
-        offerMessage: null,
-      };
+      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
@@ -1325,21 +1317,24 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       const isBusinessTargetMet =
-        subscriptionWallet >= businessTarget ||
-        subscriptiondeductedWallet >= businessTarget;
+        subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
-      // Check if all sessions are above 20% threshold
+      // ✅ Pull target values from Course model
+      const followerTarget = course.followerTarget || 0;
+      const reviewAndRatingTarget = course.reviewAndRatingTarget || 0;
+      const postTarget = course.postTarget || 0;
+
+      // ✅ Check if each marketing target is met
+      const isFollowerTargetMet = followerTarget > 0 && achievedFollowers >= followerTarget;
+      const isReviewAndRatingTargetMet = reviewAndRatingTarget > 0 && achievedReviewAndRating >= reviewAndRatingTarget;
+      const isPostTargetMet = postTarget > 0 && achievedPosts >= postTarget;
+
       const allSessionsAboveThreshold = await Promise.all(
         sessions.map(async (session) => {
           let sessionCompletionPercentage = 0;
 
           const latestCaseStudy = await model.CaseStudyResult.findOne({
-            where: {
-              userId,
-              courseId,
-              day: session.day,
-              sessionNumber: session.sessionNumber,
-            },
+            where: { userId, courseId, day: session.day, sessionNumber: session.sessionNumber },
             order: [["createdAt", "DESC"]],
           });
 
@@ -1348,56 +1343,39 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
           } else {
             const progress = session.userProgress?.[userId] || {};
             if (progress.totalMCQs && progress.correctMCQs !== undefined) {
-              sessionCompletionPercentage =
-                (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
+              sessionCompletionPercentage = (progress.correctMCQs / progress.totalMCQs) * 100 || 0;
             }
           }
 
           return sessionCompletionPercentage >= 20;
-        }),
+        })
       ).then((results) => results.every(Boolean));
 
-      const existingStatuses = user.courseStatuses
-        ? { ...user.courseStatuses }
-        : {};
+      const existingStatuses = user.courseStatuses ? { ...user.courseStatuses } : {};
 
-      // ✅ FIXED: Protect old completed users - cutoff date for new logic
-      const NEW_LOGIC_CUTOFF_DATE = new Date("2025-12-27"); // Today's date when fix was deployed
+      const NEW_LOGIC_CUTOFF_DATE = new Date("2025-12-27");
       const courseStartDateStr = user.courseDates?.[courseId]?.startDate;
-      const isOldUser =
-        !courseStartDateStr ||
-        new Date(courseStartDateStr) < NEW_LOGIC_CUTOFF_DATE;
-
-      // If user was already marked "Completed" before the fix, keep them as "Completed"
-      const wasAlreadyCompleted =
-        existingStatuses[String(courseId)] === "Completed";
+      const isOldUser = !courseStartDateStr || new Date(courseStartDateStr) < NEW_LOGIC_CUTOFF_DATE;
+      const wasAlreadyCompleted = existingStatuses[String(courseId)] === "Completed";
 
       let overallStatus = "In Progress";
 
       if (wasAlreadyCompleted && isOldUser) {
-        // ✅ Preserve old completed status for users who started before today
         overallStatus = "Completed";
       } else {
-        // ✅ Apply new logic for new users or users who weren't completed yet
         if (courseId === "24") {
-          // For course 24, consider only business target completion
           overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
         } else if (allSessionsAboveThreshold && isBusinessTargetMet) {
-          // For all other courses: BOTH conditions must be met
           overallStatus = "Completed";
         }
       }
 
-      // Check internship status (can override to Terminated or On Hold only)
       const statusRecord = await model.Status.findOne({
         where: { userId, isDeleted: false },
       });
 
       if (statusRecord && statusRecord.internshipStatus) {
-        const normalized = statusRecord.internshipStatus
-          .trim()
-          .toLowerCase()
-          .replace(/[-_]/g, " ");
+        const normalized = statusRecord.internshipStatus.trim().toLowerCase().replace(/[-_]/g, " ");
         if (["terminated"].includes(normalized)) {
           overallStatus = "Terminated";
         } else if (["on hold", "hold", "onhold"].includes(normalized)) {
@@ -1405,7 +1383,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         }
       }
 
-      // ✅ FIXED: Special rule for Mobile App Developer - only applies if business target is also met
       if (
         courseId === "9" &&
         overallStatus !== "Completed" &&
@@ -1413,42 +1390,53 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         overallStatus !== "On Hold" &&
         Number(overallCompletionRate) >= 99.99 &&
         subscriptiondeductedWallet >= 1 &&
-        isBusinessTargetMet // ✅ Added business target check
+        isBusinessTargetMet
       ) {
         const cutoffDate = new Date("2025-12-10");
         if (!courseStartDateStr || new Date(courseStartDateStr) < cutoffDate) {
           overallStatus = "Completed";
-          console.log(
-            `Special rule applied for user ${user.id}, Mobile App Development`,
-          );
+          console.log(`Special rule applied for user ${user.id}, Mobile App Development`);
         }
       }
 
-      // ✅ If status is "Completed", show 100% completion rate
       let displayCompletionRate = overallCompletionRate;
       if (overallStatus === "Completed") {
         displayCompletionRate = 100;
       }
 
-      // Save final course status
       existingStatuses[String(courseId)] = overallStatus;
-      await user.update(
-        { courseStatuses: existingStatuses },
-        { fields: ["courseStatuses"] },
-      );
+      await user.update({ courseStatuses: existingStatuses }, { fields: ["courseStatuses"] });
 
       response.courses.push({
         courseId,
         courseName: course.name,
         domainName: course.Domain?.name || null,
+
+        // Business target
         businessTarget,
+        offerMessage,
+
+        // ✅ Follower target and achieved
+        followerTarget,
+        achievedFollowers,
+        isFollowerTargetMet,
+
+        // ✅ Review & Rating target and achieved
+        reviewAndRatingTarget,
+        achievedReviewAndRating,
+        isReviewAndRatingTargetMet,
+
+        // ✅ Post target and achieved
+        postTarget,
+        achievedPosts,
+        isPostTargetMet,
+
         coursePreviews: course.CoursePreviews || [],
         overallStatus,
         overallCompletionRate: Number(displayCompletionRate.toFixed(2)),
         dailyStatus,
         startDate: user.courseDates?.[courseId]?.startDate || null,
         endDate: user.courseDates?.[courseId]?.endDate || null,
-        offerMessage,
       });
     }
 
@@ -1459,8 +1447,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
   }
 };
 
-module.exports.getDailyStatusAllCoursesPerUser =
-  getDailyStatusAllCoursesPerUser;
+module.exports.getDailyStatusAllCoursesPerUser = getDailyStatusAllCoursesPerUser;
 
 const getBusinessTarget = async (req, res) => {
   try {
