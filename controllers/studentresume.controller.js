@@ -356,29 +356,25 @@ const listResumes = async (req, res) => {
       resume.dataValues.userId = userId;
     }
 
-    // Step 2: sanitize — replace null / undefined / "" with "blank"
-    const sanitizeValue = (value) => {
-      if (value === null || value === undefined) return "blank";
-      if (typeof value === "string" && value.trim() === "") return "blank";
-      return value;
-    };
-
+    // Step 2: sanitize helper — replaces null / undefined / "" with "blank"
     const sanitizeObject = (obj) => {
       if (obj === null || obj === undefined) return "blank";
       if (Array.isArray(obj)) return obj.map(sanitizeObject);
-      if (typeof obj === "object" && obj !== null) {
-        const sanitized = {};
-        for (const key of Object.keys(obj)) {
-          sanitized[key] = sanitizeObject(obj[key]);
-        }
-        return sanitized;
+      if (typeof obj === "object") {
+        return Object.fromEntries(
+          Object.entries(obj).map(([key, val]) => [key, sanitizeObject(val)])
+        );
       }
-      return sanitizeValue(obj);
+      if (typeof obj === "string" && obj.trim() === "") return "blank";
+      return obj;
     };
 
-    // Step 3: convert Sequelize instances to plain objects, then sanitize
+    // Step 3: convert to true plain object first, then sanitize
     const sanitizedRecords = records.map((record) => {
-      const plain = typeof record.toJSON === "function" ? record.toJSON() : record;
+      const plain =
+        typeof record.toJSON === "function"
+          ? JSON.parse(JSON.stringify(record.toJSON()))
+          : JSON.parse(JSON.stringify(record));
       return sanitizeObject(plain);
     });
 
