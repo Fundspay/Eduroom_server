@@ -257,7 +257,6 @@ const listResumes = async (req, res) => {
   try {
     console.log("Starting StudentResume list...");
 
-    // DATE RANGE HANDLING (UNCHANGED)
     let { startDate, endDate } = req.query;
 
     const today = new Date();
@@ -279,7 +278,6 @@ const listResumes = async (req, res) => {
       raw: true,
     });
 
-    // 1️⃣ FETCH RESUMES (LOAD REDUCED, OUTPUT SAME)
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       where: {
@@ -315,19 +313,18 @@ const listResumes = async (req, res) => {
                 "occupation",
               ],
               where: { hasPaid: true },
-              required: false, // ❌ separate removed
+              required: false,
             },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
           ],
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: 500, // safety limit (frontend unchanged)
+      limit: 500,
     });
 
     console.log(`Total resumes fetched: ${records.length}`);
 
-    // 2️⃣ BULK USER FETCH (NO N+1)
     const users = await model.User.findAll({
       attributes: ["id", "phoneNumber", "email"],
       raw: true,
@@ -341,7 +338,6 @@ const listResumes = async (req, res) => {
       if (u.email) emailMap.set(u.email, u.id);
     }
 
-    //  ADD userId PER RECORD (OUTPUT SAME)
     for (const resume of records) {
       let userId = null;
 
@@ -351,7 +347,6 @@ const listResumes = async (req, res) => {
         if (resume.mobileNumber) {
           userId = phoneMap.get(resume.mobileNumber) || null;
         }
-
         if (!userId && resume.emailId) {
           userId = emailMap.get(resume.emailId) || null;
         }
@@ -360,8 +355,33 @@ const listResumes = async (req, res) => {
       resume.dataValues.userId = userId;
     }
 
-    console.log(" All processing done successfully!");
-    return ReS(res, { success: true, data: records, managers }, 200);
+    // ✅ NEW: Recursively replace null/undefined/""/blank values with "blank"
+    const sanitizeValue = (value) => {
+      if (value === null || value === undefined) return "blank";
+      if (typeof value === "string" && value.trim() === "") return "blank";
+      return value;
+    };
+
+    const sanitizeObject = (obj) => {
+      if (obj === null || obj === undefined) return "blank";
+      if (Array.isArray(obj)) return obj.map(sanitizeObject);
+      if (typeof obj === "object") {
+        const sanitized = {};
+        for (const key of Object.keys(obj)) {
+          sanitized[key] = sanitizeObject(obj[key]);
+        }
+        return sanitized;
+      }
+      return sanitizeValue(obj);
+    };
+
+    const sanitizedRecords = records.map((record) => {
+      const plain = record.toJSON(); // convert Sequelize instance to plain object
+      return sanitizeObject(plain);
+    });
+
+    console.log("All processing done successfully!");
+    return ReS(res, { success: true, data: sanitizedRecords, managers }, 200);
 
   } catch (error) {
     console.error("StudentResume List Error:", error);
@@ -370,7 +390,6 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
-
 
 
 // ✅ Delete resume by ID
