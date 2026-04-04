@@ -338,6 +338,7 @@ const listResumes = async (req, res) => {
       if (u.email) emailMap.set(u.email, u.id);
     }
 
+    // Step 1: assign userId into dataValues FIRST
     for (const resume of records) {
       let userId = null;
 
@@ -355,7 +356,7 @@ const listResumes = async (req, res) => {
       resume.dataValues.userId = userId;
     }
 
-    // ✅ NEW: Recursively replace null/undefined/""/blank values with "blank"
+    // Step 2: sanitize — replace null / undefined / "" with "blank"
     const sanitizeValue = (value) => {
       if (value === null || value === undefined) return "blank";
       if (typeof value === "string" && value.trim() === "") return "blank";
@@ -365,7 +366,7 @@ const listResumes = async (req, res) => {
     const sanitizeObject = (obj) => {
       if (obj === null || obj === undefined) return "blank";
       if (Array.isArray(obj)) return obj.map(sanitizeObject);
-      if (typeof obj === "object") {
+      if (typeof obj === "object" && obj !== null) {
         const sanitized = {};
         for (const key of Object.keys(obj)) {
           sanitized[key] = sanitizeObject(obj[key]);
@@ -375,8 +376,9 @@ const listResumes = async (req, res) => {
       return sanitizeValue(obj);
     };
 
+    // Step 3: convert Sequelize instances to plain objects, then sanitize
     const sanitizedRecords = records.map((record) => {
-      const plain = record.toJSON(); // convert Sequelize instance to plain object
+      const plain = typeof record.toJSON === "function" ? record.toJSON() : record;
       return sanitizeObject(plain);
     });
 
