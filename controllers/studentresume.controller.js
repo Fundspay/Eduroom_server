@@ -356,7 +356,7 @@ const listResumes = async (req, res) => {
       resume.dataValues.userId = userId;
     }
 
-    // Step 2: sanitize helper — replaces null / undefined / "" with "blank"
+    // Step 2: sanitize helper
     const sanitizeObject = (obj) => {
       if (obj === null || obj === undefined) return "blank";
       if (Array.isArray(obj)) return obj.map(sanitizeObject);
@@ -378,13 +378,13 @@ const listResumes = async (req, res) => {
       return sanitizeObject(plain);
     });
 
-    // Step 4: debug log — check if sanitization is working
+    // Step 4: debug log — MUST appear in terminal after deploy
     console.log("SANITIZED SAMPLE:", JSON.stringify(sanitizedRecords[0]));
 
-    // Step 5: force plain JSON before sending via ReS
+    // Step 5: force plain JSON before sending
     const finalData = JSON.parse(JSON.stringify(sanitizedRecords));
 
-    console.log("All processing done successfully!");
+    console.log("All processing done successfully! ✅");
     return ReS(res, { success: true, data: finalData, managers }, 200);
 
   } catch (error) {
