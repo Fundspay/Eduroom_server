@@ -369,7 +369,7 @@ const listResumes = async (req, res) => {
       return obj;
     };
 
-    // Step 3: convert to true plain object first, then sanitize
+    // Step 3: convert to true plain object then sanitize
     const sanitizedRecords = records.map((record) => {
       const plain =
         typeof record.toJSON === "function"
@@ -378,8 +378,14 @@ const listResumes = async (req, res) => {
       return sanitizeObject(plain);
     });
 
+    // Step 4: debug log — check if sanitization is working
+    console.log("SANITIZED SAMPLE:", JSON.stringify(sanitizedRecords[0]));
+
+    // Step 5: force plain JSON before sending via ReS
+    const finalData = JSON.parse(JSON.stringify(sanitizedRecords));
+
     console.log("All processing done successfully!");
-    return ReS(res, { success: true, data: sanitizedRecords, managers }, 200);
+    return ReS(res, { success: true, data: finalData, managers }, 200);
 
   } catch (error) {
     console.error("StudentResume List Error:", error);
