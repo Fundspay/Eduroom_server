@@ -395,7 +395,6 @@ const listResumes = async (req, res) => {
 
 module.exports.listResumes = listResumes;
 
-
 // ✅ Delete resume by ID
 const deleteResume = async (req, res) => {
   try {
