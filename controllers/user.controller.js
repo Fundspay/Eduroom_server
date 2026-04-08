@@ -591,6 +591,9 @@ const loginWithEmailPassword = async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return ReE(res, "Missing email or password", 400);
 
+    // 🚫 Blocked user IDs
+    const BLOCKED_USER_IDS = [4072];
+
     let account = await model.User.findOne({
       where: { email, isDeleted: false },
       include: [
@@ -615,6 +618,12 @@ const loginWithEmailPassword = async (req, res) => {
     if (!account && !manager) return ReE(res, "Invalid credentials", 401);
 
     const activeAccount = account || manager;
+
+    // 🚫 Block check
+    if (BLOCKED_USER_IDS.includes(Number(activeAccount.id))) {
+      return ReE(res, "Access denied", 403);
+    }
+
     const isMatch = await bcrypt.compare(password, activeAccount.password);
     if (!isMatch) return ReE(res, "Invalid credentials", 401);
 
@@ -645,10 +654,9 @@ const loginWithEmailPassword = async (req, res) => {
         };
       }
     } else {
-      // ── Fetch latest FundConfig id for this manager ──
       const fundConfig = await model.FundConfig.findOne({
         where: { managerId: activeAccount.id, isDeleted: false },
-        order: [["createdAt", "DESC"]], // latest config
+        order: [["createdAt", "DESC"]],
         attributes: ["id", "periodMonth", "periodYear"],
       });
 
@@ -660,7 +668,6 @@ const loginWithEmailPassword = async (req, res) => {
         department: activeAccount.department,
         position: activeAccount.position,
         internshipStatus: activeAccount.internshipStatus || null,
-        // Fund config details — null if no config created yet
         fundConfigId: fundConfig ? fundConfig.id : null,
         fundConfigPeriod: fundConfig
           ? {
@@ -673,7 +680,6 @@ const loginWithEmailPassword = async (req, res) => {
 
     const token = jwt.sign({ ...payload, role }, CONFIG.jwtSecret, { expiresIn: "365d" });
 
-    // Dynamic key based on role
     const responseKey = role === "user" ? "user" : "account";
 
     return ReS(
@@ -696,7 +702,6 @@ const loginWithEmailPassword = async (req, res) => {
 };
 
 module.exports.loginWithEmailPassword = loginWithEmailPassword;
-
 
 // ===================== LOGOUT =====================
 const logoutUser = async (req, res) => {
@@ -846,6 +851,9 @@ const loginWithGoogle = async (req, res) => {
   try {
     const firebaseUser = req.user;
 
+    // 🚫 Blocked user IDs
+    const BLOCKED_USER_IDS = [4072];
+
     let account = await model.User.findOne({
       where: { email: firebaseUser.email, isDeleted: false },
       include: [
@@ -860,7 +868,6 @@ const loginWithGoogle = async (req, res) => {
     let role = "user";
     let manager = null;
 
-    // 🔹 If not found in User table, check TeamManager
     if (!account) {
       manager = await model.TeamManager.findOne({
         where: { email: firebaseUser.email, isDeleted: false },
@@ -871,13 +878,16 @@ const loginWithGoogle = async (req, res) => {
     if (!account && !manager)
       return ReE(res, "Account not found. Please register first.", 404);
 
-    // 🔹 Pick the correct account info depending on role
     const activeAccount = account || manager;
+
+    // 🚫 Block check
+    if (BLOCKED_USER_IDS.includes(Number(activeAccount.id))) {
+      return ReE(res, "Access denied", 403);
+    }
 
     let isFirstLogin = !activeAccount.hasLoggedIn;
     if (isFirstLogin) await activeAccount.update({ hasLoggedIn: true });
 
-    // 🔹 Basic payload
     const payload = {
       user_id: activeAccount.id || null,
       managerId: activeAccount.managerId || null,
@@ -898,7 +908,6 @@ const loginWithGoogle = async (req, res) => {
       selected: activeAccount.selected || null,
     };
 
-    // 🔹 Add manager details if the role is "user"
     if (role === "user" && account && account.teamManager) {
       payload.managerDetails = {
         id: account.teamManager.id,
