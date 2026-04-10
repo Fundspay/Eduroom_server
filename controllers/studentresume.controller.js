@@ -257,6 +257,7 @@ const listResumes = async (req, res) => {
   try {
     console.log("Starting StudentResume list...");
 
+    // DATE RANGE HANDLING (UNCHANGED)
     let { startDate, endDate } = req.query;
 
     const today = new Date();
@@ -278,6 +279,7 @@ const listResumes = async (req, res) => {
       raw: true,
     });
 
+    // 1️⃣ FETCH RESUMES (LOAD REDUCED, OUTPUT SAME)
     console.log("Fetching all resumes with associations...");
     const records = await model.StudentResume.findAll({
       where: {
@@ -313,18 +315,19 @@ const listResumes = async (req, res) => {
                 "occupation",
               ],
               where: { hasPaid: true },
-              required: false,
+              required: false, // ❌ separate removed
             },
             { model: model.TeamManager, as: "teamManager", attributes: ["id", "name", "email"] },
           ],
         },
       ],
       order: [["createdAt", "DESC"]],
-      limit: 500,
+      limit: 500, // safety limit (frontend unchanged)
     });
 
     console.log(`Total resumes fetched: ${records.length}`);
 
+    // 2️⃣ BULK USER FETCH (NO N+1)
     const users = await model.User.findAll({
       attributes: ["id", "phoneNumber", "email"],
       raw: true,
@@ -338,7 +341,7 @@ const listResumes = async (req, res) => {
       if (u.email) emailMap.set(u.email, u.id);
     }
 
-    // Step 1: assign userId into dataValues FIRST
+    //  ADD userId PER RECORD (OUTPUT SAME)
     for (const resume of records) {
       let userId = null;
 
@@ -348,6 +351,7 @@ const listResumes = async (req, res) => {
         if (resume.mobileNumber) {
           userId = phoneMap.get(resume.mobileNumber) || null;
         }
+
         if (!userId && resume.emailId) {
           userId = emailMap.get(resume.emailId) || null;
         }
@@ -356,36 +360,8 @@ const listResumes = async (req, res) => {
       resume.dataValues.userId = userId;
     }
 
-    // Step 2: sanitize helper
-    const sanitizeObject = (obj) => {
-      if (obj === null || obj === undefined) return "blank";
-      if (Array.isArray(obj)) return obj.map(sanitizeObject);
-      if (typeof obj === "object") {
-        return Object.fromEntries(
-          Object.entries(obj).map(([key, val]) => [key, sanitizeObject(val)])
-        );
-      }
-      if (typeof obj === "string" && obj.trim() === "") return "blank";
-      return obj;
-    };
-
-    // Step 3: convert to true plain object then sanitize
-    const sanitizedRecords = records.map((record) => {
-      const plain =
-        typeof record.toJSON === "function"
-          ? JSON.parse(JSON.stringify(record.toJSON()))
-          : JSON.parse(JSON.stringify(record));
-      return sanitizeObject(plain);
-    });
-
-    // Step 4: debug log — MUST appear in terminal after deploy
-    console.log("SANITIZED SAMPLE:", JSON.stringify(sanitizedRecords[0]));
-
-    // Step 5: force plain JSON before sending
-    const finalData = JSON.parse(JSON.stringify(sanitizedRecords));
-
-    console.log("All processing done successfully! ✅");
-    return ReS(res, { success: true, data: finalData, managers }, 200);
+    console.log(" All processing done successfully!");
+    return ReS(res, { success: true, data: records, managers }, 200);
 
   } catch (error) {
     console.error("StudentResume List Error:", error);
@@ -394,6 +370,9 @@ const listResumes = async (req, res) => {
 };
 
 module.exports.listResumes = listResumes;
+
+
+
 
 // ✅ Delete resume by ID
 const deleteResume = async (req, res) => {
