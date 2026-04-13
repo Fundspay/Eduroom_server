@@ -44,7 +44,8 @@ const addPersonalInfo = async (req, res) => {
       city,
       state,
       pinCode,
-      collegeName
+      collegeName,
+      userType,          // ✅ added
     } = req.body;
 
     // Required fields validation
@@ -86,20 +87,15 @@ const addPersonalInfo = async (req, res) => {
       fullName: fullName ? fullName.trim() : null,
       dateOfBirth: dateOfBirth || null,
       gender: gender || null,
-      alternatePhoneNumber: alternatePhoneNumber
-        ? alternatePhoneNumber.trim()
-        : null,
+      alternatePhoneNumber: alternatePhoneNumber ? alternatePhoneNumber.trim() : null,
       residentialAddress: residentialAddress ? residentialAddress.trim() : null,
-      emergencyContactName: emergencyContactName
-        ? emergencyContactName.trim()
-        : null,
-      emergencyContactNumber: emergencyContactNumber
-        ? emergencyContactNumber.trim()
-        : null,
+      emergencyContactName: emergencyContactName ? emergencyContactName.trim() : null,
+      emergencyContactNumber: emergencyContactNumber ? emergencyContactNumber.trim() : null,
       city: city ? city.trim() : null,
       state: state ? state.trim() : null,
       pinCode: pinCode ? pinCode.trim() : null,
-      collegeName: collegeName ? collegeName.trim() : null
+      collegeName: collegeName ? collegeName.trim() : null,
+      userType: userType ? userType.trim() : null,   // ✅ added
     });
 
     // ✅ Send welcome email after registration
@@ -107,23 +103,23 @@ const addPersonalInfo = async (req, res) => {
     const emailBody = `
   <p>Dear ${firstName} ${lastName},</p>
 
-  <p>Thank you for registering with <strong>Eduroom – India’s hands-on internship platform!</strong> 🎉</p>
+  <p>Thank you for registering with <strong>Eduroom – India's hands-on internship platform!</strong> 🎉</p>
 
   <p>
     You are now one step closer to gaining real-world exposure through structured learning, 
     case studies, live projects, and business tasks.
   </p>
 
-  <h3>What’s Next?</h3>
+  <h3>What's Next?</h3>
   <ul>
-    <li>✅ You’ll receive your internship domain details & schedule shortly</li>
+    <li>✅ You'll receive your internship domain details & schedule shortly</li>
     <li>✅ Get access to learning sessions, quizzes & assignments</li>
     <li>✅ Work on live tasks and build your portfolio</li>
     <li>✅ Earn your Internship Certificate (and unlock extended internship + placement opportunities)</li>
   </ul>
 
   <p>
-    We’re excited to have you onboard and can’t wait to see you grow with Eduroom! 🌟
+    We're excited to have you onboard and can't wait to see you grow with Eduroom! 🌟
   </p>
 
   <p>
@@ -132,12 +128,10 @@ const addPersonalInfo = async (req, res) => {
   </p>
 `;
 
-const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
-
+    const mailResult = await sendMail(normalizedEmail, emailSubject, emailBody);
 
     if (!mailResult.success) {
       console.error("Failed to send welcome email:", mailResult.error);
-      // Optional: you can still return success for registration even if email fails
     }
 
     return ReS(res, { success: true, userId: user.id }, 201);
@@ -642,6 +636,7 @@ const loginWithEmailPassword = async (req, res) => {
         phoneNumber: activeAccount.phoneNumber,
         internshipStatus: activeAccount.internshipStatus || null,
         selected: activeAccount.selected || null,
+        userType: activeAccount.userType || null, 
       };
 
       if (activeAccount.teamManager) {
@@ -906,6 +901,7 @@ const loginWithGoogle = async (req, res) => {
       pinCode: activeAccount.pinCode || null,
       internshipStatus: activeAccount.internshipStatus || null,
       selected: activeAccount.selected || null,
+      userType: activeAccount.userType || null, 
     };
 
     if (role === "user" && account && account.teamManager) {

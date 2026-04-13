@@ -84,6 +84,8 @@ module.exports = (sequelize, Sequelize) => {
       resetToken: { type: Sequelize.STRING, allowNull: true },
       resetTokenExpiry: { type: Sequelize.DATE, allowNull: true },
 
+      userType: { type: Sequelize.STRING, allowNull: true },
+
       // 🔹 Team Manager
       assignedTeamManager: { type: Sequelize.BIGINT, allowNull: true },
       lastLoginAt: { type: Sequelize.DATE, allowNull: true },
