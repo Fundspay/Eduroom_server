@@ -91,8 +91,9 @@ var updateCourse = async (req, res) => {
         managerPosition: req.body.managerPosition !== undefined ? req.body.managerPosition : course.managerPosition,
         // ✅ Only these 3 fixed
         followerTarget: (req.body.followerTarget !== undefined && req.body.followerTarget !== "" && !isNaN(req.body.followerTarget)) ? Number(req.body.followerTarget) : course.followerTarget,
-reviewAndRatingTarget: (req.body.reviewAndRatingTarget !== undefined && req.body.reviewAndRatingTarget !== "" && !isNaN(req.body.reviewAndRatingTarget)) ? Number(req.body.reviewAndRatingTarget) : course.reviewAndRatingTarget,
-postTarget: (req.body.postTarget !== undefined && req.body.postTarget !== "" && !isNaN(req.body.postTarget)) ? Number(req.body.postTarget) : course.postTarget
+        reviewAndRatingTarget: (req.body.reviewAndRatingTarget !== undefined && req.body.reviewAndRatingTarget !== "" && !isNaN(req.body.reviewAndRatingTarget)) ? Number(req.body.reviewAndRatingTarget) : course.reviewAndRatingTarget,
+        postTarget: (req.body.postTarget !== undefined && req.body.postTarget !== "" && !isNaN(req.body.postTarget)) ? Number(req.body.postTarget) : course.postTarget,
+        fundsWebTarget: (req.body.fundsWebTarget !== undefined && req.body.fundsWebTarget !== "" && !isNaN(req.body.fundsWebTarget)) ? Number(req.body.fundsWebTarget) : course.fundsWebTarget,  // ✅ added
       });
 
       // -----------------------------------------------------
@@ -267,23 +268,23 @@ module.exports.deleteCourse = deleteCourse;
 
 // ✅ Fetch all Courses by Domain ID
 var fetchCoursesByDomain = async (req, res) => {
-    const { domainId } = req.params;
-    if (!domainId) return ReE(res, "Domain ID is required", 400);
+  const { domainId } = req.params;
+  if (!domainId) return ReE(res, "Domain ID is required", 400);
 
-    try {
-        const domain = await model.Domain.findByPk(domainId);
-        if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
+  try {
+    const domain = await model.Domain.findByPk(domainId);
+    if (!domain || domain.isDeleted) return ReE(res, "Domain not found", 404);
 
-        const courses = await model.Course.findAll({
-            where: { domainId, isDeleted: false },
-            attributes: { exclude: ["createdAt", "updatedAt"] },
-            include: [{ model: model.Domain, attributes: ["name"] }],
-        });
+    const courses = await model.Course.findAll({
+      where: { domainId, isDeleted: false },
+      attributes: { exclude: ["createdAt", "updatedAt"] },
+      include: [{ model: model.Domain, attributes: ["name"] }],
+    });
 
-        return ReS(res, { success: true, data: courses }, 200);
-    } catch (error) {
-        return ReE(res, error.message, 500);
-    }
+    return ReS(res, { success: true, data: courses }, 200);
+  } catch (error) {
+    return ReE(res, error.message, 500);
+  }
 };
 module.exports.fetchCoursesByDomain = fetchCoursesByDomain;
 
