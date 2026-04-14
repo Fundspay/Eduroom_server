@@ -1151,7 +1151,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    const isFundsWebUser = user.userType === "fundsweb";
+    const isfundswebUser = user.userType === "fundsweb";
 
     // ✅ Fetch all Marketing records for this user
     const marketingRecords = await model.Marketing.findAll({
@@ -1315,17 +1315,17 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ FundsWeb target — achieved count per courseId
-      const fundsWebAchieved = user.fundsWebTargets?.[courseId] ?? null;
-      const fundsWebTarget = course.fundsWebTarget || 0;
-      const isFundsWebTargetMet = fundsWebTarget > 0 && fundsWebAchieved !== null && fundsWebAchieved >= fundsWebTarget;
+      // ✅ fundsweb target — achieved count per courseId
+      const fundswebAchieved = user.fundswebTargets?.[courseId] ?? null;
+      const fundswebTarget = course.fundswebTarget || 0;
+      const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       // ✅ Target met logic split by userType
-      const isBusinessTargetMet = isFundsWeb
-        ? isFundsWebTargetMet                                                                 // fundsweb_user — use fundsWebTarget
+      const isBusinessTargetMet = isfundsweb
+        ? isfundswebTargetMet                                                                 // fundsweb_user — use fundswebTarget
         : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget); // fundsaudit_user — existing logic
 
 
@@ -1376,7 +1376,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         if (courseId === "24") {
           overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
         } else if (allSessionsAboveThreshold && isBusinessTargetMet) {
-          // ✅ fundsweb_user — sessions + fundsWebTarget both must be met
+          // ✅ fundsweb_user — sessions + fundswebTarget both must be met
           // ✅ fundsaudit_user — sessions + businessTarget (existing behavior)
           overallStatus = "Completed";
         }
@@ -1428,10 +1428,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         offerMessage,
 
-        // ✅ FundsWeb target
-        fundsWebTarget,
-        fundsWebAchieved,
-        isFundsWebTargetMet,
+        // ✅ fundsweb target
+        fundswebTarget,
+        fundswebAchieved,
+        isfundswebTargetMet,
 
         // ✅ Follower target and achieved
         followerTarget,
@@ -1521,7 +1521,7 @@ const getBusinessTarget = async (req, res) => {
         }
       }
     } else if (user.userType === "fundsweb") {
-      // 🔹 FundsWeb internal endpoint
+      // 🔹 fundsweb internal endpoint
       if (user.phoneNumber) {
         try {
           const baseUrl = process.env.API_BASE_URL || "https://api.fundsweb.in";
@@ -1529,7 +1529,7 @@ const getBusinessTarget = async (req, res) => {
           const apiResponse = await axios.get(apiUrl);
           achievedCount = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
         } catch (apiError) {
-          console.warn("FundsWeb referral API error:", apiError.message);
+          console.warn("fundsweb referral API error:", apiError.message);
         }
       }
     } else {
@@ -1548,14 +1548,14 @@ const getBusinessTarget = async (req, res) => {
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
 
-    // 8️⃣ Store achievedCount in fundsWebTargets per courseId
-    const updatedFundsWebTargets = { ...(user.fundsWebTargets || {}) };
-    updatedFundsWebTargets[courseId] = achievedCount;
-    user.fundsWebTargets = updatedFundsWebTargets;
-    user.changed("fundsWebTargets", true);
+    // 8️⃣ Store achievedCount in fundswebTargets per courseId
+    const updatedfundswebTargets = { ...(user.fundswebTargets || {}) };
+    updatedfundswebTargets[courseId] = achievedCount;
+    user.fundswebTargets = updatedfundswebTargets;
+    user.changed("fundswebTargets", true);
 
     await user.save({
-      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundsWebTargets"],
+      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundswebTargets"],
     });
 
     // 9️⃣ Send response
@@ -1573,7 +1573,7 @@ const getBusinessTarget = async (req, res) => {
           subscriptionWallet,
           subscriptionLeft,
           businessTargets: user.businessTargets,
-          fundsWebTargets: user.fundsWebTargets,
+          fundswebTargets: user.fundswebTargets,
           startDate: user.courseDates?.[courseId]?.startDate || null,
           endDate: user.courseDates?.[courseId]?.endDate || null,
         },

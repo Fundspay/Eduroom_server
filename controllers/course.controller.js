@@ -74,7 +74,7 @@ var updateCourse = async (req, res) => {
       if (!course) return ReE(res, "Course not found", 404);
 
       console.log("req.body:", req.body);
-      console.log("fundsWebTarget received:", req.body.fundsWebTarget);
+      console.log("fundswebTarget received:", req.body.fundswebTarget);
 
       const oldBusinessTarget = course.businessTarget;
 
@@ -96,7 +96,7 @@ var updateCourse = async (req, res) => {
         followerTarget: (req.body.followerTarget !== undefined && req.body.followerTarget !== "" && !isNaN(req.body.followerTarget)) ? Number(req.body.followerTarget) : course.followerTarget,
         reviewAndRatingTarget: (req.body.reviewAndRatingTarget !== undefined && req.body.reviewAndRatingTarget !== "" && !isNaN(req.body.reviewAndRatingTarget)) ? Number(req.body.reviewAndRatingTarget) : course.reviewAndRatingTarget,
         postTarget: (req.body.postTarget !== undefined && req.body.postTarget !== "" && !isNaN(req.body.postTarget)) ? Number(req.body.postTarget) : course.postTarget,
-        fundsWebTarget: (req.body.fundsWebTarget !== undefined && req.body.fundsWebTarget !== "" && !isNaN(req.body.fundsWebTarget)) ? Number(req.body.fundsWebTarget) : course.fundsWebTarget,  // ✅ added
+        fundswebTarget: (req.body.fundswebTarget !== undefined && req.body.fundswebTarget !== "" && !isNaN(req.body.fundswebTarget)) ? Number(req.body.fundswebTarget) : course.fundswebTarget,  // ✅ added
       });
 
       // -----------------------------------------------------
@@ -221,11 +221,11 @@ const fetchAllCourses = async (req, res) => {
           heading: p.heading,
         }));
 
-      // ✅ FundsWeb targets per course
-      const fundsWebAchieved = user.fundsWebTargets?.[courseIdStr] ?? null;
-      const fundsWebDeducted = user.fundsWebDeductedTargets?.[courseIdStr] ?? null;
-      const fundsWebLeft = (fundsWebAchieved !== null && fundsWebDeducted !== null)
-        ? Math.max(0, fundsWebAchieved - fundsWebDeducted)
+      // ✅ fundsweb targets per course
+      const fundswebAchieved = user.fundswebTargets?.[courseIdStr] ?? null;
+      const fundswebDeducted = user.fundswebDeductedTargets?.[courseIdStr] ?? null;
+      const fundswebLeft = (fundswebAchieved !== null && fundswebDeducted !== null)
+        ? Math.max(0, fundswebAchieved - fundswebDeducted)
         : null;
 
       return {
@@ -235,9 +235,9 @@ const fetchAllCourses = async (req, res) => {
         status,
         userCreatedAt: user.createdAt,
         // ✅ added
-        fundsWebAchieved,
-        fundsWebDeducted,
-        fundsWebLeft,
+        fundswebAchieved,
+        fundswebDeducted,
+        fundswebLeft,
       };
     });
 

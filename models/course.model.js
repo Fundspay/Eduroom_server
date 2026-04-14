@@ -17,7 +17,7 @@ module.exports = (sequelize, Sequelize) => {
       
       description: { type: Sequelize.TEXT, allowNull: true },
       businessTarget: { type: Sequelize.STRING, allowNull: true },
-      fundsWebTarget: { type: Sequelize.INTEGER, allowNull: true }, 
+      fundswebTarget: { type: Sequelize.INTEGER, allowNull: true }, 
       totalDays: { type: Sequelize.INTEGER, allowNull: true },
       duration: { type: Sequelize.STRING, allowNull: true },
       certificateCount: { type: Sequelize.INTEGER, allowNull: true },

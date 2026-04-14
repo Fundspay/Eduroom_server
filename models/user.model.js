@@ -153,9 +153,9 @@ module.exports = (sequelize, Sequelize) => {
       // 🔹 Sequelize Defaults
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
-      // 🔹 FundsWeb Referral Targets
-      fundsWebTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
-      fundsWebDeductedTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} }
+      // 🔹 fundsweb Referral Targets
+      fundswebTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
+      fundswebDeductedTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} }
     },
     {
       tableName: "Users",
