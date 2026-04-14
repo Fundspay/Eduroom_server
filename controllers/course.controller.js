@@ -73,6 +73,9 @@ var updateCourse = async (req, res) => {
       const course = await model.Course.findByPk(req.params.id);
       if (!course) return ReE(res, "Course not found", 404);
 
+      console.log("req.body:", req.body);
+      console.log("fundsWebTarget received:", req.body.fundsWebTarget);
+
       const oldBusinessTarget = course.businessTarget;
 
       await course.update({
