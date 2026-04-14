@@ -58,6 +58,14 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }
     }
 
+    // 🔹 Check if certificate already exists
+    let certificate = await model.InternshipCertificate.findOne({
+      where: { userId, courseId },
+      transaction,
+    });
+
+    const alreadyIssued = certificate && certificate.isIssued;
+
     // 🔹 Get targets
     const userTargetObj = user.businessTargets?.[courseId];
     const businessTarget        = userTargetObj?.target !== undefined
@@ -77,21 +85,24 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const threeTargetsMet   = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
                               && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
 
-    if (!businessTargetMet && !threeTargetsMet) {
-      await transaction.rollback();
-      return res.status(400).json({
-        success: false,
-        message: "Insufficient subscription wallet. Neither business target nor the 3 marketing targets are met.",
-        wallet: {
-          totalSubscribed: subscriptionWallet,
-          totalDeducted: newDeductedWallet,
-          subscriptionLeft: newSubscriptionLeft,
-          businessTarget,
-          followerTarget,
-          reviewAndRatingTarget,
-          postTarget,
-        },
-      });
+    // 🔥 UPDATED: Skip wallet check if already issued
+    if (!alreadyIssued) {
+      if (!businessTargetMet && !threeTargetsMet) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient subscription wallet. Neither business target nor the 3 marketing targets are met.",
+          wallet: {
+            totalSubscribed: subscriptionWallet,
+            totalDeducted: newDeductedWallet,
+            subscriptionLeft: newSubscriptionLeft,
+            businessTarget,
+            followerTarget,
+            reviewAndRatingTarget,
+            postTarget,
+          },
+        });
+      }
     }
 
     // 🔹 Decide how much to deduct — businessTarget takes priority
@@ -100,12 +111,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
       : (followerTarget + reviewAndRatingTarget + postTarget);
 
     const deductionType = businessTargetMet ? "businessTarget" : "threeTargets";
-
-    // 🔹 Check if certificate already exists
-    let certificate = await model.InternshipCertificate.findOne({
-      where: { userId, courseId },
-      transaction,
-    });
 
     // 🔹 Deduct wallet only if first-time issuance
     if (!certificate) {
@@ -170,7 +175,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       success: true,
       message: "Internship Certificate generated and sent successfully",
       certificateUrl: certificateFile.fileUrl,
-      deductionType, // "businessTarget" or "threeTargets"
+      deductionType,
       wallet: {
         totalSubscribed: subscriptionWallet,
         deductionAmount,
