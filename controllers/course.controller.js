@@ -218,12 +218,23 @@ const fetchAllCourses = async (req, res) => {
           heading: p.heading,
         }));
 
+      // ✅ FundsWeb targets per course
+      const fundsWebAchieved = user.fundsWebTargets?.[courseIdStr] ?? null;
+      const fundsWebDeducted = user.fundsWebDeductedTargets?.[courseIdStr] ?? null;
+      const fundsWebLeft = (fundsWebAchieved !== null && fundsWebDeducted !== null)
+        ? Math.max(0, fundsWebAchieved - fundsWebDeducted)
+        : null;
+
       return {
         ...course.toJSON(),
         courseId: course.id,
         CoursePreviews: coursePreviews,
         status,
         userCreatedAt: user.createdAt,
+        // ✅ added
+        fundsWebAchieved,
+        fundsWebDeducted,
+        fundsWebLeft,
       };
     });
 
