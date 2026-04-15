@@ -26,6 +26,10 @@ module.exports = (sequelize, Sequelize) => {
             referralCode: { type: Sequelize.STRING, allowNull: true },
             pushto: { type: Sequelize.STRING, allowNull: true },
             pushComment: { type: Sequelize.STRING, allowNull: true },
+            smt1: { type: Sequelize.STRING, allowNull: true },
+            smt2: { type: Sequelize.STRING, allowNull: true },
+            smt3: { type: Sequelize.STRING, allowNull: true },
+            smt4: { type: Sequelize.STRING, allowNull: true },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
