@@ -1151,8 +1151,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    const isfundswebUser = user.userType === "fundsweb";
-
     // ✅ Fetch all Marketing records for this user
     const marketingRecords = await model.Marketing.findAll({
       where: { userId, isDeleted: false },
@@ -1315,19 +1313,11 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ fundsweb target — achieved count per courseId
-      const fundswebAchieved = user.fundswebTargets?.[courseId] ?? null;
-      const fundswebTarget = course.fundswebTarget || 0;
-      const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
-
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
-      // ✅ Target met logic split by userType
-      const isBusinessTargetMet = isfundsweb
-        ? isfundswebTargetMet                                                                 // fundsweb_user — use fundswebTarget
-        : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget); // fundsaudit_user — existing logic
-
+      const isBusinessTargetMet =
+        subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
       // ✅ Pull target values from Course model
       const followerTarget = course.followerTarget || 0;
@@ -1376,8 +1366,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         if (courseId === "24") {
           overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
         } else if (allSessionsAboveThreshold && isBusinessTargetMet) {
-          // ✅ fundsweb_user — sessions + fundswebTarget both must be met
-          // ✅ fundsaudit_user — sessions + businessTarget (existing behavior)
           overallStatus = "Completed";
         }
       }
@@ -1427,11 +1415,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         // Business target
         businessTarget,
         offerMessage,
-
-        // ✅ fundsweb target
-        fundswebTarget,
-        fundswebAchieved,
-        isfundswebTargetMet,
 
         // ✅ Follower target and achieved
         followerTarget,
@@ -1505,35 +1488,17 @@ const getBusinessTarget = async (req, res) => {
     const businessTarget = btEntry.target || 0;
     const offerMessage = btEntry.offerMessage || null;
 
-    // 5️⃣ Fetch referral count based on userType
+    // 5️⃣ Fetch referral count (same logic as before)
     let achievedCount = 0;
-
-    if (user.userType === "fundsaudit") {
-      // 🔹 Existing Lambda endpoint
-      if (user.referralCode) {
-        try {
-          const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
-          const apiResponse = await axios.get(apiUrl);
-          const registeredUsers = apiResponse.data?.registered_users || [];
-          achievedCount = registeredUsers.filter((u) => u.has_paid).length;
-        } catch (apiError) {
-          console.warn("FundsAudit referral API error:", apiError.message);
-        }
+    if (user.referralCode) {
+      try {
+        const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
+        const apiResponse = await axios.get(apiUrl);
+        const registeredUsers = apiResponse.data?.registered_users || [];
+        achievedCount = registeredUsers.filter((u) => u.has_paid).length;
+      } catch (apiError) {
+        console.warn("Referral API error:", apiError.message);
       }
-    } else if (user.userType === "fundsweb") {
-      // 🔹 fundsweb internal endpoint
-      if (user.phoneNumber) {
-        try {
-          const baseUrl = process.env.API_BASE_URL || "https://api.fundsweb.in";
-          const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${user.phoneNumber}`;
-          const apiResponse = await axios.get(apiUrl);
-          achievedCount = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
-        } catch (apiError) {
-          console.warn("fundsweb referral API error:", apiError.message);
-        }
-      }
-    } else {
-      console.warn(`⚠️ Unknown or missing userType for user ${user.id} — skipping referral fetch`);
     }
 
     // 6️⃣ Calculate wallet values
@@ -1543,22 +1508,19 @@ const getBusinessTarget = async (req, res) => {
     const subscriptionLeft = Math.max(subscriptionWallet - alreadyDeducted, 0);
 
     // 7️⃣ Update businessTargets JSON with target and offerMessage
-    normalizedBusinessTargets[courseId] = { target: businessTarget, offerMessage };
+    normalizedBusinessTargets[courseId] = {
+      target: businessTarget,
+      offerMessage,
+    };
     user.businessTargets = normalizedBusinessTargets;
     user.subscriptionWallet = subscriptionWallet;
     user.subscriptionLeft = subscriptionLeft;
 
-    // 8️⃣ Store achievedCount in fundswebTargets per courseId
-    const updatedfundswebTargets = { ...(user.fundswebTargets || {}) };
-    updatedfundswebTargets[courseId] = achievedCount;
-    user.fundswebTargets = updatedfundswebTargets;
-    user.changed("fundswebTargets", true);
-
     await user.save({
-      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundswebTargets"],
+      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft"],
     });
 
-    // 9️⃣ Send response
+    // 8️⃣ Send response
     return ReS(
       res,
       {
@@ -1568,12 +1530,11 @@ const getBusinessTarget = async (req, res) => {
           courseId,
           businessTarget,
           offerMessage,
-          achievedCount,
+          achievedCount: subscriptionWallet,
           totalDeducted: alreadyDeducted,
           subscriptionWallet,
           subscriptionLeft,
           businessTargets: user.businessTargets,
-          fundswebTargets: user.fundswebTargets,
           startDate: user.courseDates?.[courseId]?.startDate || null,
           endDate: user.courseDates?.[courseId]?.endDate || null,
         },
