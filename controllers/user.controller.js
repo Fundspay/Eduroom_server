@@ -1755,7 +1755,7 @@ var getReferralDataByPhone = async (req, res) => {
         for (const sub of paidSubscriptions) {
 
             // Find user by phone number
-            const user = await db.User.findOne({ where: { phoneNumber: sub.userPhone } });
+            const user = await model.User.findOne({ where: { phoneNumber: sub.userPhone } });
 
             if (!user) {
                 console.warn(`⚠️ No user found for phone: ${sub.userPhone}, skipping`);
@@ -1764,7 +1764,7 @@ var getReferralDataByPhone = async (req, res) => {
             }
 
             // Find their Status record
-            const statusRecord = await db.Status.findOne({ where: { userId: user.id } });
+            const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
             if (!statusRecord) {
                 console.warn(`⚠️ No Status record found for userId: ${user.id}, skipping`);
