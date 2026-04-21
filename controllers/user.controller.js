@@ -1725,45 +1725,81 @@ var getReferralDataByPhone = async (req, res) => {
             return ReE(res, "Phone number is required", 400);
         }
 
-        console.log("📞 Calling internal API with phone number:", phoneNumber);
-
         const baseUrl = process.env.API_BASE_URL || 'https://api.fundsweb.in';
-        const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${phoneNumber}`;
+        const apiUrl  = `${baseUrl}/api/v1/subscriptionpreview/referral/${phoneNumber}`;
 
+        let referralData = null;
+
+        // Step 1: Call fundsweb API
         try {
             const response = await axios.get(apiUrl);
-            console.log("✓ Internal API call successful");
-
-            return ReS(res, response.data, 200);
-
+            console.log("✓ Fundsweb API call successful");
+            referralData = response.data;
         } catch (apiError) {
-            // 🔥 DO NOT FAIL THE SERVER
-            console.warn("⚠️ Internal API failed, continuing without referral data");
-
+            console.warn("⚠️ Fundsweb API failed");
             if (apiError.response) {
                 console.warn("Status:", apiError.response.status);
                 console.warn("Message:", apiError.response.data);
             } else {
                 console.warn("Error:", apiError.message);
             }
-
-            // Return empty data + warning instead of error
-            return ReS(res, {
-                data: null,
-                warning: "Referral data not available"
-            }, 200);
+            return ReE(res, "Failed to fetch referral data", 500);
         }
 
+        const referrer          = referralData?.referrer || {};
+        const paidSubscriptions = referralData?.paidSubscriptionDetails || [];
+
+        const results = [];
+
+        // Step 2: Loop each entry in paidSubscriptionDetails
+        for (const sub of paidSubscriptions) {
+
+            // Find user by phone number
+            const user = await db.User.findOne({ where: { phoneNumber: sub.userPhone } });
+
+            if (!user) {
+                console.warn(`⚠️ No user found for phone: ${sub.userPhone}, skipping`);
+                results.push({ phone: sub.userPhone, status: "user not found, skipped" });
+                continue;
+            }
+
+            // Find their Status record
+            const statusRecord = await db.Status.findOne({ where: { userId: user.id } });
+
+            if (!statusRecord) {
+                console.warn(`⚠️ No Status record found for userId: ${user.id}, skipping`);
+                results.push({ phone: sub.userPhone, userId: user.id, status: "status record not found, skipped" });
+                continue;
+            }
+
+            // Upsert ONLY fundsweb fields — existing fields untouched
+            await statusRecord.update({
+                fundswebReferralCode:   referrer.referralCode   || null,
+                fundswebSubscriptionId: sub.subscriptionId      || null,
+                fundswebMonths:         sub.months              || null,
+                fundswebAmount:         sub.amount              || null,
+                fundswebStartDate:      sub.startDate           || null,
+                fundswebEndDate:        sub.endDate             || null,
+                fundswebPaymentStatus:  sub.paymentStatus       ?? null,
+                fundswebSubscribedAt:   sub.subscribedAt        || null,
+            });
+
+            console.log(`✓ Fundsweb fields upserted for userId: ${user.id}`);
+            results.push({ phone: sub.userPhone, userId: user.id, status: "updated" });
+        }
+
+        return ReS(res, {
+            message: "Fundsweb referral data processed successfully",
+            results,
+        }, 200);
+
     } catch (error) {
-        // Only catch truly unexpected server errors
         console.error("❌ Unexpected server error:", error.message);
         return ReE(res, "Server error", 500);
     }
 };
 
 module.exports.getReferralDataByPhone = getReferralDataByPhone;
-
-
 // ─────────────────────────────────────────────
 // POST /api/marketing/submit
 // Intern submits their marketing metrics for the current period
