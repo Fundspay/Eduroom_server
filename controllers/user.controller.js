@@ -1749,30 +1749,23 @@ var getReferralDataByPhone = async (req, res) => {
         const referrer          = referralData?.referrer || {};
         const paidSubscriptions = referralData?.paidSubscriptionDetails || [];
 
-        const results = [];
-
         // Step 2: Loop each entry in paidSubscriptionDetails
         for (const sub of paidSubscriptions) {
 
-            // Find user by phone number
             const user = await model.User.findOne({ where: { phoneNumber: sub.userPhone } });
 
             if (!user) {
                 console.warn(`⚠️ No user found for phone: ${sub.userPhone}, skipping`);
-                results.push({ phone: sub.userPhone, status: "user not found, skipped" });
                 continue;
             }
 
-            // Find their Status record
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
             if (!statusRecord) {
                 console.warn(`⚠️ No Status record found for userId: ${user.id}, skipping`);
-                results.push({ phone: sub.userPhone, userId: user.id, status: "status record not found, skipped" });
                 continue;
             }
 
-            // Upsert ONLY fundsweb fields — existing fields untouched
             await statusRecord.update({
                 fundswebReferralCode:   referrer.referralCode   || null,
                 fundswebSubscriptionId: sub.subscriptionId      || null,
@@ -1785,13 +1778,10 @@ var getReferralDataByPhone = async (req, res) => {
             });
 
             console.log(`✓ Fundsweb fields upserted for userId: ${user.id}`);
-            results.push({ phone: sub.userPhone, userId: user.id, status: "updated" });
         }
 
-        return ReS(res, {
-            message: "Fundsweb referral data processed successfully",
-            results,
-        }, 200);
+        // Return exact same fundsweb response as before
+        return ReS(res, referralData, 200);
 
     } catch (error) {
         console.error("❌ Unexpected server error:", error.message);
