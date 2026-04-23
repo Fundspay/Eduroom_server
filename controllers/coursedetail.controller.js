@@ -1312,9 +1312,11 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ Ensure fundsWebTarget is included like fetchAllCourses
       const fundswebTarget = course.fundsWebTarget || 0;
-      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;
+
+      // ✅ FIX HERE (string key)
+      const fundswebAchieved = user.fundsWebTargets?.[String(courseId)] ?? null;
+
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
@@ -1398,7 +1400,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         const cutoffDate = new Date("2025-12-10");
         if (!courseStartDateStr || new Date(courseStartDateStr) < cutoffDate) {
           overallStatus = "Completed";
-          console.log(`Special rule applied for user ${user.id}, Mobile App Development`);
         }
       }
 
@@ -1418,7 +1419,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         offerMessage,
 
-        // ✅ fundsweb added cleanly
         fundswebTarget,
         fundswebAchieved,
         isfundswebTargetMet,
