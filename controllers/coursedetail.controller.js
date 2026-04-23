@@ -1151,7 +1151,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    const isfundswebUser = user.userType === "fundsweb"; // ✅ FIXED (only one declaration)
+    const isfundswebUser = user.userType === "fundsweb";
 
     const marketingRecords = await model.Marketing.findAll({
       where: { userId, isDeleted: false },
@@ -1312,8 +1312,9 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;
+      // ✅ Ensure fundsWebTarget is included like fetchAllCourses
       const fundswebTarget = course.fundsWebTarget || 0;
+      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
@@ -1417,6 +1418,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         offerMessage,
 
+        // ✅ fundsweb added cleanly
         fundswebTarget,
         fundswebAchieved,
         isfundswebTargetMet,
