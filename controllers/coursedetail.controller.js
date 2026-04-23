@@ -1151,9 +1151,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    const isfundswebUser = user.userType === "fundsweb";
-
-    const isfundswebUser = user.userType === "fundsweb";
+    const isfundswebUser = user.userType === "fundsweb"; // ✅ FIXED (only one declaration)
 
     const marketingRecords = await model.Marketing.findAll({
       where: { userId, isDeleted: false },
@@ -1178,7 +1176,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       return sum + count;
     }, 0);
 
-    // ✅ FIXED: Normalize businessTargets with string keys
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
@@ -1311,21 +1308,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? (completedSessions / totalSessions) * 100
         : 0;
 
-      // ✅ FIXED: use String(courseId)
       const btEntry = normalizedBusinessTargets[String(courseId)] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ FundsWeb target — achieved count per courseId
-      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;       // ✅ fixed
-      const fundswebTarget = course.fundsWebTarget || 0;                        // ✅ fixed
+      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;
+      const fundswebTarget = course.fundsWebTarget || 0;
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
-      // ✅ Target met logic split by userType
-      const isBusinessTargetMet = isfundswebUser                               // ✅ fixed
+      const isBusinessTargetMet = isfundswebUser
         ? isfundswebTargetMet
         : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget);
 
@@ -1423,12 +1417,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         offerMessage,
 
-        // ✅ FundsWeb target
-        fundswebTarget,
-        fundswebAchieved,
-        isfundswebTargetMet,
-
-        // ✅ FundsWeb target
         fundswebTarget,
         fundswebAchieved,
         isfundswebTargetMet,
