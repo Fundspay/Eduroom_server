@@ -1151,12 +1151,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     await user.reload();
 
-    // ✅ Fetch all Marketing records for this user
     const marketingRecords = await model.Marketing.findAll({
       where: { userId, isDeleted: false },
     });
 
-    // ✅ Only count verified Marketing records
     const verifiedRecords = marketingRecords.filter(m => m.isVerified === "verified");
 
     const achievedFollowers = verifiedRecords.reduce((sum, m) => {
@@ -1176,11 +1174,12 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       return sum + count;
     }, 0);
 
-    // Normalize businessTargets
+    // ✅ FIXED: Normalize businessTargets with string keys
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
-        normalizedBusinessTargets[courseId] =
+        const key = String(courseId);
+        normalizedBusinessTargets[key] =
           typeof val === "number" ? { target: val, offerMessage: null } : val;
       }
     }
@@ -1218,7 +1217,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
-      // Remove duplicate sessionNumbers per day
       const uniqueSessions = [];
       const seenKeys = new Set();
       for (const s of sessions) {
@@ -1309,7 +1307,8 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? (completedSessions / totalSessions) * 100
         : 0;
 
-      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
+      // ✅ FIXED: use String(courseId)
+      const btEntry = normalizedBusinessTargets[String(courseId)] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
@@ -1319,12 +1318,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const isBusinessTargetMet =
         subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget;
 
-      // ✅ Pull target values from Course model
       const followerTarget = course.followerTarget || 0;
       const reviewAndRatingTarget = course.reviewAndRatingTarget || 0;
       const postTarget = course.postTarget || 0;
 
-      // ✅ Check if each marketing target is met
       const isFollowerTargetMet = followerTarget > 0 && achievedFollowers >= followerTarget;
       const isReviewAndRatingTargetMet = reviewAndRatingTarget > 0 && achievedReviewAndRating >= reviewAndRatingTarget;
       const isPostTargetMet = postTarget > 0 && achievedPosts >= postTarget;
@@ -1412,21 +1409,17 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         courseName: course.name,
         domainName: course.Domain?.name || null,
 
-        // Business target
         businessTarget,
         offerMessage,
 
-        // ✅ Follower target and achieved
         followerTarget,
         achievedFollowers,
         isFollowerTargetMet,
 
-        // ✅ Review & Rating target and achieved
         reviewAndRatingTarget,
         achievedReviewAndRating,
         isReviewAndRatingTargetMet,
 
-        // ✅ Post target and achieved
         postTarget,
         achievedPosts,
         isPostTargetMet,
