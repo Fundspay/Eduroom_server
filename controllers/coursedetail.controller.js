@@ -1312,10 +1312,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      const fundswebTarget = course.fundsWebTarget || 0;
+      const fundswebTarget = course.fundswebTarget || 0;
 
       // ✅ FIX HERE (string key)
-      const fundswebAchieved = user.fundsWebTargets?.[String(courseId)] ?? null;
+      const fundswebAchieved = user.fundswebTargets?.[String(courseId)] ?? null;
 
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
