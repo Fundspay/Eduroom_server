@@ -1315,19 +1315,18 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ fundsweb target — achieved count per courseId
-      const fundswebAchieved = user.fundswebTargets?.[courseId] ?? null;
-      const fundswebTarget = course.fundswebTarget || 0;
+      // ✅ FundsWeb target — achieved count per courseId
+      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;       // ✅ fixed
+      const fundswebTarget = course.fundsWebTarget || 0;                        // ✅ fixed
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
       // ✅ Target met logic split by userType
-      const isBusinessTargetMet = isfundsweb
-        ? isfundswebTargetMet                                                                 // fundsweb_user — use fundswebTarget
-        : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget); // fundsaudit_user — existing logic
-
+      const isBusinessTargetMet = isfundswebUser                               // ✅ fixed
+        ? isfundswebTargetMet
+        : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget);
 
       // ✅ Pull target values from Course model
       const followerTarget = course.followerTarget || 0;
@@ -1376,8 +1375,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         if (courseId === "24") {
           overallStatus = isBusinessTargetMet ? "Completed" : "In Progress";
         } else if (allSessionsAboveThreshold && isBusinessTargetMet) {
-          // ✅ fundsweb_user — sessions + fundswebTarget both must be met
-          // ✅ fundsaudit_user — sessions + businessTarget (existing behavior)
           overallStatus = "Completed";
         }
       }
@@ -1428,7 +1425,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         businessTarget,
         offerMessage,
 
-        // ✅ fundsweb target
+        // ✅ FundsWeb target
         fundswebTarget,
         fundswebAchieved,
         isfundswebTargetMet,
