@@ -118,7 +118,7 @@ var updateStatus = async function (req, res) {
 
         const oldTeamManager = status.teamManager;
 
-        // 📝 Update the fields
+        // 📝 Update all fields freely (including smt1-4, pushto, pushComment)
         await status.update(req.body);
         await status.reload();
 
@@ -135,60 +135,40 @@ var updateStatus = async function (req, res) {
                 let html = "";
 
                 if (isFirstAssignment) {
-                    // 🟢 First Time Assignment Mail
                     subject = `Your Team Manager Has Been Assigned`;
-
                     html = `
                         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                             <p>Dear <strong>${status.userName}</strong>,</p>
-
                             <p>We are pleased to inform you that <strong>${manager.name}</strong> has been assigned as your <strong>Team Manager</strong>.</p>
-
                             <p>You can reach out to your Team Manager for any queries, doubts, or guidance during your internship.</p>
-
                             <ul>
                                 <li><strong>Email:</strong> ${manager.email}</li>
                                 <li><strong>Phone:</strong> ${manager.mobileNumber}</li>
                             </ul>
-
                             <p>If your Team Manager is not available, please contact our <strong>HR Support 8446874534</strong>.</p>
-
                             <p>Welcome again to <strong>EduRoom</strong>!</p>
-
-                            <p>Best regards,<br>
-                            <strong>EduRoom HR Team</strong></p>
+                            <p>Best regards,<br><strong>EduRoom HR Team</strong></p>
                         </div>
                     `;
                 } else {
-                    // 🔵 Manager Changed Mail
                     subject = `Your Team Manager Has Been Updated`;
-
                     html = `
                         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                             <p>Dear <strong>${status.userName}</strong>,</p>
-
                             <p>We wanted to let you know that your <strong>Team Manager</strong> has been updated.</p>
-
                             <p>Your new Team Manager is <strong>${manager.name}</strong>.</p>
-
                             <p>You can contact them for any internship-related doubts or queries:</p>
-
                             <ul>
                                 <li><strong>Email:</strong> ${manager.email}</li>
                                 <li><strong>Phone:</strong> ${manager.mobileNumber}</li>
                             </ul>
-
                             <p>If your Team Manager is not available, please reach out to our <strong>HR Support 8446874534</strong>.</p>
-
                             <p>Thank you for your understanding and cooperation.</p>
-
-                            <p>Warm regards,<br>
-                            <strong>EduRoom HR Team</strong></p>
+                            <p>Warm regards,<br><strong>EduRoom HR Team</strong></p>
                         </div>
                     `;
                 }
 
-                // ✉️ Send the email
                 await sendMail(status.email, subject, html);
                 console.log(`📩 Mail sent to ${status.email} — ${isFirstAssignment ? "assigned" : "updated"} manager ${manager.name}`);
             }
@@ -202,3 +182,99 @@ var updateStatus = async function (req, res) {
 };
 
 module.exports.updateStatus = updateStatus;
+
+
+var listAllFundsweb = async function (req, res) {
+    try {
+        let { monthYear, startDate, endDate } = req.query;
+
+        let monthStart = null;
+        let monthEnd = null;
+        let customStart = null;
+        let customEnd = null;
+
+        // ===============================================
+        // 1️⃣ MONTH FILTER (existing logic)
+        // ===============================================
+        if (monthYear) {
+            const [monthName, yearStr] = monthYear.split(" ");
+            const monthIndex = monthMap[monthName];
+            const year = parseInt(yearStr);
+
+            if (!isNaN(monthIndex) && !isNaN(year)) {
+                monthStart = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0));
+                monthEnd = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0));
+            }
+        }
+
+        // ===============================================
+        // 2️⃣ CUSTOM DATE RANGE FILTER (NEW)
+        // ===============================================
+        if (startDate && endDate) {
+            customStart = new Date(startDate);
+            customEnd = new Date(endDate);
+
+            // Make endDate inclusive
+            customEnd.setDate(customEnd.getDate() + 1);
+        }
+
+        // ===============================================
+        // 3️⃣ DEFAULT — CURRENT MONTH when NOTHING passed
+        // ===============================================
+        if (!monthYear && !startDate && !endDate) {
+            const now = new Date();
+            const year = now.getUTCFullYear();
+            const month = now.getUTCMonth(); // 0–11
+
+            monthStart = new Date(Date.UTC(year, month, 1, 0, 0, 0));
+            monthEnd = new Date(Date.UTC(year, month + 1, 1, 0, 0, 0));
+        }
+
+        // ===============================================
+        // WHERE CONDITION (priority: custom > month)
+        // ===============================================
+        const statusWhere = { isDeleted: false };
+
+        if (customStart && customEnd) {
+            statusWhere.registeredAt = {
+                [Op.gte]: customStart,
+                [Op.lt]: customEnd
+            };
+        } else if (monthStart && monthEnd) {
+            statusWhere.registeredAt = {
+                [Op.gte]: monthStart,
+                [Op.lt]: monthEnd
+            };
+        }
+
+        // ===============================================
+        const statuses = await model.Status.findAll({
+            where: statusWhere,
+            order: [["registeredAt", "DESC"]] // latest first
+        });
+
+        const totalStudents = await model.Status.count({
+            where: { isDeleted: false }
+        });
+
+        const allTeamManagers = await model.TeamManager.findAll({
+            where: { isDeleted: false },
+            attributes: ["id", "managerId", "name", "email", "mobileNumber", "department", "position", "internshipStatus"]
+        });
+
+        return ReS(res, {
+            success: true,
+            data: statuses,
+            totalStudents,
+            teamManagers: {
+                total: allTeamManagers.length,
+                list: allTeamManagers
+            }
+        }, 200);
+
+    } catch (error) {
+        return ReE(res, error.message, 500);
+    }
+};
+
+module.exports.listAllFundsweb = listAllFundsweb;
