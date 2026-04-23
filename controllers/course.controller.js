@@ -24,7 +24,8 @@ var addCourse = async (req, res) => {
       managerPosition,
       followerTarget,
       reviewAndRatingTarget,
-      postTarget
+      postTarget,
+      fundswebTarget,       // ✅ added
     } = req.body;
 
     if (!name) return ReE(res, "Course name is required", 400);
@@ -48,10 +49,10 @@ var addCourse = async (req, res) => {
         interpersonalSkills: interpersonalSkills || null,
         managerName: managerName || null,
         managerPosition: managerPosition || null,
-        // ✅ Only these 3 fixed
         followerTarget: followerTarget ? Number(followerTarget) : null,
         reviewAndRatingTarget: reviewAndRatingTarget ? Number(reviewAndRatingTarget) : null,
-        postTarget: postTarget ? Number(postTarget) : null
+        postTarget: postTarget ? Number(postTarget) : null,
+        fundswebTarget: fundswebTarget ? Number(fundswebTarget) : null,   // ✅ added
       });
 
       return ReS(res, course, 201);

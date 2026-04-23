@@ -66,8 +66,112 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     const alreadyIssued = certificate && certificate.isIssued;
 
+    // ─────────────────────────────────────────────
+    // 🔹 fundsweb USER PATH
+    // ─────────────────────────────────────────────
+    if (user.userType === "fundsweb") {
+
+      const fundswebTarget   = parseInt(course?.fundswebTarget || 0, 10);
+      const fundswebAchieved = parseInt(user.fundswebTargets?.[courseId] ?? 0, 10);
+      const fundswebDeducted = parseInt(user.fundswebDeductedTargets?.[courseId] ?? 0, 10);
+      const fundswebLeft     = Math.max(0, fundswebAchieved - fundswebDeducted);
+      const fundswebTargetMet = fundswebTarget > 0 && fundswebLeft >= fundswebTarget;
+
+      // 🔥 Skip wallet check if already issued
+      if (!alreadyIssued) {
+        if (!fundswebTargetMet) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: "fundsweb subscription target not met for this course.",
+            wallet: {
+              fundswebAchieved,
+              fundswebDeducted,
+              fundswebLeft,
+              fundswebTarget,
+            },
+          });
+        }
+      }
+
+      // 🔹 Deduct only on first-time issuance
+      if (!certificate) {
+        const updatedfundswebDeducted = { ...(user.fundswebDeductedTargets || {}) };
+        updatedfundswebDeducted[courseId] = fundswebDeducted + fundswebTarget;
+        user.fundswebDeductedTargets = updatedfundswebDeducted;
+        user.changed("fundswebDeductedTargets", true);
+
+        await user.save({
+          fields: ["fundswebDeductedTargets"],
+          transaction,
+        });
+      }
+
+      // 🔹 Generate certificate
+      const certificateFile = await generateInternshipCertificate(userId, courseId);
+      if (!certificateFile?.fileUrl) {
+        await transaction.rollback();
+        return res.status(500).json({
+          success: false,
+          message: "Certificate generation failed: fileUrl is missing",
+        });
+      }
+
+      // 🔹 Save or update certificate
+      if (certificate) {
+        certificate.certificateUrl = certificateFile.fileUrl;
+        certificate.isIssued       = true;
+        certificate.issuedDate     = new Date();
+        await certificate.save({ transaction });
+      } else {
+        certificate = await model.InternshipCertificate.create(
+          {
+            userId,
+            courseId,
+            certificateUrl: certificateFile.fileUrl,
+            isIssued:       true,
+            issuedDate:     new Date(),
+            deductedWallet: fundswebTarget,
+          },
+          { transaction }
+        );
+      }
+
+      // 🔹 Send email
+      const subject = `Your Internship Certificate - ${course.name}`;
+      const html = `
+        <p>Dear ${user.fullName || user.firstName},</p>
+        <p>Here is your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
+        <p>Access it here:</p>
+        <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
+        <p>Congratulations on your achievement!</p>
+        <br/>
+        <p>Best Regards,<br/>${course.name} Team</p>
+      `;
+      await sendMail(user.email, subject, html);
+
+      await transaction.commit();
+
+      return res.status(200).json({
+        success: true,
+        message: "Internship Certificate generated and sent successfully",
+        certificateUrl: certificateFile.fileUrl,
+        deductionType: "fundswebTarget",
+        wallet: {
+          fundswebAchieved,
+          fundswebDeducted: fundswebDeducted + fundswebTarget,
+          fundswebLeft: fundswebLeft - fundswebTarget,
+          fundswebTarget,
+        },
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // 🔹 FUNDSAUDIT USER PATH — existing logic, untouched
+    // ─────────────────────────────────────────────
+
     // 🔹 Get targets
-    const userTargetObj = user.businessTargets?.[courseId];
+    const userTargetObj         = user.businessTargets?.[courseId];
     const businessTarget        = userTargetObj?.target !== undefined
       ? parseInt(userTargetObj.target, 10)
       : parseInt(course?.businessTarget || 0, 10);
@@ -85,7 +189,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const threeTargetsMet   = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
                               && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
 
-    // 🔥 UPDATED: Skip wallet check if already issued
+    // 🔥 Skip wallet check if already issued
     if (!alreadyIssued) {
       if (!businessTargetMet && !threeTargetsMet) {
         await transaction.rollback();
@@ -391,30 +495,30 @@ module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
 //     const followerTarget        = parseInt(course?.followerTarget || 0, 10);
 //     const reviewAndRatingTarget = parseInt(course?.reviewAndRatingTarget || 0, 10);
 //     const postTarget            = parseInt(course?.postTarget || 0, 10);
-//     const fundsWebTarget        = parseInt(course?.fundsWebTarget || 0, 10);   // ✅
+//     const fundswebTarget        = parseInt(course?.fundswebTarget || 0, 10);   // ✅
 
-//     const isFundsWebUser    = user.userType === "fundsweb";
+//     const isfundswebUser    = user.userType === "fundsweb";
 //     const isFundsAuditUser  = user.userType === "fundsaudit";
 
 //     // ─────────────────────────────────────────────
-//     // 🔹 FUNDSWEB USER PATH
+//     // 🔹 fundsweb USER PATH
 //     // ─────────────────────────────────────────────
-//     if (isFundsWebUser) {
-//       const fundsWebAchieved   = parseInt(user.fundsWebTargets?.[courseId] ?? 0, 10);
-//       const fundsWebDeducted   = parseInt(user.fundsWebDeductedTargets?.[courseId] ?? 0, 10);
-//       const fundsWebLeft       = Math.max(0, fundsWebAchieved - fundsWebDeducted);
-//       const fundsWebTargetMet  = fundsWebTarget > 0 && fundsWebLeft >= fundsWebTarget;
+//     if (isfundswebUser) {
+//       const fundswebAchieved   = parseInt(user.fundswebTargets?.[courseId] ?? 0, 10);
+//       const fundswebDeducted   = parseInt(user.fundswebDeductedTargets?.[courseId] ?? 0, 10);
+//       const fundswebLeft       = Math.max(0, fundswebAchieved - fundswebDeducted);
+//       const fundswebTargetMet  = fundswebTarget > 0 && fundswebLeft >= fundswebTarget;
 
-//       if (!fundsWebTargetMet) {
+//       if (!fundswebTargetMet) {
 //         await transaction.rollback();
 //         return res.status(400).json({
 //           success: false,
-//           message: "FundsWeb subscription target not met for this course.",
+//           message: "fundsweb subscription target not met for this course.",
 //           wallet: {
-//             fundsWebAchieved,
-//             fundsWebDeducted,
-//             fundsWebLeft,
-//             fundsWebTarget,
+//             fundswebAchieved,
+//             fundswebDeducted,
+//             fundswebLeft,
+//             fundswebTarget,
 //           },
 //         });
 //       }
@@ -427,13 +531,13 @@ module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
 
 //       // 🔹 Deduct only on first-time issuance
 //       if (!certificate) {
-//         const updatedFundsWebDeducted = { ...(user.fundsWebDeductedTargets || {}) };
-//         updatedFundsWebDeducted[courseId] = fundsWebDeducted + fundsWebTarget;
-//         user.fundsWebDeductedTargets = updatedFundsWebDeducted;
-//         user.changed("fundsWebDeductedTargets", true);
+//         const updatedfundswebDeducted = { ...(user.fundswebDeductedTargets || {}) };
+//         updatedfundswebDeducted[courseId] = fundswebDeducted + fundswebTarget;
+//         user.fundswebDeductedTargets = updatedfundswebDeducted;
+//         user.changed("fundswebDeductedTargets", true);
 
 //         await user.save({
-//           fields: ["fundsWebDeductedTargets"],
+//           fields: ["fundswebDeductedTargets"],
 //           transaction,
 //         });
 //       }
@@ -462,7 +566,7 @@ module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
 //             certificateUrl: certificateFile.fileUrl,
 //             isIssued:       true,
 //             issuedDate:     new Date(),
-//             deductedWallet: fundsWebTarget,
+//             deductedWallet: fundswebTarget,
 //           },
 //           { transaction }
 //         );
@@ -487,12 +591,12 @@ module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
 //         success: true,
 //         message: "Internship Certificate generated and sent successfully",
 //         certificateUrl: certificateFile.fileUrl,
-//         deductionType: "fundsWebTarget",
+//         deductionType: "fundswebTarget",
 //         wallet: {
-//           fundsWebAchieved,
-//           fundsWebDeducted: fundsWebDeducted + fundsWebTarget,
-//           fundsWebLeft: fundsWebLeft - fundsWebTarget,
-//           fundsWebTarget,
+//           fundswebAchieved,
+//           fundswebDeducted: fundswebDeducted + fundswebTarget,
+//           fundswebLeft: fundswebLeft - fundswebTarget,
+//           fundswebTarget,
 //         },
 //       });
 //     }
