@@ -659,7 +659,7 @@ const sendJDToCollege = async (req, res) => {
       }
 
       const jdFile = await s3
-        .getObject({ Bucket: "fundsroomhr", Key: jdKey })
+        .getObject({ Bucket: "1fundsroomhr", Key: jdKey })
         .promise();
 
       form.append("file", jdFile.Body, {

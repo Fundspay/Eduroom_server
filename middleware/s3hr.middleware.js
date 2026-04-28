@@ -25,13 +25,13 @@ const buildS3Storage = (pathPrefix) =>
 
 // ✅ Profile Picture Upload
 const uploadProfilePicture = multer({
-  storage: buildS3Storage("fundsroomhr/profile"),
+  storage: buildS3Storage("1fundsroomhr/profile"),
   limits: { fileSize: 10 * 1024 * 1024 }, // Optional: 10MB limit
 });
 
 // ✅ General File Upload
 const uploadGeneralFile = multer({
-  storage: buildS3Storage("fundsweb/uploads"),
+  storage: buildS3Storage("1fundsweb/uploads"),
   limits: { fileSize: 50 * 1024 * 1024 }, // Optional: 50MB limit
 });
 
