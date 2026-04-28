@@ -1153,12 +1153,10 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
 
     const isfundswebUser = user.userType === "fundsweb";
 
-    // ✅ Fetch all Marketing records for this user
     const marketingRecords = await model.Marketing.findAll({
       where: { userId, isDeleted: false },
     });
 
-    // ✅ Only count verified Marketing records
     const verifiedRecords = marketingRecords.filter(m => m.isVerified === "verified");
 
     const achievedFollowers = verifiedRecords.reduce((sum, m) => {
@@ -1178,11 +1176,11 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       return sum + count;
     }, 0);
 
-    // Normalize businessTargets
     const normalizedBusinessTargets = {};
     if (user.businessTargets) {
       for (const [courseId, val] of Object.entries(user.businessTargets)) {
-        normalizedBusinessTargets[courseId] =
+        const key = String(courseId);
+        normalizedBusinessTargets[key] =
           typeof val === "number" ? { target: val, offerMessage: null } : val;
       }
     }
@@ -1220,7 +1218,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         order: [["day", "ASC"], ["sessionNumber", "ASC"]],
       });
 
-      // Remove duplicate sessionNumbers per day
       const uniqueSessions = [];
       const seenKeys = new Set();
       for (const s of sessions) {
@@ -1311,29 +1308,28 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         ? (completedSessions / totalSessions) * 100
         : 0;
 
-      const btEntry = normalizedBusinessTargets[courseId] || { target: 0, offerMessage: null };
+      const btEntry = normalizedBusinessTargets[String(courseId)] || { target: 0, offerMessage: null };
       const businessTarget = btEntry.target || 0;
       const offerMessage = btEntry.offerMessage || null;
 
-      // ✅ FundsWeb target — achieved count per courseId
-      const fundswebAchieved = user.fundsWebTargets?.[courseId] ?? null;       // ✅ fixed
-      const fundswebTarget = course.fundsWebTarget || 0;                        // ✅ fixed
+      const fundswebTarget = course.fundswebTarget || 0;
+
+      // ✅ FIX HERE (string key)
+      const fundswebAchieved = user.fundswebTargets?.[String(courseId)] ?? null;
+
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
       const subscriptionWallet = user.subscriptionWallet || 0;
       const subscriptiondeductedWallet = user.subscriptiondeductedWallet || 0;
 
-      // ✅ Target met logic split by userType
-      const isBusinessTargetMet = isfundswebUser                               // ✅ fixed
+      const isBusinessTargetMet = isfundswebUser
         ? isfundswebTargetMet
         : (subscriptionWallet >= businessTarget || subscriptiondeductedWallet >= businessTarget);
 
-      // ✅ Pull target values from Course model
       const followerTarget = course.followerTarget || 0;
       const reviewAndRatingTarget = course.reviewAndRatingTarget || 0;
       const postTarget = course.postTarget || 0;
 
-      // ✅ Check if each marketing target is met
       const isFollowerTargetMet = followerTarget > 0 && achievedFollowers >= followerTarget;
       const isReviewAndRatingTargetMet = reviewAndRatingTarget > 0 && achievedReviewAndRating >= reviewAndRatingTarget;
       const isPostTargetMet = postTarget > 0 && achievedPosts >= postTarget;
@@ -1404,7 +1400,6 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         const cutoffDate = new Date("2025-12-10");
         if (!courseStartDateStr || new Date(courseStartDateStr) < cutoffDate) {
           overallStatus = "Completed";
-          console.log(`Special rule applied for user ${user.id}, Mobile App Development`);
         }
       }
 
@@ -1421,26 +1416,21 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
         courseName: course.name,
         domainName: course.Domain?.name || null,
 
-        // Business target
         businessTarget,
         offerMessage,
 
-        // ✅ FundsWeb target
         fundswebTarget,
         fundswebAchieved,
         isfundswebTargetMet,
 
-        // ✅ Follower target and achieved
         followerTarget,
         achievedFollowers,
         isFollowerTargetMet,
 
-        // ✅ Review & Rating target and achieved
         reviewAndRatingTarget,
         achievedReviewAndRating,
         isReviewAndRatingTargetMet,
 
-        // ✅ Post target and achieved
         postTarget,
         achievedPosts,
         isPostTargetMet,
