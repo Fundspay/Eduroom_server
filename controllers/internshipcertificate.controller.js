@@ -67,28 +67,28 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const alreadyIssued = certificate && certificate.isIssued;
 
     // ─────────────────────────────────────────────
-    // 🔹 fundsweb USER PATH
+    // 🔹 FUNDSWEB USER PATH
     // ─────────────────────────────────────────────
     if (user.userType === "fundsweb") {
 
-      const fundswebTarget   = parseInt(course?.fundswebTarget || 0, 10);
-      const fundswebAchieved = parseInt(user.fundswebTargets?.[courseId] ?? 0, 10);
-      const fundswebDeducted = parseInt(user.fundswebDeductedTargets?.[courseId] ?? 0, 10);
-      const fundswebLeft     = Math.max(0, fundswebAchieved - fundswebDeducted);
-      const fundswebTargetMet = fundswebTarget > 0 && fundswebLeft >= fundswebTarget;
+      const fundsWebTarget   = parseInt(course?.fundsWebTarget || 0, 10);
+      const fundsWebAchieved = parseInt(user.fundsWebTargets?.[courseId] ?? 0, 10);
+      const fundsWebDeducted = parseInt(user.fundsWebDeductedTargets?.[courseId] ?? 0, 10);
+      const fundsWebLeft     = Math.max(0, fundsWebAchieved - fundsWebDeducted);
+      const fundsWebTargetMet = fundsWebTarget > 0 && fundsWebLeft >= fundsWebTarget;
 
       // 🔥 Skip wallet check if already issued
       if (!alreadyIssued) {
-        if (!fundswebTargetMet) {
+        if (!fundsWebTargetMet) {
           await transaction.rollback();
           return res.status(400).json({
             success: false,
-            message: "fundsweb subscription target not met for this course.",
+            message: "FundsWeb subscription target not met for this course.",
             wallet: {
-              fundswebAchieved,
-              fundswebDeducted,
-              fundswebLeft,
-              fundswebTarget,
+              fundsWebAchieved,
+              fundsWebDeducted,
+              fundsWebLeft,
+              fundsWebTarget,
             },
           });
         }
@@ -96,13 +96,13 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
       // 🔹 Deduct only on first-time issuance
       if (!certificate) {
-        const updatedfundswebDeducted = { ...(user.fundswebDeductedTargets || {}) };
-        updatedfundswebDeducted[courseId] = fundswebDeducted + fundswebTarget;
-        user.fundswebDeductedTargets = updatedfundswebDeducted;
-        user.changed("fundswebDeductedTargets", true);
+        const updatedFundsWebDeducted = { ...(user.fundsWebDeductedTargets || {}) };
+        updatedFundsWebDeducted[courseId] = fundsWebDeducted + fundsWebTarget;
+        user.fundsWebDeductedTargets = updatedFundsWebDeducted;
+        user.changed("fundsWebDeductedTargets", true);
 
         await user.save({
-          fields: ["fundswebDeductedTargets"],
+          fields: ["fundsWebDeductedTargets"],
           transaction,
         });
       }
@@ -131,7 +131,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
             certificateUrl: certificateFile.fileUrl,
             isIssued:       true,
             issuedDate:     new Date(),
-            deductedWallet: fundswebTarget,
+            deductedWallet: fundsWebTarget,
           },
           { transaction }
         );
@@ -156,18 +156,18 @@ const createAndSendInternshipCertificate = async (req, res) => {
         success: true,
         message: "Internship Certificate generated and sent successfully",
         certificateUrl: certificateFile.fileUrl,
-        deductionType: "fundswebTarget",
+        deductionType: "fundsWebTarget",
         wallet: {
-          fundswebAchieved,
-          fundswebDeducted: fundswebDeducted + fundswebTarget,
-          fundswebLeft: fundswebLeft - fundswebTarget,
-          fundswebTarget,
+          fundsWebAchieved,
+          fundsWebDeducted: fundsWebDeducted + fundsWebTarget,
+          fundsWebLeft: fundsWebLeft - fundsWebTarget,
+          fundsWebTarget,
         },
       });
     }
 
     // ─────────────────────────────────────────────
-    // 🔹 FUNDSAUDIT USER PATH — existing logic, untouched
+    // 🔹 FUNDSAUDIT USER PATH — existing logic
     // ─────────────────────────────────────────────
 
     // 🔹 Get targets
@@ -184,10 +184,13 @@ const createAndSendInternshipCertificate = async (req, res) => {
     let newDeductedWallet    = parseInt(user.subscriptiondeductedWallet || 0, 10);
     let newSubscriptionLeft  = Math.max(0, subscriptionWallet - newDeductedWallet);
 
-    // 🔹 Check which path qualifies
-    const businessTargetMet = newSubscriptionLeft >= businessTarget && businessTarget > 0;
-    const threeTargetsMet   = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
-                              && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
+    // 🔹 Check which path qualifies ✅ fixed null businessTarget
+    const businessTargetMet = businessTarget !== null && businessTarget > 0
+      ? newSubscriptionLeft >= businessTarget
+      : newSubscriptionLeft > 0;
+
+    const threeTargetsMet = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
+      && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
 
     // 🔥 Skip wallet check if already issued
     if (!alreadyIssued) {
@@ -211,7 +214,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     // 🔹 Decide how much to deduct — businessTarget takes priority
     const deductionAmount = businessTargetMet
-      ? businessTarget
+      ? (businessTarget || subscriptionWallet)
       : (followerTarget + reviewAndRatingTarget + postTarget);
 
     const deductionType = businessTargetMet ? "businessTarget" : "threeTargets";
@@ -300,6 +303,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
 };
 
 module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
+
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
