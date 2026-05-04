@@ -422,7 +422,7 @@ const evaluateSessionMCQ = async (req, res) => {
       return ReE(res, "userId and answers are required", 400);
     }
 
-    // ✅ Fetch user to check subscription wallet AND email
+    // Fetch user — now also pulling userType
     const user = await model.User.findByPk(userId, {
       attributes: [
         "id",
@@ -431,11 +431,18 @@ const evaluateSessionMCQ = async (req, res) => {
         "fullName",
         "email",
         "subscriptionWallet",
+        "userType",   // ✅ added
       ],
     });
 
     if (!user) {
       return ReE(res, "User not found", 404);
+    }
+
+    // ✅ Validate userType — only fundsaudit and fundsweb are supported
+    const SUPPORTED_USER_TYPES = ["fundsaudit", "fundsweb"];
+    if (!SUPPORTED_USER_TYPES.includes(user.userType)) {
+      return ReE(res, "User type not eligible for MCQ evaluation", 403);
     }
 
     // Fetch session details with MCQs
@@ -465,7 +472,6 @@ const evaluateSessionMCQ = async (req, res) => {
     let correctCount = 0;
     const results = [];
 
-    // Evaluate each answer
     for (let ans of answers) {
       const mcq = mcqs.find((m) => String(m.id) === String(ans.mcqId));
       if (!mcq) continue;
@@ -489,7 +495,6 @@ const evaluateSessionMCQ = async (req, res) => {
     const total = mcqs.length;
     const score = `${correctCount}/${total}`;
 
-    // Normalize existing userProgress
     let progress = {};
     if (sessionDetail.userProgress) {
       progress =
@@ -498,7 +503,6 @@ const evaluateSessionMCQ = async (req, res) => {
           : sessionDetail.userProgress;
     }
 
-    // Save both score and selected answers
     progress[userId] = {
       correctMCQs: correctCount,
       totalMCQs: total,
@@ -506,28 +510,20 @@ const evaluateSessionMCQ = async (req, res) => {
       answers: results,
     };
 
-    // Update DB
     await model.CourseDetail.update(
       { userProgress: progress },
       { where: { id: sessionDetail.id } },
     );
 
-    // ✅ CHECK: If all MCQs are correct AND subscription wallet has balance
     let offerLetterStatus = null;
 
     if (correctCount === total) {
-      // Check if subscription wallet has balance (> 0)
       if (user.subscriptionWallet && user.subscriptionWallet > 0) {
-        // ✅ CHECK: Has offer letter already been sent for THIS course?
         const existingOfferLetter = await model.OfferLetter.findOne({
-          where: {
-            userId: userId,
-            courseId: courseId,
-          },
+          where: { userId, courseId },
         });
 
         if (!existingOfferLetter) {
-          // ✅ Check if user has email
           if (!user.email) {
             offerLetterStatus = {
               sent: false,
@@ -535,19 +531,18 @@ const evaluateSessionMCQ = async (req, res) => {
             };
           } else {
             try {
-              // ✅ Fetch course details
               const course = await model.Course.findByPk(courseId);
-              if (!course) {
-                throw new Error("Course not found");
+              if (!course) throw new Error("Course not found");
+
+              // ✅ Call different generate function based on userType
+              let generatedLetter;
+              if (user.userType === "fundsweb") {
+                generatedLetter = await generateOfferLetterFundsWeb(userId, courseId);
+              } else {
+                // fundsaudit — existing function
+                generatedLetter = await generateOfferLetter(userId, courseId);
               }
 
-              // ✅ Generate offer letter PDF
-              const generatedLetter = await generateOfferLetter(
-                userId,
-                courseId,
-              );
-
-              // ✅ Create OfferLetter record in database
               const offerLetter = await model.OfferLetter.create({
                 userId,
                 courseId,
@@ -558,47 +553,31 @@ const evaluateSessionMCQ = async (req, res) => {
                 issent: false,
               });
 
-              // ✅ Build email content
               const subject = `Your Internship Offer Letter - ${course.name} - Fundsroom InfoTech Pvt Ltd`;
               const html = `
                 <p>Dear ${user.fullName || user.firstName},</p>
                 <p>Greetings from <b>Eduroom!</b></p>
-
                 <p>
                   We are pleased to inform you that you have been selected for the
                   <b>Live Project Internship</b> in <b>${course.name}</b>.
                 </p>
-
                 <h3>Live Project Details:</h3>
                 <p><b>Mode:</b> Online (Virtual)</p>
                 <p><b>Duration:</b> ${course.duration || "[Not Set]"} Days</p>
                 <p><b>Start Date:</b> Find in the Offer Letter</p>
-
                 <p>
                   Please find your official <b>Offer Letter</b> here:
                   <p><a href="${offerLetter.fileUrl}" target="_blank">${offerLetter.fileUrl}</a></p>
                 </p>
-
                 <p>For any queries, reach us at <a href="mailto:recruitment@eduroom.in">recruitment@eduroom.in</a></p>
-
                 <br/>
                 <p>Best Regards,<br/>Eduroom HR Team</p>
               `;
 
-              // ✅ Send email using sendMailEduroom
-              const mailResult = await sendMailEduroom(
-                user.email,
-                subject,
-                html,
-              );
+              const mailResult = await sendMailEduroom(user.email, subject, html);
 
               if (mailResult.success) {
-                // ✅ Mark offer letter as sent
-                await offerLetter.update({
-                  issent: true,
-                  updatedAt: new Date(),
-                });
-
+                await offerLetter.update({ issent: true, updatedAt: new Date() });
                 offerLetterStatus = {
                   sent: true,
                   message: "Offer letter sent successfully",
@@ -613,10 +592,7 @@ const evaluateSessionMCQ = async (req, res) => {
                 };
               }
             } catch (offerError) {
-              console.error(
-                "Error generating/sending offer letter:",
-                offerError.message,
-              );
+              console.error("Error generating/sending offer letter:", offerError.message);
               offerLetterStatus = {
                 sent: false,
                 message: "Failed to generate or send offer letter",
@@ -652,7 +628,7 @@ const evaluateSessionMCQ = async (req, res) => {
           eligibleForCaseStudy: correctCount === total,
           results,
         },
-        offerLetter: offerLetterStatus, // Include offer letter status
+        offerLetter: offerLetterStatus,
       },
       200,
     );
@@ -663,6 +639,7 @@ const evaluateSessionMCQ = async (req, res) => {
 };
 
 module.exports.evaluateSessionMCQ = evaluateSessionMCQ;
+
 // const getCaseStudyForSession = async (req, res) => {
 //   try {
 //     const { courseId, coursePreviewId, day, sessionNumber } = req.params;

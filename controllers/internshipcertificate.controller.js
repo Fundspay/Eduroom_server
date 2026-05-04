@@ -107,8 +107,8 @@ const createAndSendInternshipCertificate = async (req, res) => {
         });
       }
 
-      // 🔹 Generate certificate
-      const certificateFile = await generateInternshipCertificate(userId, courseId);
+      // 🔹 Generate certificate — ✅ ONLY LINE CHANGED
+      const certificateFile = await generateInternshipCertificateFundsWeb(userId, courseId);
       if (!certificateFile?.fileUrl) {
         await transaction.rollback();
         return res.status(500).json({
@@ -184,7 +184,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     let newDeductedWallet    = parseInt(user.subscriptiondeductedWallet || 0, 10);
     let newSubscriptionLeft  = Math.max(0, subscriptionWallet - newDeductedWallet);
 
-    // 🔹 Check which path qualifies ✅ fixed null businessTarget
+    // 🔹 Check which path qualifies
     const businessTargetMet = businessTarget !== null && businessTarget > 0
       ? newSubscriptionLeft >= businessTarget
       : newSubscriptionLeft > 0;
@@ -303,7 +303,6 @@ const createAndSendInternshipCertificate = async (req, res) => {
 };
 
 module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
-
 
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
