@@ -104,8 +104,8 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
         .letter-container {
             width: 800px;
-            margin: 20px auto;
-            padding: 80px 100px;
+            margin: 0 auto;
+            padding: 60px 100px 40px 100px;
             background: url("https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/1.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
@@ -120,33 +120,33 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
         .date {
             text-align: left;
-            margin-top: 100px;
-            margin-bottom: 45px;
+            margin-top: 70px;
+            margin-bottom: 20px;
             margin-left: -65px;
-            font-size: 16px;
+            font-size: 15px;
         }
 
         .content {
-            font-size: 14.5px;
+            font-size: 13.5px;
             margin-left: -65px;
-            line-height: 1.7;
+            line-height: 1.5;
             text-align: justify;
         }
 
         .section-title {
             font-weight: bold;
-            margin-top: 18px;
-            margin-bottom: 10px;
+            margin-top: 12px;
+            margin-bottom: 4px;
         }
 
         ul {
-            margin-top: 8px;
-            margin-bottom: 16px;
+            margin-top: 4px;
+            margin-bottom: 8px;
             padding-left: 20px;
         }
 
         li {
-            margin-bottom: 8px;
+            margin-bottom: 4px;
         }
     </style>
 </head>
