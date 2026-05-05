@@ -517,7 +517,7 @@ const generateOfferLetter = async (userId, courseId = null) => {
     <style>
         body { margin: 0; padding: 0; font-family: 'Times New Roman', serif; background: #f5f5f5; }
         .letter-container { width: 800px; margin: 20px auto; padding: 80px 100px;
-            background: url("https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
+            background: url("https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/offerbg.png") no-repeat center top;
             background-size: cover; min-height: 1100px; box-sizing: border-box; position: relative; }
         .date, .title, .content { font-family: 'Times New Roman', serif; }
         .date { text-align: left; margin-top: 100px; margin-bottom: 87px; margin-left: -65px; font-size: 16px; }
@@ -592,7 +592,7 @@ const generateOfferLetter = async (userId, courseId = null) => {
   const s3Key = `offerletters/${userId}/${fileName}`;
 
   await s3.putObject({
-    Bucket: "fundsweb",
+    Bucket: "1fundsweb",
     Key: s3Key,
     Body: pdfBuffer,
     ContentType: "application/pdf",
@@ -600,7 +600,7 @@ const generateOfferLetter = async (userId, courseId = null) => {
 
   return {
     fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+    fileUrl: `https://1fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 
