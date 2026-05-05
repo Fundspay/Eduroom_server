@@ -105,7 +105,7 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
         .letter-container {
             width: 800px;
             margin: 0 auto;
-            padding: 60px 100px 40px 100px;
+            padding: 80px 100px 40px 100px;
             background: url("https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/1.png") no-repeat center top;
             background-size: cover;
             min-height: 1100px;
@@ -120,7 +120,7 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
         .date {
             text-align: left;
-            margin-top: 70px;
+            margin-top: 115px;
             margin-bottom: 20px;
             margin-left: -65px;
             font-size: 15px;
