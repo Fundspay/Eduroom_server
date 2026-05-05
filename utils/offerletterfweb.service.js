@@ -136,13 +136,13 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
         .section-title {
             font-weight: bold;
-            margin-top: 10px;
-            margin-bottom: 2px;
+            margin-top: 2px;
+            margin-bottom: 1px;
         }
 
         ul {
-            margin-top: 2px;
-            margin-bottom: 6px;
+            margin-top: 1px;
+            margin-bottom: 4px;
             padding-left: 18px;
         }
 
@@ -152,6 +152,10 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
         p {
             margin: 0;
+        }
+
+        .intro-text {
+            margin-bottom: 2px;
         }
     </style>
 </head>
@@ -168,7 +172,9 @@ const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
 
             Dear <b>${candidateName}</b>,<br><br>
 
-            We are pleased to offer you the position of <b>${position}</b> at <b>Fundsroom Infotech Pvt Ltd</b>.<br><br>
+            <div class="intro-text">
+                We are pleased to offer you the position of <b>${position}</b> at <b>Fundsroom Infotech Pvt Ltd</b>.
+            </div>
 
             <div class="section-title">Joining Details</div>
 
