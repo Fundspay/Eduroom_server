@@ -13,6 +13,7 @@ const { Op } = require("sequelize");
 const { CaseStudyResult, QuestionModel } = require("../models");
 const AWS = require("aws-sdk");
 const CONFIG = require("../config/config");
+const { generateOfferLetterFundsWeb } = require("../utils/offerletterfweb.service.js");
 
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
@@ -50,7 +51,7 @@ const sendOfferLetter = async (req, res) => {
 
     // If not, generate PDF and create new record
     if (!offerLetter) {
-      const generatedLetter = await generateOfferLetter(userId, courseId);
+      const generatedLetter = await generateOfferLetterFundsWeb(userId, courseId);
 
       offerLetter = await model.OfferLetter.create({
         userId,
