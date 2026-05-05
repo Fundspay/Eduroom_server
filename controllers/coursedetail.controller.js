@@ -11,7 +11,7 @@ const { User } = require("../models");
 const { sendMailEduroom } = require("../middleware/eduroommailer.middleware");
 
 const { generateOfferLetter } = require("../utils/offerletter.service.js");
-const {generateOfferLetterFundsWeb}= rquire("../utils/offerletterfweb.service.js");
+const {generateOfferLetterFundsWeb}= require("../utils/offerletterfweb.service.js");
 
 const addOrUpdateCourseDetail = async (req, res) => {
   const { domainId, userId, courseId, coursePreviewId, days } = req.body;
