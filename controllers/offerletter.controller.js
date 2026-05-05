@@ -160,14 +160,14 @@ const sendInternshipReport = async (req, res) => {
 
     await s3
       .putObject({
-        Bucket: "fundsweb",
+        Bucket: "1fundsweb",
         Key: s3Key,
         Body: pdfBuffer,
         ContentType: "application/pdf",
       })
       .promise();
 
-    const fileUrl = `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`;
+    const fileUrl = `https://1fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`;
 
     // Build email content (UNCHANGED)
     const subject = `Your Internship Report - Fundsroom InfoTech Pvt Ltd`;
