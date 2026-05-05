@@ -18,7 +18,7 @@ const normalizeDateToISO = (input) => {
 };
 
 // ---------- GENERATE OFFER LETTER ----------
-const generateOfferLetter = async (userId, courseId = null) => {
+const generateOfferLetterFundsWeb = async (userId, courseId = null) => {
   if (!userId) throw new Error("Missing userId");
 
   // 1. Load user
@@ -277,4 +277,4 @@ const generateOfferLetter = async (userId, courseId = null) => {
   };
 };
 
-module.exports = { generateOfferLetter };
+module.exports = { generateOfferLetterFundsWeb };
