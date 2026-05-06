@@ -58,10 +58,21 @@ const generateparticipationCertificate = async (userId, courseId) => {
     });
   }
 
-  const backgroundImage =
-    Number(courseId) === 24
-      ? `${ASSET_BASE}/22.jpg`
-      : `${ASSET_BASE}/22.jpg`;
+  // ✅ Background image fetched as base64 to avoid network timeout in Puppeteer
+  const https = require("https");
+  const bgImageUrl = `${ASSET_BASE}/22.jpg`;
+
+  const backgroundImageBase64 = await new Promise((resolve, reject) => {
+    https.get(bgImageUrl, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        const base64 = Buffer.concat(chunks).toString("base64");
+        resolve(`data:image/jpeg;base64,${base64}`);
+      });
+      response.on("error", reject);
+    }).on("error", reject);
+  });
 
   const html = `
 <!DOCTYPE html>
@@ -82,7 +93,7 @@ body {
   width: 800px;
   height: 1100px;
   margin: 20px auto;
-  background: url("${backgroundImage}") no-repeat center;
+  background: url("${backgroundImageBase64}") no-repeat center;
   background-size: cover;
   position: relative;
   box-sizing: border-box;
@@ -198,15 +209,23 @@ body {
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage"
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote",
       ],
     });
 
     const page = await browser.newPage();
 
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    // ✅ domcontentloaded is faster, no network calls needed since bg is base64
+    await page.setContent(html, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    });
+
     await page.evaluateHandle('document.fonts.ready');
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
     pdfBuffer = await page.pdf({
       format: "A4",
@@ -221,8 +240,8 @@ body {
   }
 
   const timestamp = Date.now();
-  const fileName = `offerletter-${timestamp}.pdf`;
-  const s3Key = `offerletters/${userId}/${fileName}`;
+  const fileName = `participation-${timestamp}.pdf`;
+  const s3Key = `participationcertificates/${userId}/${fileName}`;
 
   await s3.putObject({
     Bucket: "1fundsweb",
@@ -237,4 +256,4 @@ body {
   };
 };
 
-module.exports = {generateparticipationCertificate };
+module.exports = { generateparticipationCertificate };
