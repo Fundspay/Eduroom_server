@@ -38,7 +38,7 @@ const sendBusinessTargetMail = async (user, activeTargets) => {
         .join("")}
     </ul>
 
-    <p>Remember, every target you complete brings you closer to mastering your Live Project(s)! 💪</p>
+    <p>Remember, every target you complete brings you closer to mastering your Internship(s)! 💪</p>
 
     <p>Motivational tip: <em>“Small consistent steps lead to big results. Keep pushing!”</em> ✨</p>
 

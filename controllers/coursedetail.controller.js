@@ -560,9 +560,9 @@ const evaluateSessionMCQ = async (req, res) => {
                 <p>Greetings from <b>Eduroom!</b></p>
                 <p>
                   We are pleased to inform you that you have been selected for the
-                  <b>Live Project Internship</b> in <b>${course.name}</b>.
+                  <b>Internship</b> in <b>${course.name}</b>.
                 </p>
-                <h3>Live Project Details:</h3>
+                <h3>Internship Details:</h3>
                 <p><b>Mode:</b> Online (Virtual)</p>
                 <p><b>Duration:</b> ${course.duration || "[Not Set]"} Days</p>
                 <p><b>Start Date:</b> Find in the Offer Letter</p>
@@ -1923,13 +1923,13 @@ const setCourseStartEndDates = async (req, res) => {
       const emailHtml = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #333; line-height: 1.6; max-width: 600px; margin: auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 10px; background-color: #fefefe;">
         <div style="text-align: center; margin-bottom: 20px;">
-          <h2 style="color: #1a73e8;">🎯 New Live Project Assigned!</h2>
-          <p style="color: #555;">Get ready to excel in your new Live Project 🚀</p>
+          <h2 style="color: #1a73e8;">🎯 New Internship Assigned!</h2>
+          <p style="color: #555;">Get ready to excel in your new Internship 🚀</p>
         </div>
 
         <p>Hi <strong>${user.name || user.firstName || "User"}</strong> 👋,</p>
 
-        <p>You have been enrolled in the Live Project <strong>${course.name}</strong>. Here are the details:</p>
+        <p>You have been enrolled in the Internship <strong>${course.name}</strong>. Here are the details:</p>
 
         <ul>
           <li>📅 <strong>Start Date:</strong> ${courseDatesUpdate.startDate}</li>
@@ -1937,7 +1937,7 @@ const setCourseStartEndDates = async (req, res) => {
           <li>🎯 <strong>Business Target:</strong> ${course.businessTarget || "Not Assigned"}</li>
         </ul>
 
-        <p>Tips to succeed in this Live Project:</p>
+        <p>Tips to succeed in this Internship:</p>
         <ul>
           <li>💡 Plan your sessions daily and stay consistent</li>
           <li>💪 Focus on completing your business targets</li>
@@ -1957,7 +1957,7 @@ const setCourseStartEndDates = async (req, res) => {
       try {
         const mailResult = await sendMailEduroom(
           user.email,
-          `Course Details: ${course.name}`,
+          `Internship Details: ${course.name}`,
           emailHtml,
         );
         if (mailResult?.success) {

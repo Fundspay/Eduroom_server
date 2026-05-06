@@ -72,10 +72,10 @@ const sendOfferLetter = async (req, res) => {
 
       <p>
         We are pleased to inform you that you have been selected for the
-        <b>Live Project Internship</b> in <b>${course.name}</b>.
+        <b>Internship</b> in <b>${course.name}</b>.
       </p>
 
-      <h3>Live Project Details:</h3>
+      <h3>Internship Details:</h3>
       <p><b>Mode:</b> Online (Virtual)</p>
       <p><b>Duration:</b> ${course.duration || "[Not Set]"} Days</p>
       <p><b>Start Date:</b> Find in the Offer Letter</p>

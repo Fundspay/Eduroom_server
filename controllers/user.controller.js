@@ -107,7 +107,7 @@ const addPersonalInfo = async (req, res) => {
 
   <p>
     You are now one step closer to gaining real-world exposure through structured learning, 
-    case studies, live projects, and business tasks.
+    case studies, Internships, and business tasks.
   </p>
 
   <h3>What's Next?</h3>
