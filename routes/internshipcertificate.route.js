@@ -6,6 +6,7 @@ const internshipcertificateController = require("../controllers/internshipcertif
 router.post("/certificate/send", internshipcertificateController.createAndSendInternshipCertificate);
 router.get("/internship/merged/email/:userId/:courseId", internshipcertificateController.generateMergedInternshipReportAndEmail);
 router.get("/listAll", internshipcertificateController.fetchAllInternshipCertificates);
+router.post("/participation-certificate", internshipcertificateController.getParticipationCertificate);
 
 
 module.exports = router;

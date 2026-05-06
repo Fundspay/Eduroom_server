@@ -10,7 +10,7 @@ const s3 = new AWS.S3({
   region: CONFIG.awsRegion
 });
 
-const ASSET_BASE = "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
+const ASSET_BASE = "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
 const normalizeDateToISO = (input) => {
   if (!input) return null;
@@ -19,7 +19,7 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0];
 };
 
-const generateInternshipCertificate = async (userId, courseId) => {
+const generateparticipationCertificate = async (userId, courseId) => {
   if (!userId) throw new Error("Missing userId");
   if (!courseId) throw new Error("Missing courseId");
 
@@ -60,8 +60,8 @@ const generateInternshipCertificate = async (userId, courseId) => {
 
   const backgroundImage =
     Number(courseId) === 24
-      ? `${ASSET_BASE}/10.png`
-      : `${ASSET_BASE}/9.png`;
+      ? `${ASSET_BASE}/22.jpg`
+      : `${ASSET_BASE}/22.jpg`;
 
   const html = `
 <!DOCTYPE html>
@@ -225,7 +225,7 @@ body {
   const s3Key = `offerletters/${userId}/${fileName}`;
 
   await s3.putObject({
-    Bucket: "fundsweb",
+    Bucket: "1fundsweb",
     Key: s3Key,
     Body: pdfBuffer,
     ContentType: "application/pdf",
@@ -233,8 +233,8 @@ body {
 
   return {
     fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+    fileUrl: `https://1fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 
-module.exports = { generateInternshipCertificate };
+module.exports = {generateparticipationCertificate };

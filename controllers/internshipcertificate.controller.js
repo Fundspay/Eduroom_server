@@ -9,6 +9,8 @@ const  { generateSessionReport } = require("../utils/internshipreport3.service")
 const  { generateMCQCaseStudyReport } = require("../utils/internshipreport4.service")
 const {finalpageinternshipreport} = require("../utils/internshipreport5.service");
 const { ReS, ReE } = require("../utils/util.service");
+const { generateparticipationCertificate } = require("../utils/participationcertfweb.service");
+
 
 
 const createAndSendInternshipCertificate = async (req, res) => {
@@ -107,7 +109,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
         });
       }
 
-      // 🔹 Generate certificate — ✅ ONLY LINE CHANGED
+      // 🔹 Generate internship certificate
       const certificateFile = await generateInternshipCertificateFundsWeb(userId, courseId);
       if (!certificateFile?.fileUrl) {
         await transaction.rollback();
@@ -152,10 +154,20 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
       await transaction.commit();
 
+      // 🔹 Generate participation certificate (non-blocking)
+      let participationCertUrl = null;
+      try {
+        const participationCert = await generateparticipationCertificate(userId, courseId);
+        participationCertUrl = participationCert.fileUrl;
+      } catch (err) {
+        console.error("Participation certificate generation failed (non-blocking):", err.message);
+      }
+
       return res.status(200).json({
         success: true,
         message: "Internship Certificate generated and sent successfully",
         certificateUrl: certificateFile.fileUrl,
+        participationCertificateUrl: participationCertUrl,
         deductionType: "fundsWebTarget",
         wallet: {
           fundsWebAchieved,
@@ -167,7 +179,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // 🔹 FUNDSAUDIT USER PATH — existing logic
+    // 🔹 FUNDSAUDIT USER PATH
     // ─────────────────────────────────────────────
 
     // 🔹 Get targets
@@ -212,7 +224,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }
     }
 
-    // 🔹 Decide how much to deduct — businessTarget takes priority
+    // 🔹 Decide how much to deduct
     const deductionAmount = businessTargetMet
       ? (businessTarget || subscriptionWallet)
       : (followerTarget + reviewAndRatingTarget + postTarget);
@@ -233,7 +245,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 Generate certificate
+    // 🔹 Generate internship certificate
     const certificateFile = await generateInternshipCertificate(userId, courseId);
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
@@ -278,10 +290,20 @@ const createAndSendInternshipCertificate = async (req, res) => {
 
     await transaction.commit();
 
+    // 🔹 Generate participation certificate (non-blocking)
+    let participationCertUrl = null;
+    try {
+      const participationCert = await generateparticipationCertificate(userId, courseId);
+      participationCertUrl = participationCert.fileUrl;
+    } catch (err) {
+      console.error("Participation certificate generation failed (non-blocking):", err.message);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Internship Certificate generated and sent successfully",
       certificateUrl: certificateFile.fileUrl,
+      participationCertificateUrl: participationCertUrl,
       deductionType,
       wallet: {
         totalSubscribed: subscriptionWallet,
@@ -848,3 +870,36 @@ module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
 // };
 
 // module.exports.fetchAllInternshipCertificates = fetchAllInternshipCertificates;
+
+// adjust path as needed
+
+const getParticipationCertificate = async (req, res) => {
+  try {
+    const { userId, courseId } = req.body;
+
+    if (!userId || !courseId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "userId and courseId are required" 
+      });
+    }
+
+    const participationCert = await generateparticipationCertificate(userId, courseId);
+
+    return res.status(200).json({
+      success: true,
+      message: "Participation Certificate generated successfully",
+      certificateUrl: participationCert.fileUrl,
+    });
+
+  } catch (error) {
+    console.error("getParticipationCertificate error:", error);
+    return res.status(500).json({ 
+      success: false, 
+      message: "Server error", 
+      error: error.message 
+    });
+  }
+};
+
+module.exports.getParticipationCertificate = getParticipationCertificate;
