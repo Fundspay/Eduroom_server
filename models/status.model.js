@@ -43,6 +43,7 @@ module.exports = (sequelize, Sequelize) => {
             updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
             fundswebTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
             fundswebDeductedTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
+            fundswebAchieved: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
         },
         {
             tableName: "Statuses",

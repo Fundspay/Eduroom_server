@@ -1772,7 +1772,7 @@ var getReferralDataByPhone = async (req, res) => {
 
             const user = await model.User.findOne({
                 where: { phoneNumber: sub.userPhone },
-                attributes: ['id', 'phoneNumber', 'fundswebTargets', 'fundswebDeductedTargets']
+                attributes: ['id', 'phoneNumber', 'fundswebTargets', 'fundswebDeductedTargets', 'fundswebAchieved']
             });
 
             if (!user) {
@@ -1804,9 +1804,10 @@ var getReferralDataByPhone = async (req, res) => {
                 fundswebSubscribedAt:       safeDate(sub.subscribedAt),
                 fundswebTargets:            safeJSON(user.fundswebTargets),
                 fundswebDeductedTargets:    safeJSON(user.fundswebDeductedTargets),
+                fundswebAchieved:           user.fundswebAchieved                ?? null,
             };
 
-            console.log("Update payload:", JSON.stringify(updatePayload));
+            console.log("Update payload:", JSON.stringify(updatePayload));   
 
             try {
                 await statusRecord.update(updatePayload);
