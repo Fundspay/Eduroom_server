@@ -1492,7 +1492,15 @@ const getBusinessTarget = async (req, res) => {
           const baseUrl = process.env.API_BASE_URL || "https://api.fundsweb.in";
           const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${user.phoneNumber}`;
           const apiResponse = await axios.get(apiUrl);
-          achievedCount = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
+          const totalPaid = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
+
+          // Include user's own subscription in achieved count
+          const userHasOwnSubscription = apiResponse.data?.paidSubscriptionDetails?.some(
+            (sub) => sub.userPhone === user.phoneNumber
+          ) ? 1 : 0;
+
+          achievedCount = totalPaid + userHasOwnSubscription;
+          console.log(`✓ fundsweb totalPaid: ${totalPaid}, ownSubscription: ${userHasOwnSubscription}, achievedCount: ${achievedCount}`);
         } catch (apiError) {
           console.warn("fundsweb referral API error:", apiError.message);
         }
@@ -1514,16 +1522,20 @@ const getBusinessTarget = async (req, res) => {
     user.subscriptionLeft = subscriptionLeft;
 
     // 8️⃣ Store achievedCount in fundswebTargets per courseId
-    const updatedfundswebTargets = { ...(user.fundswebTargets || {}) };
-    updatedfundswebTargets[courseId] = achievedCount;
-    user.fundswebTargets = updatedfundswebTargets;
+    const updatedFundswebTargets = { ...(user.fundswebTargets || {}) };
+    updatedFundswebTargets[courseId] = achievedCountNum;
+    user.fundswebTargets = updatedFundswebTargets;
     user.changed("fundswebTargets", true);
 
+    // 9️⃣ Store total achieved count in fundswebAchieved
+    user.fundswebAchieved = achievedCountNum;
+    user.changed("fundswebAchieved", true);
+
     await user.save({
-      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundswebTargets"],
+      fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundswebTargets", "fundswebAchieved"],
     });
 
-    // 9️⃣ Send response
+    // 🔟 Send response
     return ReS(
       res,
       {
@@ -1539,6 +1551,7 @@ const getBusinessTarget = async (req, res) => {
           subscriptionLeft,
           businessTargets: user.businessTargets,
           fundswebTargets: user.fundswebTargets,
+          fundswebAchieved: user.fundswebAchieved,
           startDate: user.courseDates?.[courseId]?.startDate || null,
           endDate: user.courseDates?.[courseId]?.endDate || null,
         },
