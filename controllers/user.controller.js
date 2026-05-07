@@ -1783,22 +1783,15 @@ var getReferralDataByPhone = async (req, res) => {
             }
 
             console.log(`✓ User found: ${user.id} for phone: ${sub.userPhone}`);
+            console.log(`  fundswebAchieved calculated: ${totalPaid} (totalPaid: ${totalPaid})`);
 
-            // Calculate fundswebAchieved for this user
-            // Count how many subscriptions in the list belong to THIS user's referral
-            // i.e. total paid + 1 if they have their own subscription
-            const userOwnSub = paidSubscriptions.some(s => s.userPhone === sub.userPhone) ? 1 : 0;
-            const userAchieved = totalPaid + userOwnSub;
-
-            console.log(`  fundswebAchieved calculated: ${userAchieved} (totalPaid: ${totalPaid}, ownSub: ${userOwnSub})`);
-
-            // Update fundswebAchieved on User table too
+            // Update fundswebAchieved on User table
             await model.User.update(
-                { fundswebAchieved: userAchieved },
+                { fundswebAchieved: totalPaid },
                 { where: { id: user.id } }
             );
 
-            console.log(`✓ User fundswebAchieved updated to ${userAchieved} for userId: ${user.id}`);
+            console.log(`✓ User fundswebAchieved updated to ${totalPaid} for userId: ${user.id}`);
 
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
@@ -1820,7 +1813,7 @@ var getReferralDataByPhone = async (req, res) => {
                 fundswebSubscribedAt:       safeDate(sub.subscribedAt),
                 fundswebTargets:            safeJSON(user.fundswebTargets),
                 fundswebDeductedTargets:    safeJSON(user.fundswebDeductedTargets),
-                fundswebAchieved:           userAchieved,
+                fundswebAchieved:           totalPaid,
             };
 
             console.log("Update payload:", JSON.stringify(updatePayload));
