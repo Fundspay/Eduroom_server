@@ -1473,19 +1473,21 @@ const getBusinessTarget = async (req, res) => {
     // 5️⃣ Fetch referral count based on userType
     let achievedCount = 0;
 
-    if (user.userType === "fundsaudit") {
-      // 🔹 Existing Lambda endpoint
-      if (user.referralCode) {
-        try {
-          const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
-          const apiResponse = await axios.get(apiUrl);
-          const registeredUsers = apiResponse.data?.registered_users || [];
-          achievedCount = registeredUsers.filter((u) => u.has_paid).length;
-        } catch (apiError) {
-          console.warn("FundsAudit referral API error:", apiError.message);
-        }
-      }
-    } else if (user.userType === "fundsweb") {
+    // if (user.userType === "fundsaudit") {
+    //   // 🔹 Existing Lambda endpoint
+    //   if (user.referralCode) {
+    //     try {
+    //       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
+    //       const apiResponse = await axios.get(apiUrl);
+    //       const registeredUsers = apiResponse.data?.registered_users || [];
+    //       achievedCount = registeredUsers.filter((u) => u.has_paid).length;
+    //     } catch (apiError) {
+    //       console.warn("FundsAudit referral API error:", apiError.message);
+    //     }
+    //   }
+    // } else if (user.userType === "fundsweb") {
+
+    if (user.userType === "fundsweb") {
       // 🔹 fundsweb internal endpoint
       if (user.phoneNumber) {
         try {
