@@ -1470,45 +1470,31 @@ const getBusinessTarget = async (req, res) => {
     const businessTarget = btEntry.target || 0;
     const offerMessage = btEntry.offerMessage || null;
 
-    // 5️⃣ Fetch referral count based on userType
+    // 5️⃣ Fetch referral count — always from fundsweb API
     let achievedCount = 0;
 
-    // if (user.userType === "fundsaudit") {
-    //   // 🔹 Existing Lambda endpoint
-    //   if (user.referralCode) {
-    //     try {
-    //       const apiUrl = `https://lc8j8r2xza.execute-api.ap-south-1.amazonaws.com/prod/auth/getReferralPaymentStatus?referral_code=${user.referralCode}`;
-    //       const apiResponse = await axios.get(apiUrl);
-    //       const registeredUsers = apiResponse.data?.registered_users || [];
-    //       achievedCount = registeredUsers.filter((u) => u.has_paid).length;
-    //     } catch (apiError) {
-    //       console.warn("FundsAudit referral API error:", apiError.message);
-    //     }
-    //   }
-    // } else if (user.userType === "fundsweb") {
+    if (user.phoneNumber) {
+      try {
+        const baseUrl = process.env.API_BASE_URL || "https://api.fundsweb.in";
+        const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${user.phoneNumber}`;
+        const apiResponse = await axios.get(apiUrl);
 
-    if (user.userType === "fundsweb") {
-      // 🔹 fundsweb internal endpoint
-      if (user.phoneNumber) {
-        try {
-          const baseUrl = process.env.API_BASE_URL || "https://api.fundsweb.in";
-          const apiUrl = `${baseUrl}/api/v1/subscriptionpreview/referral/${user.phoneNumber}`;
-          const apiResponse = await axios.get(apiUrl);
-          const totalPaid = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
+        console.log("Full API response:", JSON.stringify(apiResponse.data));
 
-          // Include user's own subscription in achieved count
-          const userHasOwnSubscription = apiResponse.data?.paidSubscriptionDetails?.some(
-            (sub) => sub.userPhone === user.phoneNumber
-          ) ? 1 : 0;
+        const totalPaid = apiResponse.data?.statistics?.totalPaidSubscriptions ?? 0;
 
-          achievedCount = totalPaid + userHasOwnSubscription;
-          console.log(`✓ fundsweb totalPaid: ${totalPaid}, ownSubscription: ${userHasOwnSubscription}, achievedCount: ${achievedCount}`);
-        } catch (apiError) {
-          console.warn("fundsweb referral API error:", apiError.message);
-        }
+        // Check if user has their own subscription in the list
+        const userHasOwnSubscription = apiResponse.data?.paidSubscriptionDetails?.some(
+          (sub) => sub.userPhone === user.phoneNumber
+        ) ? 1 : 0;
+
+        achievedCount = totalPaid + userHasOwnSubscription;
+        console.log(`✓ totalPaid: ${totalPaid}, ownSubscription: ${userHasOwnSubscription}, achievedCount: ${achievedCount}`);
+      } catch (apiError) {
+        console.warn("fundsweb referral API error:", apiError.message);
       }
     } else {
-      console.warn(`⚠️ Unknown or missing userType for user ${user.id} — skipping referral fetch`);
+      console.warn(`⚠️ No phoneNumber for user ${user.id} — skipping referral fetch`);
     }
 
     // 6️⃣ Calculate wallet values
@@ -1533,9 +1519,13 @@ const getBusinessTarget = async (req, res) => {
     user.fundswebAchieved = achievedCountNum;
     user.changed("fundswebAchieved", true);
 
+    console.log(`Saving fundswebAchieved: ${user.fundswebAchieved}, fundswebTargets: ${JSON.stringify(user.fundswebTargets)}`);
+
     await user.save({
       fields: ["businessTargets", "subscriptionWallet", "subscriptionLeft", "fundswebTargets", "fundswebAchieved"],
     });
+
+    console.log(`✓ User saved successfully for userId: ${user.id}`);
 
     // 🔟 Send response
     return ReS(
@@ -1567,7 +1557,6 @@ const getBusinessTarget = async (req, res) => {
 };
 
 module.exports.getBusinessTarget = getBusinessTarget;
-
 // const getBusinessUserTarget = async (req, res) => {
 //   try {
 //     let { userId } = req.params;
