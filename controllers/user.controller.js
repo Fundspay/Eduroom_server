@@ -1749,8 +1749,19 @@ var getReferralDataByPhone = async (req, res) => {
         const referrer          = referralData?.referrer || {};
         const paidSubscriptions = referralData?.paidSubscriptionDetails || [];
 
+        console.log("Total paidSubscriptions:", paidSubscriptions.length);
+
+        // Helper to safely parse dates
+        const safeDate = (val) => {
+            if (!val) return null;
+            const d = new Date(val);
+            return isNaN(d.getTime()) ? null : d;
+        };
+
         // Step 2: Loop each entry in paidSubscriptionDetails
         for (const sub of paidSubscriptions) {
+
+            console.log("Processing sub:", JSON.stringify(sub));
 
             const user = await model.User.findOne({ where: { phoneNumber: sub.userPhone } });
 
@@ -1759,6 +1770,8 @@ var getReferralDataByPhone = async (req, res) => {
                 continue;
             }
 
+            console.log(`✓ User found: ${user.id} for phone: ${sub.userPhone}`);
+
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
             if (!statusRecord) {
@@ -1766,21 +1779,29 @@ var getReferralDataByPhone = async (req, res) => {
                 continue;
             }
 
-            await statusRecord.update({
-                fundswebReferralCode:   referrer.referralCode   || null,
-                fundswebSubscriptionId: sub.subscriptionId      || null,
-                fundswebMonths:         sub.months              || null,
-                fundswebAmount:         sub.amount              || null,
-                fundswebStartDate:      sub.startDate           || null,
-                fundswebEndDate:        sub.endDate             || null,
-                fundswebPaymentStatus:  sub.paymentStatus       ?? null,
-                fundswebSubscribedAt:   sub.subscribedAt        || null,
-            });
+            console.log(`✓ Status record found: ${statusRecord.id} for userId: ${user.id}`);
 
-            console.log(`✓ Fundsweb fields upserted for userId: ${user.id}`);
+            const updatePayload = {
+                fundswebReferralCode:   referrer.referralCode   ?? null,
+                fundswebSubscriptionId: sub.subscriptionId      ?? null,
+                fundswebMonths:         sub.months              ?? null,
+                fundswebAmount:         sub.amount              ?? null,
+                fundswebStartDate:      safeDate(sub.startDate),
+                fundswebEndDate:        safeDate(sub.endDate),
+                fundswebPaymentStatus:  sub.paymentStatus       ?? null,
+                fundswebSubscribedAt:   safeDate(sub.subscribedAt),
+            };
+
+            console.log("Update payload:", JSON.stringify(updatePayload));
+
+            try {
+                await statusRecord.update(updatePayload);
+                console.log(`✓ Fundsweb fields updated for userId: ${user.id}, statusId: ${statusRecord.id}`);
+            } catch (updateError) {
+                console.error(`❌ Update failed for userId: ${user.id}`, updateError.message);
+            }
         }
 
-        // Return exact same fundsweb response as before
         return ReS(res, referralData, 200);
 
     } catch (error) {
