@@ -1758,12 +1758,22 @@ var getReferralDataByPhone = async (req, res) => {
             return isNaN(d.getTime()) ? null : d;
         };
 
+        // Helper to safely parse JSON fields
+        const safeJSON = (val) => {
+            if (!val) return {};
+            if (typeof val === 'object') return val;
+            try { return JSON.parse(val); } catch { return {}; }
+        };
+
         // Step 2: Loop each entry in paidSubscriptionDetails
         for (const sub of paidSubscriptions) {
 
             console.log("Processing sub:", JSON.stringify(sub));
 
-            const user = await model.User.findOne({ where: { phoneNumber: sub.userPhone } });
+            const user = await model.User.findOne({
+                where: { phoneNumber: sub.userPhone },
+                attributes: ['id', 'phoneNumber', 'fundswebTargets', 'fundswebDeductedTargets']
+            });
 
             if (!user) {
                 console.warn(`⚠️ No user found for phone: ${sub.userPhone}, skipping`);
@@ -1771,6 +1781,8 @@ var getReferralDataByPhone = async (req, res) => {
             }
 
             console.log(`✓ User found: ${user.id} for phone: ${sub.userPhone}`);
+            console.log(`  fundswebTargets: ${JSON.stringify(user.fundswebTargets)}`);
+            console.log(`  fundswebDeductedTargets: ${JSON.stringify(user.fundswebDeductedTargets)}`);
 
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
@@ -1782,16 +1794,16 @@ var getReferralDataByPhone = async (req, res) => {
             console.log(`✓ Status record found: ${statusRecord.id} for userId: ${user.id}`);
 
             const updatePayload = {
-                fundswebReferralCode:       referrer.referralCode           ?? null,
-                fundswebSubscriptionId:     sub.subscriptionId              ?? null,
-                fundswebMonths:             sub.months                      ?? null,
-                fundswebAmount:             sub.amount                      ?? null,
+                fundswebReferralCode:       referrer.referralCode               ?? null,
+                fundswebSubscriptionId:     sub.subscriptionId                  ?? null,
+                fundswebMonths:             sub.months                          ?? null,
+                fundswebAmount:             sub.amount                          ?? null,
                 fundswebStartDate:          safeDate(sub.startDate),
                 fundswebEndDate:            safeDate(sub.endDate),
-                fundswebPaymentStatus:      sub.paymentStatus               ?? null,
+                fundswebPaymentStatus:      sub.paymentStatus                   ?? null,
                 fundswebSubscribedAt:       safeDate(sub.subscribedAt),
-                fundswebTargets:            user.fundswebTargets            ?? {},
-                fundswebDeductedTargets:    user.fundswebDeductedTargets    ?? {},
+                fundswebTargets:            safeJSON(user.fundswebTargets),
+                fundswebDeductedTargets:    safeJSON(user.fundswebDeductedTargets),
             };
 
             console.log("Update payload:", JSON.stringify(updatePayload));
