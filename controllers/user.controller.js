@@ -1748,8 +1748,10 @@ var getReferralDataByPhone = async (req, res) => {
 
         const referrer          = referralData?.referrer || {};
         const paidSubscriptions = referralData?.paidSubscriptionDetails || [];
+        const totalPaid         = referralData?.statistics?.totalPaidSubscriptions ?? 0;
 
         console.log("Total paidSubscriptions:", paidSubscriptions.length);
+        console.log("totalPaid from statistics:", totalPaid);
 
         // Helper to safely parse dates
         const safeDate = (val) => {
@@ -1781,8 +1783,22 @@ var getReferralDataByPhone = async (req, res) => {
             }
 
             console.log(`✓ User found: ${user.id} for phone: ${sub.userPhone}`);
-            console.log(`  fundswebTargets: ${JSON.stringify(user.fundswebTargets)}`);
-            console.log(`  fundswebDeductedTargets: ${JSON.stringify(user.fundswebDeductedTargets)}`);
+
+            // Calculate fundswebAchieved for this user
+            // Count how many subscriptions in the list belong to THIS user's referral
+            // i.e. total paid + 1 if they have their own subscription
+            const userOwnSub = paidSubscriptions.some(s => s.userPhone === sub.userPhone) ? 1 : 0;
+            const userAchieved = totalPaid + userOwnSub;
+
+            console.log(`  fundswebAchieved calculated: ${userAchieved} (totalPaid: ${totalPaid}, ownSub: ${userOwnSub})`);
+
+            // Update fundswebAchieved on User table too
+            await model.User.update(
+                { fundswebAchieved: userAchieved },
+                { where: { id: user.id } }
+            );
+
+            console.log(`✓ User fundswebAchieved updated to ${userAchieved} for userId: ${user.id}`);
 
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
@@ -1804,10 +1820,10 @@ var getReferralDataByPhone = async (req, res) => {
                 fundswebSubscribedAt:       safeDate(sub.subscribedAt),
                 fundswebTargets:            safeJSON(user.fundswebTargets),
                 fundswebDeductedTargets:    safeJSON(user.fundswebDeductedTargets),
-                fundswebAchieved:           user.fundswebAchieved                ?? null,
+                fundswebAchieved:           userAchieved,
             };
 
-            console.log("Update payload:", JSON.stringify(updatePayload));   
+            console.log("Update payload:", JSON.stringify(updatePayload));
 
             try {
                 await statusRecord.update(updatePayload);
