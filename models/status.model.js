@@ -40,7 +40,9 @@ module.exports = (sequelize, Sequelize) => {
             fundswebSubscribedAt: { type: Sequelize.DATE, allowNull: true },
             isDeleted: { type: Sequelize.BOOLEAN, allowNull: false, defaultValue: false },
             createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
-            updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW }
+            updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+            fundswebTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
+            fundswebDeductedTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
         },
         {
             tableName: "Statuses",

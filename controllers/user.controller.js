@@ -1782,21 +1782,23 @@ var getReferralDataByPhone = async (req, res) => {
             console.log(`✓ Status record found: ${statusRecord.id} for userId: ${user.id}`);
 
             const updatePayload = {
-                fundswebReferralCode:   referrer.referralCode   ?? null,
-                fundswebSubscriptionId: sub.subscriptionId      ?? null,
-                fundswebMonths:         sub.months              ?? null,
-                fundswebAmount:         sub.amount              ?? null,
-                fundswebStartDate:      safeDate(sub.startDate),
-                fundswebEndDate:        safeDate(sub.endDate),
-                fundswebPaymentStatus:  sub.paymentStatus       ?? null,
-                fundswebSubscribedAt:   safeDate(sub.subscribedAt),
+                fundswebReferralCode:       referrer.referralCode           ?? null,
+                fundswebSubscriptionId:     sub.subscriptionId              ?? null,
+                fundswebMonths:             sub.months                      ?? null,
+                fundswebAmount:             sub.amount                      ?? null,
+                fundswebStartDate:          safeDate(sub.startDate),
+                fundswebEndDate:            safeDate(sub.endDate),
+                fundswebPaymentStatus:      sub.paymentStatus               ?? null,
+                fundswebSubscribedAt:       safeDate(sub.subscribedAt),
+                fundswebTargets:            user.fundswebTargets            ?? {},
+                fundswebDeductedTargets:    user.fundswebDeductedTargets    ?? {},
             };
 
             console.log("Update payload:", JSON.stringify(updatePayload));
 
             try {
                 await statusRecord.update(updatePayload);
-                console.log(`✓ Fundsweb fields updated for userId: ${user.id}, statusId: ${statusRecord.id}`);
+                console.log(`✓ Status updated for userId: ${user.id}, statusId: ${statusRecord.id}`);
             } catch (updateError) {
                 console.error(`❌ Update failed for userId: ${user.id}`, updateError.message);
             }
