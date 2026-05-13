@@ -20,7 +20,6 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0];
 };
 
-// ✅ Capitalizes first letter of each word
 const toTitleCase = (str) => {
   if (!str) return "";
   return str
@@ -40,21 +39,37 @@ const generateparticipationCertificate = async (userId, courseId) => {
 
   if (!user) throw new Error("User not found");
 
-  // ✅ Title case applied to candidate name
   const rawName = user.fullName || `${user.firstName} ${user.lastName}`;
   const candidateName = toTitleCase(rawName);
 
   let startDate = "To Be Decided";
   let endDate = "To Be Decided";
 
-  // ✅ courseId converted to string to avoid key mismatch
+  // ✅ Fix: parse courseDates if stored as JSON string in DB
+  let courseDates = user.courseDates;
+  if (typeof courseDates === "string") {
+    try {
+      courseDates = JSON.parse(courseDates);
+    } catch (e) {
+      courseDates = {};
+    }
+  }
+
   const courseIdStr = String(courseId);
 
-  if (user.courseDates && user.courseDates[courseIdStr]) {
-    const courseObj = user.courseDates[courseIdStr];
+  console.log("=== CERT DEBUG ===");
+  console.log("courseId:", courseId, "| courseIdStr:", courseIdStr);
+  console.log("courseDates type:", typeof courseDates);
+  console.log("courseDates:", JSON.stringify(courseDates));
+  console.log("match:", !!courseDates?.[courseIdStr]);
+
+  if (courseDates && courseDates[courseIdStr]) {
+    const courseObj = courseDates[courseIdStr];
 
     const rawStart = normalizeDateToISO(courseObj.startDate);
     const rawEnd = normalizeDateToISO(courseObj.endDate);
+
+    console.log("rawStart:", rawStart, "| rawEnd:", rawEnd);
 
     if (rawStart) {
       startDate = new Date(rawStart).toLocaleDateString("en-GB", {
@@ -73,9 +88,10 @@ const generateparticipationCertificate = async (userId, courseId) => {
     }
   }
 
-  // ✅ Background image fetched as base64 to avoid Puppeteer network timeout
-  const bgImageUrl = `${ASSET_BASE}/22.jpg`;
+  console.log("Final startDate:", startDate, "| endDate:", endDate);
 
+  // ✅ Background image as base64
+  const bgImageUrl = `${ASSET_BASE}/22.jpg`;
   const backgroundImageBase64 = await new Promise((resolve, reject) => {
     https.get(bgImageUrl, (response) => {
       const chunks = [];
@@ -94,7 +110,6 @@ const generateparticipationCertificate = async (userId, courseId) => {
 <head>
 <meta charset="UTF-8">
 <title>Certificate</title>
-
 <style>
 body {
   margin: 0;
@@ -102,7 +117,6 @@ body {
   font-family: 'Georgia', serif;
   background: #f5f5f5;
 }
-
 .container {
   width: 800px;
   height: 1100px;
@@ -114,7 +128,6 @@ body {
   padding: 60px 80px;
   text-align: center;
 }
-
 .logo {
   position: absolute;
   top: 40px;
@@ -123,7 +136,6 @@ body {
   font-weight: bold;
   color: #2c2c54;
 }
-
 .title {
   margin-top: 120px;
   font-size: 48px;
@@ -131,39 +143,33 @@ body {
   font-weight: bold;
   color: #1e1e6d;
 }
-
 .subtitle {
   font-size: 18px;
   letter-spacing: 3px;
   margin-top: 10px;
   color: #444;
 }
-
 .award-text {
   margin-top: 60px;
   font-size: 16px;
   letter-spacing: 1px;
 }
-
 .name {
   margin-top: 30px;
   font-size: 42px;
   color: #333;
 }
-
 .desc {
   margin-top: 25px;
   font-size: 16px;
   color: #444;
 }
-
 .footer-left {
   position: absolute;
   bottom: 120px;
   left: 80px;
   font-size: 14px;
 }
-
 .footer-right {
   position: absolute;
   bottom: 120px;
@@ -171,7 +177,6 @@ body {
   text-align: center;
   font-size: 14px;
 }
-
 .signature {
   margin-top: 10px;
   font-family: cursive;
@@ -179,29 +184,18 @@ body {
 }
 </style>
 </head>
-
 <body>
-
 <div class="container">
-
   <div class="logo">Fundsroom</div>
-
   <div class="title">CERTIFICATE</div>
   <div class="subtitle">OF PARTICIPATION</div>
-
   <div class="award-text">THE FOLLOWING AWARD IS GIVEN TO</div>
-
   <div class="name">${candidateName}</div>
-
   <div class="desc">
     for participation in the internship program from <b>${startDate}</b><br>
     to <b>${endDate}</b>.
   </div>
-
-
-
 </div>
-
 </body>
 </html>
 `;
@@ -223,7 +217,6 @@ body {
 
     const page = await browser.newPage();
 
-    // ✅ domcontentloaded is faster, no network calls needed since bg is base64
     await page.setContent(html, {
       waitUntil: "domcontentloaded",
       timeout: 60000
