@@ -198,16 +198,7 @@ body {
     to <b>${endDate}</b>.
   </div>
 
-  // <div class="footer-left">
-  //   FUNDSWEB<br>
-  //   CERTIFICATION
-  // </div>
 
-  // <div class="footer-right">
-  //   // <div class="signature">Divika</div>
-  //   Ms. Iitika Paliwal<br>
-  //   Jr. Branch Manager
-  // </div>
 
 </div>
 
