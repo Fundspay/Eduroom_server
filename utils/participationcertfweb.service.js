@@ -1,6 +1,7 @@
 "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
+const https = require("https");
 const CONFIG = require("../config/config");
 const model = require("../models");
 
@@ -19,6 +20,16 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0];
 };
 
+// ✅ Capitalizes first letter of each word
+const toTitleCase = (str) => {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(" ")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
 const generateparticipationCertificate = async (userId, courseId) => {
   if (!userId) throw new Error("Missing userId");
   if (!courseId) throw new Error("Missing courseId");
@@ -29,37 +40,40 @@ const generateparticipationCertificate = async (userId, courseId) => {
 
   if (!user) throw new Error("User not found");
 
-  const candidateName = user.fullName || `${user.firstName} ${user.lastName}`;
+  // ✅ Title case applied to candidate name
+  const rawName = user.fullName || `${user.firstName} ${user.lastName}`;
+  const candidateName = toTitleCase(rawName);
 
   let startDate = "To Be Decided";
   let endDate = "To Be Decided";
 
-  if (user.courseDates && user.courseDates[courseId]) {
-    const courseObj = user.courseDates[courseId];
+  // ✅ courseId converted to string to avoid key mismatch
+  const courseIdStr = String(courseId);
 
-    startDate = courseObj.startDate
-      ? normalizeDateToISO(courseObj.startDate)
-      : startDate;
+  if (user.courseDates && user.courseDates[courseIdStr]) {
+    const courseObj = user.courseDates[courseIdStr];
 
-    endDate = courseObj.endDate
-      ? normalizeDateToISO(courseObj.endDate)
-      : endDate;
+    const rawStart = normalizeDateToISO(courseObj.startDate);
+    const rawEnd = normalizeDateToISO(courseObj.endDate);
 
-    startDate = new Date(startDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
+    if (rawStart) {
+      startDate = new Date(rawStart).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+    }
 
-    endDate = new Date(endDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric"
-    });
+    if (rawEnd) {
+      endDate = new Date(rawEnd).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+    }
   }
 
-  // ✅ Background image fetched as base64 to avoid network timeout in Puppeteer
-  const https = require("https");
+  // ✅ Background image fetched as base64 to avoid Puppeteer network timeout
   const bgImageUrl = `${ASSET_BASE}/22.jpg`;
 
   const backgroundImageBase64 = await new Promise((resolve, reject) => {
