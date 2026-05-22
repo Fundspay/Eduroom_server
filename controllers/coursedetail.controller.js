@@ -1293,7 +1293,7 @@ const getDailyStatusAllCoursesPerUser = async (req, res) => {
       const fundswebTarget = course.fundswebTarget || 0;
 
       // ✅ FIX HERE (string key)
-      const fundswebAchieved = user.fundswebTargets?.[String(courseId)] ?? null;
+      const fundswebAchieved = user.fundswebAchieved ?? null;
 
       const isfundswebTargetMet = fundswebTarget > 0 && fundswebAchieved !== null && fundswebAchieved >= fundswebTarget;
 
