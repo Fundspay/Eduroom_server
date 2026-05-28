@@ -157,6 +157,7 @@ module.exports = (sequelize, Sequelize) => {
       fundswebTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
       fundswebDeductedTargets: { type: Sequelize.JSON, allowNull: true, defaultValue: {} },
       fundswebAchieved: { type: Sequelize.INTEGER, allowNull: true, defaultValue: 0 },
+      portfolioLink: { type: Sequelize.STRING, allowNull: true }
     },
     {
       tableName: "Users",

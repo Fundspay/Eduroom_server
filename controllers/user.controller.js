@@ -114,7 +114,7 @@ const addPersonalInfo = async (req, res) => {
   <ul>
     <li>✅ You'll receive your internship domain details & schedule shortly</li>
     <li>✅ Get access to learning sessions, quizzes & assignments</li>
-    <li>✅ Work on live tasks and build your portfolio</li>
+    <li>✅ Work on live tasks and buiwed your portfolio</li>
     <li>✅ Earn your Internship Certificate (and unlock extended internship + placement opportunities)</li>
   </ul>
 
@@ -1748,6 +1748,7 @@ var getReferralDataByPhone = async (req, res) => {
 
         const referrer          = referralData?.referrer || {};
         const paidSubscriptions = referralData?.paidSubscriptionDetails || [];
+        const referredUsers     = referralData?.referredUsers || [];
         const totalPaid         = referralData?.statistics?.totalPaidSubscriptions ?? 0;
 
         console.log("Total paidSubscriptions:", paidSubscriptions.length);
@@ -1782,16 +1783,24 @@ var getReferralDataByPhone = async (req, res) => {
                 continue;
             }
 
+            // Find portfolioLink for this user from referredUsers array
+            const matchedUser   = referredUsers.find(u => u.phoneNumber === sub.userPhone);
+            const portfolioLink = matchedUser?.portfolioLink || null;
+
             console.log(`✓ User found: ${user.id} for phone: ${sub.userPhone}`);
+            console.log(`  portfolioLink: ${portfolioLink}`);
             console.log(`  fundswebAchieved calculated: ${totalPaid} (totalPaid: ${totalPaid})`);
 
-            // Update fundswebAchieved on User table
+            // Update fundswebAchieved + portfolioLink on User table
             await model.User.update(
-                { fundswebAchieved: totalPaid },
+                { 
+                    fundswebAchieved: totalPaid,
+                    portfolioLink:    portfolioLink
+                },
                 { where: { id: user.id } }
             );
 
-            console.log(`✓ User fundswebAchieved updated to ${totalPaid} for userId: ${user.id}`);
+            console.log(`✓ User fundswebAchieved + portfolioLink updated for userId: ${user.id}`);
 
             const statusRecord = await model.Status.findOne({ where: { userId: user.id } });
 
@@ -1838,7 +1847,7 @@ module.exports.getReferralDataByPhone = getReferralDataByPhone;
 // ─────────────────────────────────────────────
 // POST /api/marketing/submit
 // Intern submits their marketing metrics for the current period
-// Body: { userId, qualifiedLeads, reviews, ratings, followersGrowth }
+// Body: { userId, qualifiedLeads, reviews, ratings, followerusersGrowth }
 // ─────────────────────────────────────────────
 var submitMarketingMetrics = async (req, res) => {
   try {
