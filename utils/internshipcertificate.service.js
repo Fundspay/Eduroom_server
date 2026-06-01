@@ -96,7 +96,7 @@ const generateInternshipCertificate = async (userId, courseId) => {
   const backgroundImage =
     Number(courseId) === 24
       ? "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/10.png"
-      : "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/9.png";
+      : "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/1.png";
 
   // 6. Build QR block HTML — only rendered when a portfolio link exists
   const qrBlockHTML = qrCodeDataURL
