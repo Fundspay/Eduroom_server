@@ -10,6 +10,7 @@ const  { generateMCQCaseStudyReport } = require("../utils/internshipreport4.serv
 const {finalpageinternshipreport} = require("../utils/internshipreport5.service");
 const { ReS, ReE } = require("../utils/util.service");
 const { generateparticipationCertificate } = require("../utils/participationcertfweb.service");
+const { generateInternshipCertificateWeb } = require("../utils/internshipcertificatefweb.service");
 
 
 
@@ -884,7 +885,7 @@ const getParticipationCertificate = async (req, res) => {
       });
     }
 
-    const participationCert = await generateparticipationCertificate(userId, courseId);
+    const participationCert = await generateInternshipCertificateWeb(userId, courseId);
 
     return res.status(200).json({
       success: true,
