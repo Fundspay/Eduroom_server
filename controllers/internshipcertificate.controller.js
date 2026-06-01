@@ -111,7 +111,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }
 
       // 🔹 Generate internship certificate
-      const certificateFile = await generateInternshipCertificateFundsWeb(userId, courseId);
+      const certificateFile = await generateInternshipCertificateWeb(userId, courseId);
       if (!certificateFile?.fileUrl) {
         await transaction.rollback();
         return res.status(500).json({
@@ -247,7 +247,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     }
 
     // 🔹 Generate internship certificate
-    const certificateFile = await generateInternshipCertificate(userId, courseId);
+    const certificateFile = await generateInternshipCertificateWeb(userId, courseId);
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
       return res.status(500).json({
@@ -885,7 +885,7 @@ const getParticipationCertificate = async (req, res) => {
       });
     }
 
-    const participationCert = await generateInternshipCertificateWeb(userId, courseId);
+    const participationCert = await generateparticipationCertificate(userId, courseId);
 
     return res.status(200).json({
       success: true,
