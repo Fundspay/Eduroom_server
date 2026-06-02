@@ -28,9 +28,12 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 Fetch user
+    // Fetch User
     const user = await model.User.findOne({
-      where: { id: userId, isDeleted: false },
+      where: {
+        id: userId,
+        isDeleted: false,
+      },
       transaction,
       lock: transaction.LOCK.UPDATE,
     });
@@ -43,9 +46,12 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 Fetch course
+    // Fetch Course
     const course = await model.Course.findOne({
-      where: { id: courseId, isDeleted: false },
+      where: {
+        id: courseId,
+        isDeleted: false,
+      },
       transaction,
     });
 
@@ -57,7 +63,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 CHECK END DATE
+    // Course End Date Check
     const userCourseData = user.courseDates?.[courseId];
 
     if (userCourseData?.endDate) {
@@ -77,75 +83,87 @@ const createAndSendInternshipCertificate = async (req, res) => {
       }
     }
 
-    // 🔹 Check if certificate already exists
+    // Check Existing Certificate
     let certificate = await model.InternshipCertificate.findOne({
-      where: { userId, courseId },
+      where: {
+        userId,
+        courseId,
+      },
       transaction,
     });
 
     const alreadyIssued = certificate && certificate.isIssued;
 
-    // ─────────────────────────────────────────────
-    // 🔹 FUNDSWEB TARGET VALIDATION
-    // ─────────────────────────────────────────────
+    // ==========================================
+    // FUNDSWEB LOGIC
+    // ==========================================
 
-    const fundsWebTarget = parseInt(course?.fundsWebTarget || 0, 10);
-    const fundsWebAchieved = parseInt(
-      user.fundsWebTargets?.[courseId] ?? 0,
-      10
-    );
-    const fundsWebDeducted = parseInt(
-      user.fundsWebDeductedTargets?.[courseId] ?? 0,
+    const fundswebTarget = parseInt(
+      course.fundswebTarget || 0,
       10
     );
 
-    const fundsWebLeft = Math.max(
+    const fundswebAchieved = parseInt(
+      user.fundswebAchieved || 0,
+      10
+    );
+
+    const fundswebDeducted = parseInt(
+      user.fundswebDeductedTargets?.[courseId] || 0,
+      10
+    );
+
+    const fundswebLeft = Math.max(
       0,
-      fundsWebAchieved - fundsWebDeducted
+      fundswebAchieved - fundswebDeducted
     );
 
-    const fundsWebTargetMet =
-      fundsWebTarget > 0 &&
-      fundsWebLeft >= fundsWebTarget;
+    const fundswebTargetMet =
+      fundswebTarget > 0 &&
+      fundswebLeft >= fundswebTarget;
 
-    // 🔥 Skip target check if certificate already issued
+    // Skip validation if already issued
     if (!alreadyIssued) {
-      if (!fundsWebTargetMet) {
+      if (!fundswebTargetMet) {
         await transaction.rollback();
 
         return res.status(400).json({
           success: false,
-          message:
-            "FundsWeb subscription target not met for this course.",
+          message: "FundsWeb target not achieved.",
           wallet: {
-            fundsWebAchieved,
-            fundsWebDeducted,
-            fundsWebLeft,
-            fundsWebTarget,
+            fundswebAchieved,
+            fundswebDeducted,
+            fundswebLeft,
+            fundswebTarget,
           },
         });
       }
     }
 
-    // 🔹 Deduct only on first-time issuance
+    // Deduct only on first issuance
     if (!certificate) {
-      const updatedFundsWebDeducted = {
-        ...(user.fundsWebDeductedTargets || {}),
+      const updatedDeductedTargets = {
+        ...(user.fundswebDeductedTargets || {}),
       };
 
-      updatedFundsWebDeducted[courseId] =
-        fundsWebDeducted + fundsWebTarget;
+      updatedDeductedTargets[courseId] =
+        fundswebDeducted + fundswebTarget;
 
-      user.fundsWebDeductedTargets = updatedFundsWebDeducted;
-      user.changed("fundsWebDeductedTargets", true);
+      user.fundswebDeductedTargets =
+        updatedDeductedTargets;
+
+      user.changed(
+        "fundswebDeductedTargets",
+        true
+      );
 
       await user.save({
-        fields: ["fundsWebDeductedTargets"],
+        fields: ["fundswebDeductedTargets"],
         transaction,
       });
     }
 
-    // 🔹 Generate internship certificate
+    // Generate Internship Certificate
     const certificateFile =
       await generateInternshipCertificateWeb(
         userId,
@@ -162,9 +180,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
       });
     }
 
-    // 🔹 Save or update certificate
+    // Save Certificate
     if (certificate) {
-      certificate.certificateUrl = certificateFile.fileUrl;
+      certificate.certificateUrl =
+        certificateFile.fileUrl;
+
       certificate.isIssued = true;
       certificate.issuedDate = new Date();
 
@@ -175,44 +195,55 @@ const createAndSendInternshipCertificate = async (req, res) => {
           {
             userId,
             courseId,
-            certificateUrl: certificateFile.fileUrl,
+            certificateUrl:
+              certificateFile.fileUrl,
             isIssued: true,
             issuedDate: new Date(),
-            deductedWallet: fundsWebTarget,
+            deductedWallet: fundswebTarget,
           },
           { transaction }
         );
     }
 
-    // 🔹 Send email
+    // Send Email
     const subject = `Your Internship Certificate - ${course.name}`;
 
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
+
       <p>
-        Here is your <b>Internship Certificate</b> for completing the
-        <b>${course.name}</b> course.
+        Here is your <b>Internship Certificate</b>
+        for completing the <b>${course.name}</b> course.
       </p>
+
       <p>Access it here:</p>
+
       <p>
         <a href="${certificateFile.fileUrl}" target="_blank">
           ${certificateFile.fileUrl}
         </a>
       </p>
+
       <p>Congratulations on your achievement!</p>
+
       <br/>
+
       <p>
         Best Regards,<br/>
         ${course.name} Team
       </p>
     `;
 
-    await sendMail(user.email, subject, html);
+    await sendMail(
+      user.email,
+      subject,
+      html
+    );
 
     await transaction.commit();
 
-    // 🔹 Generate participation certificate (non-blocking)
-    let participationCertUrl = null;
+    // Participation Certificate (Non-blocking)
+    let participationCertificateUrl = null;
 
     try {
       const participationCert =
@@ -221,10 +252,11 @@ const createAndSendInternshipCertificate = async (req, res) => {
           courseId
         );
 
-      participationCertUrl = participationCert.fileUrl;
+      participationCertificateUrl =
+        participationCert?.fileUrl || null;
     } catch (err) {
       console.error(
-        "Participation certificate generation failed (non-blocking):",
+        "Participation certificate generation failed:",
         err.message
       );
     }
@@ -233,16 +265,25 @@ const createAndSendInternshipCertificate = async (req, res) => {
       success: true,
       message:
         "Internship Certificate generated and sent successfully",
-      certificateUrl: certificateFile.fileUrl,
-      participationCertificateUrl: participationCertUrl,
-      deductionType: "fundsWebTarget",
+
+      certificateUrl:
+        certificateFile.fileUrl,
+
+      participationCertificateUrl,
+
+      deductionType: "fundswebTarget",
+
       wallet: {
-        fundsWebAchieved,
-        fundsWebDeducted:
-          fundsWebDeducted + fundsWebTarget,
-        fundsWebLeft:
-          fundsWebLeft - fundsWebTarget,
-        fundsWebTarget,
+        fundswebAchieved,
+        fundswebDeducted:
+          fundswebDeducted +
+          fundswebTarget,
+
+        fundswebLeft:
+          fundswebLeft -
+          fundswebTarget,
+
+        fundswebTarget,
       },
     });
   } catch (error) {
@@ -256,7 +297,7 @@ const createAndSendInternshipCertificate = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server error",
-      error,
+      error: error.message,
     });
   }
 };
