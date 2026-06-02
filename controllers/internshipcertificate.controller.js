@@ -16,12 +16,16 @@ const { generateInternshipCertificateWeb } = require("../utils/internshipcertifi
 
 const createAndSendInternshipCertificate = async (req, res) => {
   const transaction = await sequelize.transaction();
+
   try {
     const { userId, courseId } = req.body;
 
     if (!userId || !courseId) {
       await transaction.rollback();
-      return res.status(400).json({ success: false, message: "userId and courseId are required" });
+      return res.status(400).json({
+        success: false,
+        message: "userId and courseId are required",
+      });
     }
 
     // 🔹 Fetch user
@@ -30,9 +34,13 @@ const createAndSendInternshipCertificate = async (req, res) => {
       transaction,
       lock: transaction.LOCK.UPDATE,
     });
+
     if (!user) {
       await transaction.rollback();
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
     }
 
     // 🔹 Fetch course
@@ -40,21 +48,29 @@ const createAndSendInternshipCertificate = async (req, res) => {
       where: { id: courseId, isDeleted: false },
       transaction,
     });
+
     if (!course) {
       await transaction.rollback();
-      return res.status(404).json({ success: false, message: "Course not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Course not found",
+      });
     }
 
     // 🔹 CHECK END DATE
     const userCourseData = user.courseDates?.[courseId];
+
     if (userCourseData?.endDate) {
       const currentDate = new Date();
       const courseEndDate = new Date(userCourseData.endDate);
+
       if (currentDate < courseEndDate) {
         await transaction.rollback();
+
         return res.status(400).json({
           success: false,
-          message: "Certificate cannot be generated yet. The course end date has not been reached.",
+          message:
+            "Certificate cannot be generated yet. The course end date has not been reached.",
           endDate: userCourseData.endDate,
           courseName: userCourseData.courseName,
         });
@@ -70,263 +86,185 @@ const createAndSendInternshipCertificate = async (req, res) => {
     const alreadyIssued = certificate && certificate.isIssued;
 
     // ─────────────────────────────────────────────
-    // 🔹 FUNDSWEB USER PATH
-    // ─────────────────────────────────────────────
-    if (user.userType === "fundsweb") {
-
-      const fundsWebTarget   = parseInt(course?.fundsWebTarget || 0, 10);
-      const fundsWebAchieved = parseInt(user.fundsWebTargets?.[courseId] ?? 0, 10);
-      const fundsWebDeducted = parseInt(user.fundsWebDeductedTargets?.[courseId] ?? 0, 10);
-      const fundsWebLeft     = Math.max(0, fundsWebAchieved - fundsWebDeducted);
-      const fundsWebTargetMet = fundsWebTarget > 0 && fundsWebLeft >= fundsWebTarget;
-
-      // 🔥 Skip wallet check if already issued
-      if (!alreadyIssued) {
-        if (!fundsWebTargetMet) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: "FundsWeb subscription target not met for this course.",
-            wallet: {
-              fundsWebAchieved,
-              fundsWebDeducted,
-              fundsWebLeft,
-              fundsWebTarget,
-            },
-          });
-        }
-      }
-
-      // 🔹 Deduct only on first-time issuance
-      if (!certificate) {
-        const updatedFundsWebDeducted = { ...(user.fundsWebDeductedTargets || {}) };
-        updatedFundsWebDeducted[courseId] = fundsWebDeducted + fundsWebTarget;
-        user.fundsWebDeductedTargets = updatedFundsWebDeducted;
-        user.changed("fundsWebDeductedTargets", true);
-
-        await user.save({
-          fields: ["fundsWebDeductedTargets"],
-          transaction,
-        });
-      }
-
-      // 🔹 Generate internship certificate
-      const certificateFile = await generateInternshipCertificateWeb(userId, courseId);
-      if (!certificateFile?.fileUrl) {
-        await transaction.rollback();
-        return res.status(500).json({
-          success: false,
-          message: "Certificate generation failed: fileUrl is missing",
-        });
-      }
-
-      // 🔹 Save or update certificate
-      if (certificate) {
-        certificate.certificateUrl = certificateFile.fileUrl;
-        certificate.isIssued       = true;
-        certificate.issuedDate     = new Date();
-        await certificate.save({ transaction });
-      } else {
-        certificate = await model.InternshipCertificate.create(
-          {
-            userId,
-            courseId,
-            certificateUrl: certificateFile.fileUrl,
-            isIssued:       true,
-            issuedDate:     new Date(),
-            deductedWallet: fundsWebTarget,
-          },
-          { transaction }
-        );
-      }
-
-      // 🔹 Send email
-      const subject = `Your Internship Certificate - ${course.name}`;
-      const html = `
-        <p>Dear ${user.fullName || user.firstName},</p>
-        <p>Here is your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
-        <p>Access it here:</p>
-        <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
-        <p>Congratulations on your achievement!</p>
-        <br/>
-        <p>Best Regards,<br/>${course.name} Team</p>
-      `;
-      await sendMail(user.email, subject, html);
-
-      await transaction.commit();
-
-      // 🔹 Generate participation certificate (non-blocking)
-      let participationCertUrl = null;
-      try {
-        const participationCert = await generateparticipationCertificate(userId, courseId);
-        participationCertUrl = participationCert.fileUrl;
-      } catch (err) {
-        console.error("Participation certificate generation failed (non-blocking):", err.message);
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Internship Certificate generated and sent successfully",
-        certificateUrl: certificateFile.fileUrl,
-        participationCertificateUrl: participationCertUrl,
-        deductionType: "fundsWebTarget",
-        wallet: {
-          fundsWebAchieved,
-          fundsWebDeducted: fundsWebDeducted + fundsWebTarget,
-          fundsWebLeft: fundsWebLeft - fundsWebTarget,
-          fundsWebTarget,
-        },
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // 🔹 FUNDSAUDIT USER PATH
+    // 🔹 FUNDSWEB TARGET VALIDATION
     // ─────────────────────────────────────────────
 
-    // 🔹 Get targets
-    const userTargetObj         = user.businessTargets?.[courseId];
-    const businessTarget        = userTargetObj?.target !== undefined
-      ? parseInt(userTargetObj.target, 10)
-      : parseInt(course?.businessTarget || 0, 10);
-    const followerTarget        = parseInt(course?.followerTarget || 0, 10);
-    const reviewAndRatingTarget = parseInt(course?.reviewAndRatingTarget || 0, 10);
-    const postTarget            = parseInt(course?.postTarget || 0, 10);
+    const fundsWebTarget = parseInt(course?.fundsWebTarget || 0, 10);
+    const fundsWebAchieved = parseInt(
+      user.fundsWebTargets?.[courseId] ?? 0,
+      10
+    );
+    const fundsWebDeducted = parseInt(
+      user.fundsWebDeductedTargets?.[courseId] ?? 0,
+      10
+    );
 
-    // 🔹 Wallet info
-    const subscriptionWallet = parseInt(user.subscriptionWallet || 0, 10);
-    let newDeductedWallet    = parseInt(user.subscriptiondeductedWallet || 0, 10);
-    let newSubscriptionLeft  = Math.max(0, subscriptionWallet - newDeductedWallet);
+    const fundsWebLeft = Math.max(
+      0,
+      fundsWebAchieved - fundsWebDeducted
+    );
 
-    // 🔹 Check which path qualifies
-    const businessTargetMet = businessTarget !== null && businessTarget > 0
-      ? newSubscriptionLeft >= businessTarget
-      : newSubscriptionLeft > 0;
+    const fundsWebTargetMet =
+      fundsWebTarget > 0 &&
+      fundsWebLeft >= fundsWebTarget;
 
-    const threeTargetsMet = newSubscriptionLeft >= (followerTarget + reviewAndRatingTarget + postTarget)
-      && (followerTarget + reviewAndRatingTarget + postTarget) > 0;
-
-    // 🔥 Skip wallet check if already issued
+    // 🔥 Skip target check if certificate already issued
     if (!alreadyIssued) {
-      if (!businessTargetMet && !threeTargetsMet) {
+      if (!fundsWebTargetMet) {
         await transaction.rollback();
+
         return res.status(400).json({
           success: false,
-          message: "Insufficient subscription wallet. Neither business target nor the 3 marketing targets are met.",
+          message:
+            "FundsWeb subscription target not met for this course.",
           wallet: {
-            totalSubscribed: subscriptionWallet,
-            totalDeducted: newDeductedWallet,
-            subscriptionLeft: newSubscriptionLeft,
-            businessTarget,
-            followerTarget,
-            reviewAndRatingTarget,
-            postTarget,
+            fundsWebAchieved,
+            fundsWebDeducted,
+            fundsWebLeft,
+            fundsWebTarget,
           },
         });
       }
     }
 
-    // 🔹 Decide how much to deduct
-    const deductionAmount = businessTargetMet
-      ? (businessTarget || subscriptionWallet)
-      : (followerTarget + reviewAndRatingTarget + postTarget);
-
-    const deductionType = businessTargetMet ? "businessTarget" : "threeTargets";
-
-    // 🔹 Deduct wallet only if first-time issuance
+    // 🔹 Deduct only on first-time issuance
     if (!certificate) {
-      newDeductedWallet  += deductionAmount;
-      newSubscriptionLeft = subscriptionWallet - newDeductedWallet;
+      const updatedFundsWebDeducted = {
+        ...(user.fundsWebDeductedTargets || {}),
+      };
 
-      user.subscriptiondeductedWallet = newDeductedWallet;
-      user.subscriptionLeft           = newSubscriptionLeft;
+      updatedFundsWebDeducted[courseId] =
+        fundsWebDeducted + fundsWebTarget;
+
+      user.fundsWebDeductedTargets = updatedFundsWebDeducted;
+      user.changed("fundsWebDeductedTargets", true);
 
       await user.save({
-        fields: ["subscriptiondeductedWallet", "subscriptionLeft"],
+        fields: ["fundsWebDeductedTargets"],
         transaction,
       });
     }
 
     // 🔹 Generate internship certificate
-    const certificateFile = await generateInternshipCertificateWeb(userId, courseId);
+    const certificateFile =
+      await generateInternshipCertificateWeb(
+        userId,
+        courseId
+      );
+
     if (!certificateFile?.fileUrl) {
       await transaction.rollback();
+
       return res.status(500).json({
         success: false,
-        message: "Certificate generation failed: fileUrl is missing",
+        message:
+          "Certificate generation failed: fileUrl is missing",
       });
     }
 
     // 🔹 Save or update certificate
     if (certificate) {
       certificate.certificateUrl = certificateFile.fileUrl;
-      certificate.isIssued       = true;
-      certificate.issuedDate     = new Date();
+      certificate.isIssued = true;
+      certificate.issuedDate = new Date();
+
       await certificate.save({ transaction });
     } else {
-      certificate = await model.InternshipCertificate.create(
-        {
-          userId,
-          courseId,
-          certificateUrl: certificateFile.fileUrl,
-          isIssued:       true,
-          issuedDate:     new Date(),
-          deductedWallet: deductionAmount,
-        },
-        { transaction }
-      );
+      certificate =
+        await model.InternshipCertificate.create(
+          {
+            userId,
+            courseId,
+            certificateUrl: certificateFile.fileUrl,
+            isIssued: true,
+            issuedDate: new Date(),
+            deductedWallet: fundsWebTarget,
+          },
+          { transaction }
+        );
     }
 
     // 🔹 Send email
     const subject = `Your Internship Certificate - ${course.name}`;
+
     const html = `
       <p>Dear ${user.fullName || user.firstName},</p>
-      <p>Here is your <b>Internship Certificate</b> for completing the <b>${course.name}</b> course.</p>
+      <p>
+        Here is your <b>Internship Certificate</b> for completing the
+        <b>${course.name}</b> course.
+      </p>
       <p>Access it here:</p>
-      <p><a href="${certificateFile.fileUrl}" target="_blank">${certificateFile.fileUrl}</a></p>
+      <p>
+        <a href="${certificateFile.fileUrl}" target="_blank">
+          ${certificateFile.fileUrl}
+        </a>
+      </p>
       <p>Congratulations on your achievement!</p>
       <br/>
-      <p>Best Regards,<br/>${course.name} Team</p>
+      <p>
+        Best Regards,<br/>
+        ${course.name} Team
+      </p>
     `;
+
     await sendMail(user.email, subject, html);
 
     await transaction.commit();
 
     // 🔹 Generate participation certificate (non-blocking)
     let participationCertUrl = null;
+
     try {
-      const participationCert = await generateparticipationCertificate(userId, courseId);
+      const participationCert =
+        await generateparticipationCertificate(
+          userId,
+          courseId
+        );
+
       participationCertUrl = participationCert.fileUrl;
     } catch (err) {
-      console.error("Participation certificate generation failed (non-blocking):", err.message);
+      console.error(
+        "Participation certificate generation failed (non-blocking):",
+        err.message
+      );
     }
 
     return res.status(200).json({
       success: true,
-      message: "Internship Certificate generated and sent successfully",
+      message:
+        "Internship Certificate generated and sent successfully",
       certificateUrl: certificateFile.fileUrl,
       participationCertificateUrl: participationCertUrl,
-      deductionType,
+      deductionType: "fundsWebTarget",
       wallet: {
-        totalSubscribed: subscriptionWallet,
-        deductionAmount,
-        totalDeducted: newDeductedWallet,
-        subscriptionLeft: newSubscriptionLeft,
-        businessTarget,
-        followerTarget,
-        reviewAndRatingTarget,
-        postTarget,
+        fundsWebAchieved,
+        fundsWebDeducted:
+          fundsWebDeducted + fundsWebTarget,
+        fundsWebLeft:
+          fundsWebLeft - fundsWebTarget,
+        fundsWebTarget,
       },
     });
-
   } catch (error) {
     await transaction.rollback();
-    console.error("createAndSendInternshipCertificate error:", error);
-    return res.status(500).json({ success: false, message: "Server error", error });
+
+    console.error(
+      "createAndSendInternshipCertificate error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error,
+    });
   }
 };
 
-module.exports.createAndSendInternshipCertificate = createAndSendInternshipCertificate;
+module.exports.createAndSendInternshipCertificate =
+  createAndSendInternshipCertificate;
 
+  
 const generateMergedInternshipReportAndEmail = async (req, res) => {
   try {
     // 1️⃣ Extract and validate userId and courseId from params
