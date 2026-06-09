@@ -98,12 +98,12 @@ const taskWeightageRules = {
 // ---------------- UPSERT TASK FOR DAY ----------------
 var upsertTaskForDay = async function (req, res) {
   try {
-    const { managerId, date, task } = req.body;
+    const { managerId, date, task, sessionRecording, sessionLink } = req.body;
     if (!managerId || !date || !task) return ReE(res, "managerId, date and task are required", 400);
 
     const [dayRecord] = await model.TaskCalendarDay.findOrCreate({
       where: { teamManagerId: managerId, taskDate: date },
-      defaults: { tasks: [], dayProgress: null },
+      defaults: { tasks: [], dayProgress: null, sessionRecording: null, sessionLink: null },
     });
 
     let tasks = Array.isArray(dayRecord.tasks) ? [...dayRecord.tasks] : [];
@@ -182,9 +182,14 @@ var upsertTaskForDay = async function (req, res) {
       dayProgress = Math.round(dayProgress);
     }
 
-    await dayRecord.update({ tasks, dayProgress });
+    // ---------------- BUILD SESSION UPDATE PAYLOAD ----------------
+    const sessionUpdate = {};
+    if (sessionRecording !== undefined) sessionUpdate.sessionRecording = sessionRecording ?? null;
+    if (sessionLink !== undefined) sessionUpdate.sessionLink = sessionLink ?? null;
 
-    return ReS(res, { success: true, date, tasks, dayProgress }, 200);
+    await dayRecord.update({ tasks, dayProgress, ...sessionUpdate });
+
+    return ReS(res, { success: true, date, tasks, dayProgress, ...sessionUpdate }, 200);
   } catch (error) {
     console.error("Error upserting task:", error);
     return ReE(res, error.message, 500);
@@ -203,7 +208,7 @@ var getTaskForDate = async function (req, res) {
       where: { teamManagerId: managerId, taskDate: date, isDeleted: false },
     });
 
-    if (!record) return ReS(res, { success: true, date, tasks: [], dayProgress: null }, 200);
+    if (!record) return ReS(res, { success: true, date, tasks: [], dayProgress: null, sessionRecording: null, sessionLink: null }, 200);
 
     let tasks = Array.isArray(record.tasks) ? [...record.tasks] : [];
 
@@ -237,7 +242,14 @@ var getTaskForDate = async function (req, res) {
 
     await record.update({ tasks, dayProgress });
 
-    return ReS(res, { success: true, date, tasks, dayProgress }, 200);
+    return ReS(res, {
+      success: true,
+      date,
+      tasks,
+      dayProgress,
+      sessionRecording: record.sessionRecording ?? null,
+      sessionLink: record.sessionLink ?? null,
+    }, 200);
   } catch (error) {
     console.error("Error fetching task for date:", error);
     return ReE(res, error.message, 500);

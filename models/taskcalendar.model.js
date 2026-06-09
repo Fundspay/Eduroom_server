@@ -35,6 +35,20 @@ module.exports = (sequelize, Sequelize) => {
         allowNull: true,
       },
 
+      // 🔹 Session recording (file path or storage key)
+      sessionRecording: {
+        type: Sequelize.TEXT,
+        allowNull: true,
+        defaultValue: null,
+      },
+
+      // 🔹 Session link (publicly accessible URL)
+      sessionLink: {
+        type: Sequelize.STRING(2048),
+        allowNull: true,
+        defaultValue: null,
+      },
+
       // 🔹 Status flags
       isActive: {
         type: Sequelize.BOOLEAN,
