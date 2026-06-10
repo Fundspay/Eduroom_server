@@ -1,15 +1,16 @@
 "use strict";
 const AWS = require("aws-sdk");
 const puppeteer = require("puppeteer");
-const QRCode = require("qrcode"); // npm install qrcode
 const CONFIG = require("../config/config");
 const model = require("../models");
 
 const s3 = new AWS.S3({
   accessKeyId: CONFIG.awsAccessKeyId,
   secretAccessKey: CONFIG.awsSecretAccessKey,
-  region: CONFIG.awsRegion,
+  region: CONFIG.awsRegion
 });
+
+const ASSET_BASE = "1https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets";
 
 const normalizeDateToISO = (input) => {
   if (!input) return null;
@@ -18,31 +19,13 @@ const normalizeDateToISO = (input) => {
   return d.toISOString().split("T")[0];
 };
 
-/**
- * Generates a base64 PNG data URL for the given text/URL.
- * Returns null if no portfolioLink is set.
- */
-const generateQRCodeDataURL = async (text) => {
-  if (!text) return null;
-  try {
-    // Returns a data:image/png;base64,... string
-    return await QRCode.toDataURL(text, {
-      width: 120,
-      margin: 1,
-      color: { dark: "#000000", light: "#ffffff" },
-    });
-  } catch {
-    return null;
-  }
-};
-
 const generateInternshipCertificate = async (userId, courseId) => {
   if (!userId) throw new Error("Missing userId");
   if (!courseId) throw new Error("Missing courseId");
 
   // 1. Load user
   const user = await model.User.findOne({
-    where: { id: userId, isDeleted: false },
+    where: { id: userId, isDeleted: false }
   });
   if (!user) throw new Error("User not found");
 
@@ -69,161 +52,107 @@ const generateInternshipCertificate = async (userId, courseId) => {
     const course = await model.Course.findOne({ where: { id: Number(courseId) } });
     if (course) {
       if (course.name) courseName = course.name;
-      domainSkills = course.domainSkills ? course.domainSkills.split(",").map((s) => s.trim()) : [];
-      interpersonalSkills = course.interpersonalSkills
-        ? course.interpersonalSkills.split(",").map((s) => s.trim())
-        : [];
+      domainSkills = course.domainSkills ? course.domainSkills.split(",").map(s => s.trim()) : [];
+      interpersonalSkills = course.interpersonalSkills ? course.interpersonalSkills.split(",").map(s => s.trim()) : [];
     }
 
-    startDate = new Date(startDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-    endDate = new Date(endDate).toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    startDate = new Date(startDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
+    endDate = new Date(endDate).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
   }
 
   const role = courseName;
+  const today = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
 
-  // 4. Generate QR code for portfolioLink (null if not set)
-  const qrCodeDataURL = await generateQRCodeDataURL(user.portfolioLink);
-
-  // 5. Conditional background image
+  // ✅ CONDITIONAL BACKGROUND IMAGE
   const backgroundImage =
     Number(courseId) === 24
-      ? "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/10.png"
-      : "https://fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/1.png";
+      ? "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/10.png"
+      : "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/9.png";
 
-  // 6. Build QR block HTML — only rendered when a portfolio link exists
-  const qrBlockHTML = qrCodeDataURL
-    ? `
-      <div class="qr-block">
-        <img src="${qrCodeDataURL}" alt="Portfolio QR Code" class="qr-image" />
-        <p class="qr-label">Scan to view portfolio</p>
-      </div>`
-    : "";
-
-  // 7. HTML template
+  // 5) HTML
   const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Internship Completion Certificate</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Times New Roman', serif;
-            background: #f5f5f5;
-        }
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+     <meta charset="UTF-8">
+     <title>Internship Completion Certificate</title>
 
-        .letter-container {
-            width: 800px;
-            margin: 20px auto;
-            padding: 80px 100px;
-            background: url("${backgroundImage}") no-repeat center top;
-            background-size: cover;
-            min-height: 1100px;
-            box-sizing: border-box;
-            position: relative;
-        }
+     <style>
+         body {
+             margin: 0;
+             padding: 0;
+             font-family: 'Times New Roman', serif;
+             background: #f5f5f5;
+         }
 
-        .date,
-        .content {
-            font-family: 'Times New Roman', serif;
-        }
+         .letter-container {
+             width: 800px;
+             margin: 20px auto;
+             padding: 80px 100px;
+             background: url("${backgroundImage}") no-repeat center top;
+             background-size: cover;
+             min-height: 1100px;
+             box-sizing: border-box;
+             position: relative;
+         }
 
-        .date {
-            text-align: left;
-            margin-top: 100px;
-            margin-bottom: 87px;
-            margin-left: -65px;
-            font-size: 16px;
-        }
+         .date,
+         .content {
+             font-family: 'Times New Roman', serif;
+         }
 
-        .content {
-            font-size: 15.5px;
-            margin-left: -65px;
-            line-height: 1.6;
-            text-align: justify;
-        }
+         .date {
+             text-align: left;
+             margin-top: 100px;
+             margin-bottom: 87px;
+             margin-left: -65px;
+             font-size: 16px;
+         }
 
-        /* ── QR Code block ── */
-        .qr-block {
-            position: absolute;
-            bottom: 80px;       /* sits just above the footer area */
-            right: 100px;       /* aligns with the right padding of the container */
-            text-align: center;
-        }
+         .content {
+             font-size: 15.5px;
+             margin-left: -65px;
+             line-height: 1.6;
+             text-align: justify;
+         }
 
-        .qr-image {
-            width: 110px;
-            height: 110px;
-            display: block;
-            border: 1px solid #ccc;
-            padding: 4px;
-            background: #fff;
-        }
+         .signature {
+             margin-top: 60px;
+             font-size: 16px;
+         }
 
-        .qr-label {
-            margin: 6px 0 0;
-            font-size: 11px;
-            color: #555;
-            font-family: 'Times New Roman', serif;
-        }
+         .footer {
+             position: absolute;
+             bottom: 30px;
+             left: 100px;
+             right: 100px;
+             text-align: center;
+             font-size: 14px;
+             color: #333;
+         }
+     </style>
+ </head>
+ <body>
+     <div class="letter-container">
+         <div class="date">Date: <b>${endDate}</b></div>
 
-        .footer {
-            position: absolute;
-            bottom: 30px;
-            left: 100px;
-            right: 100px;
-            text-align: center;
-            font-size: 14px;
-            color: #333;
-        }
-    </style>
-</head>
-<body>
-    <div class="letter-container">
+         <div class="content">
+    <b>To Whom so ever it may concern</b>,<br><br>
+    We are pleased to confirm that <b>${candidateName}</b> has successfully completed ${pronouns.possessive} role as an <b>${role}</b> Intern and completed ${pronouns.possessive} internship starting from <b>${startDate}</b> till <b>${endDate}</b>.<br><br>
 
-        <div class="date">Date: <b>${endDate}</b></div>
+    During ${pronouns.possessive} internship at Eduroom, ${pronouns.subject.toLowerCase()} demonstrated key traits like <b>${interpersonalSkills.join(", ")}</b>. ${pronouns.subject} demonstrated exceptional skills in <b>${domainSkills.join(", ")}</b>.<br><br>
 
-        <div class="content">
-            <b>To Whom so ever it may concern</b>,<br><br>
+    ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)} contributions have supported to overall business and organisational development. We wish ${pronouns.object} all the best in ${pronouns.possessive} future endeavours.<br><br>
 
-            We are pleased to confirm that <b>${candidateName}</b> has successfully completed
-            ${pronouns.possessive} role as an <b>${role}</b> Intern and completed
-            ${pronouns.possessive} internship starting from <b>${startDate}</b> till
-            <b>${endDate}</b>.<br><br>
+    We also firmly believe ${pronouns.subject.toLowerCase()} will become an integral part of a future workplace.<br><br>
+</div>
 
-            During ${pronouns.possessive} internship at Eduroom,
-            ${pronouns.subject.toLowerCase()} demonstrated key traits like
-            <b>${interpersonalSkills.join(", ")}</b>.
-            ${pronouns.subject} demonstrated exceptional skills in
-            <b>${domainSkills.join(", ")}</b>.<br><br>
+     </div>
+ </body>
+ </html>
+ `;
 
-            ${pronouns.possessive.charAt(0).toUpperCase() + pronouns.possessive.slice(1)}
-            contributions have supported the overall business and organisational development.
-            We wish ${pronouns.object} all the best in ${pronouns.possessive} future
-            endeavours.<br><br>
-
-            We also firmly believe ${pronouns.subject.toLowerCase()} will become an integral
-            part of a future workplace.<br><br>
-        </div>
-
-        ${qrBlockHTML}
-
-    </div>
-</body>
-</html>
-`;
-
-  // 8. Render PDF with Puppeteer
+  // 5) Render PDF
   let pdfBuffer;
   try {
     const browser = await puppeteer.launch({
@@ -232,8 +161,9 @@ const generateInternshipCertificate = async (userId, courseId) => {
     });
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle0" });
-    await page.evaluateHandle("document.fonts.ready");
-    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    await page.evaluateHandle('document.fonts.ready');
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     pdfBuffer = await page.pdf({
       format: "A4",
@@ -246,23 +176,21 @@ const generateInternshipCertificate = async (userId, courseId) => {
     throw new Error("PDF generation failed: " + err.message);
   }
 
-  // 9. Upload to S3
+  // Upload to S3
   const timestamp = Date.now();
   const fileName = `offerletter-${timestamp}.pdf`;
   const s3Key = `offerletters/${userId}/${fileName}`;
 
-  await s3
-    .putObject({
-      Bucket: "fundsweb",
-      Key: s3Key,
-      Body: pdfBuffer,
-      ContentType: "application/pdf",
-    })
-    .promise();
+  await s3.putObject({
+    Bucket: "1fundsweb",
+    Key: s3Key,
+    Body: pdfBuffer,
+    ContentType: "application/pdf",
+  }).promise();
 
   return {
     fileName,
-    fileUrl: `https://fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
+    fileUrl: `https://1fundsweb.s3.ap-south-1.amazonaws.com/${s3Key}`,
   };
 };
 
