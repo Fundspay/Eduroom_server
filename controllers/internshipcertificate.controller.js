@@ -864,7 +864,7 @@ const getParticipationCertificate = async (req, res) => {
       });
     }
 
-    const participationCert = await generateparticipationCertificate(userId, courseId);
+    const participationCert = await  generateInternshipCertificate(userId, courseId);
 
     return res.status(200).json({
       success: true,
