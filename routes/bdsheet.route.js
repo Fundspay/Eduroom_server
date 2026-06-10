@@ -16,8 +16,10 @@ router.get("/ranges", bdsheetController.getManagerRangeAmounts);
 router.get('/target-vs-achieved', bdsheetController.getTargetVsAchieved);
 router.get('/bd-tl-leaderboard', bdsheetController.getBdTlLeaderboard);
 router.get('/account-target-vs-achieved', bdsheetController.getAccountTargetVsAchieved);
-router.get("/payments-vs-target", bdsheetController.getAccountsCountWithTargetSummary );
+router.get("/payments-vs-target", bdsheetController.getAccountsCountWithTargetSummary);
 router.post("/send-generic", bdsheetController.sendGenericEmail);
+router.get("/manager-intern-stats", bdsheetController.getManagerInternStats);
+router.post("/manager-team-stats", bdsheetController.upsertTeamStats);
 // router.post("/youtubelink", bdsheetController.upsertBdSheetLinkByTL)
 
 

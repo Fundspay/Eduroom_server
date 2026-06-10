@@ -15,6 +15,21 @@ module.exports = (sequelize, Sequelize) => {
       internsAllocated: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       internsActive: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
       accounts: { type: Sequelize.INTEGER, allowNull: false, defaultValue: 0 },
+      // In BdTarget model, add:
+
+      teamAttendance: {
+        type: Sequelize.INTEGER,
+        allowNull: true,
+        defaultValue: null,
+
+      },
+
+      teamReview: {
+        type: Sequelize.FLOAT,
+        allowNull: true,
+        defaultValue: null,
+
+      },
 
       createdAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },
       updatedAt: { type: Sequelize.DATE, allowNull: false, defaultValue: Sequelize.NOW },

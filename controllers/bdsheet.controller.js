@@ -2022,3 +2022,89 @@ module.exports.getAccountsCountWithTargetSummary =
 };
 
 module.exports.sendGenericEmail = sendGenericEmail;
+
+
+// ---------------------------
+// GET: Fetch intern stats for a manager
+// ---------------------------
+const getManagerInternStats = async (req, res) => {
+  try {
+    const { managerId } = req.query;
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    const manager = await model.TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    // Fetch from BdTarget (allocated & active targets)
+    const bdTarget = await model.BdTarget.findOne({
+      where: { teamManagerId: managerId },
+      attributes: ["internsAllocated", "internsActive"],
+    });
+
+    // Fetch from BdSheet (actual interns)
+    const bdSheetData = await model.BdSheet.findAll({
+      where: { teamManagerId: managerId },
+      attributes: ["activeStatus"],
+    });
+
+    const totalInterns = bdSheetData.length;
+    const totalActiveInterns = bdSheetData.filter(
+      (row) => row.activeStatus?.toLowerCase() === "active"
+    ).length;
+
+    return ReS(res, {
+      success: true,
+      managerId,
+      managerName: manager.name,
+      internsAllocated: bdTarget?.internsAllocated ?? 0,
+      internsActive: bdTarget?.internsActive ?? 0,
+      totalInterns,
+      totalActiveInterns,
+    });
+  } catch (err) {
+    console.error("Get Manager Intern Stats Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getManagerInternStats = getManagerInternStats;
+
+
+const upsertTeamStats = async (req, res) => {
+  try {
+    const { managerId, teamAttendance, teamReview } = req.body;
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    const manager = await model.TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    const [bdTarget, created] = await model.BdTarget.findOrCreate({
+      where: { teamManagerId: managerId },
+      defaults: {
+        teamAttendance: teamAttendance ?? null,
+        teamReview: teamReview ?? null,
+      },
+    });
+
+    if (!created) {
+      const updateData = {};
+      if (teamAttendance !== undefined) updateData.teamAttendance = teamAttendance;
+      if (teamReview !== undefined) updateData.teamReview = teamReview;
+      await bdTarget.update(updateData);
+      await bdTarget.reload();
+    }
+
+    return ReS(res, {
+      success: true,
+      message: created ? "Stats created" : "Stats updated",
+      managerId,
+      teamAttendance: bdTarget.teamAttendance,
+      teamReview: bdTarget.teamReview,
+    });
+  } catch (err) {
+    console.error("Upsert Team Stats Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.upsertTeamStats = upsertTeamStats;
