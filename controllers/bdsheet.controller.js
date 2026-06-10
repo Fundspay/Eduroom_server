@@ -2148,27 +2148,14 @@ const getManagerStatsOverview = async (req, res) => {
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
-    // ---- Date filter for BdSheet ----
-    const bdSheetDateFilter = {
-      [Op.and]: [
-        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
-        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
-      ],
-    };
-
-    // ---- Date filter for BdTarget ----
-    const bdTargetDateFilter = {
-      [Op.and]: [
-        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("date")), ">=", startDate),
-        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("date")), "<=", endDate),
-      ],
-    };
-
     // ---- BdSheet (actual intern counts) ----
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         teamManagerId: managerId,
-        ...bdSheetDateFilter,
+        [Op.and]: [
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
+        ],
       },
       attributes: ["activeStatus"],
     });
@@ -2178,11 +2165,31 @@ const getManagerStatsOverview = async (req, res) => {
       (row) => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-    // ---- BdTarget (team stats within date range) ----
+    // ---- BdTarget intern stats (via targetDate) ----
+    const bdTargetInterns = await model.BdTarget.findAll({
+      where: {
+        teamManagerId: managerId,
+        targetDate: {
+          [Op.between]: [startDate, endDate],
+        },
+      },
+      attributes: ["internsAllocated", "internsActive"],
+    });
+
+    const totalInternsAllocated = bdTargetInterns.reduce(
+      (sum, r) => sum + (Number(r.internsAllocated) || 0), 0
+    );
+    const totalInternsActive = bdTargetInterns.reduce(
+      (sum, r) => sum + (Number(r.internsActive) || 0), 0
+    );
+
+    // ---- BdTarget team stats (via date) ----
     const bdTarget = await model.BdTarget.findOne({
       where: {
         teamManagerId: managerId,
-        ...bdTargetDateFilter,
+        date: {
+          [Op.between]: [startDate, endDate],
+        },
       },
       attributes: ["teamAttendance", "teamReview", "date"],
       order: [["date", "DESC"]],
@@ -2193,8 +2200,8 @@ const getManagerStatsOverview = async (req, res) => {
       managerId,
       managerName: manager.name,
       internStats: {
-        internsAllocated: totalInterns,
-        internsActive: totalActiveInterns,
+        internsAllocated: totalInternsAllocated,
+        internsActive: totalInternsActive,
       },
       teamStats: {
         date: bdTarget?.date ?? null,
