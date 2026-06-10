@@ -20,6 +20,7 @@ router.get("/payments-vs-target", bdsheetController.getAccountsCountWithTargetSu
 router.post("/send-generic", bdsheetController.sendGenericEmail);
 router.get("/manager-intern-stats", bdsheetController.getManagerInternStats);
 router.post("/manager-team-stats", bdsheetController.upsertTeamStats);
+router.get("/manager-stats-overview", bdsheetController.getManagerStatsOverview);
 // router.post("/youtubelink", bdsheetController.upsertBdSheetLinkByTL)
 
 

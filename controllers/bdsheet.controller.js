@@ -2024,26 +2024,35 @@ module.exports.getAccountsCountWithTargetSummary =
 module.exports.sendGenericEmail = sendGenericEmail;
 
 
-// ---------------------------
-// GET: Fetch intern stats for a manager
-// ---------------------------
 const getManagerInternStats = async (req, res) => {
   try {
-    const { managerId } = req.query;
+    const { managerId, startDate, endDate } = req.query;
     if (!managerId) return ReE(res, "managerId is required", 400);
 
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
-    // Fetch from BdTarget (allocated & active targets)
+    // Date filter for BdSheet
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        [Op.and]: [
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
+        ],
+      };
+    }
+
     const bdTarget = await model.BdTarget.findOne({
       where: { teamManagerId: managerId },
       attributes: ["internsAllocated", "internsActive"],
     });
 
-    // Fetch from BdSheet (actual interns)
     const bdSheetData = await model.BdSheet.findAll({
-      where: { teamManagerId: managerId },
+      where: {
+        teamManagerId: managerId,
+        ...(startDate && endDate ? dateFilter : {}),
+      },
       attributes: ["activeStatus"],
     });
 
@@ -2060,6 +2069,7 @@ const getManagerInternStats = async (req, res) => {
       internsActive: bdTarget?.internsActive ?? 0,
       totalInterns,
       totalActiveInterns,
+      appliedFilters: { startDate: startDate || null, endDate: endDate || null },
     });
   } catch (err) {
     console.error("Get Manager Intern Stats Error:", err);
@@ -2069,10 +2079,9 @@ const getManagerInternStats = async (req, res) => {
 
 module.exports.getManagerInternStats = getManagerInternStats;
 
-
 const upsertTeamStats = async (req, res) => {
   try {
-    const { managerId, teamAttendance, teamReview } = req.body;
+    const { managerId, teamAttendance, teamReview, date } = req.body;
     if (!managerId) return ReE(res, "managerId is required", 400);
 
     const manager = await model.TeamManager.findByPk(managerId);
@@ -2083,6 +2092,7 @@ const upsertTeamStats = async (req, res) => {
       defaults: {
         teamAttendance: teamAttendance ?? null,
         teamReview: teamReview ?? null,
+        date: date ?? null,
       },
     });
 
@@ -2090,6 +2100,7 @@ const upsertTeamStats = async (req, res) => {
       const updateData = {};
       if (teamAttendance !== undefined) updateData.teamAttendance = teamAttendance;
       if (teamReview !== undefined) updateData.teamReview = teamReview;
+      if (date !== undefined) updateData.date = date;
       await bdTarget.update(updateData);
       await bdTarget.reload();
     }
@@ -2098,6 +2109,7 @@ const upsertTeamStats = async (req, res) => {
       success: true,
       message: created ? "Stats created" : "Stats updated",
       managerId,
+      date: bdTarget.date,
       teamAttendance: bdTarget.teamAttendance,
       teamReview: bdTarget.teamReview,
     });
@@ -2108,3 +2120,67 @@ const upsertTeamStats = async (req, res) => {
 };
 
 module.exports.upsertTeamStats = upsertTeamStats;
+
+const getManagerStatsOverview = async (req, res) => {
+  try {
+    const { managerId, startDate, endDate } = req.query;
+    if (!managerId) return ReE(res, "managerId is required", 400);
+
+    const manager = await model.TeamManager.findByPk(managerId);
+    if (!manager) return ReE(res, "Team Manager not found", 404);
+
+    // Date filter for BdSheet
+    let dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter = {
+        [Op.and]: [
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
+          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
+        ],
+      };
+    }
+
+    // BdTarget (targets + team stats)
+    const bdTarget = await model.BdTarget.findOne({
+      where: { teamManagerId: managerId },
+      attributes: ["internsAllocated", "internsActive", "teamAttendance", "teamReview", "date"],
+    });
+
+    // BdSheet (actual counts)
+    const bdSheetData = await model.BdSheet.findAll({
+      where: {
+        teamManagerId: managerId,
+        ...(startDate && endDate ? dateFilter : {}),
+      },
+      attributes: ["activeStatus"],
+    });
+
+    const totalInterns = bdSheetData.length;
+    const totalActiveInterns = bdSheetData.filter(
+      (row) => row.activeStatus?.toLowerCase() === "active"
+    ).length;
+
+    return ReS(res, {
+      success: true,
+      managerId,
+      managerName: manager.name,
+      internStats: {
+        internsAllocated: bdTarget?.internsAllocated ?? 0,
+        internsActive: bdTarget?.internsActive ?? 0,
+        totalInterns,
+        totalActiveInterns,
+      },
+      teamStats: {
+        date: bdTarget?.date ?? null,
+        teamAttendance: bdTarget?.teamAttendance ?? null,
+        teamReview: bdTarget?.teamReview ?? null,
+      },
+      appliedFilters: { startDate: startDate || null, endDate: endDate || null },
+    });
+  } catch (err) {
+    console.error("Get Manager Stats Overview Error:", err);
+    return ReE(res, err.message, 500);
+  }
+};
+
+module.exports.getManagerStatsOverview = getManagerStatsOverview;
