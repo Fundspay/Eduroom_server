@@ -2123,34 +2123,52 @@ module.exports.upsertTeamStats = upsertTeamStats;
 
 const getManagerStatsOverview = async (req, res) => {
   try {
-    const { managerId, startDate, endDate } = req.query;
+    const { managerId } = req.query;
+    let { startDate, endDate } = req.query;
+
     if (!managerId) return ReE(res, "managerId is required", 400);
+
+    // ---- DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED ----
+    if (!startDate || !endDate) {
+      const now = new Date();
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+      const formatDate = (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+      };
+
+      startDate = formatDate(firstDay);
+      endDate = formatDate(lastDay);
+    }
 
     const manager = await model.TeamManager.findByPk(managerId);
     if (!manager) return ReE(res, "Team Manager not found", 404);
 
-    // Date filter for BdSheet
-    let dateFilter = {};
-    if (startDate && endDate) {
-      dateFilter = {
-        [Op.and]: [
-          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
-          Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
-        ],
-      };
-    }
+    // ---- Date filter for BdSheet ----
+    const bdSheetDateFilter = {
+      [Op.and]: [
+        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), ">=", startDate),
+        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("startDate")), "<=", endDate),
+      ],
+    };
 
-    // BdTarget (targets + team stats)
-    const bdTarget = await model.BdTarget.findOne({
-      where: { teamManagerId: managerId },
-      attributes: ["internsAllocated", "internsActive", "teamAttendance", "teamReview", "date"],
-    });
+    // ---- Date filter for BdTarget ----
+    const bdTargetDateFilter = {
+      [Op.and]: [
+        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("date")), ">=", startDate),
+        Sequelize.where(Sequelize.fn("DATE", Sequelize.col("date")), "<=", endDate),
+      ],
+    };
 
-    // BdSheet (actual counts)
+    // ---- BdSheet (actual intern counts) ----
     const bdSheetData = await model.BdSheet.findAll({
       where: {
         teamManagerId: managerId,
-        ...(startDate && endDate ? dateFilter : {}),
+        ...bdSheetDateFilter,
       },
       attributes: ["activeStatus"],
     });
@@ -2160,22 +2178,30 @@ const getManagerStatsOverview = async (req, res) => {
       (row) => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
+    // ---- BdTarget (team stats within date range) ----
+    const bdTarget = await model.BdTarget.findOne({
+      where: {
+        teamManagerId: managerId,
+        ...bdTargetDateFilter,
+      },
+      attributes: ["teamAttendance", "teamReview", "date"],
+      order: [["date", "DESC"]],
+    });
+
     return ReS(res, {
       success: true,
       managerId,
       managerName: manager.name,
       internStats: {
-        internsAllocated: bdTarget?.internsAllocated ?? 0,
-        internsActive: bdTarget?.internsActive ?? 0,
-        totalInterns,
-        totalActiveInterns,
+        internsAllocated: totalInterns,
+        internsActive: totalActiveInterns,
       },
       teamStats: {
         date: bdTarget?.date ?? null,
         teamAttendance: bdTarget?.teamAttendance ?? null,
         teamReview: bdTarget?.teamReview ?? null,
       },
-      appliedFilters: { startDate: startDate || null, endDate: endDate || null },
+      appliedFilters: { startDate, endDate },
     });
   } catch (err) {
     console.error("Get Manager Stats Overview Error:", err);
