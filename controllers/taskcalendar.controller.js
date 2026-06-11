@@ -96,6 +96,108 @@ const taskWeightageRules = {
 };
 
 // ---------------- UPSERT TASK FOR DAY ----------------
+// var upsertTaskForDay = async function (req, res) {
+//   try {
+//     const { managerId, date, task, sessionRecording, sessionLink } = req.body;
+//     if (!managerId || !date || !task) return ReE(res, "managerId, date and task are required", 400);
+
+//     const [dayRecord] = await model.TaskCalendarDay.findOrCreate({
+//       where: { teamManagerId: managerId, taskDate: date },
+//       defaults: { tasks: [], dayProgress: null, sessionRecording: null, sessionLink: null },
+//     });
+
+//     let tasks = Array.isArray(dayRecord.tasks) ? [...dayRecord.tasks] : [];
+//     const deriveMode = t => defaultModeByTaskType[t] === "SYSTEM" ? "SYSTEM" : "MANUAL";
+
+//     // ---------------- ADD TASK ----------------
+//     if (!task.taskId) {
+//       const mode = deriveMode(task.taskType);
+//       const newTask = {
+//         taskId: getNextTaskId(tasks),
+//         taskType: task.taskType || null,
+//         title: task.title,
+//         mode,
+//         status: task.status || "NORMAL",
+//         order: tasks.length + 1,
+//       };
+
+//       if (mode === "SYSTEM" && newTask.taskType) {
+//         const r = await calculateSystemTaskProgress({ taskType: newTask.taskType, managerId, date });
+//         newTask.achieved = r.achieved ?? 0;
+//         newTask.target = r.target ?? 0;
+//         newTask.progress = `${r.achieved}/${r.target}`;
+//         newTask.result = r.target > 0 ? Math.round((r.achieved / r.target) * 100) : 0;
+//       } else {
+//         newTask.progress = "0";
+//         newTask.result = 0;
+//       }
+//       tasks.push(newTask);
+//     }
+
+//     // ---------------- UPDATE TASK ----------------
+//     if (task.taskId) {
+//       const index = tasks.findIndex(t => t.taskId === task.taskId);
+//       if (index === -1) return ReE(res, "Task not found for update", 404);
+
+//       const updatedTaskType = task.taskType || tasks[index].taskType;
+//       const mode = deriveMode(updatedTaskType);
+
+//       tasks[index] = {
+//         ...tasks[index],
+//         ...Object.fromEntries(Object.entries(task).filter(([k]) => k !== "taskId")),
+//         taskType: updatedTaskType,
+//         mode,
+//       };
+
+//       if (mode === "SYSTEM") {
+//         const r = await calculateSystemTaskProgress({ taskType: tasks[index].taskType, managerId, date });
+//         tasks[index].achieved = r.achieved ?? 0;
+//         tasks[index].target = r.target ?? 0;
+//         tasks[index].progress = `${r.achieved}/${r.target}`;
+//         tasks[index].result = r.target > 0 ? Math.round((r.achieved / r.target) * 100) : 0;
+//       } else {
+//         delete tasks[index].achieved;
+//         delete tasks[index].target;
+
+//         const progress =
+//           task.progress !== undefined
+//             ? task.progress
+//             : typeof tasks[index].progress === "string" && tasks[index].progress.includes("/")
+//             ? "0"
+//             : tasks[index].progress ?? "0";
+
+//         tasks[index].progress = progress;
+//         tasks[index].result = isNaN(parseFloat(progress)) ? 0 : parseFloat(progress);
+//       }
+//     }
+
+//     // ---------------- CALCULATE DAY PROGRESS ----------------
+//     const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
+//     const resultsToConsider = validResults.slice(0, 6);
+//     const weightages = taskWeightageRules[resultsToConsider.length] || [];
+
+//     let dayProgress = null;
+//     if (resultsToConsider.length) {
+//       dayProgress = resultsToConsider.reduce((sum, r, i) => sum + (r * (weightages[i] || 0)) / 100, 0);
+//       dayProgress = Math.round(dayProgress);
+//     }
+
+//     // ---------------- BUILD SESSION UPDATE PAYLOAD ----------------
+//     const sessionUpdate = {};
+//     if (sessionRecording !== undefined) sessionUpdate.sessionRecording = sessionRecording ?? null;
+//     if (sessionLink !== undefined) sessionUpdate.sessionLink = sessionLink ?? null;
+
+//     await dayRecord.update({ tasks, dayProgress, ...sessionUpdate });
+
+//     return ReS(res, { success: true, date, tasks, dayProgress, ...sessionUpdate }, 200);
+//   } catch (error) {
+//     console.error("Error upserting task:", error);
+//     return ReE(res, error.message, 500);
+//   }
+// };
+
+// module.exports.upsertTaskForDay = upsertTaskForDay;
+
 var upsertTaskForDay = async function (req, res) {
   try {
     const { managerId, date, task, sessionRecording, sessionLink } = req.body;
@@ -171,15 +273,13 @@ var upsertTaskForDay = async function (req, res) {
       }
     }
 
-    // ---------------- CALCULATE DAY PROGRESS ----------------
+    // ---------------- CALCULATE DAY PROGRESS (Simple Average) ----------------
     const validResults = tasks.map(t => t.result).filter(r => r !== null && r !== undefined);
-    const resultsToConsider = validResults.slice(0, 6);
-    const weightages = taskWeightageRules[resultsToConsider.length] || [];
 
     let dayProgress = null;
-    if (resultsToConsider.length) {
-      dayProgress = resultsToConsider.reduce((sum, r, i) => sum + (r * (weightages[i] || 0)) / 100, 0);
-      dayProgress = Math.round(dayProgress);
+    if (validResults.length) {
+      const total = validResults.reduce((sum, r) => sum + r, 0);
+      dayProgress = Math.round(total / validResults.length);
     }
 
     // ---------------- BUILD SESSION UPDATE PAYLOAD ----------------
