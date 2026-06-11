@@ -85,7 +85,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
   // 4. Conditional background image
   const backgroundImage =
     Number(courseId) === 24
-      ? "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/10.png"
+      ? "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/420.png"
       : "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/31.png";
 
   // 5. Generate QR code for portfolioLink (null if not set)
@@ -107,7 +107,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
 <head>
     <meta charset="UTF-8">
     <title>Internship Completion Certificate</title>
-
+ 
     <style>
         body {
             margin: 0;
@@ -115,7 +115,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
             font-family: 'Times New Roman', serif;
             background: #f5f5f5;
         }
-
+ 
         .letter-container {
             width: 800px;
             margin: 20px auto;
@@ -126,12 +126,12 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
             box-sizing: border-box;
             position: relative;
         }
-
+ 
         .date,
         .content {
             font-family: 'Times New Roman', serif;
         }
-
+ 
         .date {
             text-align: left;
             margin-top: 100px;
@@ -139,19 +139,19 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
             margin-left: -65px;
             font-size: 16px;
         }
-
+ 
         .content {
             font-size: 15.5px;
             margin-left: -65px;
             line-height: 1.8;
             text-align: justify;
         }
-
+ 
         .signature {
             margin-top: 60px;
             font-size: 16px;
         }
-
+ 
         .footer {
             position: absolute;
             bottom: 30px;
@@ -161,25 +161,25 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
             font-size: 14px;
             color: #333;
         }
-
+ 
         ul {
             margin-top: 10px;
             margin-bottom: 20px;
             padding-left: 22px;
         }
-
+ 
         li {
             margin-bottom: 10px;
         }
-
+ 
         /* ── QR Code block ── */
         .qr-block {
             position: absolute;
-            bottom: 80px;      /* sits just above the footer area */
+            bottom: 160px;      /* sits just above the footer area */
             right: 100px;      /* aligns with the right padding of the container */
             text-align: center;
         }
-
+ 
         .qr-image {
             width: 110px;
             height: 110px;
@@ -188,7 +188,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
             padding: 4px;
             background: #fff;
         }
-
+ 
         .qr-label {
             margin: 6px 0 0;
             font-size: 11px;
@@ -197,21 +197,21 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
         }
     </style>
 </head>
-
+ 
 <body>
     <div class="letter-container">
-
+ 
         <div class="date">
             Date: <b>${endDate}</b>
         </div>
-
+ 
         <div class="content">
-
+ 
             This is to certify that <b>${candidateName}</b> has successfully completed the
             <b>${role}</b> with <b>Fundsroom</b> from <b>${startDate}</b> to <b>${endDate}</b>.<br><br>
-
+ 
             During the internship, the participant demonstrated strong commitment and successfully:
-
+ 
             <ul>
                 <li>Completed all assigned training sessions, assessments, and case studies.</li>
                 <li>Performed practical tasks aligned with their domain (Finance / Marketing / Business Analytics).</li>
@@ -219,23 +219,23 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
                 <li>Conducted analysis and understanding of real business cases and market scenarios.</li>
                 <li>Successfully onboarded users/businesses/portfolios as part of the internship requirements.</li>
             </ul>
-
+ 
             The participant has shown excellent learning ability, execution skills, and a strong
             understanding of practical industry applications.<br><br>
-
+ 
             This certificate is awarded in recognition of their successful completion of all
             internship requirements and their overall performance.<br><br>
-
+ 
             We wish them continued success in their professional journey.<br><br>
-
+ 
             <b>Date:</b> ${today}<br><br>
-
+ 
             <b>Fundsroom Infotech Pvt. Ltd</b>
-
+ 
         </div>
-
+ 
         ${qrBlockHTML}
-
+ 
     </div>
 </body>
 </html>
