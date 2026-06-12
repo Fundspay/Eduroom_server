@@ -135,7 +135,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
         .date {
             text-align: left;
             margin-top: 100px;
-            margin-bottom: 87px;
+            margin-bottom: 27px;
             margin-left: -65px;
             font-size: 16px;
         }
@@ -228,7 +228,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
  
             We wish them continued success in their professional journey.<br><br>
  
-            <b>Date:</b> ${today}<br><br>
+            <b>Date:</b> ${today}<br>
  
             <b>Fundsroom Infotech Pvt. Ltd</b>
  
