@@ -86,7 +86,7 @@ const generateInternshipCertificateWeb = async (userId, courseId) => {
   const backgroundImage =
     Number(courseId) === 24
       ? "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/420.png"
-      : "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/31.png";
+      : "https://1fundsweb.s3.ap-south-1.amazonaws.com/fundsroom/assets/420.png";
 
   // 5. Generate QR code for portfolioLink (null if not set)
   const qrCodeDataURL = await generateQRCodeDataURL(user.portfolioLink);
