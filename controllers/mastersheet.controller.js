@@ -3,6 +3,14 @@ const { ReE, ReS } = require("../utils/util.service.js");
 const model = require("../models");
 const { Op, fn, col } = require("sequelize");
 
+const formatDate = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 var fetchMasterSheetTargets = async function (req, res) {
   try {
     let { teamManagerId, startDate, endDate, month } = req.query;
@@ -86,7 +94,10 @@ var fetchMasterSheetTargets = async function (req, res) {
         ...(managerNameFilter ? { interviewedBy: managerNameFilter } : {}),
         [Op.or]: [
           { Dateofonboarding: { [Op.between]: [sDate, eDate] } },
-          { Dateofonboarding: null, updatedAt: { [Op.between]: [sDate, eDate] } },
+          {
+            Dateofonboarding: null,
+            updatedAt: { [Op.between]: [sDate, eDate] },
+          },
         ],
       },
       attributes: ["collegeName", "Dateofonboarding", "updatedAt"],
@@ -110,7 +121,7 @@ var fetchMasterSheetTargets = async function (req, res) {
             "unprofessional",
             "resumes received",
             "CNA",
-            "connected"
+            "connected",
           ],
         },
         resumeDate: { [Op.between]: [sDate, eDate] },
@@ -125,17 +136,14 @@ var fetchMasterSheetTargets = async function (req, res) {
       },
     });
 
-    // Generate dates array correctly with server timezone
-    const formatDate = (date) => {
-      const d = new Date(date);
-      const offset = d.getTimezoneOffset() * 60000; // minutes to ms
-      const localDate = new Date(d.getTime() - offset);
-      return localDate.toISOString().split("T")[0];
-    };
-
+    // Generate dates array using local date parts (timezone-safe)
     const dateList = [];
-    for (let d = new Date(sDate.getTime()); d <= eDate; d.setDate(d.getDate() + 1)) {
-      const current = new Date(d.getTime()); // clone
+    for (
+      let d = new Date(sDate.getFullYear(), sDate.getMonth(), sDate.getDate());
+      d <= eDate;
+      d.setDate(d.getDate() + 1)
+    ) {
+      const current = new Date(d.getTime()); // clone before mutation
       dateList.push({
         date: formatDate(current),
         day: current.toLocaleDateString("en-US", { weekday: "long" }),
@@ -159,7 +167,7 @@ var fetchMasterSheetTargets = async function (req, res) {
     // Merge targets into dateList
     const merged = dateList.map((d) => {
       const matchedTargets = existingTargets.filter((t) => {
-        const tDateStr = new Date(t.targetDate).toISOString().split("T")[0];
+        const tDateStr = formatDate(new Date(t.targetDate));
         return tDateStr === d.date;
       });
 
@@ -168,9 +176,18 @@ var fetchMasterSheetTargets = async function (req, res) {
         jds: matchedTargets.reduce((s, t) => s + (t.jds || 0), 0),
         calls: matchedTargets.reduce((s, t) => s + (t.calls || 0), 0),
         followUps: matchedTargets.reduce((s, t) => s + (t.followUps || 0), 0),
-        resumetarget: matchedTargets.reduce((s, t) => s + (t.resumetarget || 0), 0),
-        collegeTarget: matchedTargets.reduce((s, t) => s + (t.collegeTarget || 0), 0),
-        interviewsTarget: matchedTargets.reduce((s, t) => s + (t.interviewsTarget || 0), 0),
+        resumetarget: matchedTargets.reduce(
+          (s, t) => s + (t.resumetarget || 0),
+          0
+        ),
+        collegeTarget: matchedTargets.reduce(
+          (s, t) => s + (t.collegeTarget || 0),
+          0
+        ),
+        interviewsTarget: matchedTargets.reduce(
+          (s, t) => s + (t.interviewsTarget || 0),
+          0
+        ),
         resumesReceivedTarget: matchedTargets.reduce(
           (s, t) => s + (t.resumesReceivedTarget || 0),
           0
@@ -185,7 +202,10 @@ var fetchMasterSheetTargets = async function (req, res) {
       resumetarget: merged.reduce((s, t) => s + t.resumetarget, 0),
       collegeTarget: merged.reduce((s, t) => s + t.collegeTarget, 0),
       interviewsTarget: merged.reduce((s, t) => s + t.interviewsTarget, 0),
-      resumesReceivedTarget: merged.reduce((s, t) => s + t.resumesReceivedTarget, 0),
+      resumesReceivedTarget: merged.reduce(
+        (s, t) => s + t.resumesReceivedTarget,
+        0
+      ),
     };
 
     return ReS(
