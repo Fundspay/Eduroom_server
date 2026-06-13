@@ -3,7 +3,7 @@ const model = require("../models/index");
 const { ReE, ReS } = require("../utils/util.service.js");
 const { Op, Sequelize } = require("sequelize");
 const axios = require("axios");
-const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses,StudentResume ,User  } = require("../models");
+const { TeamManager, BdTarget, Status, FundsAudit, BdSheet, Statuses, StudentResume, User } = require("../models");
 const SES_API_URL = "https://api.fundsweb.in/api/v1/sendemail/send-email";
 const FormData = require("form-data");
 
@@ -48,7 +48,7 @@ const upsertBdSheet = async (req, res) => {
         }
       });
 
-      
+
 
       // 🔥 MERGE JSON fields instead of replacing
       ["day1", "day2", "day3", "day4", "day5", "day6", "day7"].forEach((dayKey) => {
@@ -78,7 +78,7 @@ const upsertBdSheet = async (req, res) => {
       data: newSheet,
     });
   } catch (error) {
-    
+
     return ReE(res, error.message, 500);
   }
 };
@@ -667,11 +667,11 @@ const getDashboardStats = async (req, res) => {
 
       startDate = formatDate(firstDay);
       endDate = formatDate(lastDay);
-      
-  
+
+
     }
 
-   
+
 
     // ---------------------------
     // Manager Filter
@@ -682,7 +682,7 @@ const getDashboardStats = async (req, res) => {
       const manager = await model.TeamManager.findByPk(managerId);
       if (!manager) return ReE(res, "Team Manager not found", 404);
       teamManagerName = manager.name;
-      
+
     } else {
       console.log("No manager filter - querying ALL managers");
     }
@@ -729,7 +729,7 @@ const getDashboardStats = async (req, res) => {
       totalAccountsTarget += Number(row.accounts) || 0;
     });
 
-    
+
 
     // ---------------------------
     // DATE FILTER (BdSheet)
@@ -768,7 +768,7 @@ const getDashboardStats = async (req, res) => {
       row => row.activeStatus?.toLowerCase() === "active"
     ).length;
 
-   
+
 
     // ---------------------------
     // 3️⃣ ACHIEVED ACCOUNTS (FundsAudit)
@@ -784,14 +784,14 @@ const getDashboardStats = async (req, res) => {
       });
 
       const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
-      
-      
+
+
       if (phoneNumbers.length > 0) {
         const users = await model.User.findAll({
           where: { phoneNumber: phoneNumbers },
           attributes: ['id'],
         });
-        
+
         userIds = users.map(u => u.id);
       }
     }
@@ -824,7 +824,7 @@ const getDashboardStats = async (req, res) => {
       );
 
       totalAccountsSheet = parseInt(accountsResult[0]?.achieved_accounts || 0);
-      
+
       console.log("=== QUERY RESULT ===");
       console.log("Total Achieved Accounts:", totalAccountsSheet);
     } else if (!teamManagerName && startDate && endDate) {
@@ -1216,7 +1216,7 @@ const getTargetVsAchieved = async (req, res) => {
         hasPaid: true,
         dateOfPayment: {
           [Op.between]: [
-            new Date(from + "T00:00:00Z"), 
+            new Date(from + "T00:00:00Z"),
             new Date(to + "T23:59:59Z")
           ],
         },
@@ -1474,7 +1474,7 @@ const getBdTlLeaderboard = async (req, res) => {
   try {
     let { from, to } = req.query;
 
-    // ✅ DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
+    // DEFAULT TO CURRENT MONTH IF NO DATES PROVIDED
     if (!from || !to) {
       const now = new Date();
       const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -1490,7 +1490,6 @@ const getBdTlLeaderboard = async (req, res) => {
 
     if (!teamManagers.length) return ReE(res, "No team managers found", 404);
 
-    // Adjust dates: make 'to' cover the full day
     const fromDate = new Date(from + "T00:00:00Z");
     const toDate = new Date(to + "T23:59:59Z");
 
@@ -1521,50 +1520,15 @@ const getBdTlLeaderboard = async (req, res) => {
         s => s.activeStatus && s.activeStatus.toLowerCase() === "active"
       ).length;
 
-      // ✅ UPDATED: Use StudentResume instead of Status table
-      const students = await StudentResume.findAll({
-        where: { alloted: manager.name },
-        attributes: ['mobileNumber'],
-        raw: true,
+      // ✅ Directly count from Status table using teamManager name
+      const achievedAccounts = await Status.count({
+        where: {
+          teamManager: manager.name,
+          fundswebAchieved: { [Op.gt]: 0 },
+        },
       });
 
-      const phoneNumbers = students.map(s => s.mobileNumber).filter(Boolean);
-
-      let achievedAccounts = 0;
-
-      if (phoneNumbers.length > 0) {
-        // Get user IDs from phone numbers
-        const users = await User.findAll({
-          where: { phoneNumber: phoneNumbers },
-          attributes: ['id'],
-          raw: true,
-        });
-
-        const userIds = users.map(u => u.id);
-
-        if (userIds.length > 0) {
-          // ✅ COUNT total payments (not distinct users)
-          const accountsResult = await FundsAudit.sequelize.query(
-            `
-            SELECT COUNT(*) AS total_payments
-            FROM "FundsAudits"
-            WHERE "userId" IN (:userIds)
-              AND "hasPaid" = true
-              AND "dateOfPayment" BETWEEN :from AND :to
-            `,
-            {
-              replacements: { userIds, from: fromDate, to: toDate },
-              type: FundsAudit.sequelize.QueryTypes.SELECT,
-            }
-          );
-
-          achievedAccounts = parseInt(accountsResult[0]?.total_payments || 0);
-        }
-      }
-
-      // ---------------------------
       // Targets from BdTarget
-      // ---------------------------
       const bdTargetData = await BdTarget.findAll({
         where: {
           teamManagerId: manager.id,
@@ -1613,10 +1577,7 @@ const getBdTlLeaderboard = async (req, res) => {
       success: true,
       leaderboard: rankedData,
       totalManagers: rankedData.length,
-      appliedFilters: {
-        from,
-        to,
-      },
+      appliedFilters: { from, to },
     });
 
   } catch (err) {
@@ -1951,7 +1912,7 @@ module.exports.getAccountsCountWithTargetSummary =
   getAccountsCountWithTargetSummary;
 
 
-  const sendGenericEmail = async (req, res) => {
+const sendGenericEmail = async (req, res) => {
   try {
     const { toAddress, cc, bcc, body, attachment, subject, userId, fromAddress } = req.body;
 
